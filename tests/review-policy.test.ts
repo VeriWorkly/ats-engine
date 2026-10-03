@@ -10,7 +10,7 @@ import {
 } from "../src/index.js";
 import { BUILT_IN_LOCALES, de, hi, localizePolicy, withLocales } from "../src/locales/index.js";
 import { degreeLevel } from "../src/parser/education.js";
-import { policyRegex } from "../src/policy/regex.js";
+import { policyRegex, repeatedGroupName } from "../src/policy/regex.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const P = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -466,5 +466,19 @@ describe("#20 rule ids are unique", () => {
         rules: [...DEFAULT_POLICY.rules, DEFAULT_POLICY.rules[0]],
       }),
     ).toThrow(AtsPolicyError);
+  });
+});
+
+describe("a capture-group name used twice is refused on every engine", () => {
+  it("finds the repeated name, and ignores lookbehinds, escapes and classes", () => {
+    expect(repeatedGroupName(String.raw`(?:(?<h>a))|(?:(?<h>b))`)).toBe("h");
+    expect(repeatedGroupName(String.raw`(?<h>a)(?<=x)(?<!y)\(?<h>[(?<h>]`)).toBeNull();
+  });
+
+  it("stays linear on hostile input", () => {
+    const started = performance.now();
+    repeatedGroupName("(?<".repeat(20_000));
+    repeatedGroupName(`(?<${"a".repeat(50_000)}`);
+    expect(performance.now() - started).toBeLessThan(250);
   });
 });

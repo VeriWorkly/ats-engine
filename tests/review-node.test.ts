@@ -241,9 +241,10 @@ describe("#5 a crowded page cannot hold the visibility replay", () => {
     const page = crowdedCell(40_000);
     const started = performance.now();
     expect(() => measureVisibility(ops, page, [0, 0, 612, 792])).toThrow();
-    // The full scan took 20 s.
-    expect(performance.now() - started).toBeLessThan(3_000);
-  });
+    // The budget counts checks, not time, so the clock only scales with the machine: about 2.5 s
+    // on a desktop and 8 s on a GitHub runner, where the full scan would take about a minute.
+    expect(performance.now() - started).toBeLessThan(15_000);
+  }, 30_000);
 
   it("reports such a page's hidden text as not measured", async () => {
     const shapes: string[] = [];
