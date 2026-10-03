@@ -397,11 +397,18 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
         pageCount: 2,
       }),
     ]) {
-      const lost = report.categories.reduce((sum, entry) => sum + entry.lost, 0);
-      const possible = report.categories.reduce((sum, entry) => sum + entry.possible, 0);
+      // Integrity rules are penalties: outside the share, their points come off the result.
+      const ordinary = report.categories.filter((entry) => entry.category !== "integrity");
+      const penalty = report.categories
+        .filter((entry) => entry.category === "integrity")
+        .reduce((sum, entry) => sum + entry.lost, 0);
+      const lost = ordinary.reduce((sum, entry) => sum + entry.lost, 0);
+      const possible = ordinary.reduce((sum, entry) => sum + entry.possible, 0);
       // The old score was `100 - lost`, which floored the worst possible resume at 11 and
       // shifted meaning as soon as the applicable rule set changed.
-      expect(report.readinessScore).toBe(Math.max(0, Math.round((1 - lost / possible) * 100)));
+      expect(report.readinessScore).toBe(
+        Math.max(0, Math.round((1 - lost / possible) * 100) - penalty),
+      );
     }
 
     expect((await check(bad)).readinessScore).toBeLessThan(25);
