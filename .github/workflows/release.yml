@@ -24,11 +24,13 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
-      - uses: changesets/action@v1
+      # v2 reads the output of @changesets/cli v3; v1 published but could not see it, so it
+      # created no git tag and no GitHub release.
+      - uses: changesets/action@v2
         with:
-          version: npm run version-packages
-          publish: npm run release
+          version-script: npm run version-packages
+          publish-script: npm run release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

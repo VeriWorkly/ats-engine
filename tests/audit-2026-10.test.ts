@@ -387,13 +387,15 @@ describe("#13 visibility replay on a crowded page", () => {
     return { fnArray, argsArray };
   }
 
-  it("stays near-linear in runs × shapes", () => {
+  it("replays a crowded page far faster than the full scan it replaced", () => {
     const page = crowdedPage(20_000);
     const started = performance.now();
     measureVisibility(ops, page, PAGE);
-    // ~0.4 s alone, ~1 s under a parallel run; the quadratic scan took 5.5 s.
-    expect(performance.now() - started).toBeLessThan(2_500);
-  });
+    // The grid replay takes ~0.5 s on a desktop and ~3 s on a GitHub runner; the full scan it
+    // replaced took 5.5 s and ~16 s. On a fixed page, more shapes do put more of them over each
+    // run, so the work still grows with density; the point-check budget bounds the worst case.
+    expect(performance.now() - started).toBeLessThan(8_000);
+  }, 30_000);
 });
 
 describe("#13 the visibility index answers as a full scan does", () => {
