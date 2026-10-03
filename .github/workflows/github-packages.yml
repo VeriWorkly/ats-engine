@@ -1,0 +1,36 @@
+name: GitHub Packages
+
+# Publishes a released version to GitHub's npm registry as well, so it is listed under the
+# repository's Packages. npmjs.com stays the primary registry. Started by the Release workflow
+# after each npm release, or by hand with the tag of an existing release.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@veriworkly"
+      - run: npm ci
+      - run: npm run build
+      # Provenance attestations are an npmjs.com feature; GitHub's registry refuses them.
+      - run: npm pkg delete publishConfig.provenance
+      - run: npm publish --registry https://npm.pkg.github.com
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

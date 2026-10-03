@@ -12,6 +12,7 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write # npm provenance
+  actions: write # starts the GitHub Packages workflow
 
 jobs:
   release:
@@ -27,6 +28,7 @@ jobs:
       # v2 reads the output of @changesets/cli v3; v1 published but could not see it, so it
       # created no git tag and no GitHub release.
       - uses: changesets/action@v2
+        id: changesets
         with:
           version-script: npm run version-packages
           publish-script: npm run release
@@ -34,3 +36,8 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+      # The same version on GitHub's registry, so it is listed under the repository's Packages.
+      - if: steps.changesets.outputs.published == 'true'
+        run: gh workflow run github-packages.yml -f tag=v${{ fromJSON(steps.changesets.outputs['published-packages'])[0].version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
