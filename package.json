@@ -1,6 +1,6 @@
 {
   "name": "@veriworkly/ats-engine",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Reads a resume the way an applicant tracking system does, shows what it would store, and scores it with a published rubric. Deterministic, locale-aware, browser- and edge-safe.",
   "keywords": [
     "ats",
@@ -147,7 +147,7 @@
   "peerDependencies": {
     "mammoth": "^1.12.0",
     "pdf-parse": "^2.4.5",
-    "pdfjs-dist": "^5.4.296"
+    "pdfjs-dist": "5.4.296"
   },
   "peerDependenciesMeta": {
     "mammoth": {

@@ -3,6 +3,10 @@
 Release notes are generated from `.changeset/` by `changeset version`. See
 [.changeset/README.md](.changeset/README.md) for what counts as breaking.
 
+## 0.1.1
+
+- Pin the optional `pdfjs-dist` peer to 5.4.296. The range `^5.4.296` also allowed 5.7.x, which has a high-severity PDF scripting bug. `pdf-parse` requires this exact version.
+
 ## 0.1.0
 
 Initial release.

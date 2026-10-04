@@ -33,7 +33,7 @@ server, and a report is a pure function of its input.
 ```sh
 npm install @veriworkly/ats-engine
 # To read PDF and DOCX files on Node:
-npm install pdf-parse pdfjs-dist mammoth
+npm install pdf-parse pdfjs-dist@5.4.296 mammoth
 ```
 
 Node 20.19 or later, or any modern browser or edge runtime for the core.
