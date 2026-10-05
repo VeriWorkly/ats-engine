@@ -5,3 +5,6 @@ coverage/
 # Audit working notes and throwaway probes; not part of the package or its repo.
 AUDIT.md
 *.probe.ts
+.agents/
+.claude/
+skills-lock.json

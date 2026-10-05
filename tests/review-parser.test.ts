@@ -15,6 +15,7 @@ import { findPhone } from "../src/parser/phone.js";
 import { readResumeLines } from "../src/parser/lines.js";
 import { despaceLines, segmentResume } from "../src/parser/sections.js";
 import { segmentJob } from "../src/matching/jobSections.js";
+import { expectFast } from "./fixtures/timing.js";
 
 /**
  * Parser defects found in review, one block per finding. Every case runs against
@@ -47,9 +48,7 @@ const roleRows = (text: string) =>
 
 /** Fails when a regex goes super-linear: 50 KB must be read well inside this budget. */
 const budget = (fn: () => unknown, ms = 500) => {
-  const started = performance.now();
-  fn();
-  expect(performance.now() - started).toBeLessThan(ms);
+  expectFast(fn, ms);
 };
 
 describe("P0 JSON Resume with more highlights than the document format allows", () => {

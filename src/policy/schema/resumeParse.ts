@@ -52,11 +52,45 @@ export const resumeParseSchema = z.object({
     dec: 12,
     december: 12,
   }),
+  /**
+   * Seasons a resume dates a term by — "Spring 2020 - Fall 2021", "Summer 2018" — as the first
+   * and last month each covers. A range starts at its first season's first month and ends at its
+   * last season's last month; a season standing alone is a term of its own.
+   */
+  seasons: z
+    .record(
+      z.string().min(1),
+      z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]),
+    )
+    .default({
+      spring: [3, 5],
+      summer: [6, 8],
+      fall: [9, 11],
+      autumn: [9, 11],
+      winter: [1, 3],
+    }),
   /** The ways a resume says a role is still current. Language-bound, hence data. */
   openEnded: z
     .array(z.string().min(1))
     .min(1)
-    .default(["present", "current", "now", "ongoing", "to date", "till date"]),
+    .default(["present", "current", "now", "ongoing", "to date", "till date", "today"]),
+  /**
+   * Units of a length of time written beside a date range, which LinkedIn exports print:
+   * "Jan 2020 - Present · 4 yrs 9 mos", "(4 years 9 months)". A number before one of these is
+   * the role's duration, not its title or employer.
+   */
+  durationUnits: wordList("durationUnits").default([
+    "yr",
+    "yrs",
+    "year",
+    "years",
+    "mo",
+    "mos",
+    "month",
+    "months",
+  ]),
+  /** Labels a resume writes its owner's name under: "Name: Jane Doe". */
+  nameLabels: wordList("nameLabels").default(["name", "full name"]),
   /** Words between the two ends of a date range besides a dash: "2019 to 2022", "2019 bis 2022". */
   rangeWords: wordList("rangeWords").default(["to", "until", "through"]),
   /** Words before a lone start date that make it a current role: "since 2019", "seit 03/2019". */

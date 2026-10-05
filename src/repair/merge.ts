@@ -3,6 +3,7 @@ import { educationLevel } from "../parser/education.js";
 import { isPlausibleDate } from "../parser/dates.js";
 import { parseQuality } from "../parser/index.js";
 import { finalizeParsed, type ParsedCore } from "../parser/record.js";
+import { inLanguagesOf } from "../locales/languages.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsParsedDate, AtsParsedField, AtsParsedResume, AtsReport } from "../types.js";
 import { findGroundingViolations, type GroundingViolation } from "./grounding.js";
@@ -48,7 +49,8 @@ export function needsRepair(report: Pick<AtsReport, "parsed" | "wordCount">): bo
 
   // No roles from a document with real content is the archetype failure: an unknown heading, or
   // a column layout whose extraction interleaved the text.
-  if (quality.rolesDetected === 0 && report.wordCount > 120) return true;
+  // 160 words counted in full (numbers and short words too) is the 120 of the old count.
+  if (quality.rolesDetected === 0 && report.wordCount > 160) return true;
   // Rows recovered but missing employer or dates are a real gap, but not one to sell: the merge
   // never edits a row the parser found, so a repair would come back with the same rows.
   // A stacked header commonly costs every contact field at once.
@@ -69,6 +71,58 @@ export type MergeResult = {
 };
 
 /**
+ * The years a document writes, in four digits or two: "'19", "01/19" and "2019–21" each name a
+ * year a model may rightly write out in full. A two-digit year stands for both centuries; the
+ * plausibility check rules out the wrong one.
+ */
+export function writtenYears(text: string): Set<number> {
+  const years = new Set<number>();
+  for (const [year] of text.matchAll(/(?<!\d)(?:19|20)\d{2}(?!\d)/g)) years.add(Number(year));
+  const twoDigit = /(?:['‘’]|(?<=\d[/.-])|(?<=\d{4} ?[-–—] ?))(\d{2})(?!\d)/g;
+  for (const [, short] of text.matchAll(twoDigit))
+    years.add(1900 + Number(short)).add(2000 + Number(short));
+  return years;
+}
+
+/**
+ * Whether a document says a role is ongoing, the way a date range does: "2020 – Present",
+ * "since 2019", "01/2020 - heute", or "Present" alone on the line after the start date. The line
+ * must hold the role's start year ("2020" or "'20"), or, without one, sit beside its employer or
+ * title. A "Now used by 2 million users" bullet does not make a role that ended in 2012 run to
+ * today. Read in the document's own language.
+ */
+export function ongoingIn(source: string, policy: AtsEnginePolicy) {
+  const localized = inLanguagesOf(policy, source);
+  const words = (list: readonly string[]) => list.map((word) => escapeRegex(normalizeText(word)));
+  const openEnded = wordListRegex(words(localized.resumeParse.openEnded));
+  // The open end of a range ("– present"), or a start ("since 2019", "seit 03/2019").
+  const range = new RegExp(
+    `[-–—]\\s*(?:${openEnded.source})|${wordListRegex(words(localized.resumeParse.sinceWords)).source}`,
+    "iu",
+  );
+  /** A line that is only the open end: "Present", "- to date". */
+  const bare = (line: string | undefined) =>
+    line !== undefined && openEnded.test(line) && line.trim().split(/\s+/).length <= 3;
+  const lines = normalizeText(source).toLowerCase().split("\n");
+  const near = (anchor: string, datesBeside: boolean) =>
+    lines.some(
+      (line, index) =>
+        line.includes(anchor) &&
+        (range.test(line) ||
+          bare(lines[index + 1]) ||
+          // An employer or title with its dates on the line above or below.
+          (datesBeside &&
+            [lines[index - 1], lines[index + 1]].some(
+              (next) => next !== undefined && range.test(next),
+            ))),
+    );
+  return (startYear: number | null, anchors: readonly string[]) =>
+    startYear !== null
+      ? near(String(startYear), false) || near(`'${String(startYear).slice(2)}`, false)
+      : anchors.some((anchor) => anchor.trim() && near(normalizeText(anchor).toLowerCase(), true));
+}
+
+/**
  * Fills gaps in the deterministic parse with grounded AI values.
  *
  * One-directional: a value the parser found is never overwritten, so the worst case for a
@@ -83,23 +137,26 @@ export function mergeGrounded(
   deterministic: AtsParsedResume,
   candidate: AtsRepairCandidate,
   source: string,
-  { policy, now = new Date() }: MergeOptions,
+  { policy: basePolicy, now = new Date() }: MergeOptions,
 ): MergeResult {
+  // Read in the resume's own language: "heute" ends a German role as "Present" ends an English
+  // one, and "Diplom-Ingenieur" is a degree only to the German pack. A no-op without packs.
+  const policy = inLanguagesOf(basePolicy, source);
   const violations = findGroundingViolations(candidate, source);
   const rejected = new Set(violations.map((violation) => violation.path));
   // A value must assert something: "--" or "()" would otherwise fill a contact field.
   const ok = (path: string, value: string) => /[\p{L}\p{N}]/u.test(value) && !rejected.has(path);
 
   // Dates and "current" set tenure, the field recruiters filter on, so they are grounded too: a
-  // year must appear in the document and "current" needs a present-tense word somewhere in it.
-  // Without this a grounded employer could carry a fabricated 1990 start.
-  const text = normalizeText(source);
-  const years = new Set(text.match(/(?<!\d)(?:19|20)\d{2}(?!\d)/g));
+  // year must appear in the document, and "current" needs a present-tense word beside the role's
+  // own dates. Without this a grounded employer could carry a fabricated 1990 start, or a role
+  // that ended in 2012 could run to today because "now" appears in some bullet.
+  const years = writtenYears(normalizeText(source));
   const date = (value: AtsParsedDate | null) =>
-    isPlausibleDate(value, now) && years.has(String(value.year)) ? value : null;
-  const saysCurrent = wordListRegex(
-    policy.resumeParse.openEnded.map((word) => escapeRegex(normalizeText(word))),
-  ).test(text);
+    isPlausibleDate(value, now) && years.has(value.year) ? value : null;
+  const ongoing = ongoingIn(source, policy);
+  const isCurrent = (role: AtsRepairCandidate["roles"][number], start: AtsParsedDate | null) =>
+    role.current && ongoing(start?.year ?? null, [role.employer, role.title]);
 
   const core: ParsedCore = { ...deterministic };
   const filled = new Set<AtsParsedField>();
@@ -115,10 +172,9 @@ export function mergeGrounded(
       const title = ok(`roles[${index}].title`, role.title) ? role.title : "";
       const employer = ok(`roles[${index}].employer`, role.employer) ? role.employer : "";
       if (!title && !employer) return [];
-      const current = role.current && saysCurrent;
-      return [
-        { title, employer, start: date(role.start), end: current ? null : date(role.end), current },
-      ];
+      const start = date(role.start);
+      const current = isCurrent(role, start);
+      return [{ title, employer, start, end: current ? null : date(role.end), current }];
     });
     if (roles.length) {
       core.roles = roles;

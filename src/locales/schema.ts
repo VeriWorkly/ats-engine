@@ -31,6 +31,17 @@ const vocabularyShape = {
     .partial()
     .optional(),
   months: z.record(z.string().min(1), z.number().int().min(1).max(12)).optional(),
+  /** Seasons a term is dated by, as the first and last month each covers: "Sommer 2019". */
+  seasons: z
+    .record(
+      z.string().min(1),
+      z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]),
+    )
+    .optional(),
+  /** Units of a role's printed duration: "4 Jahre 9 Monate". */
+  durationUnits: optionalList("durationUnits"),
+  /** Labels a name is written under: "Name: …". */
+  nameLabels: optionalList("nameLabels"),
   openEnded: optionalList("openEnded"),
   rangeWords: optionalList("rangeWords"),
   sinceWords: optionalList("sinceWords"),

@@ -20,6 +20,7 @@ import { indexDrawn, type Drawn } from "../src/node/surroundings.js";
 import { extractResume } from "../src/node/index.js";
 import { buildDocxBody } from "./fixtures/buildDocx.js";
 import { buildPdf, text } from "./fixtures/buildPdf.js";
+import { expectFast, expectFastAsync } from "./fixtures/timing.js";
 
 /**
  * Regressions found in the October 2026 audit, one block per finding. Numbers are AUDIT.md's.
@@ -71,9 +72,8 @@ describe("#2 post-nominals after the name", () => {
     ["dotted run", `Jane Doe, ${"AB.".repeat(16_000)}!`],
     ["comma run", `Jane Doe${", AB".repeat(12_000)}!`],
   ])("reads a %s name line in linear time", (_, line) => {
-    const started = performance.now();
-    check(`${line}\n${RESUME}`);
-    expect(performance.now() - started).toBeLessThan(500);
+    const input = `${line}\n${RESUME}`;
+    expectFast(() => check(input), 500);
   });
 
   it.each([
@@ -97,13 +97,14 @@ describe("#3 #12 DOCX XML scans", () => {
     ["unclosed extents", '<wp:extent cx="1" '.repeat(20_000)],
     ["unclosed runs", "<w:a ".repeat(100_000)],
   ])("reads %s in linear time", (_, body) => {
-    const started = performance.now();
-    measureDocx(buildDocxBody(body));
-    expect(performance.now() - started).toBeLessThan(500);
+    const docx = buildDocxBody(body);
+    expectFast(() => measureDocx(docx), 500);
   });
 
   it("still counts a photo and a hidden run", () => {
-    const photo = '<wp:extent cx="1270000" cy="1270000"/>';
+    // A picture: a drawing with an image in it (a text box has an extent too, and is not one).
+    const photo =
+      '<w:p><w:r><w:drawing><wp:inline><wp:extent cx="1270000" cy="1270000"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rId9"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
     const hidden = "<w:p><w:r><w:rPr><w:vanish/></w:rPr><w:t>Kafka</w:t></w:r></w:p>";
     expect(measureDocx(buildDocxBody(photo + hidden))).toMatchObject({
       imageCount: 1,
@@ -270,9 +271,7 @@ describe("#16 roles with a start and no end", () => {
 describe("#17 posting size", () => {
   it("caps the posting the engine reads", () => {
     const posting = `Requirements\n- Go and Kubernetes\n${"Benefits and perks for everyone.\n".repeat(60_000)}`;
-    const started = performance.now();
-    const report = check(RESUME, posting);
-    expect(performance.now() - started).toBeLessThan(300);
+    const report = expectFast(() => check(RESUME, posting), 300);
     expect(report.requirements[0]?.text).toBe("Go and Kubernetes");
   });
 });
@@ -389,12 +388,10 @@ describe("#13 visibility replay on a crowded page", () => {
 
   it("replays a crowded page far faster than the full scan it replaced", () => {
     const page = crowdedPage(20_000);
-    const started = performance.now();
-    measureVisibility(ops, page, PAGE);
     // The grid replay takes ~0.5 s on a desktop and ~3 s on a GitHub runner; the full scan it
     // replaced took 5.5 s and ~16 s. On a fixed page, more shapes do put more of them over each
     // run, so the work still grows with density; the point-check budget bounds the worst case.
-    expect(performance.now() - started).toBeLessThan(8_000);
+    expectFast(() => measureVisibility(ops, page, PAGE), 8_000);
   }, 30_000);
 });
 
@@ -443,9 +440,10 @@ describe("#18 DOCX archives that expand past any resume", () => {
       ["word/media/image1.png", Buffer.alloc(200 * 1024 * 1024)],
     ]);
     expect(bomb.length).toBeLessThan(1024 * 1024);
-    const started = performance.now();
-    await expect(extractResume(bomb, "docx")).rejects.toThrow(/expands/);
-    expect(performance.now() - started).toBeLessThan(2_000);
+    await expectFastAsync(
+      () => expect(extractResume(bomb, "docx")).rejects.toThrow(/expands/),
+      2_000,
+    );
   });
 
   it("still reads a document with a photo in it", async () => {

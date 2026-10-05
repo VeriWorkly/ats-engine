@@ -7,6 +7,7 @@ import {
   MAX_JOB_TEXT_CHARS,
   normalizeJobText,
 } from "../src/job/index.js";
+import { expectFast } from "./fixtures/timing.js";
 
 /** Bugs found in review of `/job`. Each test failed before its fix. */
 
@@ -30,9 +31,7 @@ describe("/job regressions", () => {
     graph.push({ "@type": "JobPosting", title: "Deep", description: LONG } as never);
     const html = `<html><head>${ld({ "@graph": graph })}</head><body></body></html>`;
 
-    const started = performance.now();
-    expect(extractJobPosting(html)?.title).toBe("Deep");
-    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(expectFast(() => extractJobPosting(html), 2_000)?.title).toBe("Deep");
   });
 
   it("keeps a '<' that does not open a tag", () => {

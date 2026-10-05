@@ -20,6 +20,7 @@ import { measureVisibility, seeThroughImages, type Box } from "../src/node/hidde
 import { extractResume } from "../src/node/index.js";
 import { buildDocxBody, documentXml } from "./fixtures/buildDocx.js";
 import { buildPdf, stream } from "./fixtures/buildPdf.js";
+import { expectFast } from "./fixtures/timing.js";
 
 /**
  * The `/node`, `/job` and CLI findings of the October review, each reproduced before its fix.
@@ -379,9 +380,7 @@ describe("#13 a '>' inside a quoted attribute does not end the tag", () => {
 
   it("stays linear on a page of unclosed quotes", () => {
     const html = '<a b="'.repeat(200_000);
-    const started = performance.now();
-    htmlText(html);
-    expect(performance.now() - started).toBeLessThan(1_000);
+    expectFast(() => htmlText(html), 1_000);
   });
 });
 

@@ -29,10 +29,11 @@ describe("PDF layout detection", () => {
     expect(layout?.tableCount).toBe(0);
   }, 60_000);
 
-  it("flags a two-column layout whose columns share baselines", async () => {
-    // Both columns written on the same baselines, which is what makes the extracted text
-    // interleave: each line ends up carrying a fragment of the left column and a fragment of
-    // the right, so job titles, dates, and employers run together.
+  it("flags a two-column layout whose columns share baselines, and reads it a column at a time", async () => {
+    // Both columns written on the same baselines, which made the extracted text interleave: each
+    // line carried a fragment of the left column and a fragment of the right. The text is now
+    // read by position, a column at a time; the layout is still flagged, because an ATS that
+    // reads line by line still interleaves it.
     const ops = LEFT_COLUMN.flatMap((line: string, index: number) => [
       text(45, 720 - index * 26, line),
       text(340, 720 - index * 26, RIGHT_COLUMN[index]),
@@ -42,8 +43,9 @@ describe("PDF layout detection", () => {
 
     // Two balanced columns put half the page's text on the far side of the gutter.
     expect(layout?.columnRatio).toBeGreaterThanOrEqual(0.4);
-    // The scramble the ratio stands for, visible in the text itself.
-    expect(extracted.split("\n")[0]).toContain("Certifications");
+    const lines = extracted.split("\n");
+    expect(lines.slice(0, LEFT_COLUMN.length)).toEqual(LEFT_COLUMN);
+    expect(lines.slice(LEFT_COLUMN.length)).toEqual(RIGHT_COLUMN);
   }, 60_000);
 
   /**
@@ -69,9 +71,9 @@ describe("PDF layout detection", () => {
   }, 60_000);
 
   it("does not mistake right-aligned dates for a second column", async () => {
-    // The commonest single-column resume shape: content on the left, a date pinned right. There
-    // is a real vertical channel between them, but almost no text lives on the far side of it,
-    // so the balance term keeps this well inside the passing band.
+    // The commonest single-column resume shape: content on the left, a date pinned right on the
+    // same line. There is a real vertical channel between them, but the dates are tab stops of
+    // the lines they end, not a column: the page passes the column rule (its band is 0.15).
     const ops = LEFT_COLUMN.flatMap((line: string, index: number) => [
       text(45, 720 - index * 26, line),
       text(470, 720 - index * 26, "2021"),
@@ -79,7 +81,7 @@ describe("PDF layout detection", () => {
 
     const ratio = (await extract(ops)).layout?.columnRatio;
     expect(ratio).not.toBeNull();
-    expect(ratio).toBeLessThan(0.34);
+    expect(ratio).toBeLessThan(0.15);
   }, 60_000);
 
   it("counts ruled table grids from the page's drawing operators", async () => {
@@ -115,6 +117,7 @@ describe("resume extraction", () => {
       imageCount: 0,
       hiddenTextChars: 0,
       hiddenTextSample: "",
+      hiddenText: "",
     });
   });
 

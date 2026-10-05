@@ -115,7 +115,16 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
   const basics = isObject(resume.basics) ? resume.basics : {};
   const location = isObject(basics.location) ? basics.location : {};
 
-  const links = [str(basics.url), ...objects(basics.profiles).map((profile) => str(profile.url))]
+  // A profile with no URL is still named by its network and username ("GitHub: jdoe").
+  const links = [
+    str(basics.url),
+    ...objects(basics.profiles).map(
+      (profile) =>
+        str(profile.url) ||
+        (str(profile.username) &&
+          [str(profile.network), str(profile.username)].filter(Boolean).join(": ")),
+    ),
+  ]
     .filter(Boolean)
     .slice(0, DOCUMENT_LIMITS.links);
 
@@ -132,7 +141,8 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
     items: objects(resume.work)
       .map((work) => ({
         title: str(work.position),
-        employer: str(work.name),
+        // `company` is the pre-1.0 schema's name for it, still common in older files.
+        employer: str(work.name) || str(work.company),
         location: optional(str(work.location)),
         start: date(work.startDate),
         end: date(work.endDate),
@@ -175,6 +185,12 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
         field: optional(str(education.area)),
         start: date(education.startDate),
         end: date(education.endDate),
+        // The grade and the courses listed, as the entry's own line.
+        summary: optional(
+          [str(education.score), strings(education.courses, MAX_KEYWORDS).join(", ")]
+            .filter(Boolean)
+            .join("; "),
+        ),
       }))
       .filter((entry) => entry.school || entry.credential),
   });

@@ -8,6 +8,7 @@ import {
 } from "../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../src/locales/index.js";
 import { livePolicy } from "./livePolicy.js";
+import { expectFast } from "./fixtures/timing.js";
 
 /**
  * Regressions found in the September 2026 audit, one test per defect.
@@ -40,12 +41,17 @@ const ADVERSARIAL: Record<string, string> = {
 
 function expectFastOn(policy: AtsEnginePolicy) {
   for (const [label, input] of Object.entries(ADVERSARIAL)) {
-    const started = performance.now();
-    AtsScoringService.check(input, policy, { jobDescription: input.slice(0, 20_000), now: NOW });
-    const elapsed = performance.now() - started;
     // Generous: the fixed patterns take single-digit milliseconds. The ceiling is set far below
     // the seconds the quadratic pattern took, and far above CI noise.
-    expect(elapsed, `${label} took ${Math.round(elapsed)}ms`).toBeLessThan(500);
+    expectFast(
+      () =>
+        AtsScoringService.check(input, policy, {
+          jobDescription: input.slice(0, 20_000),
+          now: NOW,
+        }),
+      500,
+      label,
+    );
   }
 }
 
@@ -68,16 +74,18 @@ describe("adversarial input", () => {
       "digit-space run": "1 ".repeat(25_000),
     })) {
       const text = `${lead}${devanagari}\n${input}`;
-      const started = performance.now();
-      const report = AtsScoringService.check(text, localized, {
-        jobDescription: text.slice(0, 20_000),
-        now: NOW,
-        languages: ["de", "hi"],
-        region: "DE",
-      });
-      const elapsed = performance.now() - started;
+      const report = expectFast(
+        () =>
+          AtsScoringService.check(text, localized, {
+            jobDescription: text.slice(0, 20_000),
+            now: NOW,
+            languages: ["de", "hi"],
+            region: "DE",
+          }),
+        500,
+        label,
+      );
       expect(report.locale, label).toEqual({ languages: ["de", "hi"], region: "DE" });
-      expect(elapsed, `${label} took ${Math.round(elapsed)}ms`).toBeLessThan(500);
     }
   });
 
@@ -224,9 +232,7 @@ describe("review round 2", () => {
 
   it("bounds the month-name scan on long letter runs", () => {
     for (const input of ["jan".repeat(16_666), `Education\nB.S. ${"dec".repeat(16_660)}`]) {
-      const started = performance.now();
-      check(input, input.slice(0, 20_000));
-      expect(performance.now() - started).toBeLessThan(200);
+      expectFast(() => check(input, input.slice(0, 20_000)), 200);
     }
   });
 

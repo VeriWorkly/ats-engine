@@ -47,5 +47,9 @@ What does not depend on the model:
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
   including text smuggled in Unicode tag characters or PDF metadata.
 
+**API keys in the CLI.** `ats-engine check --ai` reads the key from the environment only, never
+from a flag, so it does not land in shell history or the process list, and never prints it. The
+CLI says which provider and model the resume is about to be sent to before the request leaves.
+
 **State.** The core holds no global state, does no I/O and makes no network calls; only `/ai`
 calls the provider you configure, and only `/node` reads files you pass it.

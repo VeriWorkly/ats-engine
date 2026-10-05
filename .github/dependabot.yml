@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # One pull request for the dev tools, so a busy week is one review, not ten.
+    groups:
+      dev-dependencies:
+        dependency-type: development
+    # pdfjs-dist is pinned on purpose: pdf-parse requires exactly this version (see CHANGELOG 0.1.1).
+    ignore:
+      - dependency-name: pdfjs-dist
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

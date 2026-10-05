@@ -1,0 +1,64 @@
+name: Language or country support
+description: Ask for, or offer to build, support for reading resumes in a new language or from a new country.
+title: "[Locale]: "
+labels: ["locale", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Languages and countries are added as data packs (word lists and patterns), not as engine code. [LOCALES.md](https://github.com/VeriWorkly/ats-engine/blob/main/LOCALES.md) explains what a pack contains and how it is tested. If you can't write the pack yourself, the conventions you describe below are what a maintainer needs to build one.
+
+  - type: input
+    id: locale
+    attributes:
+      label: Language or country
+      placeholder: French, France
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is needed
+      options:
+        - "A language (words: months, section headings, degree names)"
+        - "A country (conventions: dates, phone numbers, what belongs on a resume)"
+        - Both
+    validations:
+      required: true
+
+  - type: textarea
+    id: conventions
+    attributes:
+      label: Resume conventions
+      description: Whatever you know. Partial answers help.
+      value: |
+        - Date formats (for example 03/2021, März 2021):
+        - Phone number format:
+        - Common section headings (Experience, Education, Skills):
+        - Degree names, and the level each one is:
+        - Is a photo, date of birth or marital status expected, optional, or a bad idea?
+    validations:
+      required: true
+
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources
+      description: Links to official guidance, university career services or widely used resume guides for this country.
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to build the pack?
+      options:
+        - "Yes"
+        - Yes, with some guidance
+        - No, I'm requesting it
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        Test resumes for a pack must describe invented people only.

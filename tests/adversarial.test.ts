@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 
 import { AtsScoringService, DEFAULT_POLICY } from "../src/index.js";
 import { jobTextFromHtml } from "../src/job/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../src/locales/index.js";
+import { expectFast } from "./fixtures/timing.js";
 
 /**
  * Every input shape that has made, or could make, a pattern backtrack: 50 KB of it as the name
@@ -74,14 +75,16 @@ const NOW = new Date("2026-09-30T00:00:00Z");
 describe("50 KB adversarial input", () => {
   it.each(Object.entries(SHAPES))("%s, wherever it appears, in bounded time", (_, input) => {
     const resume = `${input}\njane@example.com\nExperience\nEngineer at Acme 2019 - 2022\n- ${input}`;
-    const started = performance.now();
-    AtsScoringService.check(resume, POLICY, {
-      now: NOW,
-      jobDescription: `Requirements\n- ${input}`,
-      languages: ["de", "hi"],
-      region: "DE",
-    });
-    jobTextFromHtml(`<p>${input}</p>`);
-    expect(performance.now() - started).toBeLessThan(1_500);
+    const jobDescription = `Requirements\n- ${input}`;
+    const html = `<p>${input}</p>`;
+    expectFast(() => {
+      AtsScoringService.check(resume, POLICY, {
+        now: NOW,
+        jobDescription,
+        languages: ["de", "hi"],
+        region: "DE",
+      });
+      jobTextFromHtml(html);
+    }, 1_500);
   });
 });

@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest a new check, option, output or integration.
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+      placeholder: I run the CLI in CI for my resume repo, but I can't tell which check made the score drop.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like
+      description: The behaviour, flag or API you have in mind. An example call or output helps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you've tried instead
+
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Who would use it
+      options:
+        - Candidates checking their own resume
+        - Developers building on the package
+        - Both
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        New scoring rules need evidence that real ATS software behaves that way, and must stay deterministic. The package is a tool for candidates, so features for screening or ranking other people are out of scope (see "Intended use" in the README).
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to work on it?
+      options:
+        - "Yes"
+        - Yes, with some guidance
+        - "No"
+    validations:
+      required: true

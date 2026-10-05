@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AtsScoringService, DEFAULT_POLICY } from "../src/index.js";
 import { extractResume } from "../src/node/index.js";
 import { buildPdf } from "./fixtures/buildPdf.js";
+import { expectFastAsync } from "./fixtures/timing.js";
 
 /**
  * Hidden text in a PDF: every technique candidates use to put words in front of an ATS and not in
@@ -102,9 +103,8 @@ describe("metadata", () => {
 describe("extraction stays bounded", () => {
   it("reads a PDF with an inline image promptly", async () => {
     // pdf-parse's image pass never settled on inline images; it is no longer used.
-    const started = performance.now();
-    await extractResume(buildPdf(`${visible}\n${IMAGE(450, 650, 100, 120)}`), "pdf");
-    expect(performance.now() - started).toBeLessThan(3_000);
+    const pdf = buildPdf(`${visible}\n${IMAGE(450, 650, 100, 120)}`);
+    await expectFastAsync(() => extractResume(pdf, "pdf"), 3_000);
   });
 });
 

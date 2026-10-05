@@ -20,10 +20,15 @@ export type DateRange = {
 
 type DateMatchers = {
   months: Record<string, number>;
+  seasons: Record<string, readonly [number, number]>;
   range: RegExp;
   named: RegExp;
+  season: RegExp;
   openEnded: RegExp;
 };
+
+/** A two-digit year after an apostrophe: "Jan '20". */
+const SHORT_YEAR = String.raw`['’‘]\d{2}(?!\d)`;
 
 /** A lone year range like "2019 - 2022" is ambiguous with a numeric bullet; require four digits. */
 const YEAR_ONLY = /^\d{4}$/;
@@ -59,7 +64,9 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
    * A month name is a whole word the policy lists — "Jan", "January", "Sept" — with an
    * optional full stop. Letters after an abbreviation used to be allowed, which read the
    * employer in "Novartis 2018" as November and "Marketing 2019" as March; spelled-out names
-   * are listed in the policy instead. `[\s-]+` accepts "Jan-2020" as well as "Jan 2020".
+   * are listed in the policy instead. `[\s-]*` accepts "Jan-2020" and "Jan2020" as well as
+   * "Jan 2020", and the year may be two digits after an apostrophe ("Jan '20"), resolved by
+   * `findDateRange`. A season the policy lists ("Spring 2020") is a date too.
    * A day may stand either side of the name — "15 Jan 2020", "15. Jan 2020", "June 1, 2019" —
    * and is skipped: a range read only to the month must still be read, and is otherwise lost
    * whole. The day before the name needs whitespace after it, so the name stays a whole word.
@@ -69,34 +76,63 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
    * "2021/05"), then a bare year. A month-and-year match may not start inside a full date, or
    * "04/05/2021" in the US would read as May.
    */
-  const date = String.raw`(?:(?:(?<!\d)${DAY_BEFORE})?(?<!${LETTER})(?:${monthNames})\.?[\s-]+${DAY_AFTER}\d{4}(?!\d)|(?<!\d)\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{1,2}(?!\d)|(?<![\d./-])\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}(?![\d./-])|(?<!\d)\d{4}(?!\d))`;
+  const seasons = Object.fromEntries(
+    Object.entries(rp.seasons).map(([name, span]) => [normalizeText(name).toLowerCase(), span]),
+  );
+  const seasonNames = Object.keys(seasons).map(escapeRegex).join("|") || "(?!)";
+  const seasonDate = String.raw`(?<!${LETTER})(?:${seasonNames})[\s-]+\d{4}(?!\d)`;
+  const date = String.raw`(?:(?:(?<!\d)${DAY_BEFORE})?(?<!${LETTER})(?:${monthNames})\.?[\s-]*(?:${DAY_AFTER}\d{4}(?!\d)|${SHORT_YEAR})|${seasonDate}|(?<!\d)\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{1,2}(?!\d)|(?<![\d./-])\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}(?![\d./-])|(?<!\d)\d{4}(?!\d))`;
   // "since 2019", "seit 03/2019": a start with no end, which is a current role.
   const since = wordListPattern(rp.sinceWords);
 
+  // The end of a range may be a year's last two digits ("2019–21"); `findDateRange` reads them
+  // only after a bare year, and against it.
+  const shortEnd = String.raw`\d{2}(?![\d./-])`;
+
   return {
     months,
+    seasons,
     // Global so `findDateRange` can move past a candidate that fails the sanity checks and try
     // the next one on the same line.
     // The second branch reads "Jan 2020 to date": there the "to" belongs to the open-ended
-    // phrase, so the separator branch consumes it and is left with "date".
+    // phrase, so the separator branch consumes it and is left with "date". The last reads a
+    // season alone, "Summer 2018": a term, which ends when the season does.
     range: new RegExp(
-      String.raw`(${date})(?:${separator}(${date}|${openEnded})|\s+(${openEnded}))|${since}\s+(${date})`,
+      String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})`,
       "giu",
     ),
     named: new RegExp(
-      String.raw`^(?:${DAY_BEFORE})?(${monthNames})\.?[\s-]+${DAY_AFTER}(\d{4})$`,
+      String.raw`^(?:${DAY_BEFORE})?(${monthNames})\.?[\s-]*${DAY_AFTER}(\d{4}|${SHORT_YEAR})$`,
       "u",
     ),
+    season: new RegExp(String.raw`^(${seasonNames})[\s-]+(\d{4})$`, "u"),
     openEnded: new RegExp(`^${openEnded}$`, "iu"),
   };
 });
 
-export function parseDate(raw: string, rp: AtsEnginePolicy["resumeParse"]): AtsParsedDate | null {
-  const { months, named } = buildMatchers(rp);
+/**
+ * One date as written. A year written in two digits ("Jan '20", or "21" ending "2019–21") comes
+ * back as those two digits, for `findDateRange` to place; on its own it is no plausible year.
+ * A season is read as its first month at the start of a range and its last at the end.
+ */
+export function parseDate(
+  raw: string,
+  rp: AtsEnginePolicy["resumeParse"],
+  edge: "start" | "end" = "start",
+): AtsParsedDate | null {
+  const { months, named, seasons, season } = buildMatchers(rp);
   const value = raw.trim().toLowerCase();
 
   const namedMatch = value.match(named);
-  if (namedMatch) return { year: Number(namedMatch[2]), month: months[namedMatch[1]] };
+  if (namedMatch)
+    return { year: Number(namedMatch[2].replace(/^\D/u, "")), month: months[namedMatch[1]] };
+
+  const seasonMatch = value.match(season);
+  if (seasonMatch) {
+    const [first, last] = seasons[seasonMatch[1]];
+    return { year: Number(seasonMatch[2]), month: edge === "start" ? first : last };
+  }
+  if (/^\d{2}$/.test(value)) return { year: Number(value), month: null };
 
   const month = (value: number) => (value >= 1 && value <= 12 ? value : null);
 
@@ -162,6 +198,23 @@ export function parseDocumentDate(
   return isPlausibleDate(date, now) ? date : null;
 }
 
+/** A date written with a two-digit year: "21", "Jan '20". "0000" is a four-digit one. */
+const TWO_DIGIT_YEAR = /(?:^|['’‘])\d{2}$/u;
+
+/** A two-digit year in the latest century that keeps it at or before `latest`. */
+function withCentury(date: AtsParsedDate | null, latest: number): AtsParsedDate | null {
+  if (!date || date.year >= 100) return date;
+  const year = Math.floor(latest / 100) * 100 + date.year;
+  return { ...date, year: year > latest ? year - 100 : year };
+}
+
+/** A two-digit end year as the first year ending in those digits on or after the start's. */
+function afterStart(date: AtsParsedDate | null, startYear: number): AtsParsedDate | null {
+  if (!date || date.year >= 100) return date;
+  const year = Math.floor(startYear / 100) * 100 + date.year;
+  return { ...date, year: year < startYear ? year + 100 : year };
+}
+
 /** A missing month is read generously: January for a start, December for an end. */
 function toIndex(date: AtsParsedDate, edge: "start" | "end") {
   return date.year * 12 + (date.month ?? (edge === "start" ? 1 : 12));
@@ -173,6 +226,11 @@ function toIndex(date: AtsParsedDate, edge: "start" | "end") {
  * A candidate is skipped rather than returned when either end is unreadable, a year falls
  * outside [1950, now + 10], or the range runs backwards. Later candidates on the same line are
  * still tried, so a header like "Engineer 2010 · 2019 - 2022" is not lost to its first number.
+ *
+ * Two-digit years are placed here: a start's ("Jan '20") in the century that keeps it no later
+ * than ten years ahead of `now`, an end's in the first year on or after the start that ends in
+ * those digits ("2019–21", "1998–02"). A bare two-digit end follows only a bare year, and not
+ * after an unspaced hyphen when it could be a month: "2021-03" is March.
  */
 export function findDateRange(
   line: string,
@@ -182,11 +240,30 @@ export function findDateRange(
   const matchers = buildMatchers(rp);
 
   for (const match of line.matchAll(matchers.range)) {
-    // Group 4 is the "since 2019" branch: a start alone, which is a role still held.
+    // Group 4 is the "since 2019" branch: a start alone, which is a role still held. Group 5 is
+    // a season alone, "Summer 2018": a term that starts and ends with the season.
+    if (match[5] !== undefined) {
+      const start = parseDate(match[5], rp, "start");
+      const end = parseDate(match[5], rp, "end");
+      if (!isPlausibleDate(start, now) || !isPlausibleDate(end, now)) continue;
+      return { range: { start, end, current: false }, matched: match[0] };
+    }
     const endText = match[2] ?? match[3];
     const current = match[4] !== undefined || matchers.openEnded.test(endText.trim());
-    const start = parseDate(match[1] ?? match[4], rp);
-    const end = current ? null : parseDate(endText, rp);
+    const startText = match[1] ?? match[4];
+    const parsedStart = parseDate(startText, rp);
+    const start = TWO_DIGIT_YEAR.test(startText.trim())
+      ? withCentury(parsedStart, now.getUTCFullYear() + YEARS_AHEAD)
+      : parsedStart;
+    if (!current && /^\d{2}$/.test(endText.trim())) {
+      if (!YEAR_ONLY.test(startText.trim())) continue;
+      if (/^\d{4}-\d{2}$/.test(match[0].trim()) && Number(endText) <= 12) continue;
+    }
+    const parsedEnd = current ? null : parseDate(endText, rp, "end");
+    const end =
+      start && parsedEnd && TWO_DIGIT_YEAR.test(endText.trim())
+        ? afterStart(parsedEnd, start.year)
+        : parsedEnd;
 
     if (!isPlausibleDate(start, now)) continue;
     if (!current && (!isPlausibleDate(end, now) || toIndex(end, "end") < toIndex(start, "start")))

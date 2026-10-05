@@ -11,14 +11,17 @@ const BUDGETS = {
   ".": 160,
   "./document": 3,
   "./format": 1.5,
-  "./job": 3,
+  // 3.5: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2).
+  "./job": 3.5,
   "./locales": 145,
   "./ai": 140,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,
   // The zip reader is a port of JSZip's, so the expansion budget reads exactly what mammoth will.
-  "./node": 10,
+  // 15: reading order by geometry, DOCX headers, footers, styles and links, and the PDF link
+  // annotations (0.2) took it from 9.7 to 14.0.
+  "./node": 15,
 };
 
 let failed = false;

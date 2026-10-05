@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AtsScoringService, DEFAULT_POLICY, type AtsRequirement } from "../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../src/locales/index.js";
+import { expectFast } from "./fixtures/timing.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 
@@ -81,9 +82,19 @@ describe("skills", () => {
 
 describe("knockouts", () => {
   it("compares years with the work history", () => {
-    expect(one("5+ years of backend experience")).toMatchObject({
+    expect(one("5+ years of experience")).toMatchObject({
       kind: "experience",
+      status: "met",
       detail: "10 years in the work history, 5 asked",
+    });
+    // Years of a named field are counted in the roles that name it, not the whole history.
+    expect(one("5+ years of Go experience")).toMatchObject({
+      status: "met",
+      detail: "7 years in roles naming go, 5 asked",
+    });
+    expect(one("5+ years of backend experience")).toMatchObject({
+      status: "missing",
+      detail: "The resume does not name backend; 5 years asked",
     });
     expect(one("12+ years of experience")).toMatchObject({
       status: "missing",
@@ -149,8 +160,6 @@ describe("cost", () => {
     };
     const resume = Array.from({ length: 6_000 }, (_, i) => `- go k8s ${i}`).join("\n");
     const job = `Requirements\n${Array.from({ length: 30 }, (_, i) => `- Go, Kubernetes and tool${i}`).join("\n")}`;
-    const started = performance.now();
-    expect(judge(job, resume, policy)).toHaveLength(25);
-    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(expectFast(() => judge(job, resume, policy), 2_000)).toHaveLength(25);
   });
 });

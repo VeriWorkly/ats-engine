@@ -8,7 +8,8 @@
  *
  * - invisible render mode (`3 Tr`), unless it lies over an image: that is the OCR text layer of
  *   a scan, the one legitimate use, and it is what makes a scan readable at all;
- * - fully transparent (`ca 0`);
+ * - fully transparent (`ca 0`), unless the same text is drawn visibly in the same place — the
+ *   selectable copy Chrome lays over text with a shadow, an outline or a gradient fill;
  * - smaller than 2pt;
  * - off the page;
  * - in a colour within 1.25:1 contrast of what lies beneath it — the topmost shape filled
@@ -71,6 +72,10 @@ function contrast(a: string, b: string) {
  * `fill` and `stroke` are "#rrggbb", or "" when the colour is not a flat one: a pattern, a
  * gradient. `alpha` and `strokeAlpha` are `ca` and `CA`. `softMask`: a soft mask is in force, so
  * what is painted may show through anywhere, or nowhere.
+ *
+ * The text state — font size (`Tf`), horizontal scaling (`Tz`, as a factor), leading (`TL`) and
+ * render mode (`Tr`) — is part of the graphics state, so `q`/`Q` save and restore it: an
+ * invisible or 1pt line inside `q … Q` must not make every line after it hidden too.
  */
 type GraphicsState = {
   ctm: Matrix;
@@ -79,14 +84,32 @@ type GraphicsState = {
   alpha: number;
   strokeAlpha: number;
   softMask: boolean;
+  fontSize: number;
+  hScale: number;
+  leading: number;
+  mode: number;
 };
-type Run = { text: string; center: [number, number]; box: Box; order: number } & GraphicsState & {
-    mode: number;
-    size: number;
-  };
+type Run = {
+  text: string;
+  center: [number, number];
+  box: Box;
+  order: number;
+  size: number;
+} & GraphicsState;
 
-/** `images`: where each image was drawn, in page points. */
-export type PageVisibility = { textChars: number; hidden: string[]; images: Box[] };
+/**
+ * `images`: where each image was drawn, in page points. `marks`: small filled shapes — list
+ * markers Chrome draws as paths rather than glyphs — in page points too.
+ */
+export type PageVisibility = { textChars: number; hidden: string[]; images: Box[]; marks: Box[] };
+
+/** Shapes no wider or taller than this, in points, may be list markers; this many are kept. */
+const MARK_SIZE = 12;
+const MAX_MARKS = 2_000;
+
+/** A run's text and where it is, to a 2pt cell `dx`, `dy` cells away. */
+const cell = (text: string, [x, y]: [number, number], dx = 0, dy = 0) =>
+  `${text.trim()}|${Math.round(x / 2) + dx}|${Math.round(y / 2) + dy}`;
 
 /** A `beginGroup`/`endGroup` that brackets a soft mask's content: pdf.js gives it `smask`. */
 const isSoftMaskGroup = (options: unknown) =>
@@ -182,14 +205,14 @@ export function measureVisibility(
     alpha: 1,
     strokeAlpha: 1,
     softMask: false,
+    fontSize: 0,
+    // Horizontal scaling (`Tz`), as a factor: it narrows glyphs and their advance alike.
+    hScale: 1,
+    leading: 0,
+    mode: 0,
   };
   let textMatrix: Matrix = IDENTITY;
   let lineMatrix: Matrix = IDENTITY;
-  let fontSize = 0;
-  // Horizontal scaling (`Tz`), as a factor: it narrows glyphs and their advance alike.
-  let hScale = 1;
-  let leading = 0;
-  let mode = 0;
   // The last path built, in page space: what a shading (`sh`) fills is the clip it sets.
   let lastPath: Box | null = null;
   // Inside a soft mask's own content: pdf.js lists what the mask is made of among the page's
@@ -198,6 +221,10 @@ export function measureVisibility(
 
   const drawn: Drawn[] = [];
   const runs: Run[] = [];
+  const marks: Box[] = [];
+  // Where glyphs were drawn as a soft mask — text painted with a gradient — and where visible
+  // text was drawn: a transparent copy of either is the selectable layer of a text effect.
+  const drawnGlyphs = new Set<string>();
   /** Something painted, unless it only builds a soft mask. */
   const paint = (item: Omit<Drawn, "alpha">, masked = state.softMask) => {
     if (maskDepth) return;
@@ -231,6 +258,7 @@ export function measureVisibility(
 
   const show = (glyphs: unknown, order: number) => {
     if (!Array.isArray(glyphs)) return;
+    const { fontSize, hScale } = state;
     let text = "";
     let advance = 0;
     for (const glyph of glyphs) {
@@ -251,16 +279,17 @@ export function measureVisibility(
     );
     const box = boxThrough(device, [0, 0, advance, fontSize]);
     textMatrix = multiply(textMatrix, [1, 0, 0, 1, advance, 0]);
-    if (!text.trim() || maskDepth) return;
+    const center: [number, number] = [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2];
+    if (!text.trim()) return;
+    if (maskDepth) return void drawnGlyphs.add(cell(text, center));
     runs.push({
       ...state,
       text,
-      mode,
       // No font size set is no size known (NaN, never tiny); a mirrored font is its own size, and
       // a zero scale — `0 Tz` — leaves no size at all.
       size: fontSize ? Math.abs(fontSize) * scale : Number.NaN,
       box,
-      center: [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2],
+      center,
       order,
     });
   };
@@ -304,14 +333,17 @@ export function measureVisibility(
         else if (key === "SMask") state = { ...state, softMask: value === true };
       }
     else if (fn === ops.beginText) textMatrix = lineMatrix = IDENTITY;
-    else if (fn === ops.setFont) fontSize = Number(args[1]) || 0;
+    else if (fn === ops.setFont) state = { ...state, fontSize: Number(args[1]) || 0 };
     else if (fn === ops.setHScale)
-      hScale = Number.isFinite(Number(args[0])) ? Number(args[0]) / 100 : 1;
-    else if (fn === ops.setTextRenderingMode) mode = Number(args[0]) || 0;
-    else if (fn === ops.setLeading) leading = Number(args[0]) || 0;
+      state = {
+        ...state,
+        hScale: Number.isFinite(Number(args[0])) ? Number(args[0]) / 100 : 1,
+      };
+    else if (fn === ops.setTextRenderingMode) state = { ...state, mode: Number(args[0]) || 0 };
+    else if (fn === ops.setLeading) state = { ...state, leading: Number(args[0]) || 0 };
     else if (fn === ops.moveText) moveText(Number(args[0]), Number(args[1]));
     else if (fn === ops.setLeadingMoveText) {
-      leading = -Number(args[1]);
+      state = { ...state, leading: -Number(args[1]) };
       moveText(Number(args[0]), Number(args[1]));
     } else if (fn === ops.setTextMatrix) {
       // pdf.js passes the matrix as a typed array, wrapped or not depending on the version; a
@@ -319,18 +351,27 @@ export function measureVisibility(
       const inner = args[0];
       const matrix = Array.isArray(inner) || ArrayBuffer.isView(inner) ? inner : args;
       textMatrix = lineMatrix = Array.from(matrix as ArrayLike<number>).map(Number) as Matrix;
-    } else if (fn === ops.nextLine) moveText(0, -leading);
+    } else if (fn === ops.nextLine) moveText(0, -state.leading);
     else if (fn === ops.showText || fn === ops.showSpacedText) show(args[0], order);
     else if (fn === ops.nextLineShowText || fn === ops.nextLineSetSpacingShowText) {
-      moveText(0, -leading);
+      moveText(0, -state.leading);
       show(args[args.length - 1], order);
     } else if (fn === ops.constructPath) {
       const bounds = args[2];
       if (Array.isArray(bounds) || ArrayBuffer.isView(bounds)) {
         const [x0, y0, x1, y1] = Array.from(bounds as ArrayLike<number>);
         lastPath = boxThrough(state.ctm, [x0, y0, x1, y1]);
-        if (isFill.has(args[0] as number))
+        if (isFill.has(args[0] as number)) {
           paint({ box: lastPath, order, kind: "shape", fill: state.fill });
+          const [mx0, my0, mx1, my1] = lastPath;
+          if (
+            !maskDepth &&
+            state.alpha > 0 &&
+            marks.length < MAX_MARKS &&
+            Math.max(mx1 - mx0, my1 - my0) <= MARK_SIZE
+          )
+            marks.push(lastPath);
+        }
       }
     } else if (fn === ops.shadingFill)
       // A gradient banner: its colour varies, so text on it is not judged by contrast.
@@ -351,24 +392,36 @@ export function measureVisibility(
     runs.map((run) => run.center),
     pageBox,
   );
+  // What the render mode paints the glyphs with: their outline in modes 1 and 5, outline and
+  // fill in 2 and 6 (seen if either is), else their fill. Outlined text is judged by its stroke:
+  // a white-filled heading outlined in black is plainly visible.
+  const paintsOf = (run: Run) => [
+    ...(run.mode % 4 === 1 ? [] : [{ colour: run.fill, alpha: run.alpha }]),
+    ...(run.mode % 4 === 1 || run.mode % 4 === 2
+      ? [{ colour: run.stroke, alpha: run.strokeAlpha }]
+      : []),
+  ];
+  const transparentRun = (run: Run) => paintsOf(run).every(({ alpha }) => alpha === 0);
+  for (const run of runs)
+    if (run.mode % 4 !== 3 && !transparentRun(run)) drawnGlyphs.add(cell(run.text, run.center));
+
   const hidden: string[] = [];
+  let previous: Run | undefined;
   let textChars = 0;
   for (const run of runs) {
     textChars += run.text.trim().length;
     const { top, overImage, covered } = around(run.center, run.order);
 
     const invisible = (run.mode === 3 || run.mode === 7) && !overImage;
-    // What the render mode paints the glyphs with: their outline in modes 1 and 5, outline and
-    // fill in 2 and 6 (seen if either is), else their fill. Outlined text is judged by its
-    // stroke: a white-filled heading outlined in black is plainly visible.
-    const paintMode = run.mode % 4;
-    const paints = [
-      ...(paintMode === 1 ? [] : [{ colour: run.fill, alpha: run.alpha }]),
-      ...(paintMode === 1 || paintMode === 2
-        ? [{ colour: run.stroke, alpha: run.strokeAlpha }]
-        : []),
-    ];
-    const transparent = paints.every(({ alpha }) => alpha === 0);
+    const paints = paintsOf(run);
+    // Fully transparent, unless the same text is drawn where it lies — as glyphs, or as the mask
+    // a gradient is painted through: Chrome lays such a copy over text with a shadow, an outline
+    // or `background-clip: text`, for selection. It hides nothing.
+    const transparent =
+      transparentRun(run) &&
+      ![-1, 0, 1].some((dx) =>
+        [-1, 0, 1].some((dy) => drawnGlyphs.has(cell(run.text, run.center, dx, dy))),
+      );
     const tiny = run.size < MIN_SIZE;
     const offPage =
       run.box[2] < pageBox[0] ||
@@ -382,12 +435,25 @@ export function measureVisibility(
       background !== "" &&
       paints.every(({ colour }) => colour !== "" && contrast(colour, background) < MIN_CONTRAST);
 
-    if (invisible || transparent || tiny || offPage || blended || covered) hidden.push(run.text);
+    if (!(invisible || transparent || tiny || offPage || blended || covered)) continue;
+    // Runs one after another on a line are one piece of text: Chrome draws a glyph at a time, and
+    // its hidden text read back "K u b e r n e t e s". A gap of a space's width is a space.
+    const gap = previous ? run.box[0] - previous.box[2] : NaN;
+    if (
+      previous &&
+      Math.abs(run.box[1] - previous.box[1]) < run.size / 2 &&
+      gap > -run.size / 2 &&
+      gap < run.size
+    )
+      hidden[hidden.length - 1] += (gap > 0.15 * run.size ? " " : "") + run.text;
+    else hidden.push(run.text);
+    previous = run;
   }
 
   return {
     textChars,
     hidden,
     images: drawn.filter((d) => d.kind === "image").map((d) => d.box),
+    marks,
   };
 }

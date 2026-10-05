@@ -11,6 +11,7 @@ import {
   type AtsRepairCandidate,
   type AtsReport,
 } from "../src/index.js";
+import { expectFast } from "./fixtures/timing.js";
 
 const NOW = new Date("2026-09-30T00:00:00Z");
 const merge = (deterministic: AtsParsedResume, candidate: AtsRepairCandidate, source: string) =>
@@ -367,9 +368,7 @@ describe("grounding: a shared source index", () => {
   it("stays linear in the number of values checked", () => {
     const source = `${"Senior Engineer at Acme Corporation. ".repeat(1_300)}`;
     const candidate = { skills: Array.from({ length: 500 }, (_, i) => `Skill number ${i}`) };
-    const started = performance.now();
-    findGroundingViolations(candidate, source);
-    expect(performance.now() - started).toBeLessThan(500);
+    expectFast(() => findGroundingViolations(candidate, source), 500);
   });
 });
 

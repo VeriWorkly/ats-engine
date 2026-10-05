@@ -1,7 +1,7 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { wordListPattern } from "../text/text.js";
 import { titleWordsOf } from "./experience.js";
-import { isSectionHeading } from "./sections.js";
+import { isSectionHeading, sectionKind } from "./sections.js";
 import { memo } from "../util/memo.js";
 
 /**
@@ -21,7 +21,13 @@ import { memo } from "../util/memo.js";
  */
 export const EMAIL =
   /(?<![A-Z0-9._%+-])[A-Z0-9._%+-]{1,64}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/i;
-export const LINK = /(?:https?:\/\/|www\.)[^\s|,]+|(?:linkedin\.com|github\.com)\/[^\s|,]+/gi;
+/**
+ * A web address: with a scheme or "www.", a profile on a site resumes link to without either
+ * ("dribbble.com/jane", "orcid.org/0000-…"), or a personal site on `.dev`, a top-level domain
+ * that names nothing but websites ("janedoe.dev"). Not one inside an email address.
+ */
+export const LINK =
+  /(?:https?:\/\/|www\.)[^\s|,]+|(?:linkedin\.com|github\.com|gitlab\.com|bitbucket\.org|dribbble\.com|behance\.net|orcid\.org|medium\.com|stackoverflow\.com|kaggle\.com|scholar\.google\.com)\/[^\s|,]+|(?<![\w.@/-])[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9][a-z0-9-]{0,62}){0,3}\.dev(?![\w@-])(?:\/[^\s|,]*)?/gi;
 
 /**
  * A word of a name: capitalised in a script with case ("Jane", "DOE", "O'Brien", "F."), or any
@@ -57,13 +63,17 @@ function withoutPostNominals(line: string) {
 
 const birthPattern = memo(
   (rp: AtsEnginePolicy["resumeParse"]) =>
-    new RegExp(`${wordListPattern(rp.dateOfBirthLabels)}.{0,40}?\\d`, "iu"),
+    new RegExp(
+      String.raw`${wordListPattern(rp.dateOfBirthLabels)}.{0,40}?(?:(?<!\d)(?:19|20)\d{2}(?!\d)|(?<!\d)\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{2,4}(?!\d))`,
+      "iu",
+    ),
 );
 
 /**
- * Whether the resume states a date of birth: one of the policy's labels with a number after it
- * on the same line ("Date of birth: 04.05.1990", "Born 1990"). The number is what separates the
- * personal detail from "a born leader".
+ * Whether the resume states a date of birth: one of the policy's labels with a date or a year
+ * after it on the same line ("Date of birth: 04.05.1990", "Born 1990"). The date is what
+ * separates the personal detail from "a born leader with 8 years of experience" or "born and
+ * raised in Chennai, 2 kids": any other number is not one.
  */
 export function statesDateOfBirth(lines: string[], policy: AtsEnginePolicy) {
   const re = birthPattern(policy.resumeParse);
@@ -71,11 +81,30 @@ export function statesDateOfBirth(lines: string[], policy: AtsEnginePolicy) {
 }
 
 const nameVocabulary = memo(
-  ({ nameParticles, documentTitles }: AtsEnginePolicy["resumeParse"]) => ({
+  ({ nameParticles, documentTitles, nameLabels }: AtsEnginePolicy["resumeParse"]) => ({
     particles: new RegExp(`^(?:${nameParticles.join("|")})$`, "u"),
     titles: new RegExp(`^(?:${documentTitles.join("|")})$`, "iu"),
+    label: new RegExp(String.raw`^${wordListPattern(nameLabels)}\s*[:：]\s*`, "iu"),
   }),
 );
+
+/** Where a contact line puts one detail after the next: "Jane Doe | jane@… | 415-…". */
+// Each run of spaces is matched from its start: from inside it, a long run with no separator
+// after it would be rescanned from every position.
+const CONTACT_SEPARATOR = /(?<!\s)\s*[|·•,]\s*|\t|\s{2,}|(?<!\s)\s+[–—-]\s+/;
+
+/**
+ * The part of a line that could be the name: after a "Name:" label, and on a contact line that
+ * also holds an email or a number, the part before the first separator (`split`).
+ */
+function nameCandidate(line: string, label: RegExp) {
+  const value = line.replace(label, "");
+  if (!EMAIL.test(value) && !/\d/.test(value)) return { text: value, split: false };
+  const first = value.split(CONTACT_SEPARATOR)[0] ?? "";
+  return EMAIL.test(first) || /\d/.test(first) || first === value
+    ? null
+    : { text: first, split: true };
+}
 
 /**
  * The candidate's name, taken from the top of the document.
@@ -92,27 +121,60 @@ const nameVocabulary = memo(
  * never when it is a section heading or the document's own title ("Resume").
  */
 export function findName(lines: string[], policy: AtsEnginePolicy) {
-  const { particles, titles } = nameVocabulary(policy.resumeParse);
-  const top = lines
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 6);
+  const { particles, titles, label } = nameVocabulary(policy.resumeParse);
+  const trimmed = lines.map((line) => line.trim()).filter(Boolean);
+  const titleWords = titleWordsOf(policy);
 
-  for (const [index, line] of top.entries()) {
-    if (EMAIL.test(line) || /\d/.test(line) || titles.test(line)) continue;
+  /** The name a line holds, or null. */
+  const nameIn = (line: string, index: number, firstLine: boolean) => {
+    const candidate = nameCandidate(line, label);
+    if (candidate === null || titles.test(candidate.text)) return null;
 
-    const name = withoutPostNominals(line).trim();
+    const name = withoutPostNominals(candidate.text).trim();
     const words = name.split(/\s+/);
     const named = words.filter((word) => !particles.test(word));
-    if (named.length === 0 || named.length > 5 || words.length > 7) continue;
-    if (!named.every((word) => NAME_WORD.test(word))) continue;
+    // A name shares a line with the contact details only at the top, and is two words or more:
+    // further down, "San Francisco, CA | 415-555-0142" is an address.
+    if (candidate.split && (!firstLine || named.length < 2)) return null;
+    if (named.length === 0 || named.length > 5 || words.length > 7) return null;
+    if (!named.every((word) => NAME_WORD.test(word))) return null;
     // Particles sit between the words they join, never at the ends.
-    if (particles.test(words[0]) || particles.test(words[words.length - 1])) continue;
-    if (named.length === 1 && index > 0) continue;
+    if (particles.test(words[0]) || particles.test(words[words.length - 1])) return null;
+    if (named.length === 1 && index > 0) return null;
     // A headline ("Senior Software Engineer") has the shape of a name, and is what this used to
     // return when the real name was in an image.
-    if (isSectionHeading(name, policy) || titleWordsOf(policy).test(name)) continue;
-    return name;
+    if (isSectionHeading(name, policy) || titleWords.test(name)) return null;
+    // "Jane Doe, PhD" loses its credential; "San Francisco, CA" loses its state the same way,
+    // so a name found only by cutting a comma tail is the weaker reading.
+    return { name, cut: name !== candidate.text.trim() };
+  };
+
+  // A name directly above a headline ("LUCAS MOREAU" over "Senior Product Designer") is the
+  // name, wherever the reading order put it: a sidebar read first pushes it below the contact
+  // block, out of the first few lines. Never from the work history, where "Acme Corporation"
+  // over "Senior Engineer" has the same shape.
+  const headlined = () => {
+    for (const [index, line] of trimmed.slice(0, 40).entries()) {
+      if (sectionKind(line, policy) === "experience") break;
+      const next = trimmed[index + 1];
+      if (!next || next.split(/\s+/).length > 6 || !titleWords.test(next)) continue;
+      if (isSectionHeading(next, policy)) continue;
+      const found = nameIn(line, index + 1, false);
+      if (found && !found.cut) return found.name;
+    }
+    return "";
+  };
+
+  // Only lines above that cannot be the name: the document's title, a section heading.
+  let onlyHeadingsAbove = true;
+  for (const [index, line] of trimmed.slice(0, 6).entries()) {
+    // The work history is never the header block, whatever is missing above it.
+    if (sectionKind(line, policy) === "experience") break;
+    const firstLine = onlyHeadingsAbove;
+    onlyHeadingsAbove &&= titles.test(line) || isSectionHeading(line, policy);
+    const found = nameIn(line, index, firstLine);
+    if (!found) continue;
+    return found.cut ? headlined() || found.name : found.name;
   }
-  return "";
+  return headlined();
 }

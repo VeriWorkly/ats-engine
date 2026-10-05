@@ -50,12 +50,22 @@ type ChatCompletion = {
   };
 };
 
-/** Message content as text: a string, or the text parts of a content array some servers send. */
+/**
+ * Message content as text: a string, or the text parts of a content array some servers send. A
+ * part with another type ("reasoning", "thinking") is the model's working, not its answer.
+ */
 const contentText = (content: unknown) =>
   typeof content === "string"
     ? content
     : Array.isArray(content)
-      ? content.map((part) => (typeof part?.text === "string" ? part.text : "")).join("")
+      ? content
+          .map((part) =>
+            typeof part?.text === "string" &&
+            (part.type === undefined || part.type === "text" || part.type === "output_text")
+              ? part.text
+              : "",
+          )
+          .join("")
       : "";
 
 const FINISH: Record<string, LlmResponse["finish"]> = {

@@ -18,8 +18,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -27,7 +27,7 @@ jobs:
       - run: npm ci
       # v2 reads the output of @changesets/cli v3; v1 published but could not see it, so it
       # created no git tag and no GitHub release.
-      - uses: changesets/action@v2
+      - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2
         id: changesets
         with:
           version-script: npm run version-packages

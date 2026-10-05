@@ -16,17 +16,23 @@ export function buildPdf(
   resources = "",
   info = "",
   extra: string[] = [],
+  /** `page` is added to the page dictionary (e.g. `/Annots[7 0 R]`), `trailer` to the trailer. */
+  { page = "", trailer = "" }: { page?: string; trailer?: string } = {},
 ): Buffer {
   const objects = [
     "<</Type/Catalog/Pages 2 0 R>>",
     "<</Type/Pages/Kids[3 0 R]/Count 1>>",
-    `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 4 0 R>>${resources}>>/Contents 5 0 R>>`,
+    `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 4 0 R>>${resources}>>/Contents 5 0 R${page}>>`,
     "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
     `<</Length ${Buffer.byteLength(contentStream, "latin1")}>>\nstream\n${contentStream}\nendstream`,
     `<<${info}>>`,
     ...extra,
   ];
+  return assemble(objects, `/Info 6 0 R${trailer}`);
+}
 
+/** Numbered objects and the trailer's extra entries, as a PDF file. */
+function assemble(objects: string[], trailer: string): Buffer {
   let pdf = "%PDF-1.4\n";
   const offsets: number[] = [];
   objects.forEach((body, index) => {
@@ -37,9 +43,24 @@ export function buildPdf(
   const xrefAt = Buffer.byteLength(pdf, "latin1");
   pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
   for (const offset of offsets) pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  pdf += `trailer\n<</Size ${objects.length + 1}/Root 1 0 R/Info 6 0 R>>\nstartxref\n${xrefAt}\n%%EOF\n`;
+  pdf += `trailer\n<</Size ${objects.length + 1}/Root 1 0 R${trailer}>>\nstartxref\n${xrefAt}\n%%EOF\n`;
 
   return Buffer.from(pdf, "latin1");
+}
+
+/** A PDF of several pages, one content stream each, all in Helvetica as `F1`. */
+export function buildPdfPages(contentStreams: string[]): Buffer {
+  const pages = contentStreams.map((_, index) => 4 + index * 2);
+  const objects = [
+    "<</Type/Catalog/Pages 2 0 R>>",
+    `<</Type/Pages/Kids[${pages.map((page) => `${page} 0 R`).join(" ")}]/Count ${pages.length}>>`,
+    "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    ...contentStreams.flatMap((content, index) => [
+      `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R>>>>/Contents ${pages[index]! + 1} 0 R>>`,
+      `<</Length ${Buffer.byteLength(content, "latin1")}>>\nstream\n${content}\nendstream`,
+    ]),
+  ];
+  return assemble(objects, "");
 }
 
 /** A stream object for `buildPdf`'s `extra`: `dictionary` without its `<<>>` or `/Length`. */

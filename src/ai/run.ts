@@ -111,16 +111,23 @@ function resolveRoute(context: RunContext, task: AtsAiTask, options: AtsAiCallOp
 }
 
 /**
- * Models asked for JSON without a schema sometimes fence it anyway, on several lines or on one
- * ("```json{…}```"); the fence and its language tag go, the JSON stays.
+ * The JSON in a reply. Models asked for JSON without a schema sometimes wrap it anyway: in a fence
+ * on several lines or on one ("```json{…}```"), after a reasoning block ("<think>…</think>")
+ * that open models such as DeepSeek-R1 and Qwen3 print first, or after a line of prose. The
+ * wrapping goes and the JSON stays; a reply with no object in it is returned as it is, and fails
+ * to parse.
  */
 function unfence(text: string): string {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("```") || !trimmed.endsWith("```") || trimmed.length < 6) return trimmed;
-  return trimmed
-    .slice(3, -3)
-    .replace(/^[a-z]*(?=\s|[{[])/i, "")
-    .trim();
+  let trimmed = text.replace(/^\s*<think>[\s\S]*?<\/think>/i, "").trim();
+  // Checked first, so a fence inside one of the object's own strings is left alone.
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
+  const fenced = /```[a-z]*\s*([[{][\s\S]*[\]}])\s*```/i.exec(trimmed);
+  if (fenced) return fenced[1]!.trim();
+  // Prose before the object: from the first "{" to the last "}".
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start > 0 && end > start) trimmed = trimmed.slice(start, end + 1);
+  return trimmed;
 }
 
 /** Parses one response. Throws an `AtsAiError` whose code says whether a retry can help. */

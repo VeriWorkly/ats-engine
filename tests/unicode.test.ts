@@ -56,16 +56,23 @@ describe("normalisation", () => {
 
 describe("word counting", () => {
   it("counts words in any script", () => {
-    // Three code units or more, as for English: "के" (two) is left out like "of".
-    expect(words("सॉफ्टवेयर इंजीनियर के रूप में अनुभव")).toHaveLength(5);
+    // Every word, as a word processor counts them: "के" (two code units) is a word like "of".
+    expect(words("सॉफ्टवेयर इंजीनियर के रूप में अनुभव")).toHaveLength(6);
     expect(words("Erfahrung für Kunden über Jahre")).toHaveLength(5);
   });
 
-  it("counts English exactly as before", () => {
+  it("counts every English word, short ones and numbers included", () => {
+    // Counting only runs of three letters read a 270-word resume as 198 (audit, October 2026).
     expect(words("Built a CI/CD pipeline in Go for 3 teams")).toEqual([
       "built",
+      "a",
+      "ci",
+      "cd",
       "pipeline",
+      "in",
+      "go",
       "for",
+      "3",
       "teams",
     ]);
   });

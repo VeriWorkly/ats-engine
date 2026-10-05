@@ -2,7 +2,7 @@ import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsParsedResume } from "../types.js";
 import { EMAIL, LINK, findName } from "./contact.js";
 import { parseEducation } from "./education.js";
-import { BULLET_PREFIX } from "../text/text.js";
+import { BULLET, BULLET_PREFIX } from "../text/text.js";
 import { parseRoles } from "./experience.js";
 import { finalizeParsed } from "./record.js";
 import { readResumeLines } from "./lines.js";
@@ -14,6 +14,38 @@ import { segmentResume, type ResumeSectionKind } from "./sections.js";
  * space after the colon, so a value with a colon of its own ("https://…") is left whole.
  */
 const SKILL_LABEL = /^[^:,;|]{1,40}:\s+/;
+
+/** What separates one skill from the next: a list punctuation mark, or a column gap. */
+const SKILL_SEPARATOR = /[,;|•·]|\s{2,}/g;
+
+/**
+ * A skills line cut into skills at its separators, except inside brackets: "AWS (EC2, S3,
+ * Lambda)" is one skill. A separator inside a bracket that never closes still cuts, so a stray
+ * "(" does not swallow the rest of the line.
+ */
+function splitSkills(line: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let from = 0;
+  let scanned = 0;
+  const scanTo = (end: number) => {
+    for (; scanned < end; scanned += 1) {
+      const char = line[scanned];
+      if (char === "(" || char === "[") depth += 1;
+      else if ((char === ")" || char === "]") && depth > 0) depth -= 1;
+    }
+  };
+  for (const match of line.matchAll(SKILL_SEPARATOR)) {
+    scanTo(match.index);
+    if (depth > 0) continue;
+    parts.push(line.slice(from, match.index));
+    from = match.index + match[0].length;
+  }
+  scanTo(line.length);
+  if (depth > 0) return line.split(SKILL_SEPARATOR);
+  parts.push(line.slice(from));
+  return parts;
+}
 
 /**
  * Recovers the fields an applicant tracking system stores, from the same plain text one would
@@ -64,19 +96,22 @@ export function parseReadLines(
     policy,
     now,
   );
+  // Without an Education heading, every block that can hold a degree is read, but not the work
+  // history, skills or projects, and never a bullet: "Ran a PhD intern program" is not a
+  // doctorate, nor "Partnered with Stanford University" a school.
   const education = parseEducation(
-    take("education").length ? take("education") : lines,
+    take("education").length
+      ? take("education")
+      : sections
+          .filter((section) => !["experience", "skills", "projects"].includes(section.kind))
+          .flatMap((section) => section.lines)
+          .filter((line) => !BULLET.test(line)),
     policy,
     now,
   );
 
   const skills = take("skills")
-    .flatMap((line) =>
-      line
-        .replace(BULLET_PREFIX, "")
-        .replace(SKILL_LABEL, "")
-        .split(/[,;|•·]|\s{2,}/),
-    )
+    .flatMap((line) => splitSkills(line.replace(BULLET_PREFIX, "").replace(SKILL_LABEL, "")))
     .map((skill) => skill.replace(BULLET_PREFIX, "").trim())
     // A skill names something, so it has a letter: a date or a number under the Skills heading
     // ("Geburtsdatum: 04.05.1990", once its label is dropped) is not one.

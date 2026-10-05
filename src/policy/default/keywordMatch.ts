@@ -10,10 +10,14 @@ export const DEFAULT_KEYWORD_MATCH = {
   defaultWeight: 1,
   generalTermWeight: 0.25,
   sections: {
-    required: String.raw`^(?:requirements|qualifications|what\s+you.{0,3}ll\s+need|must\s+have)`,
+    // "Minimum qualifications", "Basic Qualifications", "Must-haves", "What you bring", "About
+    // you": a posting whose required heading went unread lost every required item.
+    required: String.raw`^(?:(?:minimum|basic|required|essential|key|core)\s+)?(?:requirements|qualifications)|^(?:what\s+you.{0,3}ll\s+need|what\s+you\s+(?:bring|need|have)|must[\s-]+haves?|about\s+you|your\s+profile|who\s+you\s+are|you\s+have|you\s+bring)`,
     preferred: String.raw`^(?:nice\s+to\s+have|preferred|bonus|desirable|plus)`,
     responsibilities: String.raw`^(?:responsibilities|what\s+you.{0,3}ll\s+do|the\s+role|about\s+the\s+role)`,
-    excluded: String.raw`^(?:about\s+us|benefits|perks|equal\s+opportunity|our\s+values|why\s+join)`,
+    // "About Acme Robotics" is the employer's own section; its name is never a keyword. "About
+    // you" (required) and "About the role" (responsibilities) are matched before this.
+    excluded: String.raw`^(?:about\s+us|benefits|perks|equal\s+opportunity|our\s+values|why\s+join|about\s+(?!(?:you|your|the|this)(?![\p{L}]))[\p{L}\p{N}&.'-]{1,40}(?:\s+[\p{L}\p{N}&.'-]{1,40}){0,3})`,
   },
   stopwords: [
     "the",
@@ -129,6 +133,50 @@ export const DEFAULT_KEYWORD_MATCH = {
     "preferred",
     "required",
     "ideally",
+    // Words that open a capitalised sentence and would otherwise read as a two-letter acronym.
+    "i",
+    "no",
+    "so",
+    "do",
+    "if",
+    "up",
+    "me",
+    "my",
+    "he",
+    // Posting filler: where and how the job is, and words around a requirement rather than in it.
+    "hiring",
+    "hire",
+    "hybrid",
+    "remote",
+    "onsite",
+    "on-site",
+    "track",
+    "record",
+    "million",
+    "billion",
+    "related",
+    "relevant",
+    "field",
+    "professional",
+    "environment",
+    "fast-paced",
+    "industry",
+    "similar",
+    "equivalent",
+    "another",
+    "least",
+    "age",
+    "old",
+    "older",
+    "degree",
+    "degrees",
+    "position",
+    "ideal",
+    "successful",
+    "responsible",
+    // How well a language is spoken; the language is the requirement.
+    "fluent",
+    "fluency",
   ],
   synonyms: {
     js: "javascript",
@@ -139,8 +187,12 @@ export const DEFAULT_KEYWORD_MATCH = {
     golang: "go",
     py: "python",
     iac: "infrastructure as code",
+    // "CI" alone is continuous integration; "CD" alone is as often a compact disc.
     ci: "ci/cd",
-    cd: "ci/cd",
+    nodejs: "node.js",
+    node: "node.js",
+    reactjs: "react",
+    "react.js": "react",
   },
   implies: {
     terraform: ["infrastructure as code"],
@@ -150,6 +202,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     mysql: ["relational database", "sql"],
     react: ["javascript"],
     typescript: ["javascript"],
+    // A role is experience in its field: a teacher's years are years in education.
+    teacher: ["education"],
+    nurse: ["healthcare"],
   },
   phrases: [
     "infrastructure as code",

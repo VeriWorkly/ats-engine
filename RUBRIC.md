@@ -2,7 +2,7 @@
 
 Generated from the community policy (`DEFAULT_POLICY`) by `npm run rubric`; do not edit by hand.
 
-- Engine 0.1.1, policy `ats-v2+3c69074c`.
+- Engine 0.1.1, policy `ats-v2+a91fb7d6`.
 - **Score.** Each rule that applies can lose its weight. The readiness score is the share of the
   applicable weight kept, 0–100. A rule whose evidence is absent — page geometry for pasted
   text, a posting for the copied-posting check — is left out of both the report and the score.
@@ -25,18 +25,18 @@ Generated from the community policy (`DEFAULT_POLICY`) by `npm run rubric`; do n
 | `ats-v2.parse.roles` | Parsing | error | rolesDetected | 15 | n roles were recovered from the work history. | Give each job a line with the title, the employer, and a date range. |
 | `ats-v2.parse.roleCompleteness` | Parsing | warning | roleCompleteness | 10 | n% of recovered roles have a title, an employer and a start date. | Make sure every job lists a title, an employer, and a date range. |
 | `ats-v2.parse.contact` | Parsing | warning | contactCompleteness | 8 | n% of the expected contact fields were recovered. | Include a name, an email address, and a phone number as plain text. |
-| `ats-v2.contact.email` | Contact & links | error | a pattern, in the document | 12 | An email address was found. | Add an email address to the header of the resume. |
-| `ats-v2.contact.position` | Contact & links | warning | contact details in the first 25% | 6 | Contact details appear near the top of the document. | Move the email address and phone number into the header. |
+| `ats-v2.contact.email` | Contact & links | error | a pattern, in the document | 12 | An email address was found. | Add an email address at the top of the first page, as plain text in the body rather than in a page header. |
+| `ats-v2.contact.position` | Contact & links | warning | contact details in the first 25% | 6 | Contact details appear near the top of the document. | Put the email address and phone number at the top of the first page, in the body of the document rather than in a page header, which many ATS parsers skip. |
 | `ats-v2.privacy.dateOfBirth` | Contact & links | info | dateOfBirthStated | 2 | No date of birth is stated. | Leave your date of birth off unless the country you are applying in expects it. |
 | `ats-v2.structure.experience` | Structure | error | a experience heading | 12 | An experience section heading was found. | Add a heading reading 'Experience' above the work history. |
 | `ats-v2.structure.education` | Structure | warning | a education heading | 8 | An education section heading was found. | Add a heading reading 'Education' above the qualifications. |
 | `ats-v2.structure.skills` | Structure | warning | a skills heading | 8 | A skills section heading was found. | Add a heading reading 'Skills' above the skills list. |
 | `ats-v2.content.metrics` | Evidence | warning | metricsRatio | 10 | n% of content lines carry a number. | Quantify outcomes: amounts, percentages, timeframes, headcounts. |
-| `ats-v2.content.verbs` | Evidence | warning | actionVerbRatio | 8 | n% of content lines open with an action verb. | Start each bullet with a verb describing what you did. |
+| `ats-v2.content.verbs` | Evidence | warning | actionVerbRatio | 8 | n% of bullets name an action you took. | Make each bullet say what you did, with an action word ("Led", "Built", "Cut"), rather than what the job was. |
 | `ats-v2.content.buzzwords` | Evidence | info | buzzwordCount | 5 | Little filler language. | Replace filler phrases with a specific thing you did. |
 | `ats-v2.content.timeline` | Evidence | info | timelineIssues | 3 | The dates in the work history are consistent. | Check the dates: a role cannot start after today, and an end date left off makes jobs overlap. |
 | `ats-v2.content.skillEvidence` | Evidence | info | unsupportedSkills | 3 | Most listed skills are backed by the work they were used in. | Name each key skill in the role or project where you used it, not only in the list. |
-| `ats-v2.format.length` | Format risk | warning | wordCount | 10 | The resume is n words, a reasonable length. | Aim for roughly one page per five years of experience. |
+| `ats-v2.format.length` | Format risk | warning | wordCount | 10 | The resume is n words, a reasonable length. | Keep the resume between about 200 and 1,500 words: one or two pages. |
 | `ats-v2.format.letterSpacing` | Format risk | warning | letterSpacedLines | 8 | Headings extract as whole words. | Remove the letter spacing (tracking) from section headings so they extract as words. |
 | `ats-v2.format.columns` | Format risk | error | columnRatio | 15 | The document reads as a single column. | Use a single-column layout; columns extract in a scrambled order. |
 | `ats-v2.format.tables` | Format risk | warning | tableCount | 10 | No ruled tables were found. | Replace tables with plain paragraphs and bullets. |

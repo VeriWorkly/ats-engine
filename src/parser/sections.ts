@@ -1,6 +1,9 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { policyRegex } from "../policy/regex.js";
+import { wordListRegex } from "../text/text.js";
 import { memo } from "../util/memo.js";
+import { findDateRange } from "./dates.js";
+import { degreeLevel } from "./education.js";
 
 export type ResumeSectionKind = "experience" | "education" | "skills" | "projects" | "other";
 
@@ -32,11 +35,16 @@ export function isHeadingLine(line: string) {
  *   capitalised ("Work Experience Summary") or a connector ("Skills & Tools").
  * - "Education Program Manager, Khan Academy" is capitalised throughout but is a role: a comma
  *   or a digit after the match rules a heading out.
+ * - "Education Officer", "Skills Trainer", "Experience Designer" are job titles: a job-title word
+ *   after the match rules a heading out, when the matchers carry the policy's title words.
+ *
+ * `tail` is what follows the heading words ("Summary" in "Work Experience Summary"); empty for a
+ * bare heading.
  */
 export function classifyHeading<K>(
   line: string,
   matchers: HeadingMatchers<K>,
-): { kind: K; rest: string } | null {
+): { kind: K; rest: string; tail: string } | null {
   const colon = line.indexOf(":");
   const head = (colon === -1 ? line : line.slice(0, colon)).trim();
   if (!isHeadingLine(head)) return null;
@@ -45,15 +53,20 @@ export function classifyHeading<K>(
     const match = re.exec(head);
     const tail = match && head.slice(match.index + match[0].length);
     if (tail === null || !isTitleTail(tail, head, matchers.connector)) continue;
-    return { kind, rest: colon === -1 ? "" : line.slice(colon + 1).trim() };
+    if (matchers.titleWords?.test(tail)) continue;
+    return { kind, rest: colon === -1 ? "" : line.slice(colon + 1).trim(), tail: tail.trim() };
   }
   return null;
 }
 
-/** The section patterns, and the policy's `headingConnectors` as one whole-word test. */
+/**
+ * The section patterns, and the policy's `headingConnectors` as one whole-word test. With
+ * `titleWords`, a heading word followed by a job title is that title, not the heading.
+ */
 export type HeadingMatchers<K> = {
   kinds: ReadonlyArray<{ kind: K; re: RegExp }>;
   connector: RegExp;
+  titleWords?: RegExp;
 };
 
 /** `headingConnectors` as a test of one whole word, symbols ("&", "/") included. */
@@ -82,7 +95,10 @@ function isTitleTail(tail: string, head: string, connector: RegExp) {
   );
 }
 
-type SectionMatchers = HeadingMatchers<ResumeSectionKind>;
+type SectionMatchers = HeadingMatchers<ResumeSectionKind> & {
+  titleWords: RegExp;
+  schools: RegExp;
+};
 
 const matchersOf = memo((rp: AtsEnginePolicy["resumeParse"]): SectionMatchers => ({
   kinds: [
@@ -93,6 +109,8 @@ const matchersOf = memo((rp: AtsEnginePolicy["resumeParse"]): SectionMatchers =>
     { kind: "other", re: policyRegex(rp.sections.other, "i") },
   ],
   connector: headingConnector(rp),
+  titleWords: wordListRegex(rp.titleWords),
+  schools: wordListRegex(rp.schoolWords),
 }));
 
 const sectionMatchers = (policy: AtsEnginePolicy) => matchersOf(policy.resumeParse);
@@ -100,6 +118,11 @@ const sectionMatchers = (policy: AtsEnginePolicy) => matchersOf(policy.resumePar
 /** Whether the line is one of the policy's section headings. */
 export function isSectionHeading(line: string, policy: AtsEnginePolicy) {
   return classifyHeading(line, sectionMatchers(policy)) !== null;
+}
+
+/** The kind of section the line heads, or null when it is not a heading. */
+export function sectionKind(line: string, policy: AtsEnginePolicy) {
+  return classifyHeading(line, sectionMatchers(policy))?.kind ?? null;
 }
 
 /**
@@ -155,7 +178,8 @@ function despace(line: string, matchers: SectionMatchers): string | null {
   if (!glyphPerWord && (line !== line.toUpperCase() || classifyHeading(line, matchers)))
     return null;
 
-  const words = line.split(/\s{2,}/).map((word) => word.replace(/\s+/g, ""));
+  // A tab is a word gap too: the PDF reader prints a wide gap as one.
+  const words = line.split(/\s{2,}|\t/).map((word) => word.replace(/\s+/g, ""));
   const joined = words.join(" ");
   if (classifyHeading(joined, matchers)) return joined;
   // The lost word gap is one of the gaps the extractor printed, never inside a fragment: cut
@@ -190,6 +214,70 @@ export function despaceLines(lines: string[], policy: AtsEnginePolicy) {
   return { lines: read, spaced };
 }
 
+/** Only to tell a date from other numbers: a heading has no "now" to hold a year against. */
+const UNBOUNDED = new Date(Date.UTC(9000, 0, 1));
+
+const UNKNOWN = { kind: "other", rest: "", tail: "" } as const;
+
+/** One to four words of letters, joined by spaces or "&", "/", "-": "VOLUNTEER WORK". */
+const HEADING_WORDS = /^\p{L}+(?:[ &/-]+\p{L}+){0,3}$/u;
+
+/**
+ * The lines that are headings the policy does not know ("VOLUNTEER WORK", "Community
+ * Involvement"), told by looking like the headings it does know: in capitals where every known
+ * heading is, or with every word capitalised where every known heading is, and holding no
+ * job-title, school or degree word. Used only to close an Education section, and only when
+ * nothing between the line and the next known heading names a degree, or a school outside a job
+ * line, so that a field of study on a line of its own never cuts off a degree below it.
+ */
+function unknownHeadings(
+  lines: readonly string[],
+  headings: ReadonlyArray<unknown>,
+  { connector, titleWords, schools }: SectionMatchers,
+  policy: AtsEnginePolicy,
+) {
+  const found = new Set<number>();
+  const known = lines.filter((_, at) => headings[at]);
+  if (known.length < 2) return found;
+  const capitalised = (line: string) =>
+    line
+      .trim()
+      .split(/\s+/)
+      .every((word) => /^\p{Lu}/u.test(word) || connector.test(word));
+  const inCapitals = (line: string) => line === line.toUpperCase() && /\p{Lu}/u.test(line);
+  const style = known.every(inCapitals)
+    ? inCapitals
+    : known.every(capitalised)
+      ? capitalised
+      : null;
+  if (!style) return found;
+
+  // Scanned from the end, carrying the next known heading and the next line about schooling, so
+  // each candidate is answered in one step.
+  let nextSchooling = Infinity;
+  let nextHeading = Infinity;
+  for (let at = lines.length - 1; at >= 0; at -= 1) {
+    const line = lines[at];
+    if (headings[at]) nextHeading = at;
+    const school = schools.test(line);
+    const title = titleWords.test(line);
+    const degree = degreeLevel(line, policy) !== null;
+    if (
+      !headings[at] &&
+      at + 1 < lines.length &&
+      nextSchooling >= nextHeading &&
+      HEADING_WORDS.test(line) &&
+      style(line) &&
+      !school &&
+      !title &&
+      !degree
+    )
+      found.add(at);
+    if (degree || (school && !title)) nextSchooling = at;
+  }
+  return found;
+}
+
 /**
  * Splits the resume at its headings.
  *
@@ -201,15 +289,28 @@ export function despaceLines(lines: string[], policy: AtsEnginePolicy) {
  * Except inside Skills: there "Languages: TypeScript, Go" is a category of skills, not the
  * Languages section, so a heading word with content after its colon stays a skills line. A bare
  * "Languages" on its own line still opens a section.
+ *
+ * A heading word with more after it over a dated line ("Experience Designer" over "Jan 2019 -
+ * Present") is a role, not a heading. And an Education section is closed by a heading the policy
+ * does not know, so the roles under "Volunteer Work" are not read as schools (`unknownHeadings`).
  */
 export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeSection[] {
   const matchers = sectionMatchers(policy);
+  const headings = lines.map((line, at) => {
+    const heading = classifyHeading(line, matchers);
+    const next = lines[at + 1];
+    const datedBelow =
+      next !== undefined && findDateRange(next, policy.resumeParse, UNBOUNDED) !== null;
+    return heading && heading.tail && datedBelow ? null : heading;
+  });
+  const unknown = unknownHeadings(lines, headings, matchers, policy);
 
   const sections: ResumeSection[] = [];
   let current: ResumeSection = { kind: "other", lines: [], headed: false };
 
-  for (const line of lines) {
-    const heading = classifyHeading(line, matchers);
+  for (const [at, line] of lines.entries()) {
+    const heading =
+      headings[at] ?? (current.kind === "education" && unknown.has(at) ? UNKNOWN : null);
     if (!heading || (current.kind === "skills" && heading.rest && heading.kind !== "skills")) {
       current.lines.push(line);
       continue;

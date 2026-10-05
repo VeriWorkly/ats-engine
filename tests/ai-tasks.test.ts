@@ -93,12 +93,15 @@ describe("analyze", () => {
     expect(outcome.rejected).toEqual([{ path: "keywordOpportunities[3]", value: "Blockchain" }]);
   });
 
-  it("does not filter keyword suggestions when there is no posting to check them against", async () => {
+  it("drops every keyword suggestion when there is no posting for one to point at", async () => {
+    // A suggestion without a posting is the model's own idea of what the role needs: the advice
+    // that sends a candidate to pad a resume with irrelevant words.
     const provider = scriptedProvider(insights({ keywordOpportunities: ["Blockchain"] }));
     const ai = createAtsAi({ provider, routes });
     const outcome = await ai.analyze({ resumeText: RESUME, report: report() });
 
-    expect(outcome.result.keywordOpportunities).toEqual(["Blockchain"]);
+    expect(outcome.result.keywordOpportunities).toEqual([]);
+    expect(outcome.rejected).toEqual([{ path: "keywordOpportunities[0]", value: "Blockchain" }]);
     expect(userMessage(provider).jobDescription).toBeNull();
   });
 

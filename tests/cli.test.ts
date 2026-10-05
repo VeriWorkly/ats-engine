@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { main } from "../src/cli/main.js";
+import { ENGINE_VERSION } from "../src/version.js";
 import { buildDocx } from "./fixtures/buildDocx.js";
 import { buildPdf, LEFT_COLUMN, RIGHT_COLUMN, text } from "./fixtures/buildPdf.js";
 
@@ -121,6 +122,12 @@ describe("ats-engine check", () => {
   it("refuses a file with no readable text, the way an ATS would", async () => {
     expect(await main(["check", file("blank.txt", "   ")])).toBe(1);
     expect(err.join("\n")).toMatch(/enough readable text/);
+  });
+
+  it("prints the engine version for --version and -v", async () => {
+    expect(await main(["--version"])).toBe(0);
+    expect(await main(["-v"])).toBe(0);
+    expect(out).toEqual([ENGINE_VERSION, ENGINE_VERSION]);
   });
 
   it("prints usage for --help", async () => {

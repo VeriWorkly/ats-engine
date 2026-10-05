@@ -4,7 +4,8 @@ import { policyRegex } from "../policy/regex.js";
 
 export type JobSectionKind = "required" | "preferred" | "responsibilities" | "body" | "excluded";
 
-export type JobSection = { kind: JobSectionKind; text: string };
+/** `heading` is the line that opened the block, when one did: "About Acme Robotics". */
+export type JobSection = { kind: JobSectionKind; text: string; heading?: string };
 
 /**
  * Splits a job posting into labelled blocks, each running from its heading to the *next*
@@ -44,7 +45,11 @@ export function segmentJob(jobText: string, policy: AtsEnginePolicy): JobSection
       continue;
     }
     if (current.text.trim()) sections.push(current);
-    current = { kind: heading.kind, text: heading.rest ? `${heading.rest}\n` : "" };
+    current = {
+      kind: heading.kind,
+      text: heading.rest ? `${heading.rest}\n` : "",
+      heading: line.split(":")[0]!.trim(),
+    };
   }
   if (current.text.trim()) sections.push(current);
 

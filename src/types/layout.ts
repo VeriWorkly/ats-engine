@@ -23,6 +23,12 @@ export type AtsLayoutSignals = {
   hiddenTextChars?: number;
   /** The start of that hidden text, so the report can quote it back. */
   hiddenTextSample?: string;
+  /**
+   * All of that hidden text, whitespace collapsed to single spaces, its runs joined in reading
+   * order, and cut to the first 5,000 characters. Present whenever `hiddenTextChars` is; "" when
+   * nothing is hidden.
+   */
+  hiddenText?: string;
   /** Pages with no text layer at all: a scan, or a page exported as a picture. */
   imageOnlyPages?: number;
   /**

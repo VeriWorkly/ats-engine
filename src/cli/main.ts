@@ -1,49 +1,136 @@
 /**
- * `ats-engine check <resume> [--job <file>] [--policy <file>] [--json] [--min-score <n>]`
+ * `ats-engine check <resume> [--job <file>] [--policy <file>] [--json] [--min-score <n>] [--ai]`
  *
  * Scores a resume file (PDF, DOCX, text, or a JSON resume document) with the bundled default
  * policy, or with `--policy`. `--min-score` makes it usable as a CI gate: the exit code is 2 when the
- * readiness score falls below it.
+ * readiness score falls below it. `--ai` adds a model's analysis with the user's own key; the
+ * score never depends on it.
  */
 
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import { parseArgs } from "node:util";
 
+import type { FetchLike } from "../ai/http.js";
+import { isJsonResume, isResumeDocument } from "../document/index.js";
 import { categoryLabel, formatRoleDates, formatTenure, scoreTone } from "../format/index.js";
 import {
   AtsScoringService,
+  computeVerdict,
   DEFAULT_POLICY,
   parseAtsPolicy,
+  prepareResume,
   type AtsReport,
+  type AtsRequirement,
   type AtsResumeInput,
+  type AtsSeverity,
 } from "../index.js";
 import { jobTextFromHtml, normalizeJobText } from "../job/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../locales/index.js";
 import { detectResumeFormat, extractResume, type AtsExtraction } from "../node/extract.js";
+import { ENGINE_VERSION } from "../version.js";
+import {
+  aiJson,
+  analyzeReport,
+  DEFAULT_MAX_TOKENS,
+  describeAiError,
+  PROVIDERS,
+  renderInsights,
+  resolveAiConfig,
+} from "./ai.js";
+import {
+  banner,
+  createStyle,
+  detectTerminal,
+  printable,
+  type Env,
+  type Style,
+  type Terminal,
+} from "./terminal.js";
+import { UsageError } from "./usage.js";
+
+const KEY_VARIABLES = Object.values(PROVIDERS)
+  .map((preset) => preset.keyEnv)
+  .filter(Boolean)
+  .join(", ");
+
+const REGIONS = BUILT_IN_LOCALES.regions.map((pack) => pack.id).join(", ");
 
 const USAGE = `Usage: ats-engine check <resume> [options]
 
-Scores a resume (.pdf, .docx, .txt, .md, or a .json resume document).
+Scores a resume (.pdf, .docx, .html, .txt, .md, or a .json resume document).
 
 Options:
-  --job <file>        Job description to match against (.txt, or a saved .html page)
+  --job <file>        Job posting to match against (.txt, .pdf, .docx, or a saved .html page)
   --policy <file>     Engine policy JSON (default: the bundled default policy)
   --json              Print the full report as JSON
   --min-score <n>     Exit with code 2 when the readiness score is below n
-  --region <code>     Read the resume as from this country (US, DE, IN); default: inferred
+  --region <code>     Read the resume as from this country (${REGIONS}); default: inferred
   --text              Also print the text as an ATS reads it, line by line
-  -h, --help          Show this help`;
+  -h, --help          Show this help
+  -v, --version       Print the engine version (ats-engine --version)
 
-class UsageError extends Error {}
+AI analysis (optional, with your own API key):
+  --ai                Ask a model to explain the report and suggest improvements
+  --provider <name>   ${Object.keys(PROVIDERS).slice(0, -1).join(", ")},
+                      or openai-compatible with --base-url
+  --model <id>        A model id your provider lists
+  --base-url <url>    Use a different API endpoint for the provider
+  --max-tokens <n>    Output budget, thinking included (default ${DEFAULT_MAX_TOKENS})
+
+  The key is read from the environment only: ATS_AI_API_KEY, or the provider's own
+  variable (${KEY_VARIABLES}).
+  Ollama and other servers on localhost need no key. ATS_AI_PROVIDER, ATS_AI_MODEL,
+  ATS_AI_BASE_URL and ATS_AI_MAX_TOKENS stand in for the flags.
+
+Exit codes: 0 done, 1 error, 2 below --min-score (even when --ai fails).`;
+
+const AI_FLAGS = ["provider", "model", "base-url", "max-tokens"] as const;
+
+/** Where output goes and what the environment says. Tests pass their own. */
+export type CliContext = {
+  terminal: Terminal;
+  env: Env;
+  /** For the AI providers; defaults to the global `fetch`. */
+  fetch?: FetchLike;
+};
+
+function defaultContext(): CliContext {
+  return { terminal: detectTerminal(process.stdout, process.env), env: process.env };
+}
+
+/** A file's bytes, with the two usual mistakes named plainly. */
+async function readBytes(path: string): Promise<Buffer> {
+  try {
+    return await readFile(path);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "ENOENT") throw new UsageError(`No such file: ${path}`);
+    if (code === "EISDIR") throw new UsageError(`${path} is a folder, not a file.`);
+    throw error;
+  }
+}
 
 async function readResume(
   path: string,
 ): Promise<{ input: AtsResumeInput } & Partial<AtsExtraction>> {
   const format = detectResumeFormat(path);
-  if (!format) throw new UsageError(`Unsupported resume file type: ${extname(path) || path}`);
-  const data = await readFile(path);
-  if (extname(path).toLowerCase() === ".json") return { input: JSON.parse(data.toString("utf8")) };
+  if (!format)
+    throw new UsageError(
+      `Unsupported resume file type "${extname(path) || path}". Use .pdf, .docx, .html, .txt, .md or .json.`,
+    );
+  const data = await readBytes(path);
+  if (extname(path).toLowerCase() === ".json") {
+    let input: unknown;
+    try {
+      input = JSON.parse(data.toString("utf8"));
+    } catch (error) {
+      throw new UsageError(`${path} is not valid JSON (${(error as Error).message}).`);
+    }
+    if (!isResumeDocument(input) && !isJsonResume(input))
+      throw new UsageError(`${path} is neither a JSON Resume nor an ats-resume document.`);
+    return { input: input as AtsResumeInput };
+  }
   const { text, layout } = await extractResume(data, format);
   if (text.length < 50)
     throw new UsageError(
@@ -55,76 +142,165 @@ async function readResume(
 }
 
 async function readJob(path: string): Promise<string> {
-  const content = await readFile(path, "utf8");
-  // Normalised exactly as the server normalises a fetched job, so both score the same text.
-  return /\.html?$/i.test(path) ? jobTextFromHtml(content) : normalizeJobText(content);
+  const data = await readBytes(path);
+  if (/\.html?$/i.test(path)) return jobTextFromHtml(data.toString("utf8"));
+  // A posting saved as a PDF or a Word file is read the way a resume is.
+  const format = detectResumeFormat(path);
+  const text =
+    format === "pdf" || format === "docx"
+      ? (await extractResume(data, format)).text
+      : data.toString("utf8");
+  return normalizeJobText(text);
 }
 
-function render(report: AtsReport): string {
-  const tone = { good: "good", warn: "needs work", bad: "weak" }[scoreTone(report.readinessScore)];
+function render(report: AtsReport, style: Style): string {
+  const toned = (score: number) => {
+    const tone = scoreTone(score);
+    const paint = { good: style.green, warn: style.yellow, bad: style.red }[tone];
+    return {
+      score: paint(style.bold(`${score}/100`)),
+      label: { good: "good", warn: "needs work", bad: "weak" }[tone],
+    };
+  };
+  const severity: Record<AtsSeverity, (text: string) => string> = {
+    error: style.red,
+    warning: style.yellow,
+    info: style.dim,
+  };
+  const field = (label: string, value: string) => `  ${style.dim(label.padEnd(9))}${value}`;
+  const none = style.dim("—");
   const { parsed } = report;
+
+  const readiness = toned(report.readinessScore);
   const lines = [
-    `Readiness  ${report.readinessScore}/100 (${tone}) — ${report.checksPassed}/${report.checksTotal} checks passed`,
+    `${style.bold("Readiness")}  ${readiness.score} (${readiness.label}) — ${report.checksPassed}/${report.checksTotal} checks passed`,
   ];
   if (report.jobMatchScore !== null) {
-    lines.push(`Job match  ${report.jobMatchScore}/100`);
+    lines.push(`${style.bold("Job match")}  ${toned(report.jobMatchScore).score}`);
+    // With a posting the verdict reads the match, so it can differ from the readiness label.
+    const verdict = computeVerdict(report);
+    const paint = { strong: style.green, "needs-work": style.yellow, weak: style.red }[verdict];
+    lines.push(`${style.bold("Verdict")}    ${paint(verdict.replace("-", " "))}`);
+    if (report.requirements.length) {
+      const met = report.requirements.filter((requirement) => requirement.status === "met").length;
+      lines.push(`  Requirements met: ${met} of ${report.requirements.length}`);
+      for (const requirement of report.requirements)
+        lines.push(renderRequirement(requirement, style));
+    }
     if (report.missingKeywords.length)
-      lines.push(`  Missing keywords: ${report.missingKeywords.slice(0, 15).join(", ")}`);
+      lines.push(
+        `  Missing keywords: ${style.yellow(report.missingKeywords.slice(0, 15).join(", "))}`,
+      );
   }
 
   const read = [...report.locale.languages, report.locale.region].filter(Boolean);
-  if (read.length) lines.push(`Read as    ${read.join(", ")}`);
+  if (read.length) lines.push(`${style.bold("Read as")}    ${read.join(", ")}`);
 
-  lines.push("", "What an ATS reads:");
-  lines.push(`  Name     ${parsed.name || "—"}`);
-  lines.push(`  Email    ${parsed.email || "—"}`);
-  lines.push(`  Phone    ${parsed.phone || "—"}`);
+  lines.push("", style.bold("What an ATS reads:"));
+  lines.push(field("Name", parsed.name || none));
+  lines.push(field("Email", parsed.email || none));
+  lines.push(field("Phone", parsed.phone || none));
   for (const role of parsed.roles.slice(0, 8)) {
     // A role read without dates prints none, not "(null)".
     const dates = formatRoleDates(role);
     lines.push(
-      `  Role     ${[role.title, role.employer].filter(Boolean).join(", ") || "—"}${dates ? ` (${dates})` : ""}`,
+      field(
+        "Role",
+        `${[role.title, role.employer].filter(Boolean).join(", ") || none}${dates ? ` (${dates})` : ""}`,
+      ),
     );
   }
-  if (!parsed.roles.length) lines.push("  Roles    none found");
+  if (!parsed.roles.length) lines.push(field("Roles", "none found"));
   if (parsed.monthsOfExperience)
-    lines.push(`  Tenure   ${formatTenure(parsed.monthsOfExperience)}`);
-  if (parsed.skills.length) lines.push(`  Skills   ${parsed.skills.slice(0, 20).join(", ")}`);
+    lines.push(field("Tenure", formatTenure(parsed.monthsOfExperience)));
+  if (parsed.skills.length) lines.push(field("Skills", parsed.skills.slice(0, 20).join(", ")));
 
   if (report.failedChecks.length) {
-    lines.push("", "Failed checks:");
+    lines.push("", style.bold("Failed checks:"));
     for (const rule of report.failedChecks)
       lines.push(
-        `  [${rule.severity}] ${categoryLabel(rule.category)}: ${rule.evidence}`,
-        `      Fix: ${rule.fix}`,
+        `  ${severity[rule.severity](`[${rule.severity}]`)} ${categoryLabel(rule.category)}: ${rule.evidence}`,
+        `      ${style.accent("Fix:")} ${rule.fix}`,
       );
   }
   return lines.join("\n");
 }
 
-async function check(argv: string[]): Promise<number> {
-  const { values, positionals } = parseArgs({
-    args: argv,
-    allowPositionals: true,
-    options: {
-      job: { type: "string" },
-      policy: { type: "string" },
-      json: { type: "boolean", default: false },
-      "min-score": { type: "string" },
-      region: { type: "string" },
-      text: { type: "boolean", default: false },
-      help: { type: "boolean", short: "h", default: false },
-    },
-  });
+function renderRequirement(requirement: AtsRequirement, style: Style): string {
+  const paint = {
+    met: style.green,
+    partial: style.yellow,
+    missing: style.red,
+    unverifiable: style.dim,
+  }[requirement.status];
+  const label = paint(`[${requirement.status}]`.padEnd(14));
+  const preferred = requirement.importance === "preferred" ? style.dim(" (preferred)") : "";
+  const detail =
+    requirement.status !== "met" && requirement.detail ? style.dim(` — ${requirement.detail}`) : "";
+  return `    ${label} ${requirement.text}${preferred}${detail}`;
+}
+
+/** parseArgs' own messages talk about positional arguments; say what went wrong instead. */
+function parseCheckArgs(argv: string[]) {
+  try {
+    return parseArgs({
+      args: argv,
+      allowPositionals: true,
+      options: {
+        job: { type: "string" },
+        policy: { type: "string" },
+        json: { type: "boolean", default: false },
+        "min-score": { type: "string" },
+        region: { type: "string" },
+        text: { type: "boolean", default: false },
+        ai: { type: "boolean", default: false },
+        provider: { type: "string" },
+        model: { type: "string" },
+        "base-url": { type: "string" },
+        "max-tokens": { type: "string" },
+        help: { type: "boolean", short: "h", default: false },
+        version: { type: "boolean", short: "v", default: false },
+      },
+    });
+  } catch (error) {
+    const option = /'(-[^']*)'/.exec((error as Error).message)?.[1];
+    const code = (error as { code?: string }).code;
+    if (code === "ERR_PARSE_ARGS_UNKNOWN_OPTION")
+      throw new UsageError(
+        `Unknown option ${option}. Run "ats-engine check --help" for the options.`,
+      );
+    if (code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE")
+      throw new UsageError(`${option ?? "An option"} needs a value.`);
+    throw error;
+  }
+}
+
+async function check(argv: string[], context: CliContext): Promise<number> {
+  const { values, positionals } = parseCheckArgs(argv);
+  const { terminal } = context;
+  const style = createStyle(values.json ? 1 : terminal.depth);
   if (values.help) {
-    console.log(USAGE);
+    printUsage(terminal);
+    return 0;
+  }
+  if (values.version) {
+    console.log(ENGINE_VERSION);
     return 0;
   }
   if (positionals.length !== 1) throw new UsageError("Give exactly one resume file.");
 
-  const minScore = values["min-score"] === undefined ? null : Number(values["min-score"]);
-  if (minScore !== null && !(minScore >= 0 && minScore <= 100))
+  const minScoreText = values["min-score"];
+  const minScore = minScoreText === undefined ? null : Number(minScoreText);
+  if (
+    minScoreText !== undefined &&
+    (!/^\d+(?:\.\d+)?$/.test(minScoreText.trim()) || Number(minScoreText) > 100)
+  )
     throw new UsageError("--min-score must be a number from 0 to 100.");
+
+  const strayAiFlag = AI_FLAGS.find((flag) => values[flag] !== undefined);
+  if (strayAiFlag && !values.ai) throw new UsageError(`--${strayAiFlag} needs --ai.`);
+  // Settled before any file is read, so a missing key fails at once rather than after a parse.
+  const aiConfig = values.ai ? resolveAiConfig(values, context.env) : null;
 
   // The bundled language and region packs ride on whichever policy is used.
   const policy = withLocales(
@@ -136,31 +312,79 @@ async function check(argv: string[]): Promise<number> {
   const regions = policy.locales.regions.map((pack) => pack.id);
   if (values.region !== undefined && !regions.includes(values.region.toUpperCase()))
     throw new UsageError(`Unknown --region "${values.region}"; use one of ${regions.join(", ")}.`);
+
+  if (terminal.interactive && !values.json) console.log(banner(terminal));
+
   const { input, layout } = await readResume(positionals[0]!);
   const jobDescription = values.job ? await readJob(values.job) : undefined;
-  const report = AtsScoringService.check(input, policy, {
+  const resume = prepareResume(input);
+  const report = AtsScoringService.check(resume, policy, {
     jobDescription,
     layout,
     region: values.region,
     includeLines: values.text,
   });
+  const belowMinimum = minScore !== null && report.readinessScore < minScore;
 
-  console.log(values.json ? JSON.stringify(report, null, 2) : render(report));
+  // Resume and posting text can carry control characters; none reach the terminal.
+  if (!values.json) console.log(render(printable(report), style));
+
+  let aiFailed = false;
+  let ai: ReturnType<typeof aiJson> | undefined;
+  if (aiConfig) {
+    // Said before anything leaves the machine, in plain text: stderr can be a file while stdout
+    // is a terminal. `analyze` redacts these; see ai/redact.ts.
+    console.error(
+      `\nSending the resume to ${aiConfig.provider} at ${aiConfig.host} (${aiConfig.model}) for ` +
+        "analysis. Your name, email, phone number and links are replaced with placeholders first.",
+    );
+    try {
+      const run = await analyzeReport(
+        aiConfig,
+        { resumeText: resume.text, report, jobDescription },
+        context.fetch,
+      );
+      if (values.json) ai = aiJson(run, aiConfig);
+      else console.log(renderInsights(printable(run), aiConfig, style));
+    } catch (error) {
+      console.error(`ats-engine: ${printable(describeAiError(error, aiConfig))}`);
+      aiFailed = true;
+    }
+  }
+
+  if (values.json) console.log(JSON.stringify(ai ? { ...report, ai } : report, null, 2));
   // The reading order, for seeing what a multi-column layout became.
-  if (values.text && !values.json)
-    console.log(["", "Text as read:", ...(report.lines ?? [])].join("\n"));
-  return minScore !== null && report.readinessScore < minScore ? 2 : 0;
+  else if (values.text)
+    console.log(["", style.bold("Text as read:"), ...printable(report.lines ?? [])].join("\n"));
+
+  if (belowMinimum)
+    console.error(`Readiness ${report.readinessScore} is below --min-score ${minScore}.`);
+  // The gate's answer is known whatever happened to the analysis, and CI acts on it.
+  return belowMinimum ? 2 : aiFailed ? 1 : 0;
 }
 
-export async function main(argv: string[]): Promise<number> {
+function printUsage(terminal: Terminal) {
+  if (terminal.interactive) console.log(banner(terminal));
+  console.log(USAGE);
+}
+
+export async function main(argv: string[], context = defaultContext()): Promise<number> {
   const [command, ...rest] = argv;
   try {
-    if (command === "check") return await check(rest);
-    console.log(USAGE);
-    return command === undefined || command === "-h" || command === "--help" ? 0 : 1;
+    if (command === "check") return await check(rest, context);
+    if (command === "--version" || command === "-v") {
+      console.log(ENGINE_VERSION);
+      return 0;
+    }
+    const asked = command === undefined || command === "-h" || command === "--help";
+    if (!asked) console.error(`ats-engine: unknown command "${printable(command)}".\n`);
+    printUsage(context.terminal);
+    return asked ? 0 : 1;
   } catch (error) {
-    console.error(`ats-engine: ${error instanceof Error ? error.message : String(error)}`);
-    if (!(error instanceof UsageError) && process.env.DEBUG) console.error(error);
+    console.error(
+      `ats-engine: ${printable(error instanceof Error ? error.message : String(error))}`,
+    );
+    if (!(error instanceof UsageError) && context.env.DEBUG) console.error(error);
     return 1;
   }
 }

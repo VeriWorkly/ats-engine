@@ -16,6 +16,8 @@ export function degreeLabel(isced: AtsIscedLevel): AtsDegreeLevel {
 
 type EducationMatchers = {
   schools: RegExp;
+  /** The same, global: to take every school word out of a name. */
+  schoolsAll: RegExp;
   /** Highest level first, so a line naming two credentials is recorded at the higher one. */
   levels: Array<{ isced: AtsIscedLevel; re: RegExp }>;
 };
@@ -23,6 +25,7 @@ type EducationMatchers = {
 /** Compiled once per policy rather than once per call; the policy is stable for its lifetime. */
 const matchersFor = memo((rp: AtsEnginePolicy["resumeParse"]): EducationMatchers => ({
   schools: wordListRegex(rp.schoolWords),
+  schoolsAll: wordListRegex(rp.schoolWords, "gi"),
   levels: Object.entries(rp.degrees)
     .filter((entry): entry is [string, string] => typeof entry[1] === "string")
     .map(([level, pattern]) => ({
@@ -77,6 +80,7 @@ export function parseEducation(
     const school = isSchool
       ? schoolName(range ? line.replace(range.matched, " ") : line, degree?.matched ?? "", policy)
       : "";
+    if (!degree && !school) return;
     const entry: AtsParsedEducation = {
       school,
       credential: degree?.matched ?? "",
@@ -87,8 +91,16 @@ export function parseEducation(
 
     // A degree printed over its school ("B.S., Computer Science 2015 - 2019" / "University of
     // Washington"), or under it, is one entry. Read line by line it was two half-empty rows.
+    // Not when the two lines are dated differently: "B.Tech, IIT Bombay, 2014 - 2018" over
+    // "Class XII, Delhi Public School, 2014" are two qualifications, and the B.Tech is not from
+    // the school below it.
     const other = open?.at === at - 1 ? open.entry : null;
-    if (other && (other.school ? !entry.school && entry.isced : entry.school && !entry.isced)) {
+    const datedApart = other?.end && entry.end && other.end.year !== entry.end.year;
+    if (
+      other &&
+      !datedApart &&
+      (other.school ? !entry.school && entry.isced : entry.school && !entry.isced)
+    ) {
       other.school ||= entry.school;
       other.credential ||= entry.credential;
       other.isced ??= entry.isced;
@@ -110,7 +122,11 @@ const YEAR = /(?<!\d)(?:19|20)\d{2}(?!\d)/g;
 /** The separators an education line's parts are printed between, kept by `split`. */
 // A dash's spaces are matched from the start of their run: from inside it, a long run of spaces
 // with no dash would be rescanned from every position.
-const PART = /([|,•·]|(?<!\s)\s+[–—-]\s+)/;
+// A comma between digits is a decimal one, as in a German grade: "Note 1,7".
+const PART = /([|•·]|(?<!\d),|,(?!\d)|(?<!\s)\s+[–—-]\s+)/;
+
+/** A bracketed note holding a number after a school's name: "(Note 1,7)", "(GPA 3.8)". */
+const NUMBERED_NOTE = /\([^()\d]{0,40}\d[^()]{0,40}\)/g;
 
 /**
  * The institution named in an education line, its date range already taken out.
@@ -123,14 +139,18 @@ const PART = /([|,•·]|(?<!\s)\s+[–—-]\s+)/;
  * - A lone graduation year goes: "State University 2016" is not the institution's name.
  */
 function schoolName(text: string, credential: string, policy: AtsEnginePolicy) {
-  const { schools } = matchersFor(policy.resumeParse);
+  const { schools, schoolsAll } = matchersFor(policy.resumeParse);
   const pieces = text.split(PART);
   const name = (at: number) =>
     pieces[at]
+      .replace(NUMBERED_NOTE, " ")
       .replace(YEAR, " ")
       .trim()
       .replace(/(?<![\s,–—-])[\s,–—-]+$/, "");
-  const named = (at: number) => at % 2 === 0 && schools.test(name(at));
+  // A school word alone is a heading ("SCHOOL"), not the name of one.
+  const named = (at: number) =>
+    at % 2 === 0 && schools.test(name(at)) && !onlySchoolWords(name(at));
+  const onlySchoolWords = (text: string) => text.replace(schoolsAll, "").trim() === "";
 
   let at = pieces.findIndex((piece, i) => named(i) && !(credential && piece.includes(credential)));
   if (at === -1) at = pieces.findIndex((_, i) => named(i));

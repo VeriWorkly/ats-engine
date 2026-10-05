@@ -78,6 +78,13 @@ export function isApplicable(rule: AtsEngineRule, ctx: RuleContext) {
   if (rule.kind === "section") return ctx.lines.length > 1;
   // A check that does not apply to this resume (copying a posting, without one) drops its rule.
   if (rule.kind === "bands" && isFinding(rule.metric)) return ctx.findings[rule.metric] !== null;
+  // A share of the recovered roles means nothing when none was recovered; `rolesDetected` says
+  // so, and failing completeness on top of it charged twice for one finding.
+  if (
+    rule.kind === "parsed" &&
+    (rule.metric === "roleCompleteness" || rule.metric === "datedRoleRatio")
+  )
+    return ctx.quality.rolesDetected > 0;
   if (rule.kind !== "layout") return true;
   if (!ctx.layout) return false;
   // Measured per metric, not per document: a short resume can still be checked for ruled tables
@@ -137,7 +144,7 @@ function resolveBandMetric(
         ? actionVerbPattern(ctx.policy.text)
         : null;
     if (!re || ctx.lines.length === 0) return 0;
-    const targetLines = ctx.contentLines.length > 0 ? ctx.contentLines : ctx.lines;
+    const targetLines = ratioLines(ctx);
 
     if (rule.metric === "metricsRatio")
       return targetLines.filter((line) => re.test(line)).length / targetLines.length;
@@ -147,10 +154,16 @@ function resolveBandMetric(
     // parsers actually reward is bullets that *open* with one, so the match has to land in the
     // opening few words of the line.
     // A verb-final language (`text.actionVerbAnywhere`) puts the verb at the end instead.
+    // A regular past tense ("Shepherded") counts as the first word without being listed; a
+    // rule with a pattern of its own is graded by that alone.
+    const forms = rule.pattern ? null : actionVerbForms(ctx.policy.text);
     const opensWithVerb = (line: string) => {
+      const opening = line.replace(BULLET_PREFIX, "").split(/\s+/).slice(0, 3);
+      // Cut first: a 50 KB "word" of punctuation would be rescanned from every position.
+      const first = (opening[0] ?? "").slice(0, 40).replace(/[^\p{L}\p{M}]{1,8}$/u, "");
+      if (forms?.test(first)) return true;
       if (ctx.policy.text.actionVerbAnywhere) return re.test(line);
-      const opening = line.replace(BULLET_PREFIX, "").split(/\s+/).slice(0, 3).join(" ");
-      return re.test(opening);
+      return re.test(opening.join(" "));
     };
     return targetLines.filter(opensWithVerb).length / targetLines.length;
   }
@@ -170,22 +183,41 @@ const ratioPattern = memo((rule: Extract<AtsEngineRule, { kind: "bands" }>) =>
 const actionVerbPattern = memo((text: AtsEnginePolicy["text"]) =>
   policyRegex(wordListPattern(text.actionVerbs), "i"),
 );
+/** Anchored: the forms describe a whole word, which is all they are tested against. */
+const actionVerbForms = memo((text: AtsEnginePolicy["text"]) =>
+  policyRegex(`^(?:${text.actionVerbForms.join("|")})$`, "i"),
+);
 
-/** A rule's result: its evidence template filled with `vars`, and what it cost. */
+/**
+ * The lines both ratio metrics divide by: the bullets. Where the list markers did not survive
+ * extraction (a PDF printed from Chrome draws them as paths), the lines written as sentences
+ * under a role's dated line, so a resume grades the same from its PDF as from its text file;
+ * counting every four-word line instead took in the contact row and the role headers. The
+ * context reads them that way (`contentLinesOf` in context.ts); every line when it found none.
+ */
+const ratioLines = (ctx: RuleContext) =>
+  ctx.contentLines.length > 0 ? ctx.contentLines : ctx.lines;
+
+/**
+ * A rule's result: its evidence template filled with `vars`, and what it cost. A failing band
+ * may word its own evidence and fix (too short, too long), in place of the rule's.
+ */
 function result(
   rule: AtsEngineRule,
   passed: boolean,
   scoreImpact: number,
   vars: Record<string, string | number> = {},
+  band?: { failEvidence?: string; fix?: string },
 ): AtsRuleResult {
+  const failEvidence = band?.failEvidence ?? rule.failEvidence;
   return {
     id: rule.id,
     category: rule.category,
     severity: rule.severity,
     passed,
-    evidence: formatTemplate(passed ? rule.passEvidence : rule.failEvidence, vars),
+    evidence: formatTemplate(passed ? rule.passEvidence : failEvidence, vars),
     scoreImpact,
-    fix: rule.fix,
+    fix: (!passed && band?.fix) || rule.fix,
   };
 }
 
@@ -245,11 +277,13 @@ export function evaluateRule(rule: AtsEngineRule, ctx: RuleContext): AtsRuleResu
       : rule.kind === "layout" && rule.metric === "hiddenTextChars"
         ? (ctx.layout?.hiddenTextSample ?? "")
         : "";
-  return result(rule, passed, band.weight, {
-    n: Math.round(value),
-    pct: Math.round(value * 100),
-    sample,
-  });
+  return result(
+    rule,
+    passed,
+    band.weight,
+    { n: Math.round(value), pct: Math.round(value * 100), sample },
+    band,
+  );
 }
 
 /**

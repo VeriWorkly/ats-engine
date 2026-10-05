@@ -6,6 +6,7 @@ import { openAiCompatible } from "../src/ai/openai-compatible.js";
 import { scriptedProvider } from "../src/ai/testing/index.js";
 import { AtsScoringService, DEFAULT_POLICY } from "../src/index.js";
 import { groundingWords, isGrounded, normalizeForGrounding } from "../src/repair/grounding.js";
+import { expectFast } from "./fixtures/timing.js";
 
 /**
  * Defects found in the final review of the AI layer, one block each. Every model reply is
@@ -139,10 +140,13 @@ describe("grounding", () => {
   const words = groundingWords(source);
 
   it("takes time linear in the source, whatever the value", () => {
-    const started = performance.now();
-    expect(isGrounded("a".repeat(2_048), source, words)).toBe(true);
-    expect(isGrounded(`${"a".repeat(2_047)}b`, source, words)).toBe(false);
-    expect(performance.now() - started).toBeLessThan(500);
+    const hit = "a".repeat(2_048);
+    const miss = `${"a".repeat(2_047)}b`;
+    const results = expectFast(
+      () => [isGrounded(hit, source, words), isGrounded(miss, source, words)],
+      500,
+    );
+    expect(results).toEqual([true, false]);
   });
 
   it("still joins words only on their boundaries", () => {
@@ -172,9 +176,7 @@ describe("grounding", () => {
 
   it("compares addresses in linear time against a long run of slashes", () => {
     const slashes = normalizeForGrounding(`x${"/".repeat(48_000)}y`);
-    const started = performance.now();
-    expect(isGrounded("https://github.com/janedoe", slashes)).toBe(false);
-    expect(performance.now() - started).toBeLessThan(250);
+    expect(expectFast(() => isGrounded("https://github.com/janedoe", slashes), 250)).toBe(false);
   });
 
   it("grounds a credential written with a slash as words when the source spaces it", () => {

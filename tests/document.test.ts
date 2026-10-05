@@ -11,6 +11,7 @@ import {
   renderResumeDocument,
   type AtsResumeDocument,
 } from "../src/index.js";
+import { expectFast } from "./fixtures/timing.js";
 
 const NOW = new Date("2026-09-30T00:00:00Z");
 const check = (input: Parameters<typeof AtsScoringService.check>[0], jobDescription?: string) =>
@@ -200,9 +201,7 @@ describe("input validation", () => {
 
   it("stops flattening once the text budget is spent", () => {
     const big = { items: Array.from({ length: 200_000 }, (_, i) => `entry ${i}`) };
-    const started = performance.now();
-    expect(prepareResume(big).text.length).toBeLessThanOrEqual(50_000);
-    expect(performance.now() - started).toBeLessThan(500);
+    expect(expectFast(() => prepareResume(big), 500).text.length).toBeLessThanOrEqual(50_000);
   });
 });
 
@@ -330,9 +329,7 @@ describe("JSON Resume through the engine's front door", () => {
       basics: { name: "A" },
       work: Array.from({ length: 500_000 }, () => ({ name: "Acme", position: "Engineer" })),
     };
-    const started = performance.now();
-    const prepared = prepareResume(huge);
-    expect(performance.now() - started).toBeLessThan(500);
+    const prepared = expectFast(() => prepareResume(huge), 500);
     expect(prepared.document?.sections[0]?.kind).toBe("experience");
   });
 
@@ -369,9 +366,7 @@ describe("structured input size", () => {
         sections: [{ kind: "experience", title: "E", items: Array(1_300_000).fill({}) }],
       },
     ]) {
-      const started = performance.now();
-      expect(() => prepareResume(huge)).toThrow(AtsInputError);
-      expect(performance.now() - started).toBeLessThan(200);
+      expectFast(() => expect(() => prepareResume(huge)).toThrow(AtsInputError), 200);
     }
   });
 

@@ -6,18 +6,19 @@ import {
   jobTextFromHtml,
   MAX_JOB_TEXT_CHARS,
 } from "../src/job/index.js";
+import { expectFast } from "./fixtures/timing.js";
 
 const page = (head: string, body: string) =>
   `<!doctype html><html><head>${head}</head><body>${body}</body></html>`;
 
 describe("jobHtmlToText", () => {
-  it("keeps headings and bullets as lines", () => {
+  it("keeps headings and bullets as lines, joins phrasing tags and drops the head", () => {
     const html = page(
       "<title>Job</title>",
       "<h1>Senior Engineer</h1><h2>Requirements</h2><ul><li>Go</li><li>Kubernetes</li></ul><p>Remote <b>OK</b>.</p>",
     );
     expect(jobHtmlToText(html)).toBe(
-      "Job\nSenior Engineer\nRequirements\n• Go\n• Kubernetes\nRemote OK .",
+      "Senior Engineer\nRequirements\n• Go\n• Kubernetes\nRemote OK.",
     );
   });
 
@@ -32,7 +33,7 @@ describe("jobHtmlToText", () => {
   it("decodes named and numeric entities", () => {
     expect(
       jobHtmlToText("<p>R&amp;D &ndash; caf&eacute; &#233; &#x2014; &#39;ok&#39; &nbsp;x</p>"),
-    ).toBe("R&D – caf&eacute; é — 'ok' x");
+    ).toBe("R&D – café é — 'ok' x");
   });
 
   it("treats an unclosed tag as the end of the text", () => {
@@ -56,10 +57,10 @@ describe("jobHtmlToText", () => {
     ["a million tiny tags", "<a>x".repeat(500_000)],
     ["unterminated entities", "&amp".repeat(500_000)],
   ])("stays linear on %s", (_label, input) => {
-    const started = performance.now();
-    jobHtmlToText(input);
-    jobTextFromHtml(input);
-    expect(performance.now() - started).toBeLessThan(5_000);
+    expectFast(() => {
+      jobHtmlToText(input);
+      jobTextFromHtml(input);
+    }, 5_000);
   });
 });
 

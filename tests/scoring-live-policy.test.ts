@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { computeVerdict, type AtsLayoutSignals, type AtsResumeInput } from "../src/index.js";
 import { livePolicy as policy, livePolicyLoadError, livePolicyPath } from "./livePolicy.js";
+import { expectFastAsync } from "./fixtures/timing.js";
 
 /**
  * Calibration suite: exercises the engine against the *real* shipped policy rather than a
@@ -329,9 +330,10 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
   it("stays fast on a comma list built to make a backtracking scanner suffer", async () => {
     const bomb = Array.from({ length: 4000 }, (_, index) => `term${index}`).join(", ");
 
-    const startedAt = Date.now();
-    await check("jane@example.com\nSkills\nGo", `Requirements\n${bomb}`);
-    expect(Date.now() - startedAt).toBeLessThan(150);
+    await expectFastAsync(
+      () => check("jane@example.com\nSkills\nGo", `Requirements\n${bomb}`),
+      150,
+    );
   });
 
   /**

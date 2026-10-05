@@ -53,8 +53,15 @@ export const keywordMatchSchema = z
         { suffix: "ing", minLength: 6, replacement: "" },
         { suffix: "ies", minLength: 5, replacement: "y" },
         { suffix: "ed", minLength: 5, replacement: "" },
-        { suffix: "es", minLength: 5, replacement: "" },
-        { suffix: "s", minLength: 4, replacement: "", unless: "ss" },
+        // "-es" is a plural ending only after s, x, ch and sh ("processes", "indexes",
+        // "searches"); elsewhere the "e" is the word's own ("databases", "pipelines"), and
+        // stripping it left "databas" beside "database".
+        { suffix: "sses", minLength: 5, replacement: "ss" },
+        { suffix: "xes", minLength: 4, replacement: "x" },
+        { suffix: "ches", minLength: 5, replacement: "ch" },
+        { suffix: "shes", minLength: 5, replacement: "sh" },
+        // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
+        { suffix: "s", minLength: 3, replacement: "", unless: "ss" },
       ]),
     /** Endings a multi-word phrase may carry on its last word and still be the same phrase. */
     pluralSuffixes: wordList("pluralSuffixes").default(["s", "es"]),
@@ -79,6 +86,9 @@ export const keywordMatchSchema = z
           // "and" joins a range only after "between": "Python 3 and 5 years" asks for five. The
           // lookbehind follows the "and", so it runs once per "and", not once per space before it.
           String.raw`(?<!\d)(\d{1,2})\s*(?:\+\s*)?(?:(?:[-–]|to\s|and\s(?<=between\s+\d{1,2}\s*and\s))\s*\d{1,2}\s*)?(?:years?|yrs?)(?![\p{L}])(?![\s-]+(?:of\s+age|old|or\s+older)(?![\p{L}]))`,
+          // In words, with or without the figure: "five (5) years", "Five years", "ten (10)+
+          // years". Group 1 is the word; `numberWords` gives its value.
+          String.raw`(?<![\p{L}])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)\s*(?:\(\s*\d{1,2}\s*(?:\+\s*)?\)\s*)?(?:\+\s*)?(?:years?|yrs?)(?![\p{L}])(?![\s-]+(?:of\s+age|old|or\s+older)(?![\p{L}]))`,
         ]),
         /** Words that let experience stand in for the stated degree: "or equivalent experience". */
         equivalence: wordList("requirements.equivalence").default([
@@ -174,6 +184,99 @@ export const keywordMatchSchema = z
           ),
       })
       .prefault({}),
+    /**
+     * Number words a years pattern may capture instead of a figure: "five years". Also never
+     * keywords: "five" is not a skill a candidate is missing.
+     */
+    numberWords: z.record(term, z.number().int().positive()).default({
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+      eleven: 11,
+      twelve: 12,
+      fifteen: 15,
+      twenty: 20,
+    }),
+    /**
+     * Words that make an activity or a credential part of a requirement, so a requirement is not
+     * met by its object alone: "mentoring engineers" by an engineering title, "AWS
+     * certification" by "deployed on AWS". Each group is one ask, met by any of its words; a
+     * `sameLine` group must appear on a resume line that also names the requirement's skill
+     * (the certificate *in* AWS).
+     */
+    qualifiers: z
+      .array(z.object({ words: z.array(term).min(1), sameLine: z.boolean().default(false) }))
+      .default([
+        {
+          words: ["mentoring", "mentor", "mentored", "mentorship", "coaching", "coached"],
+          sameLine: false,
+        },
+        { words: ["leading", "lead", "led", "leadership"], sameLine: false },
+        // Not "management": "project management tools" names a field, not managing people.
+        { words: ["managing", "manage", "managed", "manager"], sameLine: false },
+        {
+          words: ["certification", "certified", "certificate", "certifications", "certificates"],
+          sameLine: true,
+        },
+        { words: ["license", "licence", "licensed", "licensure"], sameLine: true },
+      ]),
+    /**
+     * What marks a clause of a requirement as optional: "Bachelor's degree required; MBA a
+     * plus". The clause is read as preferred and does not raise the level the line asks for.
+     */
+    preferredMarkers: wordList("preferredMarkers").default([
+      String.raw`a\s+plus`,
+      String.raw`is\s+a\s+plus`,
+      "preferred",
+      String.raw`nice\s+to\s+have`,
+      String.raw`(?:a\s+)?bonus`,
+      "desirable",
+      "ideally",
+      String.raw`an\s+advantage`,
+    ]),
+    /**
+     * Text in a posting that is never a keyword: a "City, ST" location. Compiled
+     * case-sensitively and globally; each must be linear on hostile input.
+     */
+    ignorePatterns: z
+      .array(regexString("ignorePatterns"))
+      .default([
+        String.raw`(?<![\p{L}])\p{Lu}[\p{L}'.-]{0,30}(?:\s\p{Lu}[\p{L}'.-]{0,30}){0,2},\s{0,3}(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(?![\p{L}\p{N}/+#])`,
+      ]),
+    /**
+     * What a posting offers rather than asks: "Salary range $175,000 – $215,000", "Benefits:
+     * health, dental". A line that opens with one of these, or names one beside an amount of
+     * money, is not a requirement. Only then, so "experience with health insurance claims" stays.
+     */
+    offerWords: wordList("offerWords").default([
+      "salary",
+      "compensation",
+      String.raw`pay\s+range`,
+      String.raw`base\s+pay`,
+      "wage",
+      "wages",
+      "benefits",
+      "perks",
+      "equity",
+      String.raw`stock\s+options`,
+    ]),
+    /**
+     * Labels of a line that states a nationality, never a language: "Nationality: German",
+     * "Staatsangehörigkeit: deutsch". Such a line is no evidence of speaking the language.
+     */
+    nationalityLabels: wordList("nationalityLabels").default([
+      "nationality",
+      "citizenship",
+      String.raw`staatsangeh(?:ö|oe)rigkeit`,
+      String.raw`nationalit(?:ä|ae)t`,
+    ]),
     stopwords: z.array(term),
     synonyms: z.record(term, term),
     /**

@@ -77,7 +77,7 @@ describe("tables and photos", () => {
 
   it("counts a photo by its printed size", async () => {
     const drawing = (inches: number) =>
-      `<w:p><w:r><w:drawing><wp:inline><wp:extent cx="${inches * 914_400}" cy="${inches * 914_400}"/></wp:inline></w:drawing></w:r></w:p>`;
+      `<w:p><w:r><w:drawing><wp:inline><wp:extent cx="${inches * 914_400}" cy="${inches * 914_400}"/><a:graphic><a:graphicData><pic:pic/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
     expect((await measure(drawing(1.2))).imageCount).toBe(1);
     expect((await measure(drawing(0.3))).imageCount).toBe(0);
   });

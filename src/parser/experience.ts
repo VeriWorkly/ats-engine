@@ -5,10 +5,20 @@ import { findDateRange } from "./dates.js";
 import { isHeadingLine } from "./sections.js";
 import { memo } from "../util/memo.js";
 
-type HeaderMatchers = { titleWords: RegExp; splitter: RegExp; verbOpener: RegExp };
+type HeaderMatchers = {
+  titleWords: RegExp;
+  splitter: RegExp;
+  verbOpener: RegExp;
+  duration: RegExp;
+};
 
 const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatchers => ({
   titleWords: wordListRegex(rp.titleWords),
+  // "4 yrs 9 mos", "(4 years 9 months)": how long, which LinkedIn prints beside the dates.
+  duration: new RegExp(
+    String.raw`(?<![\p{L}\p{N}])\d{1,2}\+?\s*${wordListPattern(rp.durationUnits)}\.?`,
+    "giu",
+  ),
   // Split before collapsing whitespace: a tab or a run of spaces is a column gap between
   // title and employer, and collapsing it first merged the two into one field. The words
   // that join a title to its employer ("Engineer at Acme", "Entwickler bei Acme") are data; an
@@ -80,20 +90,30 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
  * one ("grew revenue 2019 - 2021", "from 1000 to 5000 users") are achievements, not tenure.
  */
 export function parseRoles(
-  lines: string[],
+  given: string[],
   policy: AtsEnginePolicy,
   now: Date = new Date(),
 ): AtsParsedRole[] {
   const roles: AtsParsedRole[] = [];
 
   const rp = policy.resumeParse;
-  const { verbOpener: opensWithVerb, titleWords } = matchersOf(policy);
+  const lines = joinWrappedDates(given, rp, now);
+  const { verbOpener: opensWithVerb, titleWords, duration } = matchersOf(policy);
+  // The employer the last employer line named, for the roles under it that name none.
+  let group = "";
   // A header is a short, unbulleted line with no dates of its own. A trailing full stop does not
   // make "Senior Engineer, Acme Corp." a sentence.
   const isHeader = (line: string | undefined): line is string =>
     line !== undefined &&
     !BULLET.test(line) &&
     isHeadingLine(line.replace(/\.$/, "")) &&
+    !findDateRange(line, rp, now);
+  const isLongHeader = (line: string | undefined): line is string =>
+    line !== undefined &&
+    !BULLET.test(line) &&
+    line.length <= 120 &&
+    line.trim().split(/\s+/).length <= 14 &&
+    !/[.,;।]$/u.test(line.replace(/\.$/, "")) &&
     !findDateRange(line, rp, now);
   const isSingle = (line: string) => splitTitleAndEmployer(line, policy).employer === "";
   const lettersIn = (text: string) => text.match(/\p{L}/gu)?.length ?? 0;
@@ -102,7 +122,7 @@ export function parseRoles(
   const anchors = lines.flatMap((line, index) => {
     const found = BULLET.test(line) ? null : findDateRange(line, rp, now);
     if (!found) return [];
-    const remainder = line.replace(found.matched, " ").trim();
+    const remainder = line.replace(found.matched, " ").replace(duration, " ").trim();
     return [{ index, found, own: lettersIn(remainder) >= 3 ? remainder : "" }];
   });
   const ownAt = new Map(anchors.map((anchor) => [anchor.index, anchor.own]));
@@ -156,17 +176,105 @@ export function parseRoles(
       free(above - 1) &&
       isSingle(lines[above - 1]) &&
       (isSingle(lines[above]) || (titled(above - 1) && !titled(above)));
-    if (!header && free(index - 1))
-      header = stacked(index - 1)
-        ? `${take(index - 2)} | ${headerParts(take(index - 1), policy)[0]}`
-        : take(index - 1);
+    // A whole header over a short line with no title of its own, over the dates: the short line
+    // is where ("Remote"), or the end of a header the page wrapped ("…School of Public" /
+    // "Health"). Either way the header is the line above it, not the short line.
+    // Such a header ran to the page's width, so it may be longer than a heading-shaped line.
+    const wrapped = (above: number) =>
+      free(above) &&
+      !used.has(above - 1) &&
+      isLongHeader(lines[above - 1]) &&
+      titled(above - 1) &&
+      !isSingle(lines[above - 1]) &&
+      !titled(above) &&
+      isSingle(lines[above]) &&
+      !opensWithVerb.test(lines[above]);
+    let top = index;
+    if (!header && free(index - 1)) {
+      if (wrapped(index - 1)) {
+        take(index - 1);
+        header = take(index - 2);
+        top = index - 2;
+      } else if (stacked(index - 1)) {
+        header = `${take(index - 2)} | ${headerParts(take(index - 1), policy)[0]}`;
+        top = index - 2;
+      } else {
+        header = take(index - 1);
+        top = index - 1;
+      }
+    }
     if (!header && free(index + 1)) header = take(index + 1);
 
-    const { title, employer } = splitTitleAndEmployer(header, policy);
-    roles.push({ ...found.range, title, employer });
+    const split = splitTitleAndEmployer(header, policy);
+    let { employer } = split;
+    // Several roles under one employer: "Acme Corporation, New York, NY" on a line of its own
+    // over a title and its dates, then more titles and dates. The employer line names every role
+    // under it, until a role names its own.
+    if (split.title && !employer) {
+      const above = top - 1;
+      if (titled(top) && free(above) && !titled(above) && employerLine(lines[above])) {
+        employer = headerParts(take(above), policy)[0] ?? "";
+        group = employer;
+      } else employer = group;
+    } else if (employer) {
+      // Stacked with the employer over the title, it heads a group too.
+      group = top === index - 2 && employer === headerParts(lines[top], policy)[0] ? employer : "";
+    }
+    roles.push({ ...found.range, title: split.title, employer });
   }
 
   return roles;
+}
+
+/**
+ * A line that can name an employer above a role: no label (":"), not a sentence's lowercase
+ * opening. Header-shaped and title-free are checked by the caller.
+ */
+const employerLine = (line: string) => !line.includes(":") && /^[\p{Lu}\p{N}]/u.test(line);
+
+/**
+ * A date range the page wrapped onto two lines — "Aug 2018 – Aug" over "2021", "2003 –" over
+ * "2008" — rejoined, so the role it dates is not lost. Only a short date-shaped line is
+ * rejoined, and only when neither line holds a range of its own and together they do.
+ */
+function joinWrappedDates(lines: readonly string[], rp: AtsEnginePolicy["resumeParse"], now: Date) {
+  const joined: string[] = [];
+  for (let at = 0; at < lines.length; at += 1) {
+    const line = lines[at];
+    const next = lines[at + 1];
+    if (
+      next !== undefined &&
+      next.length <= 12 &&
+      /^['’‘]?\d/u.test(next) &&
+      !BULLET.test(line) &&
+      /\d/.test(line) &&
+      !findDateRange(line, rp, now) &&
+      findDateRange(`${line} ${next}`, rp, now)
+    ) {
+      joined.push(`${line} ${next}`);
+      at += 1;
+      continue;
+    }
+    // A row whose two sides both wrap: "Engineer, Alpine Ski House⇥Jul 2003 – May" over
+    // "Systems⇥2008". Each side is rejoined with its own continuation.
+    const [left, right, ...restLine] = line.split("\t");
+    const [nextLeft, nextRight, ...restNext] = next?.split("\t") ?? [];
+    if (
+      right !== undefined &&
+      nextRight !== undefined &&
+      !restLine.length &&
+      !restNext.length &&
+      nextRight.trim().length <= 12 &&
+      /^['’‘]?\d/u.test(nextRight.trim()) &&
+      !BULLET.test(line) &&
+      !findDateRange(right, rp, now) &&
+      findDateRange(`${right} ${nextRight.trim()}`, rp, now)
+    ) {
+      joined.push(`${left} ${nextLeft!.trim()}\t${right} ${nextRight.trim()}`);
+      at += 1;
+    } else joined.push(line);
+  }
+  return joined;
 }
 
 /** The policy's job-title words, compiled once. */

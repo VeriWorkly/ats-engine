@@ -6,13 +6,15 @@ import {
   formatRoleDates,
   formatTenure,
   roleSpanMonths,
+  SCORE_BANDS,
   scoreTone,
   sortByCategoryOrder,
 } from "../src/format/index.js";
+import { VERDICT_BANDS } from "../src/scoring/verdict.js";
 
 describe("format helpers", () => {
   it("bands scores for display", () => {
-    expect([100, 80, 79, 55, 54, 0].map(scoreTone)).toEqual([
+    expect([100, 75, 74, 45, 44, 0].map(scoreTone)).toEqual([
       "good",
       "good",
       "warn",
@@ -20,6 +22,10 @@ describe("format helpers", () => {
       "bad",
       "bad",
     ]);
+  });
+
+  it("bands scores exactly as the verdict does, so the CLI and a report never disagree", () => {
+    expect(SCORE_BANDS).toEqual({ good: VERDICT_BANDS.strong, warn: VERDICT_BANDS.needsWork });
   });
 
   it("orders known categories and keeps unknown ones after them", () => {

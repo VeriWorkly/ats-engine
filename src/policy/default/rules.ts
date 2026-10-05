@@ -8,7 +8,7 @@ export const DEFAULT_RULES = [
     min: 50,
     weight: 20,
     passEvidence: "Recovered {n} words of text.",
-    failEvidence: "Only {n} words of text could be recovered.",
+    failEvidence: "Only {n} {n|word|words} of text could be recovered.",
     fix: "Save the resume as a text-based PDF rather than a scan or an image.",
   },
   {
@@ -22,7 +22,7 @@ export const DEFAULT_RULES = [
     weight: 12,
     passEvidence: "An email address was found.",
     failEvidence: "No email address was found.",
-    fix: "Add an email address to the header of the resume.",
+    fix: "Add an email address at the top of the first page, as plain text in the body rather than in a page header.",
   },
   {
     id: "ats-v2.contact.position",
@@ -35,7 +35,8 @@ export const DEFAULT_RULES = [
     weight: 6,
     passEvidence: "Contact details appear near the top of the document.",
     failEvidence: "Contact details appear well below the top of the document.",
-    fix: "Move the email address and phone number into the header.",
+    // Not "into the header": a Word or PDF page header is often skipped by ATS parsers.
+    fix: "Put the email address and phone number at the top of the first page, in the body of the document rather than in a page header, which many ATS parsers skip.",
   },
   {
     id: "ats-v2.structure.experience",
@@ -76,14 +77,25 @@ export const DEFAULT_RULES = [
     severity: "warning",
     kind: "bands",
     metric: "wordCount",
+    // Every word counts, "a" and "9" included. The ceiling is about two full pages.
     bands: [
-      { upTo: 200, weight: 10 },
-      { upTo: 1200, weight: 0 },
-      { upTo: null, weight: 8 },
+      {
+        upTo: 200,
+        weight: 10,
+        failEvidence: "The resume is {n} {n|word|words}, too short to show what you did.",
+        fix: "Add to it: a few bullets for each recent role saying what you did and what came of it.",
+      },
+      { upTo: 1500, weight: 0 },
+      {
+        upTo: null,
+        weight: 8,
+        failEvidence: "The resume is {n} words, too long for a reviewer to read through.",
+        fix: "Cut it to what matters for the job: recent roles in full, older ones in a line or two.",
+      },
     ],
     passEvidence: "The resume is {n} words, a reasonable length.",
-    failEvidence: "The resume is {n} words, outside the range most reviewers expect.",
-    fix: "Aim for roughly one page per five years of experience.",
+    failEvidence: "The resume is {n} {n|word|words}, outside the range most reviewers expect.",
+    fix: "Keep the resume between about 200 and 1,500 words: one or two pages.",
   },
   {
     id: "ats-v2.format.letterSpacing",
@@ -97,7 +109,7 @@ export const DEFAULT_RULES = [
     ],
     passEvidence: "Headings extract as whole words.",
     failEvidence:
-      '{n} lines extract with a space between letters, as a heading set as "E X P E R I E N C E" does.',
+      '{n} {n|line extracts|lines extract} with a space between letters, as a heading set as "E X P E R I E N C E" does.',
     fix: "Remove the letter spacing (tracking) from section headings so they extract as words.",
   },
   {
@@ -124,15 +136,18 @@ export const DEFAULT_RULES = [
     severity: "warning",
     kind: "bands",
     metric: "actionVerbRatio",
-    // No pattern: the verbs are `text.actionVerbs`, which a language pack extends.
+    // No pattern: the verbs are `text.actionVerbs` and `text.actionVerbForms`, which a
+    // language pack extends. Worded for every language: a Hindi bullet ends with its verb, a
+    // German one may name the action as a noun ("Entwicklung von …").
     flags: "i",
     bands: [
       { upTo: 0.2, weight: 8 },
       { upTo: null, weight: 0 },
     ],
-    passEvidence: "{pct}% of content lines open with an action verb.",
-    failEvidence: "Only {pct}% of content lines open with an action verb.",
-    fix: "Start each bullet with a verb describing what you did.",
+    passEvidence: "{pct}% of bullets name an action you took.",
+    failEvidence:
+      "Only {pct}% of bullets name an action you took; the rest read as duties or labels.",
+    fix: 'Make each bullet say what you did, with an action word ("Led", "Built", "Cut"), rather than what the job was.',
   },
   {
     id: "ats-v2.content.buzzwords",
@@ -145,7 +160,7 @@ export const DEFAULT_RULES = [
       { upTo: null, weight: 5 },
     ],
     passEvidence: "Little filler language.",
-    failEvidence: "{n} filler phrases were found.",
+    failEvidence: "{n} filler {n|phrase was|phrases were} found.",
     fix: "Replace filler phrases with a specific thing you did.",
   },
   {
@@ -175,7 +190,7 @@ export const DEFAULT_RULES = [
       { upTo: null, weight: 10 },
     ],
     passEvidence: "No ruled tables were found.",
-    failEvidence: "{n} ruled tables were found.",
+    failEvidence: "{n} ruled {n|table was|tables were} found.",
     fix: "Replace tables with plain paragraphs and bullets.",
   },
   {
@@ -189,7 +204,7 @@ export const DEFAULT_RULES = [
       { upTo: null, weight: 3 },
     ],
     passEvidence: "The dates in the work history are consistent.",
-    failEvidence: "{n} dates in the work history look wrong: {sample}.",
+    failEvidence: "{n} {n|date|dates} in the work history {n|looks|look} wrong: {sample}.",
     fix: "Check the dates: a role cannot start after today, and an end date left off makes jobs overlap.",
   },
   {
@@ -220,7 +235,8 @@ export const DEFAULT_RULES = [
       { upTo: null, weight: 15 },
     ],
     passEvidence: "Every page has a text layer.",
-    failEvidence: "{n} pages are pictures with no text, so an ATS reads nothing on them.",
+    failEvidence:
+      "{n} {n|page is a picture|pages are pictures} with no text, so an ATS reads nothing on {n|it|them}.",
     fix: "Export the resume as a text PDF rather than scanning it or saving it as an image.",
   },
   // Integrity. Deductions in points (`penalty`), never part of the denominator: they say what
@@ -256,7 +272,7 @@ export const DEFAULT_RULES = [
     ],
     passEvidence: "No hidden text.",
     failEvidence:
-      '{n} characters are hidden from a reader but read by an ATS, starting "{sample}".',
+      '{n} {n|character is|characters are} hidden from a reader but read by an ATS, starting "{sample}".',
     fix: "Remove hidden text. White or tiny text and text behind an image is read by the ATS and treated as keyword stuffing once a recruiter sees it.",
   },
   {
@@ -287,7 +303,7 @@ export const DEFAULT_RULES = [
       { upTo: null, weight: 10 },
     ],
     passEvidence: "No invisible characters.",
-    failEvidence: "{n} invisible characters were found in the text.",
+    failEvidence: "{n} invisible {n|character was|characters were} found in the text.",
     fix: "Remove zero-width and other invisible characters; retype any word they split.",
   },
   {
@@ -302,7 +318,8 @@ export const DEFAULT_RULES = [
       { upTo: null, weight: 10 },
     ],
     passEvidence: "No look-alike letters from other alphabets.",
-    failEvidence: '{n} words mix Latin with look-alike Cyrillic letters, such as "{sample}".',
+    failEvidence:
+      '{n} {n|word mixes|words mix} Latin with look-alike letters from another alphabet, such as "{sample}".',
     fix: "Retype those words: they look right but no search matches them.",
   },
   {
@@ -318,7 +335,7 @@ export const DEFAULT_RULES = [
     ],
     passEvidence: "No keyword stuffing.",
     failEvidence:
-      '{n} terms or lines are repeated far beyond what the text needs, such as "{sample}".',
+      '{n} {n|term or line is|terms or lines are} repeated far beyond what the text needs, such as "{sample}".',
     fix: "Name each skill where you used it. Repetition does not raise a match score in a modern ATS, and recruiters read it as stuffing.",
   },
   {
@@ -336,7 +353,7 @@ export const DEFAULT_RULES = [
       { upTo: null, weight: 2 },
     ],
     passEvidence: "No photo was found.",
-    failEvidence: "{n} images were found, most likely a photo.",
+    failEvidence: "{n} {n|image was|images were} found, most likely a photo.",
     fix: "Leave the photo off unless the country you are applying in expects one.",
   },
   {
@@ -349,7 +366,7 @@ export const DEFAULT_RULES = [
       { upTo: 0, weight: 15 },
       { upTo: null, weight: 0 },
     ],
-    passEvidence: "{n} roles were recovered from the work history.",
+    passEvidence: "{n} {n|role was|roles were} recovered from the work history.",
     failEvidence: "No roles could be recovered from the work history.",
     fix: "Give each job a line with the title, the employer, and a date range.",
   },
@@ -359,6 +376,8 @@ export const DEFAULT_RULES = [
     severity: "warning",
     kind: "parsed",
     metric: "roleCompleteness",
+    // Left out when no role was recovered: `parse.roles` reports that, and a share of nothing
+    // is no evidence.
     bands: [
       { upTo: 0.6, weight: 10 },
       { upTo: null, weight: 0 },

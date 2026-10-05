@@ -11,6 +11,7 @@ import {
 import { BUILT_IN_LOCALES, de, hi, localizePolicy, withLocales } from "../src/locales/index.js";
 import { degreeLevel } from "../src/parser/education.js";
 import { policyRegex, repeatedGroupName } from "../src/policy/regex.js";
+import { expectFast } from "./fixtures/timing.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const P = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -416,18 +417,15 @@ describe("#18 the Hindi language pattern is linear on a long Devanagari run", ()
   it("matches each pattern in well under a second", () => {
     const text = `${"क".repeat(50_000)} x`;
     for (const pattern of hi.requirements!.languagePatterns!) {
-      const start = performance.now();
-      expect([...text.matchAll(policyRegex(pattern, "gi"))]).toEqual([]);
-      expect(performance.now() - start).toBeLessThan(250);
+      const matches = expectFast(() => [...text.matchAll(policyRegex(pattern, "gi"))], 250);
+      expect(matches).toEqual([]);
     }
   });
 
   it("and so is every years pattern on a long run of spaces", () => {
     const text = `1${" ".repeat(50_000)}x`;
     for (const pattern of localized(["de", "hi"], "DE").keywordMatch.requirements.yearsPatterns) {
-      const start = performance.now();
-      policyRegex(pattern, "i").exec(text);
-      expect(performance.now() - start).toBeLessThan(250);
+      expectFast(() => policyRegex(pattern, "i").exec(text), 250);
     }
   });
 });
@@ -476,9 +474,11 @@ describe("a capture-group name used twice is refused on every engine", () => {
   });
 
   it("stays linear on hostile input", () => {
-    const started = performance.now();
-    repeatedGroupName("(?<".repeat(20_000));
-    repeatedGroupName(`(?<${"a".repeat(50_000)}`);
-    expect(performance.now() - started).toBeLessThan(250);
+    const a = "(?<".repeat(20_000);
+    const b = `(?<${"a".repeat(50_000)}`;
+    expectFast(() => {
+      repeatedGroupName(a);
+      repeatedGroupName(b);
+    }, 250);
   });
 });

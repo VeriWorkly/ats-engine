@@ -75,7 +75,8 @@ export function createAtsAi(options: AtsAiOptions): AtsAi {
   return {
     analyze: (input, call = {}) => runTask(context, analyzeSpec(input, redactAnalysis), call),
     repairParse: (input, call = {}) => runTask(context, repairParseSpec(input, enginePolicy), call),
-    convertResume: (input, call = {}) => runTask(context, convertResumeSpec(input), call),
+    convertResume: (input, call = {}) =>
+      runTask(context, convertResumeSpec(input, enginePolicy), call),
   };
 }
 

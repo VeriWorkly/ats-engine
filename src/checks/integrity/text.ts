@@ -1,7 +1,8 @@
 import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { NO_FINDING as NONE, quote, type Finding } from "../finding.js";
 import { wordListPattern } from "../../text/text.js";
-import { findDateRange } from "../../parser/dates.js";
+import { segmentResume } from "../../parser/sections.js";
+import { isDatedLine } from "../bullets.js";
 import { memo } from "../../util/memo.js";
 
 /**
@@ -86,48 +87,131 @@ export function copiedPosting(resume: string, posting: string | undefined): Find
   return total ? { value: shared / total, sample: quote(sample) } : NONE;
 }
 
+/** A line this long is a paragraph, or a resume that extracted as one run: its words all count. */
+const LINE_WORDS = 40;
+
+/** A list: three or more short items between commas, pipes, semicolons or middle dots. */
+function listItems(line: string): string[] | null {
+  // "Cloud: AWS, GCP" — a label before a colon is not an item.
+  const body = line.replace(/^[^:]{1,40}:/u, "");
+  // A plain split and `trim`, not `\s*` around the separator or a `[\s.]+$`: on a long run of
+  // spaces either is retried from every position in it.
+  const items = body
+    .split(/[,|;·•]/u)
+    .map((item) => {
+      let end = item.length;
+      while (end > 0 && item[end - 1] === ".") end -= 1;
+      return item.slice(0, end).trim().toLowerCase();
+    })
+    .filter(Boolean);
+  if (items.length < 3 || items.some((item) => item.split(/\s+/).length > 4)) return null;
+  return items;
+}
+
 /**
  * Terms repeated far beyond what any real resume needs — "Python Python Python …" in a footer,
- * or the same keyword line pasted several times. A term counts when it occurs at least 15 times
- * and at least 5% as often as the words that are not repeated so; a line, when it appears three
- * times or more away from any role's dates. Stopwords and short words never count, so ordinary prose does not
- * trip it. `now` bounds the plausible years, as everywhere dates are read.
+ * a skills block naming Kubernetes nine times, or the same keyword line pasted several times.
+ * Density, not a bare count:
+ *
+ * - A term counts once per line it appears on (the lines of a paragraph-length run count each
+ *   time), and is stuffed when that reaches 15 and 5% of the words that are not repeated so: a
+ *   data engineer says "data" in most bullets, often twice in one, and that is the job.
+ * - A line that is not a list and repeats one term five times or more, as 30% of its words.
+ * - A list item named three times or more within one section outside the work history, as a
+ *   skills block padded with the same skills is; each role naming its own stack is not.
+ * - A line appearing three times or more, unless every copy sits at the same place in its role
+ *   block — the employer above each title, "Key achievements:" under each date line — which is
+ *   the resume's layout, not repetition.
+ *
+ * Stopwords and words under three letters never count as terms, so ordinary prose does not trip
+ * it; a two-letter skill ("Go") counts as a list item. `now` bounds the plausible years.
  */
 export function stuffedTerms(
-  text: string,
+  // Read per line instead, so a term counts once per line; kept for the callers.
+  _text: string,
   lines: string[],
   policy: AtsEnginePolicy,
   now: Date,
 ): Finding {
   const stop = new Set(policy.keywordMatch.stopwords);
-  const words = wordsOf(text);
-  const counts = new Map<string, number>();
-  for (const word of words)
-    if (word.length > 2 && !stop.has(word)) counts.set(word, (counts.get(word) ?? 0) + 1);
+  const isTerm = (word: string) => word.length > 2 && /\p{L}/u.test(word) && !stop.has(word);
+  const total = new Map<string, number>();
+  const spread = new Map<string, number>();
+  const stuffed = new Map<string, number>();
+  const add = (map: Map<string, number>, key: string, by = 1) =>
+    map.set(key, (map.get(key) ?? 0) + by);
 
-  // A field's own word recurs: "data" a dozen times is a data engineer's resume, not stuffing.
+  let counted = 0;
+  for (const line of lines) {
+    const words = wordsOf(line);
+    counted += words.length;
+    const here = new Map<string, number>();
+    for (const word of words) if (isTerm(word)) add(here, word);
+    const paragraph = words.length > LINE_WORDS;
+    const list = listItems(line) !== null;
+    for (const [word, count] of here) {
+      add(total, word, count);
+      add(spread, word, paragraph ? count : 1);
+      if (!list && count >= 5 && count >= words.length * 0.3) stuffed.set(word, 0);
+    }
+  }
   // The share is of the words besides the repeated ones, or ten terms pasted forty times each
   // would raise the bar they are measured against above every one of them.
-  const repeated = [...counts].filter(([, count]) => count >= 15);
-  const rest = words.length - repeated.reduce((sum, [, count]) => sum + count, 0);
+  const repeated = [...spread].filter(([, count]) => count >= 15);
+  const rest = counted - repeated.reduce((sum, [word]) => sum + (total.get(word) ?? 0), 0);
   const threshold = Math.max(15, rest * 0.05);
-  const terms = repeated.filter(([, count]) => count >= threshold).sort((a, b) => b[1] - a[1]);
+  for (const [word, count] of repeated) if (count >= threshold) stuffed.set(word, 0);
+  for (const word of stuffed.keys()) stuffed.set(word, total.get(word) ?? 0);
 
-  // A line beside a role's date range is that role's metadata — its city, "Full-time · Remote" —
-  // and repeats under every role of an honest resume, so it is not counted.
-  const dated = (at: number) =>
-    at >= 0 && at < lines.length && findDateRange(lines[at], policy.resumeParse, now) !== null;
-  const lineCounts = new Map<string, number>();
-  lines.forEach((line, at) => {
-    if (line.split(/\s+/).length < 3 || dated(at) || dated(at - 1) || dated(at + 1)) return;
-    lineCounts.set(line.toLowerCase(), (lineCounts.get(line.toLowerCase()) ?? 0) + 1);
+  // Where each line sits relative to the nearest role date line above and below it.
+  const dated = lines.map((line) => isDatedLine(line, policy, now));
+  const above: number[] = [];
+  const below: number[] = new Array<number>(lines.length);
+  let last = -Infinity;
+  dated.forEach((isDated, at) => {
+    if (isDated) last = at;
+    above.push(at - last);
   });
-  const repeatedLines = [...lineCounts].filter(([, count]) => count >= 3);
+  let next = Infinity;
+  for (let at = lines.length - 1; at >= 0; at -= 1) {
+    if (dated[at]) next = at;
+    below[at] = next - at;
+  }
+  const nearRole = (at: number) => dated[at] || above[at] <= 2 || below[at] <= 2;
+
+  // A skills block naming one skill again and again, read per section outside the work history.
+  const besideRoles = new Set(lines.filter((_, at) => nearRole(at)));
+  for (const section of segmentResume(lines, policy)) {
+    if (section.kind === "experience" || section.kind === "projects") continue;
+    const items = new Map<string, number>();
+    for (const line of section.lines)
+      if (!besideRoles.has(line)) for (const item of listItems(line) ?? []) add(items, item);
+    for (const [item, count] of items)
+      if (count >= 3) stuffed.set(item, Math.max(count, stuffed.get(item) ?? 0));
+  }
+  const terms = [...stuffed].sort((a, b) => b[1] - a[1]);
+
+  const lineAt = new Map<string, number[]>();
+  lines.forEach((line, at) => {
+    if (line.split(/\s+/).length < 3 || dated[at]) return;
+    const key = line.toLowerCase();
+    lineAt.set(key, [...(lineAt.get(key) ?? []), at]);
+  });
+  // Every copy at one distance from its role's dates is the layout of a role block.
+  const sameOffset = (at: number[], offset: number[]) =>
+    at.every((index) => offset[index] <= 4 && offset[index] === offset[at[0]]);
+  const repeatedLines = [...lineAt].filter(
+    ([, at]) =>
+      at.length >= 3 &&
+      !sameOffset(at, above) &&
+      !sameOffset(at, below) &&
+      !at.some((i) => above[i] <= 1 || below[i] <= 1),
+  );
 
   const value = terms.length + repeatedLines.length;
   if (!value) return NONE;
   const sample = terms.length
     ? `${terms[0][0]} ×${terms[0][1]}`
-    : `${quote(repeatedLines[0][0])} ×${repeatedLines[0][1]}`;
+    : `${quote(repeatedLines[0][0])} ×${repeatedLines[0][1].length}`;
   return { value, sample };
 }
