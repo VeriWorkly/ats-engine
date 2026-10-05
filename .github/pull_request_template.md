@@ -12,4 +12,4 @@
 - [ ] Any new regex over input runs in linear time, with a case in the adversarial tests
 - [ ] Every resume in fixtures and tests describes an invented person
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for the reasoning behind each rule.
+See [CONTRIBUTING.md](https://github.com/VeriWorkly/ats-engine/blob/main/CONTRIBUTING.md) for the reasoning behind each rule.

@@ -73,8 +73,9 @@ Tests are named after the area they cover (`parser-fixes`, `matching-fixes`, `no
 `requirements`, …). Older files named after a review or an audit (`audit-*`, `review-*`,
 `regressions`) hold one block per fixed defect, and are being folded into the area files.
 `tests/properties.test.ts` holds generated-input properties. `tests/fixtures/` builds PDFs, DOCX
-files and the labelled corpus, and `timing.ts` has `expectFast`, which every time budget uses so
-a busy machine cannot fail a test.
+files and the labelled corpus, and `timing.ts` has `expectFast`, which time budgets use so a
+busy machine cannot fail a test. Two long extraction tests in `review-node.test.ts` still time a
+single run against a 15 s budget.
 
 ## Dependencies
 

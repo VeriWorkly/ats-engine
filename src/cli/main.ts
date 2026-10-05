@@ -111,6 +111,15 @@ async function readBytes(path: string): Promise<Buffer> {
   }
 }
 
+/** A file's JSON, or a usage error naming the file. */
+function parseJson(data: Buffer, path: string): unknown {
+  try {
+    return JSON.parse(data.toString("utf8"));
+  } catch (error) {
+    throw new UsageError(`${path} is not valid JSON (${(error as Error).message}).`);
+  }
+}
+
 async function readResume(
   path: string,
 ): Promise<{ input: AtsResumeInput } & Partial<AtsExtraction>> {
@@ -121,12 +130,7 @@ async function readResume(
     );
   const data = await readBytes(path);
   if (extname(path).toLowerCase() === ".json") {
-    let input: unknown;
-    try {
-      input = JSON.parse(data.toString("utf8"));
-    } catch (error) {
-      throw new UsageError(`${path} is not valid JSON (${(error as Error).message}).`);
-    }
+    const input = parseJson(data, path);
     if (!isResumeDocument(input) && !isJsonResume(input))
       throw new UsageError(`${path} is neither a JSON Resume nor an ats-resume document.`);
     return { input: input as AtsResumeInput };
@@ -305,7 +309,7 @@ async function check(argv: string[], context: CliContext): Promise<number> {
   // The bundled language and region packs ride on whichever policy is used.
   const policy = withLocales(
     values.policy
-      ? parseAtsPolicy(JSON.parse(await readFile(values.policy, "utf8")))
+      ? parseAtsPolicy(parseJson(await readBytes(values.policy), values.policy))
       : DEFAULT_POLICY,
     BUILT_IN_LOCALES,
   );
@@ -352,7 +356,8 @@ async function check(argv: string[], context: CliContext): Promise<number> {
     }
   }
 
-  if (values.json) console.log(JSON.stringify(ai ? { ...report, ai } : report, null, 2));
+  // JSON escapes C0 controls but not C1 (U+0080–U+009F), which a terminal can still act on.
+  if (values.json) console.log(JSON.stringify(printable(ai ? { ...report, ai } : report), null, 2));
   // The reading order, for seeing what a multi-column layout became.
   else if (values.text)
     console.log(["", style.bold("Text as read:"), ...printable(report.lines ?? [])].join("\n"));

@@ -110,24 +110,63 @@ function resolveRoute(context: RunContext, task: AtsAiTask, options: AtsAiCallOp
   return { ...route, retries } as TaskRoute & { retries: number };
 }
 
+const parses = (text: string) => {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** The object or array opening at `start`, to its matching close, read past strings; or null. */
+function balancedFrom(text: string, start: number): string | null {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let at = start; at < text.length; at += 1) {
+    const char = text[at];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+    } else if (char === '"') inString = true;
+    else if (char === "{" || char === "[") depth += 1;
+    else if (char === "}" || char === "]") {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, at + 1);
+    }
+  }
+  return null;
+}
+
+/** How many opening braces are tried as the start of the answer. Replies are bounded anyway. */
+const MAX_CANDIDATES = 20;
+
 /**
- * The JSON in a reply. Models asked for JSON without a schema sometimes wrap it anyway: in a fence
- * on several lines or on one ("```json{…}```"), after a reasoning block ("<think>…</think>")
- * that open models such as DeepSeek-R1 and Qwen3 print first, or after a line of prose. The
- * wrapping goes and the JSON stays; a reply with no object in it is returned as it is, and fails
- * to parse.
+ * The JSON in a reply. Models asked for JSON without a schema sometimes wrap it: in a fence on
+ * several lines or on one ("```json{…}```"), after reasoning ("<think>…</think>", printed first by
+ * open models such as DeepSeek-R1 and Qwen3, whose chat template may supply the opening tag), or
+ * between sentences ("Here it is: {…} Hope this helps!"). Reasoning goes, then the answer is
+ * taken whole if it parses, else the first fenced block or whole JSON object in it. A reply with
+ * no object is returned as it is, and fails to parse.
  */
 function unfence(text: string): string {
-  let trimmed = text.replace(/^\s*<think>[\s\S]*?<\/think>/i, "").trim();
-  // Checked first, so a fence inside one of the object's own strings is left alone.
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
-  const fenced = /```[a-z]*\s*([[{][\s\S]*[\]}])\s*```/i.exec(trimmed);
-  if (fenced) return fenced[1]!.trim();
-  // Prose before the object: from the first "{" to the last "}".
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start > 0 && end > start) trimmed = trimmed.slice(start, end + 1);
-  return trimmed;
+  const close = text.toLowerCase().lastIndexOf("</think>");
+  const answer = (close === -1 ? text : text.slice(close + "</think>".length)).trim();
+  if (parses(answer)) return answer;
+  const fenced = /```[a-z]*\s*([[{][\s\S]*?[\]}])\s*```/i.exec(answer)?.[1]?.trim();
+  if (fenced && parses(fenced)) return fenced;
+  let tried = 0;
+  for (
+    let at = answer.indexOf("{");
+    at !== -1 && tried < MAX_CANDIDATES;
+    at = answer.indexOf("{", at + 1), tried += 1
+  ) {
+    const candidate = balancedFrom(answer, at);
+    if (candidate && parses(candidate)) return candidate;
+  }
+  return answer;
 }
 
 /** Parses one response. Throws an `AtsAiError` whose code says whether a retry can help. */

@@ -61,8 +61,11 @@ Verdict    needs work
 What an ATS reads:
   Name     Mei Lin Chen
   Email    meilin.chen@example.edu
+  Phone    512-555-0193
   Role     Software Engineering Intern, Globex Corporation (May 2025 – Aug 2025)
   Role     Software Developer Intern, Initech (Jun 2024 – Aug 2024)
+  Role     Teaching Assistant, UT Austin Department of Computer Science (Jan 2024 – May 2026)
+  Tenure   2 yr 5 mo
   Skills   Python, Java, JavaScript, TypeScript, React, Node.js, SQL, PostgreSQL, Git, Docker, AWS
 
 Failed checks:

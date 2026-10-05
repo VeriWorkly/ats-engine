@@ -71,15 +71,22 @@ export type MergeResult = {
 };
 
 /**
- * The years a document writes, in four digits or two: "'19", "01/19" and "2019–21" each name a
- * year a model may rightly write out in full. A two-digit year stands for both centuries; the
+ * Two digits written as a year: after an apostrophe ("Jan '19"), after a month ("3/19", "03.19",
+ * "03-19"; a single-digit month only with a slash, so "Python 3.11" and "4-12 people" are not
+ * dates), or ending a range that starts with a full year ("2019–21").
+ */
+const TWO_DIGIT_YEAR =
+  /(?:['‘’]|(?<![\d.,/-])(?:0?[1-9]|1[0-2])\/|(?<![\d.,/-])(?:0[1-9]|1[0-2])[.-]|(?<!\d)(?:19|20)\d{2} ?[-–—] ?)(\d{2})(?!\d|[.,]\d)/g;
+
+/**
+ * The years a document writes, in four digits or two (see `TWO_DIGIT_YEAR`): each names a year a
+ * model may rightly write out in full. A two-digit year stands for both centuries; the
  * plausibility check rules out the wrong one.
  */
 export function writtenYears(text: string): Set<number> {
   const years = new Set<number>();
   for (const [year] of text.matchAll(/(?<!\d)(?:19|20)\d{2}(?!\d)/g)) years.add(Number(year));
-  const twoDigit = /(?:['‘’]|(?<=\d[/.-])|(?<=\d{4} ?[-–—] ?))(\d{2})(?!\d)/g;
-  for (const [, short] of text.matchAll(twoDigit))
+  for (const [, short] of text.matchAll(TWO_DIGIT_YEAR))
     years.add(1900 + Number(short)).add(2000 + Number(short));
   return years;
 }
@@ -95,19 +102,23 @@ export function ongoingIn(source: string, policy: AtsEnginePolicy) {
   const localized = inLanguagesOf(policy, source);
   const words = (list: readonly string[]) => list.map((word) => escapeRegex(normalizeText(word)));
   const openEnded = wordListRegex(words(localized.resumeParse.openEnded));
-  // The open end of a range ("– present"), or a start ("since 2019", "seit 03/2019").
+  // The open end of a range, after a dash or a range word ("– present", "to date", "bis heute"),
+  // or a start ("since 2019", "seit 03/2019").
+  const rangeWords = wordListRegex(words(localized.resumeParse.rangeWords)).source;
+  const sinceWords = wordListRegex(words(localized.resumeParse.sinceWords)).source;
+  // An open-ended word ending the line counts too: "2019 to date", "Jan 2019 Present".
   const range = new RegExp(
-    `[-–—]\\s*(?:${openEnded.source})|${wordListRegex(words(localized.resumeParse.sinceWords)).source}`,
+    `(?:[-–—]|${rangeWords})\\s*(?:${openEnded.source})|(?:${openEnded.source})\\s*$|${sinceWords}`,
     "iu",
   );
   /** A line that is only the open end: "Present", "- to date". */
   const bare = (line: string | undefined) =>
     line !== undefined && openEnded.test(line) && line.trim().split(/\s+/).length <= 3;
   const lines = normalizeText(source).toLowerCase().split("\n");
-  const near = (anchor: string, datesBeside: boolean) =>
+  const near = (holds: (line: string) => boolean, datesBeside: boolean) =>
     lines.some(
       (line, index) =>
-        line.includes(anchor) &&
+        holds(line) &&
         (range.test(line) ||
           bare(lines[index + 1]) ||
           // An employer or title with its dates on the line above or below.
@@ -116,10 +127,21 @@ export function ongoingIn(source: string, policy: AtsEnginePolicy) {
               (next) => next !== undefined && range.test(next),
             ))),
     );
-  return (startYear: number | null, anchors: readonly string[]) =>
-    startYear !== null
-      ? near(String(startYear), false) || near(`'${String(startYear).slice(2)}`, false)
-      : anchors.some((anchor) => anchor.trim() && near(normalizeText(anchor).toLowerCase(), true));
+  return (startYear: number | null, anchors: readonly string[]) => {
+    if (startYear !== null) {
+      // The start year as the document writes it: "2019", "'19", "03/19".
+      const short = String(startYear).slice(2);
+      const year = new RegExp(
+        `(?<!\\d)${startYear}(?!\\d)|['‘’]${short}(?!\\d)|\\/${short}(?!\\d)`,
+      );
+      return near((line) => year.test(line), false);
+    }
+    // The employer when there is one: a title such as "Engineer" can head another role too.
+    const anchor = anchors.find((value) => value.trim());
+    if (!anchor) return false;
+    const text = normalizeText(anchor).toLowerCase();
+    return near((line) => line.includes(text), true);
+  };
 }
 
 /**

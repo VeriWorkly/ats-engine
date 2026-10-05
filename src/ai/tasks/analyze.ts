@@ -83,6 +83,8 @@ function groundKeywords(items: string[], report: AtsReport, job: string, resume:
       .trim()
       .split(/\s+/)
       .slice(1)
+      // Without the punctuation around it: "(Google)" and "\"Google\"" are Google.
+      .map((word) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}+#]+$/gu, ""))
       .filter((word) => /\p{N}|^\p{Lu}/u.test(word));
 
   const grounded = (part: string) => {

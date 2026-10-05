@@ -89,23 +89,25 @@ export function createRedaction(
   const digits = parsed.phone.replace(/\D/g, "");
   if (digits.length >= 7) {
     // As the parser read it, or with other separators ("415.555.0199"), with or without the
-    // country code.
+    // country code. A country code starts with "+", so the "3." of a numbered list is not one,
+    // and may be followed by a trunk zero ("+44 (0)20 7946 0958").
     const national = [...digits.slice(-10)].join(PHONE_GAP);
     entries.push({
       placeholder: "[PHONE]",
       original: parsed.phone.trim(),
       patterns: [
         escapeRegex(parsed.phone.trim()),
-        String.raw`(?:\+?\d{1,3}${PHONE_GAP})?\(?` + national,
+        String.raw`(?:\+\d{1,3}${PHONE_GAP}(?:0${PHONE_GAP})?)?\(?` + national,
       ],
     });
   }
 
   if (named) {
-    // Any spacing between letters, as a letter-spaced header ("J A N E   D O E") extracts.
+    // Any spacing between letters, as a letter-spaced header ("J A N E   D O E") extracts, but a
+    // space between the parts: "Tim Ely" is not "timely".
     const first = nameLetters(parts[0]!);
     const last = nameLetters(parts[parts.length - 1]!);
-    const patterns = [parts.map(nameLetters).join(String.raw`\s*`)];
+    const patterns = [parts.map(nameLetters).join(String.raw`\s+`)];
     if (parts.length >= 2)
       patterns.push(
         String.raw`${last}\s*,\s*${first}(?:\s+\p{L}\.?)?`, // "Doe, Jane", "Doe, Jane Q."
