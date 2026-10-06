@@ -71,3 +71,28 @@ describe("a role row whose title and dates both wrap", () => {
     expect(`${roles[1]!.title} ${roles[1]!.employer}`).toContain("Alpine Ski House Systems");
   });
 });
+
+describe("a letter-spaced name whose word gap was lost", () => {
+  const sidebarFirst = (nameLine: string, email: string) =>
+    [
+      "CONTACT",
+      email,
+      "+1 415 555 0100",
+      "San Francisco, CA",
+      "SKILLS",
+      "Python",
+      nameLine,
+      "Senior Backend Engineer",
+      "EXPERIENCE",
+      "Backend Engineer, Acme Corp",
+      "Jan 2020 - Present",
+    ].join("\n");
+
+  it("is split where the email splits the same letters", () => {
+    expect(name(sidebarFirst("J A N E D O E", "jane.doe@example.com"))).toBe("JANE DOE");
+  });
+
+  it("is left alone when the email does not spell it", () => {
+    expect(name(sidebarFirst("J A N E D O E", "jd1987@example.com"))).not.toBe("JANE DOE");
+  });
+});

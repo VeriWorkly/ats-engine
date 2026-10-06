@@ -60,6 +60,18 @@ export const keywordMatchSchema = z
         { suffix: "xes", minLength: 4, replacement: "x" },
         { suffix: "ches", minLength: 5, replacement: "ch" },
         { suffix: "shes", minLength: 5, replacement: "sh" },
+        // A singular in "-che" folds as its plural does: "cache" and "caches" to "cach".
+        { suffix: "che", minLength: 4, replacement: "ch" },
+        // "-ses" is ambiguous: "buses" is "bus" + "es", "cases" is "case" + "s". Singular and
+        // plural fold to one shorter form, so either reading meets: "bus", "buses" and "status",
+        // "statuses" lose the "s" as "cpus" does ("bu", "statu"); "cause" and "causes" fold to
+        // "cau"; "case", "cases", "gas" and "gases" to "cas" and "gas". "uses" (four letters)
+        // stays the stopword "use".
+        { suffix: "uses", minLength: 4, replacement: "u" },
+        { suffix: "use", minLength: 3, replacement: "u" },
+        { suffix: "us", minLength: 2, replacement: "u" },
+        { suffix: "ases", minLength: 4, replacement: "as" },
+        { suffix: "ase", minLength: 3, replacement: "as" },
         // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
         { suffix: "s", minLength: 3, replacement: "", unless: "ss" },
       ]),
@@ -245,15 +257,18 @@ export const keywordMatchSchema = z
      * Text in a posting that is never a keyword: a "City, ST" location. Compiled
      * case-sensitively and globally; each must be linear on hostile input.
      */
-    ignorePatterns: z
-      .array(regexString("ignorePatterns"))
-      .default([
-        String.raw`(?<![\p{L}])\p{Lu}[\p{L}'.-]{0,30}(?:\s\p{Lu}[\p{L}'.-]{0,30}){0,2},\s{0,3}(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(?![\p{L}\p{N}/+#])`,
-      ]),
+    ignorePatterns: z.array(regexString("ignorePatterns")).default([
+      String.raw`(?<![\p{L}])\p{Lu}[\p{L}'.-]{0,30}(?:\s\p{Lu}[\p{L}'.-]{0,30}){0,2},\s{0,3}(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(?![\p{L}\p{N}/+#])`,
+      // Without the comma, only where an address ends — the line, a stop or a ZIP code: "Office
+      // in Boston MA", "Cambridge MA 02139". Not "Requires MS in Computer Science", where the
+      // state code is a degree.
+      String.raw`(?<![\p{L}])\p{Lu}\p{Ll}[\p{L}'.-]{0,30}(?:\s\p{Lu}\p{Ll}[\p{L}'.-]{0,30}){0,2}\s(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(?=\s{0,3}(?:$|[.,;:)|]|\d{5}(?!\d)))`,
+    ]),
     /**
      * What a posting offers rather than asks: "Salary range $175,000 – $215,000", "Benefits:
-     * health, dental". A line that opens with one of these, or names one beside an amount of
-     * money, is not a requirement. Only then, so "experience with health insurance claims" stays.
+     * health, dental". A line that opens with one of these as its label ("Benefits:", "Pay
+     * range"), or names one beside an amount of money, is not a requirement. Only then, so
+     * "Compensation analysis experience" and "Equity research" stay requirements.
      */
     offerWords: wordList("offerWords").default([
       "salary",

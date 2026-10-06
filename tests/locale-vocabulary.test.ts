@@ -43,3 +43,21 @@ describe("German pack vocabulary for dates, durations and names", () => {
     expect(report.parsed.roles[0]?.start).toEqual({ year: 2018, month: 6 });
   });
 });
+
+describe("region codes from a region pack", () => {
+  it("never takes an Indian city and state code for the name", () => {
+    const text = [
+      "Pune, MH | priya@example.in | +91 98765 43210",
+      "Priya Raman",
+      "Software Engineer",
+      "",
+      "Experience",
+      "Software Engineer, Infosys",
+      "Jan 2020 - Present",
+      "- Built APIs.",
+    ].join("\n");
+    expect(AtsScoringService.check(text, policy, { region: "IN", now: NOW }).parsed.name).toBe(
+      "Priya Raman",
+    );
+  });
+});

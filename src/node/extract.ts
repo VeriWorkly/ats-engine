@@ -1,9 +1,10 @@
 import type { AtsLayoutSignals } from "../types.js";
-import { decodeEntities, htmlText } from "../job/html.js";
+import { decodeEntities, htmlText, readHtml } from "../job/html.js";
 import {
   docxChunks,
   docxMargins,
   MAX_DOCX_EXPANDED_BYTES,
+  MAX_HIDDEN_TEXT,
   measureDocx,
   readableArchive,
   UNMEASURABLE_DOCX,
@@ -75,21 +76,56 @@ export function normalizeExtractedText(text: string): string {
 /**
  * A text file's characters: UTF-16 by its byte-order mark, else UTF-8 — and, where the bytes are
  * not UTF-8, Windows-1252, the encoding Notepad and Word's "plain text" wrote for years. Decoding
- * those as UTF-8 turned every accented letter and curly quote into "�".
+ * those as UTF-8 turned every accented letter and curly quote into "�"; decoding a whole UTF-8
+ * file as Windows-1252 for one stray byte in it turned every "é" into "Ã©".
  */
 function decodeText(data: Uint8Array): string {
   const [first, second] = data;
   if (first === 0xff && second === 0xfe) return new TextDecoder("utf-16le").decode(data);
   if (first === 0xfe && second === 0xff) return new TextDecoder("utf-16be").decode(data);
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(data);
-  } catch {
-    // Node decodes "windows-1252" as Latin-1, leaving 0x80-0x9F as control characters: those
-    // are Windows-1252's curly quotes, dashes, euro sign and the rest.
-    return new TextDecoder("latin1")
-      .decode(data)
-      .replace(/[\u0080-\u009f]/g, (char) => CP1252[char.charCodeAt(0) - 0x80]!);
+  const utf8 = new TextDecoder();
+  // Bytes that are not UTF-8 among many that are — one stray byte pasted into a UTF-8 file — are
+  // read one at a time; a file with fewer valid multibyte characters than stray bytes is
+  // Windows-1252 throughout.
+  const parts: string[] = [];
+  let [start, multibyte, stray] = [0, 0, 0];
+  for (let at = 0; at < data.length;) {
+    const length = sequence(data, at);
+    if (length > 1) multibyte += 1;
+    if (length) {
+      at += length;
+      continue;
+    }
+    parts.push(utf8.decode(data.subarray(start, at)), cp1252(data.subarray(at, at + 1)));
+    stray += 1;
+    start = at += 1;
   }
+  if (stray > multibyte) return cp1252(data);
+  parts.push(utf8.decode(data.subarray(start)));
+  return parts.join("");
+}
+
+/** Node decodes "windows-1252" as Latin-1, leaving 0x80-0x9F as control characters: those are
+ * Windows-1252's curly quotes, dashes, euro sign and the rest. */
+const cp1252 = (data: Uint8Array) =>
+  new TextDecoder("latin1")
+    .decode(data)
+    .replace(/[\u0080-\u009f]/g, (char) => CP1252[char.charCodeAt(0) - 0x80]!);
+
+/** The length of the well-formed UTF-8 sequence at `at`, or 0. */
+function sequence(data: Uint8Array, at: number): number {
+  const lead = data[at]!;
+  if (lead < 0x80) return 1;
+  const length = lead < 0xc2 ? 0 : lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : lead < 0xf5 ? 4 : 0;
+  // The second byte's range rules out overlong forms, surrogates and code points past U+10FFFF.
+  const low = lead === 0xe0 ? 0xa0 : lead === 0xf0 ? 0x90 : 0x80;
+  const high = lead === 0xed ? 0x9f : lead === 0xf4 ? 0x8f : 0xbf;
+  for (let next = 1; next < length; next += 1) {
+    const byte = data[at + next];
+    if (byte === undefined || byte < (next === 1 ? low : 0x80) || byte > (next === 1 ? high : 0xbf))
+      return 0;
+  }
+  return length;
 }
 
 /** Windows-1252's characters for 0x80-0x9F; its five unassigned codes stay as they are. */
@@ -135,14 +171,15 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
   // What `mammoth` leaves out and an ATS that reads the whole file sees: the page header (often
   // the name and contact details) before the body, the footer after it, HTML embedded whole, and
   // the targets of links whose text is only "LinkedIn".
+  // An embedded page is read as a resume page is: what its markup hides is left out, and counted.
   const { header, footer } = docxMargins(data);
+  const chunks = docxChunks(data).map((chunk) => readHtml(chunk, "document"));
   const value = withLinks(
-    [header, htmlText(html), ...docxChunks(data).map((chunk) => htmlText(chunk)), footer].join(
-      "\n",
-    ),
+    [header, htmlText(html), ...chunks.map((chunk) => chunk.text), footer].join("\n"),
     [...html.matchAll(HREF)].map(([, href]) => decodeEntities(href!)),
   );
   if (!measured) return { text: value };
+  const chunked = chunks.flatMap((chunk) => chunk.hidden);
   return {
     text: value,
     layout: {
@@ -150,10 +187,35 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
       tableCount: measured.tableCount,
       pageCount: 0,
       imageCount: measured.imageCount,
-      hiddenTextChars: measured.hiddenChars,
-      hiddenTextSample: measured.hiddenSample,
-      hiddenText: measured.hiddenText,
+      ...hiddenSignals([measured.hiddenText, ...chunked]),
+      // Counted whole: the document's hidden text above is cut to its first 5,000 characters.
+      hiddenTextChars: measured.hiddenChars + hiddenSignals(chunked).hiddenTextChars,
     },
+  };
+}
+
+/**
+ * Hidden text as the layout reports it: every run, whitespace collapsed, joined in reading order.
+ */
+function hiddenSignals(runs: readonly string[]) {
+  const text = runs.join(" ").replace(/\s+/g, " ").trim();
+  return {
+    hiddenTextChars: text.replace(/\s/g, "").length,
+    hiddenTextSample: text.slice(0, 80),
+    hiddenText: text.slice(0, MAX_HIDDEN_TEXT),
+  };
+}
+
+/**
+ * A resume saved as a web page: the text a reader sees, without the elements its markup hides,
+ * whose text is reported as hidden; its tables are counted as a Word document's are. A page has
+ * no geometry to measure columns by.
+ */
+function readHtmlResume(html: string): AtsExtraction {
+  const { text, hidden, tables } = readHtml(html, "document");
+  return {
+    text,
+    layout: { columnRatio: null, tableCount: tables, pageCount: 0, ...hiddenSignals(hidden) },
   };
 }
 
@@ -168,7 +230,7 @@ export async function extractResume(
       : format === "docx"
         ? await extractDocx(data)
         : format === "html"
-          ? { text: htmlText(decodeText(data)) }
+          ? readHtmlResume(decodeText(data))
           : format === "text"
             ? { text: decodeText(data) }
             : null;

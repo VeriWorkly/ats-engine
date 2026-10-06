@@ -42,6 +42,11 @@ const vocabularyShape = {
   durationUnits: optionalList("durationUnits"),
   /** Labels a name is written under: "Name: …". */
   nameLabels: optionalList("nameLabels"),
+  /** Letters after a name ("Dipl.-Ing.", "CA" for a chartered accountant), and codes that name a
+   * region rather than a credential ("MH", "KA"). */
+  postNominals: optionalList("postNominals"),
+  regionCodes: optionalList("regionCodes"),
+  workplaceWords: optionalList("workplaceWords"),
   openEnded: optionalList("openEnded"),
   rangeWords: optionalList("rangeWords"),
   sinceWords: optionalList("sinceWords"),

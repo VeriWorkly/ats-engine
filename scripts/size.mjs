@@ -11,17 +11,19 @@ const BUDGETS = {
   ".": 160,
   "./document": 3,
   "./format": 1.5,
-  // 3.5: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2).
-  "./job": 3.5,
+  // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
+  // optional end tags, a tag scan that skips scripts and comments, and hidden-element rules (0.2).
+  "./job": 3.8,
   "./locales": 145,
   "./ai": 140,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,
   // The zip reader is a port of JSZip's, so the expansion budget reads exactly what mammoth will.
-  // 15: reading order by geometry, DOCX headers, footers, styles and links, and the PDF link
-  // annotations (0.2) took it from 9.7 to 14.0.
-  "./node": 15,
+  // 17: reading order by geometry, DOCX headers, footers, styles and links, and the PDF link
+  // annotations (0.2) took it from 9.7 to 14.0; list-bullet and tab-stop checks, hidden text in
+  // DOCX headers, soft masks and HTML resumes, and encoding repair (0.2) to 16.0.
+  "./node": 17,
 };
 
 let failed = false;

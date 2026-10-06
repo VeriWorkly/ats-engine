@@ -14,6 +14,13 @@ import type { AtsRegionPackInput } from "../schema.js";
  */
 const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 
+/**
+ * "LLM" undotted, as the default policy reads it: a Master of Laws only where a degree stands and
+ * with a law school or university on the line; otherwise a large language model.
+ */
+const LAW = String.raw`(?<!\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\p{L})`;
+const LLM = String.raw`llm(?=\s*[,()]|\s+in\s|\s+(?:19|20)\d{2}(?!\d)|\s*$)(?:(?=[^\n]{0,80}?${LAW})|(?<=${LAW}[^\n]{0,80}llm))`;
+
 export const US: AtsRegionPackInput = {
   id: "US",
   name: "United States",
@@ -69,6 +76,41 @@ export const IN: AtsRegionPackInput = {
   maintainers: [],
   phoneCountry: "IN",
   dateOrder: "DMY",
+  // State and union territory codes written after a city ("Pune, MH"): a place, never a name.
+  regionCodes: [
+    "AP",
+    "AR",
+    "AS",
+    "BR",
+    "CG",
+    "DL",
+    "GA",
+    "GJ",
+    "HP",
+    "HR",
+    "JH",
+    "JK",
+    "KA",
+    "KL",
+    "LA",
+    "MH",
+    "ML",
+    "MN",
+    "MP",
+    "MZ",
+    "NL",
+    "OD",
+    "PB",
+    "PY",
+    "RJ",
+    "SK",
+    "TN",
+    "TR",
+    "TS",
+    "UK",
+    "UP",
+    "WB",
+  ],
   rules: {
     "ats-v2.privacy.dateOfBirth": { weight: 0 },
     "ats-v2.format.photo": { weight: 0 },
@@ -80,7 +122,7 @@ export const IN: AtsRegionPackInput = {
     // (SSLC) of Karnataka and Kerala, are the Class X board exam, not school-leaving; the
     // pre-university course (PUC, "II PUC") is Class XII. "BE" undotted is the English verb
     // unless a branch of engineering or a bracket follows; "LLM" undotted is a language model
-    // unless it stands where a degree does (see the default policy's LLM_DEGREE).
+    // unless it stands where a degree does beside a law school (see `LLM` above).
     "2": word(
       String.raw`class\s+(?:x|10)(?:th)?|10th(?:\s+(?:standard|grade|class))?|matriculation|s\.?s\.?l\.?c\.?|s\.?s\.?c\.?|secondary\s+school\s+certificate`,
     ),
@@ -91,7 +133,7 @@ export const IN: AtsRegionPackInput = {
       String.raw`b\.?\s?com\.?|b\.?c\.?a\.?|b\.?b\.?a\.?|b\.\s?e\.?|be(?=\s*\(|\s+(?:in\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\p{L}\p{M}]))|b\.?\s?pharm\.?|ll\.?b\.?`,
     ),
     "7": word(
-      String.raw`m\.?\s?com\.?|m\.?c\.?a\.?|m\.\s?e\.?|pgdm|pgdba|post[\s-]?graduate\s+diploma|m\.?b\.?b\.?s\.?|ll\.m\.?|llm(?=\s*(?:,|\(|$)|\s+in\s|\s+(?:19|20)\d{2}(?!\d))`,
+      String.raw`m\.?\s?com\.?|m\.?c\.?a\.?|m\.\s?e\.?|pgdm|pgdba|post[\s-]?graduate\s+diploma|m\.?b\.?b\.?s\.?|ll\.m\.?|${LLM}`,
     ),
   },
 };

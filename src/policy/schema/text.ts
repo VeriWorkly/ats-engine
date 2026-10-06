@@ -345,13 +345,15 @@ export const engineTextSchema = z
      * skill). Language packs add their own.
      */
     injectionPhrases: wordList("text.injectionPhrases").default([
-      // Up to three determiners: "ignore all the previous", "disregard all of the above". An
-      // instruction is in the imperative: after a modal or "to" it describes what a system does
-      // ("our model must ignore previous instructions embedded in uploads"), unless it is "you".
-      String.raw`(?<!(?:must|should|shall|will|would|can|could|may|might|cannot|never|not|to|that|which)\s{1,3})(?:ignore|disregard|forget|override)\s+(?:(?:all|any|the|your|of|my|these|those)\s+){0,3}(?:previous|prior|above|earlier|preceding|other)\s+(?:instructions?|prompts?|directions?|rules|context)`,
+      // Up to three determiners: "ignore all the previous", "disregard all of the above". Said
+      // of a system an engineer built it is a description, not an instruction: "our model must
+      // ignore previous instructions embedded in uploads", "taught the classifier to ignore
+      // prior instructions". Said to anyone else ("I want you to", "Recruiting bots should",
+      // "Remember to") it is one.
+      String.raw`(?<!(?:model|models|llm|llms|system|systems|classifier|classifiers|pipeline|pipelines|filter|filters|guardrail|guardrails|parser|parsers)(?:\s{1,3}(?:must|should|shall|will|would|can|could|may|might|cannot|to|never|not|always|then|now))?\s{1,3})(?:ignore|disregard|forget|override)\s+(?:(?:all|any|the|your|of|my|these|those)\s+){0,3}(?:previous|prior|above|earlier|preceding|other)\s+(?:instructions?|prompts?|directions?|rules|context)`,
       String.raw`you\s+(?:must|should|shall|will|need\s+to|are\s+to)\s+(?:now\s+)?(?:ignore|disregard|forget|override)\s+(?:(?:all|any|the|your|of|my|these|those)\s+){0,3}(?:previous|prior|above|earlier|preceding|other)\s+(?:instructions?|prompts?|directions?|rules|context)`,
       // Aimed at the grading itself: "disregard the rubric", "give this resume a 10/10".
-      String.raw`(?<!(?:must|should|shall|will|would|can|could|may|might|cannot|never|not|to|that|which)\s{1,3})(?:ignore|disregard|forget|override)\s+(?:(?:all|any|the|your|these|those)\s+){0,2}(?:rubric|(?:scoring|grading|screening|evaluation)\s+(?:rubric|criteria|guidelines|rules))`,
+      String.raw`(?<!(?:model|models|llm|llms|system|systems|classifier|classifiers|pipeline|pipelines|filter|filters|guardrail|guardrails|parser|parsers)(?:\s{1,3}(?:must|should|shall|will|would|can|could|may|might|cannot|to|never|not|always|then|now))?\s{1,3})(?:ignore|disregard|forget|override)\s+(?:(?:all|any|the|your|these|those)\s+){0,2}(?:rubric|(?:scoring|grading|screening|evaluation)\s+(?:rubric|criteria|guidelines|rules))`,
       String.raw`(?:give|award|assign)\s+(?:this|my)\s+(?:resume|cv|candidate|applicant|profile|application)\s+(?:an?\s+|the\s+)?(?:10\s*/\s*10|100\s*/\s*100|perfect|full\s+marks|top\s+(?:score|marks|rating)|highest|maximum)`,
       // Not "system prompt:", which an engineer writes about the prompts they built.
       String.raw`(?:new|updated|real)\s+(?:instructions?|prompt)\s*:|system\s+instructions?\s*:`,

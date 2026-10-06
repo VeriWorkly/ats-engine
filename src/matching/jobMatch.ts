@@ -1,9 +1,8 @@
 import { degreeLevels } from "../parser/education.js";
-import { policyRegex } from "../policy/regex.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
-import { memo } from "../util/memo.js";
 import { alternationGroups } from "./alternation.js";
-import { segmentJob, type JobSectionKind } from "./jobSections.js";
+import { isOfferLine, segmentJob, withoutIgnored, type JobSectionKind } from "./jobSections.js";
+import { requirementLines } from "./requirements.js";
 import {
   buildVocabulary,
   extractVocabulary,
@@ -17,19 +16,13 @@ export type JobMatch = {
   missing: string[];
 };
 
-const ignorePatternsOf = memo((patterns: readonly string[]) =>
-  patterns.map((pattern) => policyRegex(pattern, "gu")),
-);
-
 /**
  * A posting line as the keyword match reads it: without the text that is never a keyword (a
  * "City, ST" location) and without its degree, which is matched by level rather than by word
  * (`highestIsced`), so a B.Tech meets "Bachelor's degree" as the requirements judge says it does.
  */
 function readPostingLine(line: string, policy: AtsEnginePolicy) {
-  let text = line;
-  for (const re of ignorePatternsOf(policy.keywordMatch.ignorePatterns))
-    text = text.replace(re, " ");
+  let text = withoutIgnored(line, policy);
   const levels = degreeLevels(text, policy);
   for (const { matched } of levels) text = text.replace(matched, " ");
   // Named together, levels are usually alternatives ("BS/MS"): the lowest is the bar.
@@ -74,11 +67,23 @@ export function computeJobMatch(
   };
 
   // The employer's name, from the heading of its own section ("About Acme Robotics"): it recurs
-  // through the posting and is never something a candidate is missing.
+  // through the posting and is never something a candidate is missing — unless a requirement
+  // names the word itself: "About GitLab" over "Experience with GitLab CI", "About Cloud Data
+  // Systems" over "cloud data pipelines".
+  const headings = sections.filter((section) => section.kind === "excluded" && section.heading);
+  const asked = headings.length
+    ? extractVocabulary(
+        requirementLines(jobText, policy)
+          .map((line) => line.text)
+          .join("\n"),
+        km,
+        vocab,
+      )
+    : new Map<string, unknown>();
   const employer = new Set(
-    sections
-      .filter((section) => section.kind === "excluded" && section.heading)
-      .flatMap((section) => [...extractVocabulary(section.heading!, km, vocab).keys()]),
+    headings
+      .flatMap((section) => [...extractVocabulary(section.heading!, km, vocab).keys()])
+      .filter((token) => !asked.has(token)),
   );
 
   // A term can appear in more than one block. Keep the strongest claim: a skill listed under
@@ -91,7 +96,12 @@ export function computeJobMatch(
   for (const section of sections) {
     const weight = sectionWeight[section.kind];
     if (weight <= 0) continue;
-    const read = section.text.split("\n").map((line) => readPostingLine(line, policy));
+    // What the posting offers ("Salary range $175,000", "Benefits: dental") is not asked of the
+    // candidate, as the requirements judge reads it.
+    const read = section.text
+      .split("\n")
+      .filter((line) => !isOfferLine(line, policy))
+      .map((line) => readPostingLine(line, policy));
     // Appended rather than spread: a posting is capped at 20k characters, which is more than
     // enough newlines to push a spread past the engine's argument-count limit.
     for (const line of read) scoredLines.push(line.text);

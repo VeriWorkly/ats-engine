@@ -31,6 +31,50 @@ const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatc
   verbOpener: new RegExp(`^${wordListPattern(text.contentLineVerbs)}`, "iu"),
 }));
 
+const placesOf = memo((rp: AtsEnginePolicy["resumeParse"]) => ({
+  code: new RegExp(`^(?:${rp.regionCodes.join("|")})$`, "u"),
+  postNominal: new RegExp(`^(?:${rp.postNominals.join("|")})$`, "iu"),
+  workplace: new RegExp(`^(?:${rp.workplaceWords.join("|")})$`, "iu"),
+}));
+
+/** The policy's state and province codes, credentials after a name, and workplace words. */
+export const placeWords = (policy: AtsEnginePolicy) => placesOf(policy.resumeParse);
+
+/**
+ * A line that says where a role is worked, not for whom: "San Francisco, CA", "Austin, TX
+ * 78701", "Remote", "Boston, MA (Hybrid)". A city with a country ("Berlin, Germany") is not told
+ * from an employer with its city ("Acme, Berlin") without a gazetteer, so it is not one.
+ */
+export function isPlace(line: string, policy: AtsEnginePolicy) {
+  const { code, workplace } = placesOf(policy.resumeParse);
+  const parts = line
+    .replace(BULLET_PREFIX, "")
+    .split(/[,|·•()]/u)
+    .map((part) => part.trim().replace(/\s\d{5}(?:-\d{4})?$/u, ""))
+    .filter(Boolean);
+  const where = (part: string) => code.test(part) || workplace.test(part);
+  if (parts.length === 0) return false;
+  if (parts.every(where)) return true;
+  // "City, ST", then perhaps how it is worked.
+  return (
+    parts.length >= 2 &&
+    code.test(parts[1]) &&
+    parts.slice(2).every(where) &&
+    parts[0].split(/\s+/).length <= 3
+  );
+}
+
+/** A line opening with one of the policy's action verbs: a description, not a header. */
+export const opensWithVerb = (line: string, policy: AtsEnginePolicy) =>
+  matchersOf(policy).verbOpener.test(line);
+
+/**
+ * A header longer than this ran to the page's width, so a short line under it is the rest of it
+ * ("…School of Public" / "Health"); a shorter one ended where it meant to, and the short line
+ * under it is a field of its own ("Software Engineer - Backend" / "Stripe").
+ */
+const WRAP_WIDTH = 48;
+
 function headerParts(header: string, policy: AtsEnginePolicy) {
   // Empty brackets are what is left of "(Jan 2020 - Present)" once the dates are taken out. A
   // leading "." is kept when a word follows it: ".NET Developer".
@@ -154,6 +198,15 @@ export function parseRoles(
   const sides = belowVotes > aboveVotes ? [1, -1] : [-1, 1];
 
   const titled = (at: number) => titleWords.test(lines[at] ?? "");
+  // Dates first ("2020 - Present" over "Senior Engineer, Acme"): the first role's dates open the
+  // block with its header below, so every bare date line reads the line below before the one
+  // above, which is the last line of the role before ("Reduced costs by 30% across 4 teams").
+  const [first] = anchors;
+  const datesFirst =
+    first !== undefined &&
+    !first.own &&
+    !isHeader(lines[first.index - 1]) &&
+    isHeader(lines[first.index + 1]);
   // A neighbour that is a whole header on its own: a title and an employer, "Founder - Acme".
   const whole = (at: number, from: number) =>
     halfAt(at, from) !== null && !isSingle(lines[at]) && titled(at);
@@ -177,8 +230,9 @@ export function parseRoles(
       isSingle(lines[above - 1]) &&
       (isSingle(lines[above]) || (titled(above - 1) && !titled(above)));
     // A whole header over a short line with no title of its own, over the dates: the short line
-    // is where ("Remote"), or the end of a header the page wrapped ("…School of Public" /
-    // "Health"). Either way the header is the line above it, not the short line.
+    // is where ("Remote", "Austin, TX"), which is dropped; the end of a header the page wrapped
+    // ("…School of Public" / "Health"), which is put back; or the employer under a title and
+    // team ("Software Engineer - Backend" / "Stripe"), which is kept beside it.
     // Such a header ran to the page's width, so it may be longer than a heading-shaped line.
     const wrapped = (above: number) =>
       free(above) &&
@@ -187,13 +241,17 @@ export function parseRoles(
       titled(above - 1) &&
       !isSingle(lines[above - 1]) &&
       !titled(above) &&
-      isSingle(lines[above]) &&
+      (isSingle(lines[above]) || isPlace(lines[above], policy)) &&
       !opensWithVerb.test(lines[above]);
     let top = index;
+    if (!header && datesFirst && free(index + 1)) header = take(index + 1);
     if (!header && free(index - 1)) {
       if (wrapped(index - 1)) {
-        take(index - 1);
-        header = take(index - 2);
+        const short = take(index - 1).trim();
+        const long = take(index - 2).trim();
+        header = isPlace(short, policy)
+          ? long
+          : `${long}${long.length >= WRAP_WIDTH ? " " : ", "}${short}`;
         top = index - 2;
       } else if (stacked(index - 1)) {
         header = `${take(index - 2)} | ${headerParts(take(index - 1), policy)[0]}`;
@@ -209,10 +267,19 @@ export function parseRoles(
     let { employer } = split;
     // Several roles under one employer: "Acme Corporation, New York, NY" on a line of its own
     // over a title and its dates, then more titles and dates. The employer line names every role
-    // under it, until a role names its own.
+    // under it, until a role names its own. It opens a group, so it starts the section or follows
+    // the bullets of the role before; anywhere else, and as a place ("San Francisco, CA"), it is
+    // the end of the role before.
     if (split.title && !employer) {
       const above = top - 1;
-      if (titled(top) && free(above) && !titled(above) && employerLine(lines[above])) {
+      if (
+        titled(top) &&
+        free(above) &&
+        !titled(above) &&
+        employerLine(lines[above]) &&
+        (above === 0 || BULLET.test(lines[above - 1])) &&
+        !isPlace(lines[above], policy)
+      ) {
         employer = headerParts(take(above), policy)[0] ?? "";
         group = employer;
       } else employer = group;
@@ -235,7 +302,8 @@ const employerLine = (line: string) => !line.includes(":") && /^[\p{Lu}\p{N}]/u.
 /**
  * A date range the page wrapped onto two lines — "Aug 2018 – Aug" over "2021", "2003 –" over
  * "2008" — rejoined, so the role it dates is not lost. Only a short date-shaped line is
- * rejoined, and only when neither line holds a range of its own and together they do.
+ * rejoined, and only when neither line holds a range of its own and together they do: "Senior
+ * Engineer, 23andMe" over "2018 - 2019" is a header over its dates, not a wrapped range.
  */
 function joinWrappedDates(lines: readonly string[], rp: AtsEnginePolicy["resumeParse"], now: Date) {
   const joined: string[] = [];
@@ -249,6 +317,7 @@ function joinWrappedDates(lines: readonly string[], rp: AtsEnginePolicy["resumeP
       !BULLET.test(line) &&
       /\d/.test(line) &&
       !findDateRange(line, rp, now) &&
+      !findDateRange(next, rp, now) &&
       findDateRange(`${line} ${next}`, rp, now)
     ) {
       joined.push(`${line} ${next}`);
@@ -268,6 +337,7 @@ function joinWrappedDates(lines: readonly string[], rp: AtsEnginePolicy["resumeP
       /^['’‘]?\d/u.test(nextRight.trim()) &&
       !BULLET.test(line) &&
       !findDateRange(right, rp, now) &&
+      !findDateRange(nextRight, rp, now) &&
       findDateRange(`${right} ${nextRight.trim()}`, rp, now)
     ) {
       joined.push(`${left} ${nextLeft!.trim()}\t${right} ${nextRight.trim()}`);

@@ -1,9 +1,10 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsParsedResume } from "../types.js";
 import { EMAIL, LINK, findName } from "./contact.js";
-import { parseEducation } from "./education.js";
+import { findDateRange } from "./dates.js";
+import { degreeLevel, parseEducation } from "./education.js";
 import { BULLET, BULLET_PREFIX } from "../text/text.js";
-import { parseRoles } from "./experience.js";
+import { opensWithVerb, parseRoles, titleWordsOf } from "./experience.js";
 import { finalizeParsed } from "./record.js";
 import { readResumeLines } from "./lines.js";
 import { findPhone } from "./phone.js";
@@ -96,16 +97,29 @@ export function parseReadLines(
     policy,
     now,
   );
-  // Without an Education heading, every block that can hold a degree is read, but not the work
-  // history, skills or projects, and never a bullet: "Ran a PhD intern program" is not a
-  // doctorate, nor "Partnered with Stanford University" a school.
+  // Without an Education heading, every block that can hold a degree is read, never a bullet:
+  // "Ran a PhD intern program" is not a doctorate, nor "Partnered with Stanford University" a
+  // school. From the work history, skills and projects — where the lines under an education
+  // heading the policy does not know end up — only a line naming a degree, and the school line
+  // beside it: not a role's dated header ("MBA Intern, Goldman Sachs  2019"), and not the employer
+  // over a title ("Stanford University" / "Research Assistant").
   const education = parseEducation(
     take("education").length
       ? take("education")
-      : sections
-          .filter((section) => !["experience", "skills", "projects"].includes(section.kind))
-          .flatMap((section) => section.lines)
-          .filter((line) => !BULLET.test(line)),
+      : sections.flatMap((section) => {
+          const body = section.lines.filter((line) => !BULLET.test(line));
+          if (!["experience", "skills", "projects"].includes(section.kind)) return body;
+          const titleWords = titleWordsOf(policy);
+          const role = body.map(
+            (line) =>
+              opensWithVerb(line, policy) ||
+              (titleWords.test(line) && findDateRange(line, policy.resumeParse, now) !== null),
+          );
+          const degree = body.map((line, at) => !role[at] && degreeLevel(line, policy) !== null);
+          return body.filter(
+            (_, at) => !role[at] && (degree[at] || degree[at - 1] || degree[at + 1]),
+          );
+        }),
     policy,
     now,
   );

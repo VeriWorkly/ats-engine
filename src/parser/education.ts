@@ -125,6 +125,9 @@ const YEAR = /(?<!\d)(?:19|20)\d{2}(?!\d)/g;
 // A comma between digits is a decimal one, as in a German grade: "Note 1,7".
 const PART = /([|•·]|(?<!\d),|,(?!\d)|(?<!\s)\s+[–—-]\s+)/;
 
+/** A month and year standing alone: "06/2011", "6.2011". */
+const MONTH_YEAR = /(?<![\d./-])\d{1,2}[./](?:19|20)\d{2}(?![\d./-])/g;
+
 /** A bracketed note holding a number after a school's name: "(Note 1,7)", "(GPA 3.8)". */
 const NUMBERED_NOTE = /\([^()\d]{0,40}\d[^()]{0,40}\)/g;
 
@@ -136,7 +139,8 @@ const NUMBERED_NOTE = /\([^()\d]{0,40}\d[^()]{0,40}\)/g;
  * - Ending at its comma. A campus after one ("University of California, Berkeley") cannot be
  *   told from a city ("Harvard University, Cambridge") or a field of study ("Universität
  *   Hamburg, Informatik") without vocabulary, and a name cut short is better than a wrong one.
- * - A lone graduation year goes: "State University 2016" is not the institution's name.
+ * - A lone graduation year goes: "State University 2016" is not the institution's name, and so
+ *   does a lone month and year ("Beethoven-Gymnasium Bonn   06/2011"), whole.
  */
 function schoolName(text: string, credential: string, policy: AtsEnginePolicy) {
   const { schools, schoolsAll } = matchersFor(policy.resumeParse);
@@ -144,7 +148,9 @@ function schoolName(text: string, credential: string, policy: AtsEnginePolicy) {
   const name = (at: number) =>
     pieces[at]
       .replace(NUMBERED_NOTE, " ")
+      .replace(MONTH_YEAR, " ")
       .replace(YEAR, " ")
+      .replace(/\s+/g, " ")
       .trim()
       .replace(/(?<![\s,–—-])[\s,–—-]+$/, "");
   // A school word alone is a heading ("SCHOOL"), not the name of one.

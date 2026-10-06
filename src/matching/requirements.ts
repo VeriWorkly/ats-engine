@@ -1,3 +1,4 @@
+import { isDatedLine } from "../checks/bullets.js";
 import { ISCED_LABELS } from "../format/index.js";
 import { degreeLevels } from "../parser/education.js";
 import { monthsOfExperience } from "../parser/tenure.js";
@@ -8,8 +9,14 @@ import type { AtsParsedResume, AtsRequirement } from "../types.js";
 import { memo } from "../util/memo.js";
 import { own } from "../util/own.js";
 import { alternationGroups } from "./alternation.js";
-import { segmentJob } from "./jobSections.js";
-import { BULLET_PREFIX, escapeRegex, wordListPattern, wordListRegex } from "../text/text.js";
+import { isOfferLine, segmentJob, withoutIgnored } from "./jobSections.js";
+import {
+  BULLET,
+  BULLET_PREFIX,
+  escapeRegex,
+  wordListPattern,
+  wordListRegex,
+} from "../text/text.js";
 import {
   buildVocabulary,
   canonicalize,
@@ -44,6 +51,40 @@ const EQUIVALENT_MONTHS = 24;
 const NEGATED_EVIDENCE = /\b(?:not|no|without|lack(?:ing)?|inactive|expired)\b/iu;
 const WEAK_LANGUAGE = /\b(?:beginner|basic|elementary|limited|a1|a2)\b/iu;
 
+/** A resume section with the heading line that opened it, when one did: "Certifications". */
+export type HeadedSection = ResumeSection & { heading?: string };
+
+/**
+ * Each section with the line that opened it. `segmentResume` keeps the heading's kind but not
+ * its words, and a "Licenses and Certifications" heading is what makes "BLS" under it a
+ * credential. Recovered by walking the lines the sections were cut from; when they do not line
+ * up, no heading is given.
+ */
+export function withHeadings(
+  lines: readonly string[],
+  sections: readonly ResumeSection[],
+): HeadedSection[] {
+  const headings: Array<string | undefined> = [];
+  let at = 0;
+  for (const section of sections) {
+    let heading: string | undefined;
+    let body = section.lines.length;
+    if (section.headed) {
+      heading = lines[at];
+      at += 1;
+      // A heading with text after it ("Certifications: BLS") opens its section with that text.
+      if (body && section.lines[0] !== lines[at] && heading?.includes(section.lines[0]!)) body -= 1;
+    }
+    at += body;
+    if (body && section.lines.at(-1) !== lines[at - 1]) return [...sections];
+    headings.push(heading);
+  }
+  if (at !== lines.length) return [...sections];
+  return sections.map((section, i) =>
+    headings[i] === undefined ? section : { ...section, heading: headings[i] },
+  );
+}
+
 type Status = "met" | "partial" | "missing";
 const STRENGTH: Record<Status, number> = { missing: 0, partial: 1, met: 2 };
 const weaker = (a: Status, b: Status) => (STRENGTH[a] <= STRENGTH[b] ? a : b);
@@ -77,17 +118,13 @@ type Matchers = {
   alternation: RegExp;
   /** A clause the posting marks optional: "MBA a plus". */
   preferred: RegExp;
+  /** The same, global: blanked out to see what else a clause says. */
+  preferredAll: RegExp;
   authorization: RegExp;
   clearance: RegExp;
   /** `qualifiers`, each folded to the tokens a line is read as. */
   qualifiers: Array<{ tokens: Set<string>; sameLine: boolean }>;
-  /** A line that opens with an offer word, and one that names it anywhere. */
-  offerStart: RegExp;
-  offer: RegExp;
 };
-
-/** An amount of money: "$175,000", "€80k", "90,000 EUR". */
-const MONEY = /[$€£₹¥]\s?\d|\d[\d,.]*\s?(?:k\b|usd|eur|gbp|inr)/i;
 
 const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
   const r = km.requirements;
@@ -106,12 +143,11 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
       "iu",
     ),
     nationality: new RegExp(`^\\s*${wordListPattern(km.nationalityLabels)}`, "iu"),
-    offerStart: new RegExp(`^\\s*${wordListPattern(km.offerWords)}`, "iu"),
-    offer: wordListRegex(km.offerWords),
     equivalence: wordListRegex(r.equivalence),
     equivalences: wordListRegex(r.equivalence, "gi"),
     alternation: wordListRegex(km.alternationWords),
     preferred: wordListRegex(km.preferredMarkers),
+    preferredAll: wordListRegex(km.preferredMarkers, "gi"),
     authorization: wordListRegex(r.authorization),
     clearance: wordListRegex(r.clearance),
     qualifiers: km.qualifiers.map(({ words, sameLine }) => ({
@@ -125,12 +161,45 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
   };
 });
 
-/** The language a line asks for or states in a policy pattern: "fluent in German". */
-function namedLanguage(text: string, matchers: Matchers) {
+/** The languages a line asks for or states in a policy pattern: "fluent in German". */
+function patternLanguages(text: string, matchers: Matchers) {
   return matchers.languages
     .flatMap((pattern) => [...text.matchAll(pattern)])
     .map((match) => match[1]?.toLowerCase())
-    .find((captured) => captured !== undefined && matchers.languageNames.has(captured));
+    .filter(
+      (captured): captured is string =>
+        captured !== undefined && matchers.languageNames.has(captured),
+    );
+}
+
+/** The word after a position, when only spaces stand before it. */
+const NEXT_WORD = /\s*(\p{L}[\p{L}\p{M}'’-]*)/uy;
+
+/**
+ * Every language a requirement asks for. In a policy pattern ("fluent in German"), or named as a
+ * language on its own — at the end, before punctuation ("English/Spanish", "English (C1)") or
+ * before a function word ("English and Spanish"). A name before a plain word describes it: "German
+ * enterprise customers" is a market, "the Chinese market" too. `alone` reads the second kind
+ * without the first; a line about years or a degree is never only a language.
+ */
+function askedLanguages(
+  ask: string,
+  matchers: Matchers,
+  km: AtsEnginePolicy["keywordMatch"],
+  vocab: ReturnType<typeof buildVocabulary>,
+  alone: boolean,
+) {
+  const shaped = patternLanguages(ask, matchers);
+  if (!shaped.length && !alone) return [];
+  const next = new RegExp(NEXT_WORD.source, "uy");
+  const standalone = [...ask.matchAll(matchers.anyLanguage)]
+    .filter((match) => {
+      next.lastIndex = match.index + match[0].length;
+      const word = next.exec(ask)?.[1];
+      return word === undefined || canonicalize(word, km, vocab) === null;
+    })
+    .map((match) => match[0].toLowerCase());
+  return [...new Set([...shaped, ...standalone])];
 }
 
 /**
@@ -149,7 +218,7 @@ function listsLanguages(line: string, matchers: Matchers, names: Record<string, 
       return own(names, name) ?? name;
     }),
   );
-  return named.size >= 2 || namedLanguage(body, matchers) !== undefined;
+  return named.size >= 2 || patternLanguages(body, matchers).length > 0;
 }
 
 /** Where one clause of a requirement ends: a comma, a semicolon, or the policy's "and" words. */
@@ -169,21 +238,49 @@ const offersAlternatives = (between: string, matchers: Matchers) =>
  * The requirement without the clauses it marks optional — "Bachelor's degree required; MBA a
  * plus" asks for the Bachelor's — blanked rather than cut, so offsets still line up. A line
  * that is optional throughout ("Python preferred") is kept whole and read as preferred.
+ *
+ * A marker covers the whole of its sentence part (up to a ";") when it opens it on its own
+ * ("Ideally, you have 3+ years of Rust"), closes it on its own ("Kafka, ideally"), or closes a
+ * list it continues with an alternation word ("Rust, Scala or Elixir is a plus", "Python,
+ * Haskell, or OCaml preferred"). Otherwise it covers its own clause: "BS in Computer Science,
+ * MS preferred" still asks for the BS.
  */
 function withoutOptional(text: string, matchers: Matchers) {
-  const clauses = (text.match(/[^;,()]+/g) ?? []).filter((clause) => /\p{L}/u.test(clause));
-  const optional = clauses.filter((clause) => matchers.preferred.test(clause));
-  if (!optional.length) return { asked: text, optional: false };
-  if (optional.length === clauses.length) return { asked: text, optional: true };
-  const asked = optional.reduce(
-    (out, clause) => out.replace(clause, " ".repeat(clause.length)),
-    text,
-  );
-  return { asked, optional: false };
+  const isClause = (clause: string) => /\p{L}/u.test(clause);
+  const markerOnly = (clause: string) => !/\p{L}/u.test(clause.replace(matchers.preferredAll, " "));
+  const blanked: string[] = [];
+  let any = false;
+  let all = true;
+  for (const part of text.split(/(;)/)) {
+    const clauses = (part.match(/[^,()]+/g) ?? []).filter(isClause);
+    const optional = clauses.filter((clause) => matchers.preferred.test(clause));
+    const first = clauses[0];
+    const last = clauses.at(-1);
+    const whole =
+      clauses.length > 0 &&
+      (optional.length === clauses.length ||
+        (first !== undefined && matchers.preferred.test(first) && markerOnly(first)) ||
+        (last !== undefined &&
+          matchers.preferred.test(last) &&
+          (markerOnly(last) || matchers.alternation.test(last))));
+    if (whole) {
+      any = true;
+      blanked.push(" ".repeat(part.length));
+      continue;
+    }
+    if (clauses.length) all = false;
+    any ||= optional.length > 0;
+    blanked.push(
+      optional.reduce((out, clause) => out.replace(clause, " ".repeat(clause.length)), part),
+    );
+  }
+  if (!any) return { asked: text, optional: false };
+  if (all) return { asked: text, optional: true };
+  return { asked: blanked.join(""), optional: false };
 }
 
 /** The posting's requirement statements: each line, or sentence of a long one, under its headings. */
-function requirementLines(jobText: string, policy: AtsEnginePolicy) {
+export function requirementLines(jobText: string, policy: AtsEnginePolicy) {
   const sections = segmentJob(jobText, policy);
   const hasRequired = sections.some((s) => s.kind === "required");
   // A posting with no Requirements heading still lists them — as bullets in its body. So does
@@ -213,7 +310,7 @@ function requirementLines(jobText: string, policy: AtsEnginePolicy) {
           line.length > MAX_REQUIREMENT_CHARS ? line.split(/(?<=[.;])\s+/) : [line],
         )
         .map((line) => line.replace(BULLET_PREFIX, "").trim())
-        .filter((line) => /\p{L}/u.test(line) && !isOffer(line, policy))
+        .filter((line) => /\p{L}/u.test(line) && !isOfferLine(line, policy))
         .map((line) => ({
           text: line.slice(0, MAX_REQUIREMENT_CHARS),
           importance: section.kind === "preferred" ? ("preferred" as const) : ("required" as const),
@@ -222,10 +319,33 @@ function requirementLines(jobText: string, policy: AtsEnginePolicy) {
     .slice(0, MAX_REQUIREMENTS);
 }
 
-/** What the posting offers (pay, benefits), which is not something it asks of the candidate. */
-function isOffer(line: string, policy: AtsEnginePolicy) {
-  const { offerStart, offer } = matchersOf(policy.keywordMatch);
-  return offerStart.test(line) || (MONEY.test(line) && offer.test(line));
+const titleWordOf = memo(
+  (rp: AtsEnginePolicy["resumeParse"]) => new RegExp(`^${wordListPattern(rp.titleWords)}$`, "iu"),
+);
+
+/**
+ * The job-title nouns of a requirement, as tokens: a title word ("manager", "lead") straight
+ * after a word that is not a stopword — "Engineering Manager", "Tech Lead" — rather than an
+ * activity ("lead engineering teams", "experience managing", "ability to lead").
+ */
+function titleNouns(
+  text: string,
+  policy: AtsEnginePolicy,
+  vocab: ReturnType<typeof buildVocabulary>,
+) {
+  const km = policy.keywordMatch;
+  const isTitle = titleWordOf(policy.resumeParse);
+  const nouns = new Set<string>();
+  let before: RegExpExecArray | null = null;
+  for (const word of text.matchAll(/\p{L}[\p{L}\p{M}\p{N}'’]*/gu)) {
+    const gap = before ? text.slice(before.index + before[0].length, word.index) : "";
+    if (before && /^[\s-]+$/u.test(gap) && isTitle.test(word[0])) {
+      const token = canonicalize(word[0], km, vocab);
+      if (token && canonicalize(before[0], km, vocab) !== null) nouns.add(token);
+    }
+    before = word;
+  }
+  return nouns;
 }
 
 /** The years a pattern captured: a figure, or a number word ("five") the policy knows. */
@@ -251,20 +371,54 @@ export function judgeRequirements(
   const matchers = matchersOf(km);
   const proper = properNounTokens(jobText, km.nounsCapitalized);
 
+  // A credential heading ("Certifications", "Licenses and Certifications") certifies what is
+  // listed under it. Recognised, it opened the section; unrecognised, it is a line of its own
+  // that names nothing but credentials, and covers the lines after it.
+  const credentialTokens = new Set(
+    matchers.qualifiers.filter((q) => q.sameLine).flatMap((q) => [...q.tokens]),
+  );
+  const credentialsIn = (text: string) => {
+    const tokens = [...extractVocabulary(text, km, vocab).keys()];
+    return tokens.length && tokens.every((token) => credentialTokens.has(token))
+      ? new Set(tokens)
+      : null;
+  };
+  const NONE = new Set<string>();
+
   // The resume line by line, each with its section and what it demonstrates. Two bounds keep
   // this linear in practice: only the phrases the resume contains at all are searched for line
   // by line (a tuned policy can carry hundreds), and no more lines than any resume has.
   const ranked = sections
-    .flatMap((section) => section.lines.map((line) => ({ line, kind: section.kind })))
+    .flatMap((section) => {
+      const heading = (section as HeadedSection).heading;
+      let context =
+        heading && section.kind === "other"
+          ? new Set(
+              [...extractVocabulary(heading, km, vocab).keys()].filter((t) =>
+                credentialTokens.has(t),
+              ),
+            )
+          : NONE;
+      return section.lines.map((line) => {
+        const opens =
+          !BULLET.test(line) && line.split(/\s+/).length <= 5 && !/\d/u.test(line)
+            ? credentialsIn(line)
+            : null;
+        if (opens) context = opens;
+        return { line, kind: section.kind, context };
+      });
+    })
     .slice(0, MAX_EVIDENCE_LINES);
   const whole = ranked
     .map((entry) => entry.line)
     .join("\n")
     .toLowerCase();
   const present = { ...km, phrases: km.phrases.filter((phrase) => whole.includes(phrase)) };
-  const resumeLines = ranked.map(({ line, kind }) => ({
+  const resumeLines = ranked.map(({ line, kind, context }) => ({
     line,
+    kind,
     rank: EVIDENCE_RANK[kind],
+    context,
     holds: resumeCapabilities(extractVocabulary(line, present, vocab), vocab),
   }));
   const held = new Set(resumeLines.flatMap((entry) => [...entry.holds]));
@@ -279,27 +433,63 @@ export function judgeRequirements(
     (lists ??= resumeLines.some((entry) =>
       listsLanguages(entry.line, matchers, km.requirements.languageNames),
     ));
-  const rolesWith = (tokens: readonly string[]) => {
-    const matched = new Set<number>();
-    let role = -1;
-    for (const section of sections) {
-      if (section.kind !== "experience") continue;
-      for (const line of section.lines) {
-        const next = parsed.roles.findIndex(
-          (item, index) =>
-            index > role &&
-            ((item.title && line.includes(item.title)) ||
-              (item.employer && line.includes(item.employer))),
-        );
+
+  // What each dated role's lines hold. A role is anchored on its own lines — its dated line and
+  // the header lines just above it that name its title or employer — never on a bullet that
+  // happens to name an employer ("Integrated billing with the Globex partner API").
+  let roleHolds: Array<Set<string>> | undefined;
+  const holdingsOfRoles = () => {
+    if (roleHolds) return roleHolds;
+    const work = resumeLines.filter((entry) => entry.kind === "experience");
+    const holds = parsed.roles.map(() => new Set<string>());
+    const names = (at: number, role: number) => {
+      const { title, employer } = parsed.roles[role]!;
+      const line = work[at]!.line;
+      return (
+        !BULLET.test(line) &&
+        Boolean((title && line.includes(title)) || (employer && line.includes(employer)))
+      );
+    };
+    const dated = work.flatMap((entry, at) => (isDatedLine(entry.line, policy, now) ? [at] : []));
+    const owner = new Array<number>(work.length).fill(-1);
+    if (dated.length === parsed.roles.length) {
+      // Each role's dated line in order, raised to the header lines above it that name it.
+      const starts = dated.map((at, role) => {
+        const floor = Math.max(role ? dated[role - 1]! + 1 : 0, at - 3);
+        let start = at;
+        for (let up = at - 1; up >= floor && !BULLET.test(work[up]!.line); up -= 1)
+          if (names(up, role)) start = up;
+        return start;
+      });
+      starts.forEach((start, role) => {
+        const end = starts[role + 1] ?? work.length;
+        for (let at = start; at < end; at += 1) owner[at] = role;
+      });
+    } else {
+      // The roles came from somewhere the lines do not show (a structured document, a hidden
+      // line): follow their headers through the lines, still never through a bullet.
+      let role = -1;
+      work.forEach((_, at) => {
+        const next = parsed.roles.findIndex((__, index) => index > role && names(at, index));
         if (next >= 0) role = next;
-        if (role >= 0) {
-          const holds = resumeCapabilities(extractVocabulary(line, present, vocab), vocab);
-          if (tokens.some((token) => holds.has(token))) matched.add(role);
-        }
-      }
+        owner[at] = role;
+      });
     }
-    return [...matched].map((index) => parsed.roles[index]!).filter(Boolean);
+    work.forEach((entry, at) => {
+      const role = owner[at]!;
+      if (role >= 0) for (const token of entry.holds) holds[role]!.add(token);
+    });
+    return (roleHolds = holds);
   };
+  /**
+   * The roles that name what a years ask is of: any of its named skills, or, for a field in
+   * plain words ("software engineering"), every word of it — each group by any of its members.
+   */
+  const rolesWith = (groups: ReadonlyArray<readonly string[]>, every: boolean) =>
+    holdingsOfRoles().flatMap((holds, index) => {
+      const has = (group: readonly string[]) => group.some((token) => holds.has(token));
+      return (every ? groups.every(has) : groups.some(has)) ? [parsed.roles[index]!] : [];
+    });
   /** The highest level a resume line names, or -1. */
   const lineLevel = (line: string) => degreeLevels(line, policy)[0]?.isced ?? -1;
 
@@ -335,36 +525,48 @@ export function judgeRequirements(
     }
 
     const years = matchers.years.map((re) => re.exec(ask)).find(Boolean) ?? null;
-    // Every level the line names, highest first, and where in the line each is named.
-    const levels = degreeLevels(ask, policy);
+    // Every level the line names, highest first, and where in the line each is named. Not a
+    // state code after a city: "Office in Boston MA" asks for no Master's.
+    const levels = degreeLevels(withoutIgnored(ask, policy), policy);
 
     // A language: met when the resume names it, in any of the names the packs know for it. Only
     // a name the policy lists is one: "proficient in Python" has the shape of "fluent in German".
     // A line that names one without that shape ("communication skills in English") asks for it
-    // too, unless it is about years or a degree.
-    const name =
-      namedLanguage(ask, matchers) ??
-      (years || levels.length ? undefined : ask.match(matchers.anyLanguage)?.[0]?.toLowerCase());
-    if (name) {
+    // too, unless it is about years or a degree. Every language it names is asked for: "Bilingual
+    // English/Spanish" is not met by English alone.
+    const languages = askedLanguages(ask, matchers, km, vocab, !(years || levels.length));
+    if (languages.length) {
       const names = km.requirements.languageNames;
-      const english = own(names, name) ?? name;
-      const aliases = [english, ...Object.keys(names).filter((alias) => names[alias] === english)];
-      const named = wordListRegex([...new Set([name, ...aliases])].map(escapeRegex));
-      const evidence = evidenceFor(
-        (entry) =>
+      const states = languages.map((name) => {
+        const english = own(names, name) ?? name;
+        const aliases = [
+          english,
+          ...Object.keys(names).filter((alias) => names[alias] === english),
+        ];
+        const named = wordListRegex([...new Set([name, ...aliases])].map(escapeRegex));
+        const shows = (entry: (typeof resumeLines)[number]) =>
           named.test(entry.line) &&
           !WEAK_LANGUAGE.test(entry.line) &&
-          !matchers.nationality.test(entry.line.replace(BULLET_PREFIX, "")),
-      );
+          !matchers.nationality.test(entry.line.replace(BULLET_PREFIX, ""));
+        return { name, shows, found: resumeLines.some(shows) };
+      });
+      const found = states.filter((state) => state.found).length;
       return {
         ...base,
         kind: "language",
         // Unnamed is not absent: a resume written in English rarely says "English". A resume that
-        // lists its languages and leaves this one off is missing it; one that lists none (a
-        // language named in passing is not a list) leaves the question to the application.
-        status: evidence.length ? "met" : listsAny() ? "missing" : "unverifiable",
-        terms: [{ term: name, found: evidence.length > 0 }],
-        evidence,
+        // lists its languages and leaves one off is missing it; one that lists none (a language
+        // named in passing is not a list) leaves the question to the application.
+        status:
+          found === states.length
+            ? "met"
+            : found
+              ? "partial"
+              : listsAny()
+                ? "missing"
+                : "unverifiable",
+        terms: states.map(({ name, found }) => ({ term: name, found })),
+        evidence: evidenceFor((entry) => states.some((state) => state.shows(entry))),
       } satisfies AtsRequirement;
     }
 
@@ -410,16 +612,20 @@ export function judgeRequirements(
     // "Go or Java" is one ask: a group is met by any of its members.
     const { find } = alternationGroups([rest], km, vocab);
     const extracted = [...extractVocabulary(rest, km, vocab)];
+    // A job title's noun is the title, not the activity: "Manager" in "an Engineering Manager",
+    // "Lead" in "Tech Lead" — a title word right after a word of its own.
+    const titles = titleNouns(rest, policy, vocab);
+    const isQualifier = (token: string) =>
+      !titles.has(token) && matchers.qualifiers.some((qualifier) => qualifier.tokens.has(token));
     // An activity or a credential is part of the ask, not a plain word to drop beside a skill:
     // "mentoring" in "mentoring engineers", "certification" in "AWS certification".
     const qualifiers = matchers.qualifiers.flatMap((qualifier) => {
-      const found = extracted.find(([token]) => qualifier.tokens.has(token));
+      const found = extracted.find(([token]) => !titles.has(token) && qualifier.tokens.has(token));
       return found ? [{ ...qualifier, label: found[1].label }] : [];
     });
     const named = extracted.filter(
       ([token, term]) =>
-        (term.label.length > 2 || term.skill || proper.has(token)) &&
-        !matchers.qualifiers.some((qualifier) => qualifier.tokens.has(token)),
+        (term.label.length > 2 || term.skill || proper.has(token)) && !isQualifier(token),
     );
     const isSkill = ([token, term]: (typeof named)[number]) =>
       term.skill || proper.has(term.label) || proper.has(token);
@@ -440,12 +646,15 @@ export function judgeRequirements(
     ).length;
     const termsMet = groups.size === 0 || groupsMet === groups.size;
 
-    // A qualifier is shown by a line naming it — beside the skill, for a credential.
+    // A qualifier is shown by a line naming it — beside the skill, for a credential, or under a
+    // heading that names the credential ("Certifications").
     const showsQualifier = (
       entry: (typeof resumeLines)[number],
       qualifier: (typeof qualifiers)[number],
     ) =>
-      [...qualifier.tokens].some((token) => entry.holds.has(token)) &&
+      [...qualifier.tokens].some(
+        (token) => entry.holds.has(token) || (qualifier.sameLine && entry.context.has(token)),
+      ) &&
       (!qualifier.sameLine || !skills.length || picked.some(([token]) => entry.holds.has(token)));
     const qualifiersShown = qualifiers.map((qualifier) =>
       resumeLines.some((entry) => showsQualifier(entry, qualifier)),
@@ -531,10 +740,16 @@ export function judgeRequirements(
             status: have >= askedYears ? "met" : "missing",
             detail: `${Math.floor(have)} years in the work history, ${askedYears} asked`,
           };
+        // Named skills: the roles naming any of them, and all must be held somewhere. Plain
+        // words: the roles naming the whole field — "software engineering" is not met by a
+        // sales role that worked with engineering.
+        const scopeMembers = new Map<string, string[]>();
+        for (const [token] of scope)
+          scopeMembers.set(find(token), [...(scopeMembers.get(find(token)) ?? []), token]);
         const inRoles =
-          (monthsOfExperience(rolesWith(scope.map(([token]) => token)), now) ?? 0) / 12;
+          (monthsOfExperience(rolesWith([...scopeMembers.values()], !skills.length), now) ?? 0) /
+          12;
         const counted = `${Math.floor(inRoles)} years in roles naming ${labels}, ${askedYears} asked`;
-        // Named skills must all be held; plain words describe the field, and one of them is it.
         if (inRoles >= askedYears)
           return {
             status: skills.length && scopeHeld < scopeGroups.size ? "partial" : "met",

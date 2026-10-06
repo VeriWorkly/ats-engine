@@ -386,17 +386,21 @@ describe("#12 a DOCX built from an embedded HTML chunk is read", () => {
 
 describe("#13 list markers drawn as shapes are read as bullets", () => {
   it("starts a line with a small filled square just before it with a bullet", async () => {
+    // Two items of one list: a lone mark is no list (review #1 of the second pass).
     const ops = [
       at(45, 712, "Experience"),
       `40 698 3 3 re f`,
       at(50, 697, "Cut paging volume 45% by rebuilding alerts."),
+      `40 685 3 3 re f`,
+      at(50, 684, "Moved deploys to Argo CD."),
       // A timeline dot is larger than a list marker, and stays a dot.
-      `38 676 6 6 re f`,
-      at(50, 677, "Staff Engineer, Datadog"),
+      `38 664 6 6 re f`,
+      at(50, 665, "Staff Engineer, Datadog"),
     ].join("\n");
     expect(lines((await pdf(ops)).text)).toEqual([
       "Experience",
       "• Cut paging volume 45% by rebuilding alerts.",
+      "• Moved deploys to Argo CD.",
       "Staff Engineer, Datadog",
     ]);
   });

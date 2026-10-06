@@ -2,7 +2,7 @@
 
 Generated from the community policy (`DEFAULT_POLICY`) by `npm run rubric`; do not edit by hand.
 
-- Engine 0.1.1, policy `ats-v2+a91fb7d6`.
+- Engine 0.1.1, policy `ats-v2+d3670d30`.
 - **Score.** Each rule that applies can lose its weight. The readiness score is the share of the
   applicable weight kept, 0–100. A rule whose evidence is absent — page geometry for pasted
   text, a posting for the copied-posting check — is left out of both the report and the score.

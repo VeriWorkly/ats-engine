@@ -55,8 +55,11 @@ export function decodeEntities(text: string): string {
   });
 }
 
-/** Elements whose content is never visible text. */
-const HIDDEN = new Set(["script", "style", "noscript", "template", "svg", "head", "title"]);
+/** Elements whose content is never visible text. A document's head is not one of them: its end
+ * tag is optional, and what it holds (title, style, script) is dropped on its own. */
+const HIDDEN = new Set("script style noscript template svg title".split(" "));
+/** Elements whose content is text up to their first end tag: a "<main" in a script is no tag. */
+const RAW = new Set("script style title textarea noscript xmp".split(" "));
 
 /**
  * A page's furniture rather than its posting: navigation, sidebars, forms and their controls,
@@ -64,14 +67,23 @@ const HIDDEN = new Set(["script", "style", "noscript", "template", "svg", "head"
  * where they hold the posting's own title.
  */
 const CHROME = new Set("nav aside form select button dialog".split(" "));
+
 /**
- * An attribute, as `name=value` lowercased without whitespace, that hides its element or marks
- * it as page furniture: `hidden`, `aria-hidden="true"`, an inline `display: none`, an ARIA role
- * of furniture, an `id` or `class` naming a cookie banner or a list of other jobs. Anchored, and
- * each `.*` is followed by literals only, so it stays linear.
+ * Attributes, as `name=value` lowercased without whitespace, that hide an element: `hidden`, an
+ * inline `display: none` or `opacity: 0`. Anchored, and each `.*` is followed by literals only,
+ * so it stays linear.
  */
-const CHROME_ATTRIBUTE =
-  /^(?:hidden=|aria-hidden=true$|role=(?:navigation|banner|contentinfo|complementary|dialog|alertdialog|search)$|(?:id|class)=.*(?:cookie|consent|gdpr|similar|related)|style=.*(?:display:none|visibility:hidden))/;
+const HIDING = String.raw`hidden=|style=.*(?:display:none|opacity:0(?:\.0*)?(?:;|!|$))`;
+/** On a job page, also an ARIA role of furniture, `aria-hidden`, `visibility: hidden`, and an
+ * `id` or `class` naming a cookie banner or a list of other jobs. */
+const PAGE_HIDING = new RegExp(
+  `^(?:${HIDING}|style=.*visibility:hidden|aria-hidden=true$|role=(?:navigation|banner|contentinfo|complementary|dialog|alertdialog|search)$|(?:id|class)=.*(?:cookie|consent|gdpr|similar|related))`,
+);
+/** In a document, also text under 2px or 2pt, or `visibility: hidden` — which an element inside
+ * may undo, so these hide only an element with no elements of its own. */
+const DOCUMENT_HIDING = new RegExp(`^(?:${HIDING})`);
+const LEAF_HIDING =
+  /^style=.*(?:visibility:hidden|font-size:(?:0(?:\.0*)?(?:[a-z]+|%)?|[01](?:\.\d{1,6})?p[xt])(?:;|!|$))/;
 
 /**
  * Phrasing elements: they style a run of text without breaking it, so where text touches them
@@ -166,35 +178,86 @@ function findTag(html: string, prefix: string, from: number, before?: number): n
 }
 
 /**
- * Past the end of the `name` element whose start tag ends before `from`: elements of the same
- * name inside it are counted, so an `<svg>` nested in another does not end the outer one early.
- * One that never closes runs to the end. Linear: each search is bounded by the next close tag.
+ * Each tag from `from` on, as [where it opens, past its `>`, its lowercased name, whether it is
+ * an end tag]. Comments are skipped, and so is the content of a raw-text element (`RAW`), which
+ * holds no tags. Stops at a tag that never closes. One forward pass.
+ */
+function* tagsFrom(html: string, from: number): Generator<[number, number, string, boolean]> {
+  for (let at = html.indexOf("<", from); at !== -1;) {
+    let next = at + 1;
+    if (html.startsWith("<!--", at)) {
+      next = html.indexOf("-->", at + 4) + 3;
+      if (next < 3) return;
+    } else if (opensTag(html, at)) {
+      const end = tagEnd(html, at) + 1;
+      if (!end) return;
+      const name = tagName(html.slice(at, end));
+      const closing = html[at + 1] === "/";
+      yield [at, end, name, closing];
+      next = !closing && RAW.has(name) ? skipElement(html, name, end) : end;
+    }
+    at = html.indexOf("<", next);
+  }
+}
+
+/**
+ * Where the `name` element whose start tag ends at `from` ends: past its end tag, or — for one
+ * whose end tag HTML lets an author omit — where the next tag that ends it starts. Elements of
+ * the same name inside it are counted, so an `<svg>` nested in another does not end the outer
+ * one early; a raw-text element ends at its first end tag. One that never closes runs to the
+ * end. Linear in what it skips.
+ *
+ * A paragraph ends at a block that opens or an element that closes around it; a list item at
+ * the next item of its list or the list's end: `<p hidden>Two<p>Three` hides "Two" alone.
  */
 function skipElement(html: string, name: string, from: number): number {
-  let depth = 1;
-  let at = from;
-  for (;;) {
-    const close = findTag(html, `</${name}`, at);
-    if (close === -1) return html.length;
-    // Opens are looked for only up to the close: a search past it, for a name that never opens
-    // again, cost the rest of the page on every element skipped.
-    for (let open = findTag(html, `<${name}`, at, close); open !== -1;) {
-      depth += 1;
-      open = findTag(html, `<${name}`, open + 1, close);
-    }
-    depth -= 1;
-    if (!depth) return html.indexOf(">", close) + 1 || html.length;
-    at = close + 1;
+  if (RAW.has(name)) {
+    const close = findTag(html, `</${name}`, from);
+    return close === -1 ? html.length : html.indexOf(">", close) + 1 || html.length;
   }
+  const item = name === "li";
+  let depth = 0;
+  for (const [at, end, tag, closing] of tagsFrom(html, from)) {
+    if (
+      name === "p"
+        ? closing
+          ? !INLINE.has(tag)
+          : BLOCK.has(tag) && tag !== "br"
+        : item && !depth && tag === "li"
+    )
+      return closing && tag === name ? end : at;
+    if (item ? tag !== "ul" && tag !== "ol" : tag !== name) continue;
+    if (closing && !depth--) return item ? at : end;
+    if (!closing && html[end - 2] !== "/") depth += 1;
+  }
+  return html.length;
+}
+
+/**
+ * The first `<main>`, else the one `<article>` outside navigation, sidebars and other articles,
+ * where a page has exactly one: a list of related jobs as cards is no posting. Tags in scripts
+ * and comments are not counted.
+ */
+function landmark(html: string): number {
+  let [article, articles, nested, furniture] = [-1, 0, 0, 0];
+  for (const [at, , name, closing] of tagsFrom(html, 0)) {
+    const step = closing ? -1 : 1;
+    if (name === "main" && !closing) return at;
+    if (name === "aside" || name === "nav") furniture = Math.max(0, furniture + step);
+    if (name !== "article") continue;
+    if (!closing && !furniture && !nested) [article, articles] = [at, articles + 1];
+    nested = Math.max(0, nested + step);
+  }
+  return articles === 1 ? article : -1;
 }
 
 /** Each attribute of a tag, name and value; one forward pass, each match consuming input. */
 const ATTRIBUTE = /([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
 
-/** Whether a start tag's attributes hide its element, or mark it as page furniture. */
-function hiddenByAttributes(tag: string): boolean {
+/** Whether one of a start tag's attributes, as `name=value`, matches `pattern`. */
+function hiddenByAttributes(tag: string, pattern: RegExp): boolean {
   return [...tag.slice(1 + tagName(tag).length).matchAll(ATTRIBUTE)].some(([, name, ...values]) =>
-    CHROME_ATTRIBUTE.test(
+    pattern.test(
       `${name}=${values.find((part) => part !== undefined) ?? ""}`.toLowerCase().replace(/\s/g, ""),
     ),
   );
@@ -204,12 +267,18 @@ function hiddenByAttributes(tag: string): boolean {
 const VOID = new Set("br hr img input meta link".split(" "));
 
 /**
+ * An HTML document read for its text: `hidden`, the text of the elements dropped as hidden
+ * (`document` mode), and `tables`, the tables read.
+ */
+export type HtmlReading = { text: string; hidden: string[]; tables: number };
+
+/**
  * The visible text of an HTML document or fragment, one line per block, entities decoded and
  * whitespace as the page had it.
  *
  * Block elements become line breaks, so headings and bullets survive as lines instead of
  * collapsing into one paragraph; phrasing elements (`b`, `span`, `sup`, …) join the text
- * around them. Script, style, the document's head and similar elements are dropped with their
+ * around them. Script, style, the document's title and similar elements are dropped with their
  * content; an element left unclosed drops everything after it, which on a well-formed page never
  * happens and on a hostile one is the safe direction. A `<` that cannot open a tag ("<5k") is
  * text, as it is to a browser.
@@ -218,18 +287,25 @@ const VOID = new Set("br hr img input meta link".split(" "));
  * `<main>` (or its one `<article>`) when it has one, and navigation, sidebars, forms, dialogs,
  * cookie banners, "similar jobs" lists and elements hidden by `hidden`, `aria-hidden` or an
  * inline `display: none` are dropped.
+ *
+ * `document`: the input is a resume. Elements a reader cannot see — `hidden`, `display: none`,
+ * `opacity: 0`, text under 2px — are dropped and their text kept in `hidden`; nothing is
+ * furniture.
  */
-export function htmlText(html: string, page = false): string {
-  let chrome = new Set([...CHROME, "header", "footer"]);
-  if (page)
-    for (const name of ["main", "article"]) {
-      const start = findTag(html, `<${name}`, 0);
-      if (start === -1) continue;
-      html = html.slice(start, skipElement(html, name, start + 1));
+export function readHtml(html: string, mode?: "page" | "document"): HtmlReading {
+  let chrome = new Set(mode === "page" ? [...CHROME, "header", "footer"] : []);
+  if (mode === "page") {
+    const start = landmark(html);
+    if (start !== -1) {
+      const open = tagEnd(html, start) + 1;
+      html = html.slice(start, skipElement(html, tagName(html.slice(start, open)), open));
       chrome = CHROME;
-      break;
     }
+  }
+  const hides = mode === "page" ? PAGE_HIDING : mode && DOCUMENT_HIDING;
   const out: string[] = [];
+  const hidden: string[] = [];
+  let tables = 0;
   let index = 0;
 
   // Where the text since the last tag began.
@@ -261,15 +337,29 @@ export function htmlText(html: string, page = false): string {
     const starts = html[open + 1] !== "/";
     index = close + 1;
 
-    if (
-      starts &&
-      (HIDDEN.has(name) ||
-        (page &&
-          (chrome.has(name) || (/\s/.test(tag) && !VOID.has(name) && hiddenByAttributes(tag)))))
-    ) {
+    if (starts && (HIDDEN.has(name) || chrome.has(name))) {
       if (!tag.endsWith("/>")) index = skipElement(html, name, index);
       continue;
     }
+    // An element hidden by its attributes; one whose size or visibility hides it only when it
+    // holds text alone, its end tag the next tag: an element inside may set its own.
+    const next = html.indexOf("<", index);
+    if (
+      starts &&
+      hides &&
+      /\s/.test(tag) &&
+      !VOID.has(name) &&
+      (hiddenByAttributes(tag, hides) ||
+        (mode === "document" &&
+          indexOfIgnoreCase(html, `</${name}`, next, next + 1) === next &&
+          hiddenByAttributes(tag, LEAF_HIDING)))
+    ) {
+      const end = tag.endsWith("/>") ? index : skipElement(html, name, index);
+      if (mode === "document") hidden.push(readHtml(html.slice(index, end)).text);
+      index = end;
+      continue;
+    }
+    if (starts && name === "table") tables += 1;
     // A list item keeps its marker, so it reads as the bullet it is — to a resume's content
     // rules, and to a posting's heading detection, which must not take an item for a heading.
     // A phrasing tag that text touches joins it; between two sibling elements — skill tags,
@@ -279,5 +369,9 @@ export function htmlText(html: string, page = false): string {
     text = index;
   }
 
-  return decodeEntities(out.join(""));
+  return { text: decodeEntities(out.join("")), hidden, tables };
 }
+
+/** `readHtml`'s text: a job page's (`page`), or every element's. */
+export const htmlText = (html: string, page = false) =>
+  readHtml(html, page ? "page" : undefined).text;

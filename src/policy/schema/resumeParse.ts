@@ -136,6 +136,61 @@ export const resumeParseSchema = z.object({
     "el",
   ]),
   /**
+   * Credentials written after a name ("Priya Raman, MBA", "Jane Doe, MD"): a name cut from one of
+   * these is the name, wherever a company over a title sits below it. Matched whole, ignoring case.
+   */
+  postNominals: wordList("postNominals").default([
+    String.raw`ph\.?d\.?`,
+    String.raw`m\.?d\.?`,
+    String.raw`d\.?o\.?`,
+    String.raw`j\.?d\.?`,
+    String.raw`esq\.?`,
+    "mba",
+    "msc",
+    "bsc",
+    "cpa",
+    "cfa",
+    "cma",
+    "acca",
+    "pmp",
+    "cissp",
+    "csm",
+    String.raw`p\.?e\.?`,
+    String.raw`r\.?n\.?`,
+    "bsn",
+    "msn",
+    "np",
+    "rd",
+    "dds",
+    "dmd",
+    "dvm",
+    "pharmd",
+    "lcsw",
+    "frcs",
+    "mrcp",
+  ]),
+  /**
+   * Two-letter codes of states and provinces, written in capitals after a city ("New York, NY").
+   * A name cut from one of these is a place, unless the code is also a credential the
+   * `postNominals` list ("MD"). Matched whole and case-sensitively.
+   */
+  regionCodes: wordList("regionCodes").default(
+    (
+      "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ " +
+      "NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY " +
+      "AB BC MB NB NL NS NT NU ON PE QC SK YT"
+    ).split(" "),
+  ),
+  /** Words that say how or where a role is worked rather than for whom: "Remote", "Hybrid". */
+  workplaceWords: wordList("workplaceWords").default([
+    "remote",
+    "hybrid",
+    "on-?site",
+    "in-office",
+    "work from home",
+    "wfh",
+  ]),
+  /**
    * Lowercase words a capitalised heading may join its words with: "Skills and Tools". Any other
    * lowercase word after the heading word reads as prose ("History of Art BA").
    */

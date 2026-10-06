@@ -14,6 +14,9 @@ export type PositionedRun = {
   mass: number;
   row?: unknown;
   size?: number;
+  /** Whether its text could be a tab stop's — a date or a place has a digit or a comma — rather
+   * than a word of a second column. Unknown is taken as could. */
+  stop?: boolean;
 };
 
 /** The best gutter: the share of text beyond it, where it is, and whether right-aligned runs
@@ -33,6 +36,8 @@ const GUTTER_SEARCH_END = 0.7;
 const GUTTER_STEP = 4;
 /** Points from the page's right text edge within which a run is right-aligned to it. */
 const FLUSH = 3;
+/** Characters of right-hand text a tab stop holds at most: a date, a place, not a paragraph. */
+const TAB_STOP_CHARS = 40;
 
 /**
  * Finds the most balanced vertical channel that no text crosses, and reports how much of the
@@ -53,7 +58,8 @@ const FLUSH = 3;
  * it, in the same size, is a tab stop rather than a column when those lines all end flush with
  * the right margin: "City, ST · Jan 2021 – Present" after every job title, with short bullets
  * under it, measured 0.26 — a sidebar's share — on a single-column resume. A second column's
- * lines are ragged, so it still counts when its baselines happen to match the first's.
+ * lines are ragged, or long, or mostly on baselines of their own — a right-aligned sidebar ends
+ * every line flush — so it still counts when some of its baselines happen to match the first's.
  *
  * `min(left, right)` covers the other end: a page whose lines are simply shorter than the
  * candidate split has no text at all on the far side, so the share is zero and no gutter is
@@ -83,13 +89,17 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
     let straddling = 0;
     let left = 0;
     let right = 0;
-    // Lines with text on both sides in one size; how many end at the margin; their right text.
+    // Lines with text on both sides in one size; how many end at the margin, and how many hold a
+    // few words on the right; their right text; lines with text on the right alone.
     let shared = 0;
     let flush = 0;
+    let short = 0;
     let sharedRight = 0;
+    let rightOnly = 0;
 
     for (const row of rows.values()) {
       let [l, r, reach, lSize, rSize] = [0, 0, 0, 0, 0];
+      let stop = false;
       for (const run of row) {
         if (run.left < split && run.right > split) straddling += 1;
         else if (run.right <= split) {
@@ -97,6 +107,7 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
           lSize = Math.max(lSize, run.size ?? 0);
         } else {
           r += run.mass;
+          stop ||= run.stop !== false;
           reach = Math.max(reach, run.right);
           rSize = Math.max(rSize, run.size ?? 0);
         }
@@ -107,10 +118,15 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
         shared += 1;
         sharedRight += r;
         if (reach >= edge - FLUSH) flush += 1;
-      }
+        if (r <= TAB_STOP_CHARS && stop) short += 1;
+      } else if (r && !l) rightOnly += 1;
     }
 
-    const tabs = shared > 0 && flush >= 0.8 * shared;
+    // Tab stops: flush right, each beside text on its left, and a date or a place — a few
+    // characters with a digit or a comma. A right side of words — a sidebar's skills, its email
+    // — or with more lines of its own than lines it shares is a column whose baselines happen to
+    // meet the other's.
+    const tabs = shared > 0 && flush >= 0.8 * shared && short >= 0.8 * shared && rightOnly < shared;
     if (tabs) right -= sharedRight;
     if (straddling > straddleAllowance || left + right === 0) continue;
     found.push({ ratio: Math.min(left, right) / (left + right), split, tabs, straddling });

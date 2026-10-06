@@ -92,6 +92,8 @@ type GraphicsState = {
 type Run = {
   text: string;
   center: [number, number];
+  /** Where its first glyph starts, on its baseline. */
+  origin: [number, number];
   box: Box;
   order: number;
   size: number;
@@ -106,6 +108,12 @@ export type PageVisibility = { textChars: number; hidden: string[]; images: Box[
 /** Shapes no wider or taller than this, in points, may be list markers; this many are kept. */
 const MARK_SIZE = 12;
 const MAX_MARKS = 2_000;
+
+/** Glyphs a soft mask is built from that are matched against what is painted through it; past
+ * this many pairs, the rest are taken as painted visibly. */
+const MAX_MASK_PAIRS = 100_000;
+/** Visible glyphs a transparent run is compared with, across a page, before the rest are not. */
+const MAX_PIECE_CHECKS = 2_000_000;
 
 /** A run's text and where it is, to a 2pt cell `dx`, `dy` cells away. */
 const cell = (text: string, [x, y]: [number, number], dx = 0, dy = 0) =>
@@ -225,9 +233,31 @@ export function measureVisibility(
   // Where glyphs were drawn as a soft mask — text painted with a gradient — and where visible
   // text was drawn: a transparent copy of either is the selectable layer of a text effect.
   const drawnGlyphs = new Set<string>();
+  // The glyphs the soft mask being built or in force is made of. They show only where what is
+  // painted through the mask stands out from what lies under it: a white rectangle painted
+  // through a mask of the text on a white page shows nothing, and is no visible copy of it.
+  let maskGlyphs: Array<{ text: string; center: [number, number] }> = [];
+  const throughMask: Array<{
+    text: string;
+    center: [number, number];
+    fill: string;
+    order: number;
+  }> = [];
   /** Something painted, unless it only builds a soft mask. */
   const paint = (item: Omit<Drawn, "alpha">, masked = state.softMask) => {
     if (maskDepth) return;
+    if (state.softMask)
+      for (const glyph of maskGlyphs) {
+        const [x, y] = glyph.center;
+        const [x0, y0, x1, y1] = item.box;
+        if (throughMask.length >= MAX_MASK_PAIRS) drawnGlyphs.add(cell(glyph.text, glyph.center));
+        else if (x >= x0 && x <= x1 && y >= y0 && y <= y1)
+          throughMask.push({
+            ...glyph,
+            fill: item.kind === "shape" ? item.fill : "",
+            order: item.order,
+          });
+      }
     // Through a mask it may show anywhere or nowhere: it covers nothing for certain, and what
     // lies on it has no known background.
     drawn.push(masked ? { ...item, fill: "", alpha: 0 } : { ...item, alpha: state.alpha });
@@ -281,10 +311,11 @@ export function measureVisibility(
     textMatrix = multiply(textMatrix, [1, 0, 0, 1, advance, 0]);
     const center: [number, number] = [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2];
     if (!text.trim()) return;
-    if (maskDepth) return void drawnGlyphs.add(cell(text, center));
+    if (maskDepth) return void maskGlyphs.push({ text, center });
     runs.push({
       ...state,
       text,
+      origin: apply(device, 0, 0),
       // No font size set is no size known (NaN, never tiny); a mirrored font is its own size, and
       // a zero scale — `0 Tz` — leaves no size at all.
       size: fontSize ? Math.abs(fontSize) * scale : Number.NaN,
@@ -314,9 +345,11 @@ export function measureVisibility(
           ctm: multiply(state.ctm, Array.from(matrix as ArrayLike<number>) as Matrix),
         };
     } else if (fn === ops.paintFormXObjectEnd) state = stack.pop() ?? state;
-    else if ((fn === ops.beginGroup || fn === ops.endGroup) && isSoftMaskGroup(args[0]))
+    else if ((fn === ops.beginGroup || fn === ops.endGroup) && isSoftMaskGroup(args[0])) {
+      // A new mask's glyphs replace the last one's.
+      if (fn === ops.beginGroup && !maskDepth) maskGlyphs = [];
       maskDepth = Math.max(0, maskDepth + (fn === ops.beginGroup ? 1 : -1));
-    else if (fn === ops.setFillRGBColor && typeof args[0] === "string")
+    } else if (fn === ops.setFillRGBColor && typeof args[0] === "string")
       state = { ...state, fill: args[0] };
     else if (fn === ops.setStrokeRGBColor && typeof args[0] === "string")
       state = { ...state, stroke: args[0] };
@@ -389,9 +422,15 @@ export function measureVisibility(
 
   const around = indexDrawn(
     drawn,
-    runs.map((run) => run.center),
+    [...runs.map((run) => run.center), ...throughMask.map((glyph) => glyph.center)],
     pageBox,
   );
+  for (const { text, center, fill, order } of throughMask) {
+    const top = around(center, order).top;
+    const background = top ? top.fill : "#ffffff";
+    if (fill === "" || background === "" || contrast(fill, background) >= MIN_CONTRAST)
+      drawnGlyphs.add(cell(text, center));
+  }
   // What the render mode paints the glyphs with: their outline in modes 1 and 5, outline and
   // fill in 2 and 6 (seen if either is), else their fill. Outlined text is judged by its stroke:
   // a white-filled heading outlined in black is plainly visible.
@@ -402,8 +441,49 @@ export function measureVisibility(
       : []),
   ];
   const transparentRun = (run: Run) => paintsOf(run).every(({ alpha }) => alpha === 0);
+  // Visible runs by the point their baseline is on, in order along it: Chrome draws an outline
+  // a glyph at a time and its transparent copy in pieces ("PRIY", "A", " NAIR"), in fonts whose
+  // widths differ, so a piece is matched by the glyphs that start within it.
+  const lines = new Map<number, Run[]>();
   for (const run of runs)
-    if (run.mode % 4 !== 3 && !transparentRun(run)) drawnGlyphs.add(cell(run.text, run.center));
+    if (run.mode % 4 !== 3 && !transparentRun(run)) {
+      drawnGlyphs.add(cell(run.text, run.center));
+      const key = Math.round(run.origin[1]);
+      if (lines.has(key)) lines.get(key)!.push(run);
+      else lines.set(key, [run]);
+    }
+  for (const line of lines.values()) line.sort((a, b) => a.origin[0] - b.origin[0]);
+  let checks = 0;
+  const copied = (run: Run) => {
+    const [x, y] = run.origin;
+    // Widths differ a little between the two fonts: the glyphs are taken in order from where
+    // the piece starts until they spell as many characters as it has.
+    const end = run.box[2] + run.size;
+    const bare = (text: string) => text.replace(/\s/g, "");
+    const target = bare(run.text);
+    const pieces: Run[] = [];
+    for (const key of [-1, 0, 1]) {
+      const line = lines.get(Math.round(y) + key) ?? [];
+      let low = 0;
+      let high = line.length;
+      while (low < high) {
+        const middle = (low + high) >> 1;
+        if (line[middle]!.origin[0] < x - 0.5) low = middle + 1;
+        else high = middle;
+      }
+      for (let at = low; at < line.length && line[at]!.origin[0] < end; at += 1) {
+        if ((checks += 1) > MAX_PIECE_CHECKS) return false;
+        if (Math.abs(line[at]!.origin[1] - y) <= 1) pieces.push(line[at]!);
+      }
+    }
+    pieces.sort((a, b) => a.origin[0] - b.origin[0]);
+    let spelt = "";
+    for (const piece of pieces) {
+      if (spelt.length >= target.length) break;
+      spelt += bare(piece.text);
+    }
+    return target !== "" && spelt === target;
+  };
 
   const hidden: string[] = [];
   let previous: Run | undefined;
@@ -421,7 +501,8 @@ export function measureVisibility(
       transparentRun(run) &&
       ![-1, 0, 1].some((dx) =>
         [-1, 0, 1].some((dy) => drawnGlyphs.has(cell(run.text, run.center, dx, dy))),
-      );
+      ) &&
+      !copied(run);
     const tiny = run.size < MIN_SIZE;
     const offPage =
       run.box[2] < pageBox[0] ||

@@ -1,8 +1,7 @@
 import { prepareResume, type AtsResumeInput, type PreparedResume } from "../input.js";
 import { localizePolicy, type AtsLocaleOptions } from "../locales/resolve.js";
 import { computeJobMatch } from "../matching/jobMatch.js";
-import { judgeRequirements } from "../matching/requirements.js";
-import type { ResumeSection } from "../parser/sections.js";
+import { judgeRequirements, withHeadings, type HeadedSection } from "../matching/requirements.js";
 import { policyFingerprint } from "../policy/fingerprint.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { BULLET_PREFIX, normalizeText } from "../text/text.js";
@@ -113,12 +112,17 @@ export class AtsScoringService {
     // Hidden text is no evidence of fit: the match and the requirements read only what a reader
     // sees. And when the resume was caught gaming the screener (an integrity error), the match
     // is held to the readiness score that carries the deduction, as the verdict already is.
-    const visible = visibleLine(layout);
+    // Only text the policy's hidden-text rule fails is set aside: below its threshold a few
+    // hidden characters are layout, and the rule says so by passing.
+    const hiddenRule = active.find((rule) => metricOf.get(rule.id) === "hiddenTextChars");
+    const hiding = !hiddenRule || failedChecks.some((rule) => rule.id === hiddenRule.id);
+    const visible = hiding ? visibleLine(layout) : () => true;
     const shown = lines.filter(visible);
-    const shownSections: ResumeSection[] =
+    const headed = withHeadings(lines, sections);
+    const shownSections: HeadedSection[] =
       shown.length === lines.length
-        ? sections
-        : sections.map((section) => ({ ...section, lines: section.lines.filter(visible) }));
+        ? headed
+        : headed.map((section) => ({ ...section, lines: section.lines.filter(visible) }));
     const jobMatch = computeJobMatch(
       shown.length === lines.length ? ctx.text : shown.join(" ").replace(/\s+/g, " ").trim(),
       jobDescription,

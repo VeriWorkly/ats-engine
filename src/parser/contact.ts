@@ -1,6 +1,6 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { wordListPattern } from "../text/text.js";
-import { titleWordsOf } from "./experience.js";
+import { placeWords, titleWordsOf } from "./experience.js";
 import { isSectionHeading, sectionKind } from "./sections.js";
 import { memo } from "../util/memo.js";
 
@@ -40,7 +40,8 @@ const isPostNominal = (token: string) =>
   /^[\p{L}.]{2,8}$/u.test(token) && (token.includes(".") || /\p{Lu}[\p{L}.]*\p{Lu}/u.test(token));
 
 /**
- * The line without the credentials after the name: "Jane Doe, PhD", "Raj Patel, M.D., CPA".
+ * The line without the credentials after the name: "Jane Doe, PhD", "Raj Patel, M.D., CPA", and
+ * the parts cut ("PhD"; "M.D.", "CPA"), or none.
  *
  * Walks the comma-separated parts from the end and stops at the first that is not all
  * credentials, so each part is read once. It was a regex repeating a group of letters, which
@@ -58,7 +59,9 @@ function withoutPostNominals(line: string) {
     stripped ||= tokens.length > 0;
     cut -= 1;
   }
-  return stripped ? parts.slice(0, cut).join(",") : line;
+  return stripped
+    ? { text: parts.slice(0, cut).join(","), tail: parts.slice(cut).map((part) => part.trim()) }
+    : { text: line, tail: [] };
 }
 
 const birthPattern = memo(
@@ -95,15 +98,17 @@ const CONTACT_SEPARATOR = /(?<!\s)\s*[|·•,]\s*|\t|\s{2,}|(?<!\s)\s+[–—-]\
 
 /**
  * The part of a line that could be the name: after a "Name:" label, and on a contact line that
- * also holds an email or a number, the part before the first separator (`split`).
+ * also holds an email or a number, the part before the first separator (`split`), with the part
+ * after it when that separator is a comma (`tail`: "NY" in "New York, NY | jane@…").
  */
 function nameCandidate(line: string, label: RegExp) {
   const value = line.replace(label, "");
-  if (!EMAIL.test(value) && !/\d/.test(value)) return { text: value, split: false };
-  const first = value.split(CONTACT_SEPARATOR)[0] ?? "";
-  return EMAIL.test(first) || /\d/.test(first) || first === value
-    ? null
-    : { text: first, split: true };
+  if (!EMAIL.test(value) && !/\d/.test(value)) return { text: value, split: false, tail: [] };
+  const parts = value.split(CONTACT_SEPARATOR);
+  const first = parts[0] ?? "";
+  if (EMAIL.test(first) || /\d/.test(first) || first === value) return null;
+  const comma = value.slice(first.length).trimStart().startsWith(",");
+  return { text: first, split: true, tail: comma && parts[1] ? [parts[1].trim()] : [] };
 }
 
 /**
@@ -124,13 +129,51 @@ export function findName(lines: string[], policy: AtsEnginePolicy) {
   const { particles, titles, label } = nameVocabulary(policy.resumeParse);
   const trimmed = lines.map((line) => line.trim()).filter(Boolean);
   const titleWords = titleWordsOf(policy);
+  const { code, postNominal } = placeWords(policy);
+  // A comma tail of state codes and no credential: "New York, NY", "Austin, TX 78701". "MD" is
+  // both, and read as the credential.
+  const isPlaceTail = (tail: readonly string[]) =>
+    tail.length > 0 &&
+    tail.every((part) => code.test(part.replace(/\s\d{5}(?:-\d{4})?$/u, ""))) &&
+    !tail.some((part) => postNominal.test(part));
+
+  // A letter-spaced name can reach us with its word gap lost ("J A N E D O E" read as "JANEDOE":
+  // a shadowed heading is one text run, and the PDF keeps no wider space between the words). When
+  // the email's name parts spell it exactly ("jane.doe@…"), it is split where they split.
+  const emailParts =
+    trimmed
+      .slice(0, 12)
+      .join("\n")
+      .match(EMAIL)?.[0]
+      ?.split("@")[0]
+      ?.split(/[._-]+/)
+      .filter((part) => /^\p{L}{2,}$/u.test(part)) ?? [];
+  const spelledByEmail = (text: string) => {
+    if (emailParts.length < 2) return text;
+    // "JANEDOE", or still letter-spaced: "J A N E D O E".
+    const letters = text.split(/\s+/);
+    const word = letters.every((letter) => [...letter].length === 1) ? letters.join("") : text;
+    if (/\s/.test(word) || emailParts.join("").toLowerCase() !== word.toLowerCase()) return text;
+    let at = 0;
+    return emailParts
+      .map((part) => {
+        const piece = word.slice(at, at + part.length);
+        at += part.length;
+        return piece;
+      })
+      .join(" ");
+  };
 
   /** The name a line holds, or null. */
   const nameIn = (line: string, index: number, firstLine: boolean) => {
     const candidate = nameCandidate(line, label);
     if (candidate === null || titles.test(candidate.text)) return null;
 
-    const name = withoutPostNominals(candidate.text).trim();
+    const cut = withoutPostNominals(candidate.text);
+    const name = spelledByEmail(cut.text.trim());
+    const place = isPlaceTail(candidate.split ? candidate.tail : cut.tail);
+    // "New York, NY | jane@…" opens a contact line with the city, not the name.
+    if (candidate.split && place) return null;
     const words = name.split(/\s+/);
     const named = words.filter((word) => !particles.test(word));
     // A name shares a line with the contact details only at the top, and is two words or more:
@@ -144,9 +187,9 @@ export function findName(lines: string[], policy: AtsEnginePolicy) {
     // A headline ("Senior Software Engineer") has the shape of a name, and is what this used to
     // return when the real name was in an image.
     if (isSectionHeading(name, policy) || titleWords.test(name)) return null;
-    // "Jane Doe, PhD" loses its credential; "San Francisco, CA" loses its state the same way,
-    // so a name found only by cutting a comma tail is the weaker reading.
-    return { name, cut: name !== candidate.text.trim() };
+    // "Jane Doe, PhD" loses its credential; "San Francisco, CA" loses its state the same way, and
+    // is a place, the weakest reading of all.
+    return { name, cut: cut.text.trim() !== candidate.text.trim(), place };
   };
 
   // A name directly above a headline ("LUCAS MOREAU" over "Senior Product Designer") is the
@@ -165,8 +208,12 @@ export function findName(lines: string[], policy: AtsEnginePolicy) {
     return "";
   };
 
-  // Only lines above that cannot be the name: the document's title, a section heading.
+  // Only lines above that cannot be the name: the document's title, a section heading. A name
+  // with its credentials cut ("Priya Raman, MBA") is still the name at the top, over any company
+  // above a title further down; one whose cut tail is a state ("San Francisco, CA") is a place,
+  // taken only when no other name is found.
   let onlyHeadingsAbove = true;
+  let place = "";
   for (const [index, line] of trimmed.slice(0, 6).entries()) {
     // The work history is never the header block, whatever is missing above it.
     if (sectionKind(line, policy) === "experience") break;
@@ -174,7 +221,8 @@ export function findName(lines: string[], policy: AtsEnginePolicy) {
     onlyHeadingsAbove &&= titles.test(line) || isSectionHeading(line, policy);
     const found = nameIn(line, index, firstLine);
     if (!found) continue;
-    return found.cut ? headlined() || found.name : found.name;
+    if (!found.place) return found.name;
+    place ||= found.name;
   }
-  return headlined();
+  return headlined() || place;
 }

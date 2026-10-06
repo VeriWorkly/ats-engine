@@ -90,10 +90,15 @@ export function copiedPosting(resume: string, posting: string | undefined): Find
 /** A line this long is a paragraph, or a resume that extracted as one run: its words all count. */
 const LINE_WORDS = 40;
 
+/** A line with a label before a colon: "kafka-tools: Kafka, Go", "Cloud: AWS, GCP". */
+const LABELLED = /^[^:]{1,40}:/u;
+/** A year in a line: an entry ("Mentor, Code for America, 2019"), not a list of skills. */
+const YEAR = /(?<!\d)(?:19|20)\d\d(?!\d)/u;
+
 /** A list: three or more short items between commas, pipes, semicolons or middle dots. */
 function listItems(line: string): string[] | null {
   // "Cloud: AWS, GCP" — a label before a colon is not an item.
-  const body = line.replace(/^[^:]{1,40}:/u, "");
+  const body = line.replace(LABELLED, "");
   // A plain split and `trim`, not `\s*` around the separator or a `[\s.]+$`: on a long run of
   // spaces either is retried from every position in it.
   const items = body
@@ -117,8 +122,9 @@ function listItems(line: string): string[] | null {
  *   time), and is stuffed when that reaches 15 and 5% of the words that are not repeated so: a
  *   data engineer says "data" in most bullets, often twice in one, and that is the job.
  * - A line that is not a list and repeats one term five times or more, as 30% of its words.
- * - A list item named three times or more within one section outside the work history, as a
- *   skills block padded with the same skills is; each role naming its own stack is not.
+ * - A list item named three times or more within one line, or across the undated, unlabelled
+ *   lists of a skills section, as a skills block padded with the same skills is. Each role
+ *   naming its own stack is not, nor three certifications from one issuer.
  * - A line appearing three times or more, unless every copy sits at the same place in its role
  *   block — the employer above each title, "Key achievements:" under each date line — which is
  *   the resume's layout, not repetition.
@@ -179,15 +185,29 @@ export function stuffedTerms(
   }
   const nearRole = (at: number) => dated[at] || above[at] <= 2 || below[at] <= 2;
 
-  // A skills block naming one skill again and again, read per section outside the work history.
+  // A list naming one skill again and again: within one line anywhere, or across the plain lists
+  // of a skills section. Entries elsewhere repeat a field by nature — the issuer of three
+  // certifications, an award won each year, each open-source project's stack — and so do the
+  // dated or labelled entries a skills section swallows under a heading it did not recognise
+  // ("Volunteer", "Open Source").
   const besideRoles = new Set(lines.filter((_, at) => nearRole(at)));
-  for (const section of segmentResume(lines, policy)) {
-    if (section.kind === "experience" || section.kind === "projects") continue;
-    const items = new Map<string, number>();
-    for (const line of section.lines)
-      if (!besideRoles.has(line)) for (const item of listItems(line) ?? []) add(items, item);
+  const flag = (items: Map<string, number>) => {
     for (const [item, count] of items)
       if (count >= 3) stuffed.set(item, Math.max(count, stuffed.get(item) ?? 0));
+  };
+  for (const section of segmentResume(lines, policy)) {
+    if (section.kind === "experience" || section.kind === "projects") continue;
+    const across = new Map<string, number>();
+    for (const line of section.lines) {
+      if (besideRoles.has(line)) continue;
+      const items = listItems(line) ?? [];
+      const within = new Map<string, number>();
+      for (const item of items) add(within, item);
+      flag(within);
+      if (section.kind === "skills" && !LABELLED.test(line) && !YEAR.test(line))
+        for (const item of items) add(across, item);
+    }
+    flag(across);
   }
   const terms = [...stuffed].sort((a, b) => b[1] - a[1]);
 

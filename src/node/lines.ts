@@ -12,8 +12,8 @@
  * Within a line: a gap wider than a cell's is a tab, the column gap the parser splits a job title
  * from its employer on (pdf-parse merged them whenever pdf.js reported the gap as one wide
  * space); a narrower one, or a space pdf.js reported, is a space; abutting runs ("Node" ".js",
- * in two fonts) join. A run drawn twice in place — the transparent copy Chrome lays over text
- * with a shadow or an outline — is read once.
+ * in two fonts) join, unless pdf.js ended a line between them. A run drawn twice in place — the
+ * transparent copy Chrome lays over text with a shadow or an outline — is read once.
  */
 
 import { findGutter, type PositionedRun } from "./layout.js";
@@ -34,18 +34,44 @@ const LINE_THRESHOLD = 4.6;
  * cell gap: skill tags, a table's columns, a date set apart from its title. */
 const CELL_THRESHOLD = 7;
 const CELL_EMS = 0.6;
+/** Right-hand text this short, in characters, may be a tab stop of the text left of it. */
+const TAB_STOP_CHARS = 40;
 
-type Placed = { str: string; x: number; y: number; right: number; size: number; blank: boolean };
+type Placed = {
+  str: string;
+  x: number;
+  y: number;
+  right: number;
+  size: number;
+  blank: boolean;
+  /** pdf.js ended a line after it. */
+  eol: boolean;
+};
 
 /** A list marker drawn as a shape — a filled disc or square — rather than as a glyph. */
 const MARKED = /^\s*[•●▪■◦○‣∙·*–-]/u;
 /** A word set with a space between its letters, as a letter-spaced heading extracts. */
 const LETTERED = /^\s*\S(?: \S)+\s*$/u;
 
+/** The gaps between a line's runs that are wider than abutting, smallest first. */
+function gapsOf(line: readonly Placed[]) {
+  const solid = line.filter((item) => !item.blank);
+  return solid
+    .slice(1)
+    .map((item, at) => item.x - solid[at]!.right)
+    .filter((gap, at) => gap > 0.2 * (solid[at + 1]!.size || 10))
+    .sort((a, b) => a - b);
+}
+
+/** Whether no gap of a line stands out from the rest, as a stretched word space does not. */
+const even = (gaps: readonly number[]) =>
+  gaps.length >= 2 && gaps[gaps.length - 1]! <= 1.5 * gaps[(gaps.length - 1) >> 1]!;
+
 /**
  * `pageWidth` lets the page's gutter be found (and is what `columns` measures); `marks` are small
  * filled shapes drawn on the page, in the same viewport space, for the list markers Chrome draws
- * as paths: a line with one just before its first glyph starts with "• ".
+ * as paths: lines of body text with one just before their first glyph, two or more in a list,
+ * start with "• ".
  */
 export function pageText(
   items: readonly PdfTextItem[],
@@ -53,7 +79,7 @@ export function pageText(
   pageWidth = 0,
   marks: readonly Box[] = [],
 ): { text: string; columns: number | null } {
-  const placed: Placed[] = [];
+  let placed: Placed[] = [];
   for (const item of items) {
     // An empty item only marks where pdf.js saw a line end; position says that here.
     if (!item.str) continue;
@@ -65,21 +91,43 @@ export function pageText(
       right: x + item.width,
       size: item.height,
       blank: !item.str.trim(),
+      eol: item.hasEOL,
     });
   }
   placed.sort((a, b) => a.y - b.y || a.x - b.x);
 
+  // A run drawn twice within a point or two — a shadow, or the transparent copy over an outline
+  // — is read once, before lines are formed: the copies' baselines may straddle two lines'.
+  const seen = new Set<string>();
+  const key = (item: Placed, dx: number, dy: number) =>
+    `${Math.round(item.x / 2) + dx}|${Math.round(item.y / 2) + dy}|${item.str}`;
+  placed = placed.filter((item) => {
+    if (item.blank) return true;
+    for (const dx of [-1, 0, 1])
+      for (const dy of [-1, 0, 1]) if (seen.has(key(item, dx, dy))) return false;
+    seen.add(key(item, 0, 0));
+    return true;
+  });
+
+  // A line's baseline is its middle item's, not its first's, so one a hair above the rest does
+  // not split it; never further than one and a half lines' threshold from its top.
   const rows: Placed[][] = [];
   for (const item of placed) {
     const row = rows.at(-1);
-    if (row && item.y - row[0].y < LINE_THRESHOLD) row.push(item);
+    if (
+      row &&
+      item.y - row[row.length >> 1]!.y < LINE_THRESHOLD &&
+      item.y - row[0]!.y < 1.5 * LINE_THRESHOLD
+    )
+      row.push(item);
     else rows.push([item]);
   }
 
   const runs: PositionedRun[] = [];
   rows.forEach((row) => {
     for (const { x, right, str, size, blank } of row)
-      if (!blank) runs.push({ left: x, right, mass: str.trim().length, row, size });
+      if (!blank)
+        runs.push({ left: x, right, mass: str.trim().length, row, size, stop: /[\d,]/.test(str) });
   });
   const gutter = findGutter(runs, pageWidth);
 
@@ -102,13 +150,14 @@ export function pageText(
         solid.filter((item) => item.right <= split),
         solid.filter((item) => item.x >= split),
       ];
-      // A line across the gutter — a heading, a rule of text — or one whose right-hand text is a
-      // tab stop of its left-hand text ends the band above it and is read whole.
+      // A line across the gutter — a heading, a rule of text — or one whose short right-hand
+      // text is a tab stop of its left-hand text ends the band above it and is read whole.
       if (
         l.length + r.length < solid.length ||
         (tabs &&
           l.length &&
           r.length &&
+          r.reduce((sum, item) => sum + item.str.trim().length, 0) <= TAB_STOP_CHARS &&
           Math.abs(size(l) - size(r)) <= 0.2 * Math.max(size(l), size(r)))
       ) {
         flush();
@@ -162,11 +211,19 @@ export function pageText(
     }
   }
 
-  // The right edge of the page's text. A line flush with it, on a page where several are, may be
-  // justified: its word spaces are stretched.
+  for (const line of lines) line.sort((a, b) => a.x - b.x);
+  // The right edge of the page's text. A line flush with it may be justified — its word spaces
+  // stretched — when the page has several such lines whose gaps are all alike, it starts where
+  // they start, and no gap of its own stands out: a date set apart from its title does.
   const edge = runs.reduce((most, run) => Math.max(most, run.right), -Infinity);
   const flush = (line: Placed[]) => line.some((item) => !item.blank && item.right >= edge - 1);
-  const justifiable = lines.filter(flush).length >= 3;
+  const start = (line: Placed[]) => line.find((item) => !item.blank)?.x ?? Infinity;
+  const stretched = lines.filter((line) => flush(line) && even(gapsOf(line)));
+  const margin =
+    stretched.length >= 3
+      ? stretched.reduce((least, line) => Math.min(least, start(line)), Infinity)
+      : NaN;
+
   // Marks by the 8pt band of the page their middle is in, so a line meets only those near it.
   const bands = new Map<number, Box[]>();
   for (const mark of marks) {
@@ -181,79 +238,120 @@ export function pageText(
       for (const mark of bands.get(band) ?? []) found.push(mark);
     return found;
   };
-  const text = lines
-    .map((line) => {
-      line.sort((a, b) => a.x - b.x);
-      const justified = justifiable && flush(line);
-      const kept: Placed[] = [];
-      for (const item of line) {
-        const previous = kept.at(-1);
-        if (
-          previous?.str !== item.str ||
-          Math.abs(previous.x - item.x) >= 2 ||
-          Math.abs(previous.y - item.y) >= 2
-        )
-          kept.push(item);
+  // The body text's size: the one most characters on the page are set in.
+  const sizes = new Map<number, number>();
+  for (const { size = 0, mass } of runs) sizes.set(size, (sizes.get(size) ?? 0) + mass);
+  let body = 0;
+  for (const [size, mass] of sizes) if (mass > (sizes.get(body) ?? 0)) body = size;
+
+  const texts = lines.map((line) => {
+    const justified = Math.abs(start(line) - margin) <= 1 && flush(line) && even(gapsOf(line));
+    const kept: Placed[] = [];
+    for (const item of line) {
+      const previous = kept.at(-1);
+      if (
+        previous?.str !== item.str ||
+        Math.abs(previous.x - item.x) >= 2 ||
+        Math.abs(previous.y - item.y) >= 2
+      )
+        kept.push(item);
+    }
+    // A line drawn a glyph at a time — letter-spaced, "L U C A S   M O R E A U" — has its word
+    // breaks where a gap is well past the line's usual one; pdf.js reported both as one space.
+    const solid = kept.filter((item) => !item.blank);
+    const gaps = solid
+      .slice(1)
+      .map((item, at) => item.x - solid[at].right)
+      .sort((a, b) => a - b);
+    const glyphs = solid.length > 3 && solid.every((item) => item.str.trim().length === 1);
+    const wordGap = glyphs ? 1.5 * Math.max(gaps[gaps.length >> 1], 0.1) : Infinity;
+    let out = "";
+    let last: Placed | undefined;
+    let space = false;
+    for (const item of kept) {
+      if (item.blank) {
+        space = true;
+        continue;
       }
-      // A line drawn a glyph at a time — letter-spaced, "L U C A S   M O R E A U" — has its word
-      // breaks where a gap is well past the line's usual one; pdf.js reported both as one space.
-      const solid = kept.filter((item) => !item.blank);
-      const gaps = solid
-        .slice(1)
-        .map((item, at) => item.x - solid[at].right)
-        .sort((a, b) => a - b);
-      const glyphs = solid.length > 3 && solid.every((item) => item.str.trim().length === 1);
-      const wordGap = glyphs ? 1.5 * Math.max(gaps[gaps.length >> 1], 0.1) : Infinity;
-      let out = "";
-      let last: Placed | undefined;
-      let space = false;
-      for (const item of kept) {
-        if (item.blank) {
-          space = true;
-          continue;
-        }
-        if (last) {
-          const gap = item.x - last.right;
-          const size = Math.max(item.size, last.size) || 10;
-          // A space pdf.js saw is a word space up to an em wide (two on a justified line); past
-          // that it is the gap between skill tags or table cells. Between two letter-spaced
-          // words pdf.js kept apart, it is the gap between words.
-          const cell = justified
-            ? Math.max(CELL_THRESHOLD, 2 * size)
-            : space
-              ? size
-              : Math.max(CELL_THRESHOLD, CELL_EMS * size);
-          out +=
-            gap > cell || gap > wordGap || (LETTERED.test(last.str) && LETTERED.test(item.str))
-              ? "\t"
-              : space || gap > 0.2 * size
-                ? " "
-                : "";
-        }
-        out += item.str;
-        last = item;
-        space = false;
+      if (last) {
+        const gap = item.x - last.right;
+        const size = Math.max(item.size, last.size) || 10;
+        // A space pdf.js saw is a word space up to an em wide (two on a justified line); past
+        // that it is the gap between skill tags or table cells. Between two letter-spaced
+        // words pdf.js kept apart, it is the gap between words.
+        const cell = justified
+          ? Math.max(CELL_THRESHOLD, 2 * size)
+          : space
+            ? size
+            : Math.max(CELL_THRESHOLD, CELL_EMS * size);
+        out +=
+          gap > cell || gap > wordGap || (LETTERED.test(last.str) && LETTERED.test(item.str))
+            ? "\t"
+            : space || last.eol || gap > 0.2 * size
+              ? " "
+              : "";
       }
-      const first = line.find((item) => !item.blank);
-      const marked =
-        first &&
-        !MARKED.test(first.str) &&
-        near(first.y, Math.min(first.size, 100)).some(([x0, y0, x1, y1]) => {
-          const side = Math.max(x1 - x0, y1 - y0);
-          const middle = (y0 + y1) / 2;
-          return (
-            side <= 0.45 * first.size &&
-            side >= 0.1 * first.size &&
-            Math.min(x1 - x0, y1 - y0) >= 0.6 * side &&
-            x1 <= first.x + 0.5 &&
-            first.x - x1 <= 1.5 * first.size &&
-            middle <= first.y &&
-            middle >= first.y - first.size
-          );
-        });
-      return marked ? `• ${out}` : out;
-    })
-    .join("\n");
+      out += item.str;
+      last = item;
+      space = false;
+    }
+    // A small filled shape just before the line's first glyph: its list marker, if the line
+    // reads as a list item does — body text, not a short line in capitals or a larger size, as
+    // a heading's square or a timeline's dot beside a job title are.
+    const first = solid[0];
+    const shape =
+      first && !MARKED.test(first.str)
+        ? near(first.y, Math.min(first.size, 100)).find(([x0, y0, x1, y1]) => {
+            const side = Math.max(x1 - x0, y1 - y0);
+            const middle = (y0 + y1) / 2;
+            return (
+              side <= 0.45 * first.size &&
+              side >= 0.1 * first.size &&
+              Math.min(x1 - x0, y1 - y0) >= 0.6 * side &&
+              x1 <= first.x + 0.5 &&
+              first.x - x1 <= 1.5 * first.size &&
+              middle <= first.y &&
+              middle >= first.y - first.size
+            );
+          })
+        : undefined;
+    const heading =
+      !first ||
+      first.size > 1.05 * body ||
+      (/\p{Lu}/u.test(out) && !/\p{Ll}/u.test(out) && out.trim().split(/\s+/).length <= 4);
+    return { out, shape: !!shape, mark: heading ? undefined : shape?.[0], x: first?.x ?? NaN };
+  });
+
+  // A mark is a list marker where it starts two or more items of one list: lines marked at the
+  // same place, with nothing between them but the wrapped lines of their items. A list of one
+  // item is one whose mark sits where a longer list's marks do, or where another sentence's
+  // does: a job title beside a timeline's dot is a few words.
+  const bulleted = new Set<number>();
+  const lists = new Map<number, number>();
+  const add = (mark: number, count: number) =>
+    lists.set(Math.round(mark), (lists.get(Math.round(mark)) ?? 0) + count);
+  for (let at = 0; at < texts.length;) {
+    const { mark, x, out } = texts[at]!;
+    let end = at + 1;
+    const items = [at];
+    if (mark !== undefined)
+      for (; end < texts.length; end += 1) {
+        const next = texts[end]!;
+        if (next.mark !== undefined && Math.abs(next.mark - mark) <= 1) items.push(end);
+        else if (next.shape || Math.abs(next.x - x) > 2) break;
+      }
+    if (items.length >= 2) {
+      for (const item of items) bulleted.add(item);
+      add(mark!, 2);
+    } else if (mark !== undefined && out.trim().split(/\s+/).length >= 6) add(mark, 1);
+    at = end;
+  }
+  texts.forEach(({ mark, out }, at) => {
+    const listed = (dx: number) => (lists.get(Math.round(mark!) + dx) ?? 0) >= 2;
+    if (mark !== undefined && out.trim().split(/\s+/).length >= 6 && [-1, 0, 1].some(listed))
+      bulleted.add(at);
+  });
+  const text = texts.map(({ out }, at) => (bulleted.has(at) ? `• ${out}` : out)).join("\n");
 
   return { text, columns: gutter?.ratio ?? null };
 }
@@ -268,15 +366,16 @@ const MAX_LINKS = 50;
  */
 export function withLinks(text: string, targets: readonly string[]): string {
   const shown = text.toLowerCase();
-  const missing = new Set<string>();
+  const missing = new Map<string, string>();
   for (const target of targets) {
     if (missing.size >= MAX_LINKS || target.length > 500) continue;
     const bare = target.trim().replace(/^mailto:([^?]*).*$/i, "$1");
     if (!/^(?:https?:\/\/\S+|[^\s@/:]+@[^\s@/]+)$/i.test(bare)) continue;
-    // Scheme, "www." and trailing slashes aside, a target the text shows is not added again.
+    // Scheme, "www." and trailing slashes aside, a target the text shows is not added again,
+    // nor one added already in another form.
     let core = bare.replace(/^https?:\/\/(?:www\.)?/i, "").toLowerCase();
     while (/[/?#]$/.test(core)) core = core.slice(0, -1);
-    if (!shown.includes(core)) missing.add(bare);
+    if (!shown.includes(core) && !missing.has(core)) missing.set(core, bare);
   }
-  return missing.size ? `${text}\n${[...missing].join("\n")}` : text;
+  return missing.size ? `${text}\n${[...missing.values()].join("\n")}` : text;
 }

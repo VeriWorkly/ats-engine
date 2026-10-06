@@ -290,18 +290,23 @@ function unknownHeadings(
  * Languages section, so a heading word with content after its colon stays a skills line. A bare
  * "Languages" on its own line still opens a section.
  *
- * A heading word with more after it over a dated line ("Experience Designer" over "Jan 2019 -
- * Present") is a role, not a heading. And an Education section is closed by a heading the policy
+ * A heading word with a word after it that joins no heading ("Experience Strategist") over a
+ * line of bare dates is a role, not a heading. And an Education section is closed by a heading the policy
  * does not know, so the roles under "Volunteer Work" are not read as schools (`unknownHeadings`).
  */
 export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeSection[] {
   const matchers = sectionMatchers(policy);
   const headings = lines.map((line, at) => {
     const heading = classifyHeading(line, matchers);
-    const next = lines[at + 1];
-    const datedBelow =
-      next !== undefined && findDateRange(next, policy.resumeParse, UNBOUNDED) !== null;
-    return heading && heading.tail && datedBelow ? null : heading;
+    if (!heading?.tail) return heading;
+    // More heading words ("& Certifications", "and Leadership", "Summary") make a longer heading.
+    const [first] = heading.tail.split(/\s+/);
+    if (matchers.connector.test(first) || classifyHeading(heading.tail, matchers)) return heading;
+    // Any other word over a line of bare dates is a job title the policy does not list: no section
+    // opens on dates alone, and "Work Experience Highlights" opens on a role.
+    const next = lines[at + 1] ?? "";
+    const found = findDateRange(next, policy.resumeParse, UNBOUNDED);
+    return found && !/\p{L}{3}/u.test(next.replace(found.matched, " ")) ? null : heading;
   });
   const unknown = unknownHeadings(lines, headings, matchers, policy);
 

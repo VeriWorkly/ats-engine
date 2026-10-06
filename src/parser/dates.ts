@@ -230,7 +230,12 @@ function toIndex(date: AtsParsedDate, edge: "start" | "end") {
  * Two-digit years are placed here: a start's ("Jan '20") in the century that keeps it no later
  * than ten years ahead of `now`, an end's in the first year on or after the start that ends in
  * those digits ("2019–21", "1998–02"). A bare two-digit end follows only a bare year, and not
- * after an unspaced hyphen when it could be a month: "2021-03" is March.
+ * after an unspaced hyphen when it could be a month: "2021-03" is March. Nor is it one when it
+ * lands after `now`, or when a word follows it as in an address ("Suite 2021 - 30 Main St").
+ *
+ * A season alone ("Summer 2018") is read only when the line holds no range, and only at an edge
+ * of the line or in a column of its own: in "Led the Fall 2021 recruiting season" or "Fall 2019
+ * cohort, Acme Lab  Jan 2019 - Dec 2020" it is not the role's term.
  */
 export function findDateRange(
   line: string,
@@ -238,15 +243,19 @@ export function findDateRange(
   now: Date = new Date(),
 ): { range: DateRange; matched: string } | null {
   const matchers = buildMatchers(rp);
+  let term: { range: DateRange; matched: string } | null = null;
 
   for (const match of line.matchAll(matchers.range)) {
     // Group 4 is the "since 2019" branch: a start alone, which is a role still held. Group 5 is
-    // a season alone, "Summer 2018": a term that starts and ends with the season.
+    // a season alone, "Summer 2018": a term that starts and ends with the season, kept for when
+    // the line holds no range.
     if (match[5] !== undefined) {
+      if (term || !standsApart(line, match.index, match[0].length)) continue;
       const start = parseDate(match[5], rp, "start");
       const end = parseDate(match[5], rp, "end");
       if (!isPlausibleDate(start, now) || !isPlausibleDate(end, now)) continue;
-      return { range: { start, end, current: false }, matched: match[0] };
+      term = { range: { start, end, current: false }, matched: match[0] };
+      continue;
     }
     const endText = match[2] ?? match[3];
     const current = match[4] !== undefined || matchers.openEnded.test(endText.trim());
@@ -255,9 +264,11 @@ export function findDateRange(
     const start = TWO_DIGIT_YEAR.test(startText.trim())
       ? withCentury(parsedStart, now.getUTCFullYear() + YEARS_AHEAD)
       : parsedStart;
-    if (!current && /^\d{2}$/.test(endText.trim())) {
+    const shortEnd = !current && /^\d{2}$/.test(endText.trim());
+    if (shortEnd) {
       if (!YEAR_ONLY.test(startText.trim())) continue;
       if (/^\d{4}-\d{2}$/.test(match[0].trim()) && Number(endText) <= 12) continue;
+      if (WORD_AFTER.test(line.slice(match.index + match[0].length))) continue;
     }
     const parsedEnd = current ? null : parseDate(endText, rp, "end");
     const end =
@@ -268,8 +279,32 @@ export function findDateRange(
     if (!isPlausibleDate(start, now)) continue;
     if (!current && (!isPlausibleDate(end, now) || toIndex(end, "end") < toIndex(start, "start")))
       continue;
+    if (shortEnd && end && end.year > now.getUTCFullYear()) continue;
 
     return { range: { start, end, current }, matched: match[0] };
   }
-  return null;
+  return term;
+}
+
+/** A word straight after a date, one space away at most: "30 Main St", not a column. */
+const WORD_AFTER = /^ ?[\p{L}]/u;
+
+/**
+ * Whether the text at `index` stands apart on its line: at its start or end, give or take
+ * brackets and separators, or set off by a column gap, a tab or a bar.
+ */
+function standsApart(line: string, index: number, length: number) {
+  const before = line.slice(0, index);
+  const after = line.slice(index + length);
+  if (/^[\s([|•·–—-]*$/u.test(before) || /^[\s)\].,;:|•·–—-]*$/u.test(after)) return true;
+  const head = before.trimEnd();
+  const tail = after.trimStart();
+  return (
+    before.endsWith("\t") ||
+    before.length - head.length >= 2 ||
+    /[|·•]$/u.test(head) ||
+    after.startsWith("\t") ||
+    after.length - tail.length >= 2 ||
+    /^[|·•]/u.test(tail)
+  );
 }
