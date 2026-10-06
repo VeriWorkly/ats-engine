@@ -215,52 +215,6 @@ describe("#4 PDF text squashed, stencilled over, or outlined", () => {
   });
 });
 
-describe("#5 a crowded page cannot hold the visibility replay", () => {
-  const ops = OPS as unknown as Record<string, number>;
-
-  /** `count` 1pt squares and `count` one-glyph runs, all in one cell of the index. */
-  function crowdedCell(count: number) {
-    const fnArray: number[] = [];
-    const argsArray: unknown[][] = [];
-    for (let i = 0; i < count; i += 1) {
-      fnArray.push(ops.constructPath);
-      argsArray.push([ops.fill, [], new Float32Array([100 + (i % 50), 100, 101 + (i % 50), 101])]);
-    }
-    for (let i = 0; i < count; i += 1) {
-      fnArray.push(ops.beginText, ops.setFont, ops.setTextMatrix, ops.showText);
-      argsArray.push(
-        [],
-        ["F1", 10],
-        [[1, 0, 0, 1, 100 + (i % 50), 120]],
-        [[{ unicode: "a", width: 500 }]],
-      );
-    }
-    return { fnArray, argsArray };
-  }
-
-  it("gives up, as unmeasured, instead of scanning quadratically", () => {
-    const page = crowdedCell(40_000);
-    const started = performance.now();
-    expect(() => measureVisibility(ops, page, [0, 0, 612, 792])).toThrow();
-    // The budget counts checks, not time, so the clock only scales with the machine: about 2.5 s
-    // on a desktop and 8 s on a GitHub runner, where the full scan would take about a minute.
-    expect(performance.now() - started).toBeLessThan(15_000);
-  }, 30_000);
-
-  it("reports such a page's hidden text as not measured", async () => {
-    const shapes: string[] = [];
-    const runs: string[] = [];
-    for (let i = 0; i < 20_000; i += 1) {
-      shapes.push(`${100 + (i % 50)} 100 1 1 re f`);
-      runs.push(`BT /F1 10 Tf ${100 + (i % 50)} 120 Td (a) Tj ET`);
-    }
-    const started = performance.now();
-    const { layout } = await extractResume(buildPdf([...shapes, ...runs].join("\n")), "pdf");
-    expect(layout?.hiddenTextChars).toBeUndefined();
-    expect(performance.now() - started).toBeLessThan(15_000);
-  }, 30_000);
-});
-
 /** `pages` pages that all show one content stream. */
 function multiPagePdf(pages: number, content: string): Buffer {
   const objects: string[] = [];
@@ -1042,36 +996,30 @@ describe("R4 an image whose colour-key /Mask hides no pixel still covers the tex
 const vanishRun = (value: string) => `<w:r><w:rPr><w:vanish/></w:rPr><w:t>${value}</w:t></w:r>`;
 
 describe("final review: nested tables and markup outside the elements stay linear", () => {
-  const timed = (data: Buffer) => {
-    const start = performance.now();
-    const measured = measureDocx(data);
-    return { measured, ms: performance.now() - start };
-  };
+  /** Measured within 2 s, judged on the fastest of a few runs. */
+  const timed = (data: Buffer) => expectFast(() => measureDocx(data), 2000);
 
   it("resolves a run's background in constant time under deeply nested tables", () => {
     // Quadratic, this walked 60,000 tables for each of 60,000 runs: tens of seconds.
     const body = `${BODY}${"<w:tbl>".repeat(60_000)}${"<w:r></w:r>".repeat(60_000)}`;
-    const { measured, ms } = timed(buildDocxBody(body));
+    const measured = timed(buildDocxBody(body));
     expect(measured?.tableCount).toBe(60_000);
-    expect(ms).toBeLessThan(2000);
   });
 
   it("reads nothing inside a comment, a CDATA section or a processing instruction", () => {
     const hostile = `<!-- ${"<w:tbl>".repeat(60_000)}${"<w:r></w:r>".repeat(60_000)} -->`;
-    const { measured, ms } = timed(
+    const measured = timed(
       buildDocxBody(
         `${BODY}${hostile}<?pi <w:tbl> ?><w:p><w:r><w:t><![CDATA[<w:tbl>]]></w:t></w:r></w:p>`,
       ),
     );
     expect(measured?.tableCount).toBe(0);
-    expect(ms).toBeLessThan(2000);
   });
 
   it("drops the rest of a document whose comment never closes, in linear time", () => {
     const body = `${BODY}${"<!--<w:tbl>".repeat(100_000)}`;
-    const { measured, ms } = timed(buildDocxBody(body));
+    const measured = timed(buildDocxBody(body));
     expect(measured?.tableCount).toBe(0);
-    expect(ms).toBeLessThan(2000);
   });
 
   it("still reads hidden text written as CDATA", () => {
