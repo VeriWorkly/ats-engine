@@ -2,7 +2,7 @@
 "@veriworkly/ats-engine": minor
 ---
 
-The CLI can ask a model to explain the report: `ats-engine check resume.pdf --ai --provider <name> --model <id>`. Presets cover Anthropic, OpenAI, OpenRouter, Gemini, Groq, Together and Ollama, and `openai-compatible` with `--base-url` covers any other Chat Completions endpoint. The key is read from the environment only (the provider's own variable, then `ATS_AI_API_KEY`) and never sent over plain http to another machine; the CLI names the provider and host before sending, contact details are redacted first, and `--json` adds the analysis as an `ai` field. The score does not depend on it.
+The CLI can ask a model to explain the report: `ats-engine check resume.pdf --ai --provider <name> --model <id>`. Presets cover Anthropic, OpenAI, OpenRouter, Gemini, Groq, Together and Ollama, and `openai-compatible` with `--base-url` covers any other Chat Completions endpoint. The key is read from the environment only (the provider's own variable, then `ATS_AI_API_KEY`) and never sent over plain http to another machine; the CLI names the provider and host before sending, contact details are redacted first, and `--json` adds the analysis as an `ai` field. `--timeout <seconds>` (or `ATS_AI_TIMEOUT`, default 120) bounds the whole wait, retries included, so a provider that never answers fails with "No answer from <provider> at <host> within N s" instead of after about 4 minutes. The score does not depend on it.
 
 With `--job`, the text output now lists every requirement with its status and, when it is not met, why. A posting may be a `.pdf` or `.docx` file as well as text or a saved web page, and a verdict line appears beside the job match.
 

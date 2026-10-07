@@ -33,6 +33,7 @@ import {
   aiJson,
   analyzeReport,
   DEFAULT_MAX_TOKENS,
+  DEFAULT_TIMEOUT_SECONDS,
   describeAiError,
   PROVIDERS,
   renderInsights,
@@ -77,15 +78,17 @@ AI analysis (optional, with your own API key):
   --model <id>        A model id your provider lists
   --base-url <url>    Use a different API endpoint for the provider
   --max-tokens <n>    Output budget, thinking included (default ${DEFAULT_MAX_TOKENS})
+  --timeout <s>       Longest wait for the answer in seconds, retries included
+                      (default ${DEFAULT_TIMEOUT_SECONDS})
 
   The key is read from the environment only: ATS_AI_API_KEY, or the provider's own
   variable (${KEY_VARIABLES}).
   Ollama and other servers on localhost need no key. ATS_AI_PROVIDER, ATS_AI_MODEL,
-  ATS_AI_BASE_URL and ATS_AI_MAX_TOKENS stand in for the flags.
+  ATS_AI_BASE_URL, ATS_AI_MAX_TOKENS and ATS_AI_TIMEOUT stand in for the flags.
 
 Exit codes: 0 done, 1 error, 2 below --min-score (even when --ai fails).`;
 
-const AI_FLAGS = ["provider", "model", "base-url", "max-tokens"] as const;
+const AI_FLAGS = ["provider", "model", "base-url", "max-tokens", "timeout"] as const;
 
 /** Where output goes and what the environment says. Tests pass their own. */
 export type CliContext = {
@@ -262,6 +265,7 @@ function parseCheckArgs(argv: string[]) {
         model: { type: "string" },
         "base-url": { type: "string" },
         "max-tokens": { type: "string" },
+        timeout: { type: "string" },
         help: { type: "boolean", short: "h", default: false },
         version: { type: "boolean", short: "v", default: false },
       },

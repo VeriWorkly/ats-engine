@@ -187,6 +187,7 @@ describe("--ai configuration", () => {
       baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
       host: "generativelanguage.googleapis.com",
       maxTokens: 8000,
+      timeoutMs: 120_000,
       apiKey: "g",
     });
     expect(
@@ -374,5 +375,66 @@ describe("--ai", () => {
       context({ fetch }),
     );
     expect(code).toBe(2);
+  });
+});
+
+describe("--timeout", () => {
+  const env = { GEMINI_API_KEY: "g" };
+  const args = ["check", resumePath, "--ai", "--provider", "gemini", "--model", "m"];
+
+  /** A provider that never answers, and lets go only when the request is aborted. */
+  const silent = (): { fetch: FetchLike; calls: () => number } => {
+    let calls = 0;
+    const fetch: FetchLike = (_url, init) => {
+      calls += 1;
+      return new Promise((_resolve, reject) => {
+        const signal = init.signal as unknown as AbortSignal;
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+    };
+    return { fetch, calls: () => calls };
+  };
+
+  it("defaults to 120 s in all, and reads --timeout or ATS_AI_TIMEOUT in seconds", () => {
+    expect(resolveAiConfig({ provider: "gemini", model: "m" }, env).timeoutMs).toBe(120_000);
+    expect(
+      resolveAiConfig({ provider: "gemini", model: "m" }, { ...env, ATS_AI_TIMEOUT: "45" })
+        .timeoutMs,
+    ).toBe(45_000);
+    expect(
+      resolveAiConfig(
+        { provider: "gemini", model: "m", timeout: "300" },
+        { ...env, ATS_AI_TIMEOUT: "45" },
+      ).timeoutMs,
+    ).toBe(300_000);
+  });
+
+  it.each(["0", "-5", "abc", "", "Infinity", "1e9"])("refuses --timeout %j", (value) => {
+    expect(() => resolveAiConfig({ provider: "gemini", model: "m", timeout: value }, env)).toThrow(
+      "--timeout must be a number of seconds, more than 0 and at most 3600.",
+    );
+  });
+
+  it("needs --ai", async () => {
+    expect(await main(["check", resumePath, "--timeout", "30"], context())).toBe(1);
+    expect(err.join("\n")).toContain("--timeout needs --ai.");
+  });
+
+  it("stops waiting for a provider that never answers at the deadline, retries included", async () => {
+    const provider = silent();
+    const started = performance.now();
+    const code = await main(
+      [...args, "--timeout", "0.05"],
+      context({ env, fetch: provider.fetch }),
+    );
+    expect(code).toBe(1);
+    // The report still printed; the AI part failed within its total budget, not 2 × 120 s.
+    expect(out.join("\n")).toContain("Readiness");
+    expect(performance.now() - started).toBeLessThan(5_000);
+    // The deadline covers the retry too: the call that timed out is not made again.
+    expect(provider.calls()).toBe(1);
+    expect(err.join("\n")).toContain(
+      "No answer from gemini at generativelanguage.googleapis.com within 0.05 s. Raise --timeout",
+    );
   });
 });

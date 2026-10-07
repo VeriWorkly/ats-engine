@@ -59,11 +59,17 @@ export const PROVIDER_NAMES = Object.keys(PROVIDERS);
 /** Output budget when none is given. Thinking models spend part of it before they answer. */
 export const DEFAULT_MAX_TOKENS = 8_000;
 
+/** The longest the CLI waits for an analysis, retries included, when none is given. A thinking
+ * model spending its whole default budget answers well within it. */
+export const DEFAULT_TIMEOUT_SECONDS = 120;
+const MAX_TIMEOUT_SECONDS = 3_600;
+
 export type AiFlags = {
   provider?: string;
   model?: string;
   "base-url"?: string;
   "max-tokens"?: string;
+  timeout?: string;
 };
 
 export type AiConfig = {
@@ -74,6 +80,8 @@ export type AiConfig = {
   /** Where the resume goes, as the notice before sending names it. */
   host: string;
   maxTokens: number;
+  /** The whole wait for an answer, retries included. */
+  timeoutMs: number;
   apiKey: string;
 };
 
@@ -133,6 +141,13 @@ export function resolveAiConfig(flags: AiFlags, env: Env): AiConfig {
   if (!Number.isInteger(maxTokens) || maxTokens <= 0)
     throw new UsageError("--max-tokens must be a positive whole number.");
 
+  const wait = flags.timeout ?? env.ATS_AI_TIMEOUT;
+  const seconds = wait === undefined ? DEFAULT_TIMEOUT_SECONDS : Number(wait);
+  if (!(wait?.trim() !== "" && seconds > 0 && seconds <= MAX_TIMEOUT_SECONDS))
+    throw new UsageError(
+      `--timeout must be a number of seconds, more than 0 and at most ${MAX_TIMEOUT_SECONDS}.`,
+    );
+
   const apiKey =
     (preset.keyEnv ? env[preset.keyEnv] : undefined) || env.ATS_AI_API_KEY || undefined;
   const local = Boolean(baseUrl && isLocal(baseUrl));
@@ -156,13 +171,19 @@ export function resolveAiConfig(flags: AiFlags, env: Env): AiConfig {
         (preset.adapter === "anthropic" ? "https://api.anthropic.com" : "https://api.openai.com"),
     ).host,
     maxTokens,
+    timeoutMs: seconds * 1000,
     // A local server ignores the key, but the adapter requires one.
     apiKey: apiKey ?? "local",
   };
 }
 
 export function createProvider(config: AiConfig, fetch?: FetchLike): LlmProvider {
-  const options = { apiKey: config.apiKey, baseUrl: config.baseUrl, fetch };
+  const options = {
+    apiKey: config.apiKey,
+    baseUrl: config.baseUrl,
+    fetch,
+    timeoutMs: config.timeoutMs,
+  };
   return config.adapter === "anthropic" ? anthropic(options) : openAiCompatible(options);
 }
 
@@ -175,7 +196,9 @@ export async function analyzeReport(
     provider: createProvider(config, fetch),
     routes: { analyze: { model: config.model, maxTokens: config.maxTokens, retries: 1 } },
   });
-  return ai.analyze(input);
+  // One deadline for the whole call: each attempt may use all of it, and a retry only what is
+  // left, so a provider that never answers costs `timeoutMs`, not that once per attempt.
+  return ai.analyze(input, { signal: AbortSignal.timeout(config.timeoutMs) });
 }
 
 /** What went wrong, and what to change. */
@@ -186,6 +209,11 @@ export function describeAiError(error: unknown, config: AiConfig): string {
   switch (error.code) {
     case "truncated":
       return `${where} ran out of output tokens. Raise --max-tokens (now ${config.maxTokens}).`;
+    case "aborted":
+      return (
+        `No answer from ${config.provider} at ${config.host} within ${config.timeoutMs / 1000} s. ` +
+        "Raise --timeout, or try a faster model."
+      );
     case "refused":
       return `${where} declined to analyse this resume.`;
     case "invalid_output":
