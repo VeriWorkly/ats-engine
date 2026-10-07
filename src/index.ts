@@ -52,6 +52,7 @@ export * from "./document/index.js";
 
 // Scoring
 export { parseQuality, parseResume } from "./parser/index.js";
+export { check } from "./check.js";
 export { AtsScoringService, type AtsCheckOptions } from "./scoring/engine.js";
 export type { AtsLocale, AtsLocaleOptions } from "./locales/resolve.js";
 export { computeVerdict, VERDICT_BANDS, type AtsVerdict } from "./scoring/verdict.js";

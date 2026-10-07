@@ -5,7 +5,7 @@
  * posting) in the languages it is written in, and in one region:
  *
  *   const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
- *   AtsScoringService.check(resume, policy).locale; // { languages: ["de"], region: "DE" }
+ *   check(resume, policy).locale; // { languages: ["de"], region: "DE" }
  *
  * A pack is data — see LOCALES.md for writing one, and the JSON Schemas below for checking it.
  */

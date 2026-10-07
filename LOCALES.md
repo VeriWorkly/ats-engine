@@ -4,11 +4,11 @@ The engine reads resumes in more than English through **locale packs**: plain da
 language's or a country's vocabulary to whatever policy you score with.
 
 ```ts
-import { AtsScoringService, DEFAULT_POLICY } from "@veriworkly/ats-engine";
+import { check, DEFAULT_POLICY } from "@veriworkly/ats-engine";
 import { BUILT_IN_LOCALES, withLocales } from "@veriworkly/ats-engine/locales";
 
 const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES); // once, at startup
-const report = AtsScoringService.check(resume, policy);
+const report = check(resume, policy);
 report.locale; // { languages: ["de"], region: "DE" }
 ```
 

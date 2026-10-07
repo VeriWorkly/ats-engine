@@ -27,7 +27,7 @@ These hold everywhere, and each has a test:
 ## The `check()` pipeline
 
 ```
-AtsScoringService.check(resume, policy, options)                 scoring/engine.ts
+check(resume, policy, options)                                   check.ts, scoring/engine.ts
  1 prepareResume          input → text, document, hidden chars    input.ts
  2 localizePolicy         languages, region, date order           locales/resolve.ts
  3 readResume             lines, sections (once), parse, context  scoring/context.ts
@@ -114,6 +114,6 @@ runtime-agnostic subpath for the browser and runs the core in a bare V8 context 
 
 Keep: everything exported today. Remove in 1.0: `level`, `highestDegree`, `AtsDegreeLevel`,
 `DEGREE_LABELS`. Candidates to rename or make internal at 1.0, decided then rather than churned
-now: `AtsScoringService.check` → a `check()` function, `TaskRoute` → `AtsAiRoute`,
+now: `AtsScoringService` (today an alias of the documented `check()` function), `TaskRoute` → `AtsAiRoute`,
 `AiEvalCase`/`AiEvalReport` → `AtsAi…`, and the accidental exports `chatCompletionBody`,
 `messagesBody`, `localizePolicy`, `parseQuality`, the grounding helpers.

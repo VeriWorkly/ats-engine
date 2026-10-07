@@ -115,16 +115,16 @@ Before the resume is sent, the CLI names the provider and host it is about to se
 
 ### Score resume text
 
-`AtsScoringService.check` takes resume text and a policy and returns a report. Use `DEFAULT_POLICY` unless you have written your own.
+`check` takes resume text and returns a report. It scores with `DEFAULT_POLICY` unless you pass a policy of your own as the second argument.
 
 ```ts
-import { AtsScoringService, DEFAULT_POLICY } from "@veriworkly/ats-engine";
+import { check } from "@veriworkly/ats-engine";
 
-const report = AtsScoringService.check(resumeText, DEFAULT_POLICY);
+const report = check(resumeText);
 
 console.log(report.readinessScore); // 0-100
-for (const check of report.failedChecks) {
-  console.log(`${check.severity}: ${check.evidence}\n  Fix: ${check.fix}`);
+for (const failed of report.failedChecks) {
+  console.log(`${failed.severity}: ${failed.evidence}\n  Fix: ${failed.fix}`);
 }
 ```
 
@@ -136,7 +136,7 @@ Text alone cannot show columns, tables, photos or hidden text. `extractResume` r
 
 ```ts
 import { readFile } from "node:fs/promises";
-import { AtsScoringService, DEFAULT_POLICY } from "@veriworkly/ats-engine";
+import { check, DEFAULT_POLICY } from "@veriworkly/ats-engine";
 import { detectResumeFormat, extractResume } from "@veriworkly/ats-engine/node";
 
 const bytes = new Uint8Array(await readFile("resume.pdf"));
@@ -144,7 +144,7 @@ const format = detectResumeFormat("resume.pdf"); // "pdf" | "docx" | "text" | nu
 if (!format) throw new Error("Unsupported file type");
 
 const { text, layout } = await extractResume(bytes, format);
-const report = AtsScoringService.check(text, DEFAULT_POLICY, { layout });
+const report = check(text, DEFAULT_POLICY, { layout });
 ```
 
 In a web server, pass the uploaded file's name and MIME type to `detectResumeFormat(fileName, mimeType)` and its bytes to `extractResume`.
@@ -156,7 +156,7 @@ Pass the posting's text as `jobDescription`. If you have a saved job page instea
 ```ts
 import { jobTextFromHtml } from "@veriworkly/ats-engine/job";
 
-const report = AtsScoringService.check(resumeText, DEFAULT_POLICY, {
+const report = check(resumeText, DEFAULT_POLICY, {
   jobDescription: jobTextFromHtml(postingHtml),
   now: new Date("2026-10-01"), // optional: fix the date so tenure is reproducible
 });
@@ -175,8 +175,8 @@ import { BUILT_IN_LOCALES, withLocales } from "@veriworkly/ats-engine/locales";
 
 const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 
-AtsScoringService.check(resumeText, policy).locale; // { languages: ["de"], region: "DE" }
-AtsScoringService.check(resumeText, policy, { region: "IN" });
+check(resumeText, policy).locale; // { languages: ["de"], region: "DE" }
+check(resumeText, policy, { region: "IN" });
 ```
 
 ### What's in a report
@@ -224,7 +224,7 @@ Scoring never needs a model. The AI tasks are optional extras that run on your o
 Each call returns the result together with the values that were dropped for not appearing in the resume, token usage, the number of attempts, and the prompt version, so you can bill and audit calls yourself.
 
 ```ts
-import { AtsScoringService, DEFAULT_POLICY } from "@veriworkly/ats-engine";
+import { check, DEFAULT_POLICY } from "@veriworkly/ats-engine";
 import { createAtsAi } from "@veriworkly/ats-engine/ai";
 import { anthropic } from "@veriworkly/ats-engine/ai/anthropic";
 
@@ -233,7 +233,7 @@ const ai = createAtsAi({
   routes: { analyze: { model: "claude-sonnet-5-5", maxTokens: 4000 } },
 });
 
-const report = AtsScoringService.check(resumeText, DEFAULT_POLICY, { jobDescription });
+const report = check(resumeText, DEFAULT_POLICY, { jobDescription });
 const { result, usage } = await ai.analyze({ resumeText, report, jobDescription });
 ```
 
