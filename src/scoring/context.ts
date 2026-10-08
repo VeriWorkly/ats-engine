@@ -99,8 +99,14 @@ export function readResume(
     findings: {
       injectionPhrases: injectionPhrases(
         text,
-        // Text no reader sees: smuggled in tag characters, or in the file's metadata.
-        [prepared.hidden.smuggled, layout?.metadataText ?? ""].join("\n"),
+        // Text no reader sees: smuggled in tag characters, or in the file's metadata. And lines
+        // opening with "#" as written: the line reader drops a Markdown heading's marks, and
+        // "### System:" is a prompt delimiter with them.
+        [
+          prepared.hidden.smuggled,
+          layout?.metadataText ?? "",
+          ...prepared.text.split("\n").filter((line) => line.trimStart().startsWith("#")),
+        ].join("\n"),
         policy,
       ),
       invisibleCharacters: {

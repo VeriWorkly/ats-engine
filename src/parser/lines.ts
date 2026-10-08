@@ -40,14 +40,53 @@ function joinWrapped(lines: string[], policy: AtsEnginePolicy): string[] {
   return joined;
 }
 
+/** The opening of an ATX heading ("## Experience"): one to six marks, then a space. */
+const MARKDOWN_HEADING = /^#{1,6}[ \t]+/;
+/** A thematic break ("---", "* * *", "___"): a rule, not text. */
+const MARKDOWN_RULE = /^([-*_])(?:[ \t]*\1){2,}$/;
+/** An inline link, `[text](url)`, bounded so a line of unclosed brackets stays linear. */
+const MARKDOWN_LINK = /\[([^\]\n]{1,200})\]\(([^)\s]{1,500})\)/g;
+
+/** A heading's text: the marks before it, and any closing run of marks after a space, removed. */
+function headingText(line: string, opening: number): string {
+  const text = line.slice(opening).trimEnd();
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "#") end -= 1;
+  return end < text.length && (end === 0 || text[end - 1] === " " || text[end - 1] === "\t")
+    ? text.slice(0, end).trimEnd()
+    : text;
+}
+
+/**
+ * A line of Markdown as its reader sees it. `#` and `*` are list markers to the line reader, so a
+ * "## Experience" heading read as a bullet and the section it opened was lost. Heading marks and
+ * rules go; `**bold**` and `__bold__` lose their marks when they come in pairs; a link keeps its
+ * text and its target. "C#", "#1" and "snake_case" are not Markdown and are left as they are.
+ */
+function readMarkdown(line: string): string {
+  if (MARKDOWN_RULE.test(line)) return "";
+  const heading = MARKDOWN_HEADING.exec(line);
+  let text = heading ? headingText(line, heading[0].length) : line;
+  for (const mark of ["**", "__"]) {
+    const parts = text.split(mark);
+    // An odd number of parts is an even number of marks: every one has its pair.
+    if (parts.length > 1 && parts.length % 2 === 1) text = parts.join("");
+  }
+  if (!text.includes("](")) return text;
+  return text.replace(MARKDOWN_LINK, (_, label: string, href: string) => {
+    const target = href.replace(/^mailto:/i, "");
+    return label.trim() === target ? target : `${label} ${target}`;
+  });
+}
+
 /**
  * A resume's trimmed, non-empty lines, read the way a person reads them: wrapped lines rejoined
- * and letter-spaced ones read back as words. `spaced` counts the latter for the letter-spacing
+ * and letter-spaced ones read back as words, Markdown read past. `spaced` counts the latter for the letter-spacing
  * rule. Run once per resume: the wrap threshold is measured on the lines it is given.
  */
 export function readResumeLines(lines: string[], policy: AtsEnginePolicy) {
   return despaceLines(
-    joinWrapped(lines.map((line) => line.trim()).filter(Boolean), policy),
+    joinWrapped(lines.map((line) => readMarkdown(line.trim()).trim()).filter(Boolean), policy),
     policy,
   );
 }

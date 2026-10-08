@@ -110,10 +110,31 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
   const { titleWords } = matchersOf(policy);
   const titleIndex = parts.findIndex((part) => titleWords.test(part));
 
-  if (titleIndex === -1) return { title: parts[0], employer: parts.slice(1).join(", ") };
+  if (titleIndex === -1) return { title: parts[0], employer: withoutPlace(parts.slice(1), policy) };
 
-  const employer = parts.filter((_, index) => index !== titleIndex).join(", ");
+  const employer = withoutPlace(
+    parts.filter((_, index) => index !== titleIndex),
+    policy,
+  );
   return { title: parts[titleIndex], employer };
+}
+
+/**
+ * The employer's parts, joined, without where the role is worked after them: "Acme, San
+ * Francisco, CA" is Acme, "Acme, Remote" is Acme. Only "City, ST" and workplace words are places
+ * (see `isPlace`); "Acme, Berlin" keeps its city, and an employer is never left empty.
+ */
+function withoutPlace(parts: string[], policy: AtsEnginePolicy): string {
+  const { code, workplace } = placesOf(policy.resumeParse);
+  let end = parts.length;
+  while (end > 1 && workplace.test(parts[end - 1]!)) end -= 1;
+  if (
+    end > 2 &&
+    code.test(parts[end - 1]!.replace(/\s\d{5}(?:-\d{4})?$/u, "")) &&
+    parts[end - 2]!.split(/\s+/).length <= 3
+  )
+    end -= 2;
+  return parts.slice(0, end).join(", ");
 }
 
 /**
@@ -147,10 +168,23 @@ export function parseRoles(
   let group = "";
   // A header is a short, unbulleted line with no dates of its own. A trailing full stop does not
   // make "Senior Engineer, Acme Corp." a sentence.
+  // A header in parts — "Engineer, Acme — San Francisco, CA", "Engineer | Acme | Remote" — runs
+  // longer than a heading, and its separators are not words: up to 12 words, and not opening
+  // with an action verb, which a description line would.
+  const isPartedHeader = (line: string) => {
+    const words = line.split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word)).length;
+    return (
+      line.length <= 100 &&
+      words <= 12 &&
+      !/[.,;।]$/u.test(line) &&
+      headerParts(line, policy).length >= 2 &&
+      !opensWithVerb.test(line)
+    );
+  };
   const isHeader = (line: string | undefined): line is string =>
     line !== undefined &&
     !BULLET.test(line) &&
-    isHeadingLine(line.replace(/\.$/, "")) &&
+    (isHeadingLine(line.replace(/\.$/, "")) || isPartedHeader(line.replace(/\.$/, ""))) &&
     !findDateRange(line, rp, now);
   const isLongHeader = (line: string | undefined): line is string =>
     line !== undefined &&
