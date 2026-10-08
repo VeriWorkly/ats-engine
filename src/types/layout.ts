@@ -4,7 +4,8 @@
  * `columnRatio` is the share of content lines whose text items are separated by a horizontal gap
  * wide enough to read as a column gutter — the signature of a two-column layout, a sidebar, or a
  * floating text box, all of which extract in a scrambled order. `tableCount` is the number of
- * ruled table grids found by tracing the page's vector drawing operators.
+ * ruled table grids found by tracing the page's vector drawing operators: stroked lines, and the
+ * thin filled rectangles a browser prints a CSS border as.
  *
  * Absent for pasted text and Studio documents, which have no geometry to measure; the rules that
  * depend on it are then omitted from the report rather than assumed to pass.

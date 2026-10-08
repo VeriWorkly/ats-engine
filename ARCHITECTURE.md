@@ -65,7 +65,7 @@ Splitting those is welcome where a seam is clear.
 | `report/`, `repair/`     | `shape` (full / restricted); `grounding`, `merge` (AI repair acceptance)                                                                                                                                                                                                                                                          | `.`                    |
 | `format/`, `job/`        | display helpers; job text from HTML (`html.ts` scanner, whole-page mode skipping navigation and hidden elements; `index.ts` JSON-LD)                                                                                                                                                                                              | `/format`, `/job`      |
 | `ai/`                    | `run` (task runner, retries), `provider`, `http`, `schema`, `redact`, `tasks/`, adapters, `testing/`                                                                                                                                                                                                                              | `/ai`, `/ai/*`         |
-| `node/`                  | `extract` (formats, normalisation), `pdf` (text + geometry in one pass), `lines` (PDF lines in reading order: by baseline, column by column, links, bullets drawn as shapes), `hidden` + `surroundings` (visibility replay and its grid), `layout` (columns), `docx` (zip, hidden runs, bomb budget), `peer`, `child`, `protocol` | `/node`, `/node/child` |
+| `node/`                  | `extract` (formats, normalisation), `pdf` (text + geometry in one pass), `lines` (PDF lines in reading order: by baseline, column by column, links, bullets drawn as shapes), `hidden` + `surroundings` (replay, grid), `tables` (grids), `layout` (columns), `docx` (zip, hidden runs, bomb budget), `peer`, `child`, `protocol` | `/node`, `/node/child` |
 | `cli/`                   | `main` (`ats-engine check`, arguments, the text report), `terminal` (colour, banner, control-character stripping), `ai` (`--ai` provider presets over the two adapters), `usage`                                                                                                                                                  | bin                    |
 | `util/`                  | `memo`, `own` (own-property lookup), `hash`                                                                                                                                                                                                                                                                                       | internal               |
 
@@ -90,7 +90,7 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 | `/locales`                                              |      22 | zod, libphonenumber-js                                   |
 | `/ai`                                                   |      41 | zod, libphonenumber-js                                   |
 | `/ai/openai-compatible`, `/ai/anthropic`, `/ai/testing` |     4–5 | none                                                     |
-| `/node`                                                 |      11 | node:\*, pdfjs-dist, pdf-parse, mammoth (optional peers) |
+| `/node`                                                 |      12 | node:\*, pdfjs-dist, pdf-parse, mammoth (optional peers) |
 
 Bundle budgets per subpath are enforced by `npm run size`; `npm run smoke` bundles every
 runtime-agnostic subpath for the browser and runs the core in a bare V8 context (edge).
@@ -106,9 +106,14 @@ runtime-agnostic subpath for the browser and runs the core in a bare V8 context 
 - **One file per private policy.** Hosts load a policy from one path or one JSON value; the code
   is split by area, the data file is not.
 - **PDF text is assembled here**, not by pdf-parse, which loses the gap between a job title and
-  its employer; pdf-parse remains for ruled-table detection only. Lines are ordered by where they
-  sit on the page, not by the order the file paints them: browsers paint floated and positioned
-  elements out of order, and reading in paint order scrambled whole sections.
+  its employer. Lines are ordered by where they sit on the page, not by the order the file paints
+  them: browsers paint floated and positioned elements out of order, and reading in paint order
+  scrambled whole sections.
+- **Ruled tables are counted twice**, and the larger count kept. `node/tables.ts` reads the rules
+  the visibility replay already walks: stroked lines and filled shapes up to 1.5pt thick, because
+  a browser prints a CSS border as a thin filled rectangle; a table is at least two rows of two
+  closed cells with text. pdf-parse's `getTable` sees stroked rules only and stays because it
+  joins them its own way; it is the only reason pdf-parse is still a peer.
 
 ## Pre-1.0 API plan
 

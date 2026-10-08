@@ -8,7 +8,7 @@ import type { Box } from "./surroundings.js";
 import { pageText, withLinks, type PdfTextItem } from "./lines.js";
 import { optional } from "./peer.js";
 
-/** Pages whose pictures are counted, and the most pdf-parse looks for ruled tables on. */
+/** Pages whose pictures and ruled tables are counted, here and by pdf-parse. */
 const MAX_PAGES_MEASURED = 6;
 /**
  * Pages with text whose visibility is measured. Every page whose text is read is measured up to
@@ -52,7 +52,7 @@ type PdfGeometry = Omit<AtsLayoutSignals, "tableCount">;
 async function readPdf(
   data: Uint8Array,
   maxChars: number,
-): Promise<{ text: string; geometry: PdfGeometry }> {
+): Promise<{ text: string; geometry: PdfGeometry; tables: number }> {
   const pdfjs = await optional(() => import("pdfjs-dist/legacy/build/pdf.mjs"), "pdfjs-dist");
   const ops = pdfjs.OPS as unknown as Record<string, number>;
   const document = await pdfjs
@@ -74,6 +74,7 @@ async function readPdf(
     const links: string[] = [];
     let imageOnlyPages = 0;
     let imageCount = 0;
+    let tables = 0;
     let visibilityRead = true;
     let measured = 0;
 
@@ -112,6 +113,7 @@ async function readPdf(
             // stack, and this catch would then report the page's hidden text as unmeasured.
             for (const run of seen.hidden) hidden.push(run);
             if (number <= MAX_PAGES_MEASURED) {
+              tables += seen.tables;
               // An image and next to no text: a scan with no OCR layer, or a page saved as a
               // picture.
               if (seen.images.length && seen.textChars < MIN_PAGE_TEXT) imageOnlyPages += 1;
@@ -163,6 +165,7 @@ async function readPdf(
     }
 
     return {
+      tables,
       text: withLinks(text, links),
       geometry: {
         ...(metadataText && { metadataText }),
@@ -193,17 +196,22 @@ export async function extractPdf(
   // pdf.js can take ownership of (detach) the bytes it is handed, so each of the two passes gets
   // its own copy. `new Uint8Array(…)` always copies; `.slice()` would not on a Node `Buffer`,
   // where it returns a view of the same memory.
-  const { text, geometry } = await readPdf(new Uint8Array(data), maxChars);
-  // pdf-parse is kept for what pdf.js does not do itself: finding ruled tables.
+  const { text, geometry, tables: drawn } = await readPdf(new Uint8Array(data), maxChars);
+  // Ruled tables are counted twice and the larger count kept: from the rules the page draws,
+  // stroked or filled (a browser prints a CSS border as a thin filled rectangle), and by
+  // pdf-parse, which reads stroked rules only but joins them its own way.
   const parser = new PDFParse({ data: new Uint8Array(data), verbosity: 0 });
 
   try {
-    let tableCount = 0;
+    let tableCount = drawn;
     try {
       // The first pages only: every page cost a 1 500-page upload minutes, and a table count no
       // resume would have.
       const tables = await parser.getTable({ first: MAX_PAGES_MEASURED });
-      tableCount = tables.pages.reduce((sum, page) => sum + page.tables.length, 0);
+      tableCount = Math.max(
+        drawn,
+        tables.pages.reduce((sum, page) => sum + page.tables.length, 0),
+      );
     } catch {
       // Table detection walks vector drawing operators and is the more fragile of the two
       // passes. A document it cannot analyse still has perfectly good text, so extraction

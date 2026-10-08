@@ -103,6 +103,69 @@ export const RIGHT_COLUMN = [
   "Education University of California",
 ];
 
+/**
+ * Page content as Chrome prints it: CSS pixels, y down, through `.75 0 0 -.75 0 792 cm`, so a
+ * 1px border is a filled rectangle 0.75pt thick. `body` is drawn with `chromeRect` and
+ * `chromeText`.
+ */
+export const chromePage = (...body: string[]) =>
+  ["q .75 0 0 -.75 0 792 cm 0 0 0 rg", ...body, "Q"].join("\n");
+
+/** A filled rectangle in CSS pixels, as Chrome paints a border edge or a background. */
+export const chromeRect = (x: number, y: number, width: number, height: number) =>
+  `${x} ${y} ${width} ${height} re f`;
+
+/** Text at a CSS-pixel position (its baseline), upright through Chrome's flipped matrix. */
+export function chromeText(x: number, y: number, value: string) {
+  return `BT /F1 13.33 Tf 1 0 0 -1 ${x} ${y} Tm (${value.replace(/([()\\])/g, "\\$1")}) Tj ET`;
+}
+
+/**
+ * A bordered HTML table (`border: 1px solid`) as Chrome prints it: every edge of every cell a
+ * filled 1px rectangle, text in each cell. `collapse` is `border-collapse: collapse` (neighbours
+ * share an edge); otherwise the default `separate`, a 2px gap between the cells' own borders
+ * inside the table's border. `frames`: each box's border painted as Blink paints a uniform one,
+ * a single frame, its outer rectangle with the inner cut out (`re re f*`), rather than four
+ * edges. Positions are CSS pixels from the top left.
+ */
+export function chromeTable(
+  rows: number,
+  cols: number,
+  { left = 80, top = 300, cellWidth = 220, cellHeight = 32, collapse = true, frames = false } = {},
+) {
+  const edges = (x: number, y: number, width: number, height: number) =>
+    frames
+      ? [`${x} ${y} ${width} ${height} re ${x + 1} ${y + 1} ${width - 2} ${height - 2} re f*`]
+      : [
+          chromeRect(x, y, width, 1),
+          chromeRect(x, y + height - 1, width, 1),
+          chromeRect(x, y, 1, height),
+          chromeRect(x + width - 1, y, 1, height),
+        ];
+  const spacing = collapse ? 0 : 2;
+  const inset = collapse ? 0 : 1 + spacing;
+  const ops: string[] = [];
+  if (!collapse)
+    ops.push(
+      ...edges(
+        left,
+        top,
+        cols * (cellWidth + spacing) + spacing + 2,
+        rows * (cellHeight + spacing) + spacing + 2,
+      ),
+    );
+  for (let row = 0; row < rows; row += 1)
+    for (let col = 0; col < cols; col += 1) {
+      const x = left + inset + col * (cellWidth + spacing - (collapse ? 1 : 0));
+      const y = top + inset + row * (cellHeight + spacing - (collapse ? 1 : 0));
+      ops.push(
+        ...edges(x, y, cellWidth, cellHeight),
+        chromeText(x + 8, y + 21, `Cell ${row}${col}`),
+      );
+    }
+  return ops.join("\n");
+}
+
 /** Draws a stroked `rows` x `cols` grid with text in every cell. */
 export function ruledTable(rows: number, cols: number) {
   const [x0, y0, cellW, cellH] = [60, 380, 160, 40];

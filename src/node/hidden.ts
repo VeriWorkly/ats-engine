@@ -22,6 +22,7 @@
  */
 
 import { indexDrawn, type Box, type Drawn } from "./surroundings.js";
+import { countRuledTables, pathRules } from "./tables.js";
 
 export type { Box };
 
@@ -71,7 +72,8 @@ function contrast(a: string, b: string) {
 /**
  * `fill` and `stroke` are "#rrggbb", or "" when the colour is not a flat one: a pattern, a
  * gradient. `alpha` and `strokeAlpha` are `ca` and `CA`. `softMask`: a soft mask is in force, so
- * what is painted may show through anywhere, or nowhere.
+ * what is painted may show through anywhere, or nowhere. `lineWidth` is the pen (`w`), in user
+ * space.
  *
  * The text state — font size (`Tf`), horizontal scaling (`Tz`, as a factor), leading (`TL`) and
  * render mode (`Tr`) — is part of the graphics state, so `q`/`Q` save and restore it: an
@@ -84,6 +86,7 @@ type GraphicsState = {
   alpha: number;
   strokeAlpha: number;
   softMask: boolean;
+  lineWidth: number;
   fontSize: number;
   hScale: number;
   leading: number;
@@ -101,9 +104,16 @@ type Run = {
 
 /**
  * `images`: where each image was drawn, in page points. `marks`: small filled shapes — list
- * markers Chrome draws as paths rather than glyphs — in page points too.
+ * markers Chrome draws as paths rather than glyphs — in page points too. `tables`: ruled tables
+ * drawn on the page (`countRuledTables`).
  */
-export type PageVisibility = { textChars: number; hidden: string[]; images: Box[]; marks: Box[] };
+export type PageVisibility = {
+  textChars: number;
+  hidden: string[];
+  images: Box[];
+  marks: Box[];
+  tables: number;
+};
 
 /** Shapes no wider or taller than this, in points, may be list markers; this many are kept. */
 const MARK_SIZE = 12;
@@ -213,6 +223,7 @@ export function measureVisibility(
     alpha: 1,
     strokeAlpha: 1,
     softMask: false,
+    lineWidth: 1,
     fontSize: 0,
     // Horizontal scaling (`Tz`), as a factor: it narrows glyphs and their advance alike.
     hScale: 1,
@@ -270,6 +281,17 @@ export function measureVisibility(
     return seeThrough.has(id);
   };
   const isFill = new Set([ops.fill, ops.eoFill, ops.fillStroke, ops.eoFillStroke]);
+  const fillsRules = new Set([...isFill, ops.closeFillStroke, ops.closeEOFillStroke]);
+  const strokes = new Set([
+    ops.stroke,
+    ops.closeStroke,
+    ops.fillStroke,
+    ops.eoFillStroke,
+    ops.closeFillStroke,
+    ops.closeEOFillStroke,
+  ]);
+  // Thin lines and bars, in page space, for `countRuledTables`.
+  const rules: Box[] = [];
   const isImage = new Set(
     [
       ops.paintImageXObject,
@@ -364,7 +386,9 @@ export function measureVisibility(
         else if (key === "CA" && typeof value === "number")
           state = { ...state, strokeAlpha: value };
         else if (key === "SMask") state = { ...state, softMask: value === true };
+        else if (key === "LW" && typeof value === "number") state = { ...state, lineWidth: value };
       }
+    else if (fn === ops.setLineWidth) state = { ...state, lineWidth: Number(args[0]) || 0 };
     else if (fn === ops.beginText) textMatrix = lineMatrix = IDENTITY;
     else if (fn === ops.setFont) state = { ...state, fontSize: Number(args[1]) || 0 };
     else if (fn === ops.setHScale)
@@ -390,6 +414,23 @@ export function measureVisibility(
       moveText(0, -state.leading);
       show(args[args.length - 1], order);
     } else if (fn === ops.constructPath) {
+      // pdf.js gives the path itself as `[Float32Array]`, in user space.
+      const data = (args[1] as unknown[] | undefined)?.[0];
+      const op = args[0] as number;
+      const [filled, stroked] = [
+        fillsRules.has(op) && state.alpha > 0,
+        strokes.has(op) && state.strokeAlpha > 0,
+      ];
+      if (!maskDepth && (filled || stroked) && (ArrayBuffer.isView(data) || Array.isArray(data))) {
+        const [a, b, c, d] = state.ctm;
+        pathRules(
+          data as ArrayLike<number>,
+          (x, y) => apply(state.ctm, x, y),
+          filled,
+          stroked ? state.lineWidth * Math.sqrt(Math.abs(a * d - b * c)) : undefined,
+          rules,
+        );
+      }
       const bounds = args[2];
       if (Array.isArray(bounds) || ArrayBuffer.isView(bounds)) {
         const [x0, y0, x1, y1] = Array.from(bounds as ArrayLike<number>);
@@ -536,5 +577,9 @@ export function measureVisibility(
     hidden,
     images: drawn.filter((d) => d.kind === "image").map((d) => d.box),
     marks,
+    tables: countRuledTables(
+      rules,
+      runs.map((run) => run.center),
+    ),
   };
 }
