@@ -2,7 +2,8 @@
 // the step below min-score. No dependencies: Node and npx come with every GitHub runner.
 import { spawnSync } from "node:child_process";
 import { appendFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 
 const env = process.env;
 const resume = env.ATS_RESUME?.trim();
@@ -22,8 +23,9 @@ const minScore = minScoreText ? Number(minScoreText) : null;
 if (minScore !== null && !(minScore >= 0 && minScore <= 100))
   fail(`min-score must be a number from 0 to 100, not "${minScoreText}".`);
 
-const args = ["--yes", `@veriworkly/ats-engine@${version}`, "check", resume, "--json"];
-if (job) args.push("--job", job);
+// Absolute, because npx runs outside the repository: see the spawn below.
+const args = ["--yes", `@veriworkly/ats-engine@${version}`, "check", resolve(resume), "--json"];
+if (job) args.push("--job", resolve(job));
 if (region) args.push("--region", region);
 
 // On Windows `npx` is a .cmd file, which only a shell runs, and a shell would split a path with
@@ -35,7 +37,10 @@ const [command, prefix] = local
   : process.platform === "win32"
     ? [process.execPath, [join(dirname(process.execPath), "node_modules/npm/bin/npx-cli.js")]]
     : ["npx", []];
+// Run outside the repository: inside one whose package.json depends on the engine (or is the
+// engine), npx runs that local copy instead of the pinned version.
 const run = spawnSync(command, [...prefix, ...(local ? args.slice(2) : args)], {
+  cwd: env.RUNNER_TEMP || tmpdir(),
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
 });
