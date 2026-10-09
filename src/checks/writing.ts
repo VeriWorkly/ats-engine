@@ -139,15 +139,20 @@ export function tenseMismatches(blocks: readonly RoleBlock[], policy: AtsEngineP
     const present = m.presentVerb.test(word);
     return past === present ? null : past ? "past" : "present";
   };
+  // Only a past role is judged: its work is over, so "Manage the data warehouse" misreads it.
+  // The current role may be written either way — "Lead the team" for what is ongoing, "Built
+  // the fraud service" for what is finished — and resumes rightly do both.
   let judged = 0;
   const wrong: string[] = [];
-  for (const block of blocks)
+  for (const block of blocks) {
+    if (block.current) continue;
     for (const bullet of block.bullets) {
       const tense = tenseOf(bullet);
       if (!tense) continue;
       judged += 1;
-      if (tense === (block.current ? "past" : "present")) wrong.push(bullet);
+      if (tense === "present") wrong.push(bullet);
     }
+  }
   if (!judged) return null;
   return wrong.length ? { value: wrong.length, sample: quote(wrong[0]) } : NO_FINDING;
 }

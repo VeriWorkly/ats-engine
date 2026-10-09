@@ -152,7 +152,7 @@ describe("weak openers", () => {
 });
 
 describe("tense", () => {
-  it("quotes a past tense in the current role and a present tense in a past one", () => {
+  it("quotes a present tense in a past role", () => {
     const found = rule(
       check(`${HEAD}Engineer, Acme Corp    Jan 2022 – Present
 • Lead the payments team of 8 engineers
@@ -164,8 +164,21 @@ Engineer, Globex    Jan 2018 – Dec 2021
     );
     expect(found).toMatchObject({ passed: false, scoreImpact: 2 });
     expect(found?.evidence).toBe(
-      '2 bullets are in the wrong tense for their role, such as "Built the fraud scoring service".',
+      '1 bullet in a past role is in the present tense, such as "Manage the data warehouse for 12 teams".',
     );
+  });
+
+  it("accepts the current role written in the past tense, as finished work is", () => {
+    const found = rule(
+      check(`${HEAD}Engineer, Acme Corp    Jan 2022 – Present
+• Built the fraud scoring service
+• Cut checkout latency 30% by caching rates
+Engineer, Globex    Jan 2018 – Dec 2021
+• Designed the event pipeline
+• Led the migration to Kafka`),
+      "tense",
+    );
+    expect(found).toMatchObject({ passed: true });
   });
 
   it("is dropped when no bullet opens with a verb it knows", () => {

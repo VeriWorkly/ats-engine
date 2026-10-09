@@ -479,10 +479,10 @@ export const DEFAULT_RULES = [
       { upTo: 0, weight: 0 },
       { upTo: null, weight: 2 },
     ],
-    passEvidence: "Past roles are written in the past tense, the current one in the present.",
+    passEvidence: "Past roles are written in the past tense.",
     failEvidence:
-      '{n} {n|bullet is|bullets are} in the wrong tense for {n|its|their} role, such as "{sample}".',
-    fix: 'Write the role you hold now in the present tense ("Lead") and past roles in the past ("Led").',
+      '{n} {n|bullet|bullets} in a past role {n|is|are} in the present tense, such as "{sample}".',
+    fix: 'Write roles you have left in the past tense ("Led", not "Lead"). The role you hold now can use either.',
   },
   {
     id: "ats-v2.writing.bulletLength",
