@@ -41,7 +41,8 @@ jobs:
       - run: npm pack --dry-run
 
   action:
-    # The GitHub Action as a workflow uses it: the composite step, the published engine it pins.
+    # The GitHub Action as a workflow uses it, the composite step on each OS, against the engine
+    # built from this commit: the version it pins is published only when this commit is released.
     name: GitHub Action on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -50,8 +51,16 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
       - id: check
         uses: ./action
+        env:
+          ATS_ENGINE_CLI: ${{ github.workspace }}/dist/cli/index.js
         with:
           resume: action/test/resume.md
           job: action/test/job.txt
