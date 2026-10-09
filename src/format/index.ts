@@ -8,6 +8,7 @@
  */
 
 import type {
+  AtsAdvice,
   AtsDegreeLevel,
   AtsIscedLevel,
   AtsParsedCertification,
@@ -69,6 +70,17 @@ export function sortByCategoryOrder<T extends { category: string }>(items: reado
     return index === -1 ? CATEGORY_ORDER.length : index;
   };
   return [...items].sort((a, b) => rank(a.category) - rank(b.category));
+}
+
+/** Labels of the kinds of advice (`report.advice`), which is shown apart from the score. */
+export const ADVICE_LABELS: Readonly<Record<AtsAdvice["kind"], string>> = {
+  file: "File",
+  age: "Age",
+  ats: "ATS",
+};
+
+export function adviceLabel(kind: AtsAdvice["kind"]) {
+  return own(ADVICE_LABELS, kind) ?? kind;
 }
 
 const MONTH_LABELS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");

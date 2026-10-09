@@ -11,6 +11,7 @@ import { parseArgs } from "node:util";
 
 import type { FetchLike } from "../ai/http.js";
 import {
+  adviceLabel,
   categoryLabel,
   formatCertification,
   formatRoleDates,
@@ -64,6 +65,7 @@ const KEY_VARIABLES = Object.values(PROVIDERS)
   .join(", ");
 
 const REGIONS = BUILT_IN_LOCALES.regions.map((pack) => pack.id).join(", ");
+const TARGETS = Object.keys(DEFAULT_POLICY.advice.targets).join(", ");
 
 const USAGE = `Usage: ats-engine check <resume> [options]
 
@@ -77,6 +79,8 @@ Options:
   --min-score <n>     Exit with code 2 when the readiness score is below n
   --region <code>     Read the resume as from this country (${REGIONS}); default: inferred
   --text              Also print the text as an ATS reads it, line by line
+  --ats <name>        Add the documented notes on one ATS (${TARGETS}), each with its
+                      source; advice only, the score does not change
   -h, --help          Show this help
   -v, --version       Print the engine version (ats-engine --version)
 
@@ -185,6 +189,17 @@ function render(report: AtsReport, style: Style): string {
         `      ${style.accent("Fix:")} ${rule.fix}`,
       );
   }
+
+  // After the failed checks, under its own heading: worth knowing, never part of the score.
+  if (report.advice.length) {
+    lines.push("", style.bold("Advice (not scored):"));
+    for (const item of report.advice) {
+      lines.push(`  ${style.dim(`[${adviceLabel(item.kind)}]`)} ${item.message}`);
+      if (item.evidence) lines.push(`      ${style.dim(item.evidence)}`);
+      if (item.fix) lines.push(`      ${style.accent("Fix:")} ${item.fix}`);
+      if (item.source) lines.push(`      ${style.dim(`Source: ${item.source}`)}`);
+    }
+  }
   return lines.join("\n");
 }
 
@@ -215,6 +230,7 @@ function parseCheckArgs(argv: string[]) {
         "min-score": { type: "string" },
         region: { type: "string" },
         text: { type: "boolean", default: false },
+        ats: { type: "string" },
         ai: { type: "boolean", default: false },
         provider: { type: "string" },
         model: { type: "string" },
@@ -275,10 +291,13 @@ async function check(argv: string[], context: CliContext): Promise<number> {
   const regions = policy.locales.regions.map((pack) => pack.id);
   if (values.region !== undefined && !regions.includes(values.region.toUpperCase()))
     throw new UsageError(`Unknown --region "${values.region}"; use one of ${regions.join(", ")}.`);
+  const targets = Object.keys(policy.advice.targets);
+  if (values.ats !== undefined && !targets.includes(values.ats.toLowerCase()))
+    throw new UsageError(`Unknown --ats "${values.ats}"; use one of ${targets.join(", ")}.`);
 
   if (terminal.interactive && !values.json) console.log(banner(terminal));
 
-  const { input, layout } = await readResumeFile(positionals[0]!);
+  const { input, layout, file } = await readResumeFile(positionals[0]!);
   const job = values.job ? await readJobFile(values.job) : undefined;
   const jobDescription = job?.text;
   const resume = prepareResume(input);
@@ -286,6 +305,8 @@ async function check(argv: string[], context: CliContext): Promise<number> {
     jobDescription,
     jobCompany: job?.company,
     layout,
+    file,
+    targetAts: values.ats,
     region: values.region,
     includeLines: values.text,
   });

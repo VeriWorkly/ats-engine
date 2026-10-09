@@ -78,12 +78,12 @@ Palette:
 
 ## Tools
 
-| Tool           | Input                                                                    | Returns                                                                                                                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `check_resume` | `path` or `text`; optional `job_path` or `job_text`; optional `region`   | Readiness score (0–100), verdict, category scores, every failed check with its evidence and fix, and the fields an ATS stores (name, contact, roles, education, skills). With a posting: job match and requirements too. |
-| `match_job`    | `path` or `text`; `job_path` or `job_text` (required); optional `region` | Job match score, each requirement judged met / partial / missing / unverifiable with evidence, and the missing keywords, soft skills apart.                                                                              |
-| `explain_rule` | `rule_id`                                                                | One rubric rule: category, severity, what it checks, points, how to fix it. An unknown id lists the valid ones.                                                                                                          |
-| `extract_text` | `path` or `text`; optional `region`                                      | The text in the order an ATS reads it, line by line, plus what the layout measured (columns, tables, hidden text). For "why did it read my resume like this?"                                                            |
+| Tool           | Input                                                                                         | Returns                                                                                                                                                                                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check_resume` | `path` or `text`; optional `job_path` or `job_text`; optional `region`; optional `target_ats` | Readiness score (0–100), verdict, category scores, every failed check with its evidence and fix, and the fields an ATS stores (name, contact, roles, education, skills, certifications, languages). With a posting: job match and requirements too. Then `advice`, which is not scored. |
+| `match_job`    | `path` or `text`; `job_path` or `job_text` (required); optional `region`                      | Job match score, each requirement judged met / partial / missing / unverifiable with evidence, and the missing keywords.                                                                                                                                                                |
+| `explain_rule` | `rule_id`                                                                                     | One rubric rule: category, severity, what it checks, points, how to fix it. An unknown id lists the valid ones.                                                                                                                                                                         |
+| `extract_text` | `path` or `text`; optional `region`                                                           | The text in the order an ATS reads it, line by line, plus what the layout measured (columns, tables, hidden text). For "why did it read my resume like this?"                                                                                                                           |
 
 Every tool returns readable text for the assistant and the same result as structured JSON
 (`structuredContent`, described by each tool's `outputSchema`).
@@ -98,6 +98,14 @@ The resource `rubric://default` is the whole rubric as JSON.
 - Files over 20 MB are refused, and so are folders. So is a PDF with no text layer: an ATS
   cannot read a scan either.
 - `region` is `US`, `DE` or `IN`. Without it, the region is inferred from the resume.
+- `target_ats` is `greenhouse`, `lever` or `taleo`. It adds what that vendor documents publicly,
+  each note with a link to the vendor's page. It never changes the score.
+
+**Advice.** `check_resume` ends with `advice`, a list that is never scored. For a file it covers
+the name (`Resume_final_v3 (2).pdf` reads as a draft; a `Firstname-Lastname-Resume.pdf` name is
+suggested), a size over 2 MB, a password, and tracked changes or comments left in a Word
+document. For a US resume it also covers details that can invite age bias. With `target_ats` it
+adds the vendor's notes.
 
 ## Privacy
 

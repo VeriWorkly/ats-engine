@@ -14,14 +14,17 @@ const BUDGETS = {
   // 170: certifications and spoken languages read as rows (their parsers, CEFR level words and
   // the requirement judging over them, 4.1) and the writing rules (their checks and word lists,
   // 2.7) took it from 161.2 to 168.0 (0.3). zod is about half of the entry: zod/mini is the trim.
-  ".": 170,
+  // 172: the advice, which is not scored (policy.advice: file-name words, every advice message and
+  // the sourced target-ATS notes, 2.3; the file, age and ATS checks, 1.0), took it to 171.3.
+  ".": 172,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
   // optional end tags, a tag scan that skips scripts and comments, and hidden-element rules (0.2).
   "./job": 3.8,
   "./locales": 145,
-  "./ai": 140,
+  // 141: the policy schema it validates against gained `advice` (its defaults), 140.7.
+  "./ai": 141,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,

@@ -44,7 +44,7 @@ report.locale; // { languages: ["de"], region: "DE" }
 | ---- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `de` | language | community | Compounds ("Softwareentwickler"), noun-style bullets count as action verbs, capitals carry no proper-noun signal                      |
 | `hi` | language | community | Detected by Devanagari script; verb-final, so action verbs count anywhere in a line                                                   |
-| `US` | region   | verified  | Date of birth and photo are warnings                                                                                                  |
+| `US` | region   | verified  | Date of birth and photo are warnings; age advice (`ageAdvice`: graduation year or experience past 20 years)                           |
 | `DE` | region   | community | `DD.MM.YYYY`; Abitur, Diplom (FH = 6, otherwise 7), Meister and staatlich geprüfter Techniker (6); date of birth and photo not judged |
 | `IN` | region   | community | `DD/MM/YYYY`; Class X/SSC (2), Class XII (3), B.Com, B.E., MCA, PGDM, MBBS; date of birth and photo not judged                        |
 
@@ -79,6 +79,14 @@ Things to know:
 - **Rules, weights and stemming belong to the policy.** A language pack can't change them, because
   a German suffix rule would fold "engineer" into "engine". A region pack may adjust named rules
   (`weight`, `severity`). `weight: 0` turns a rule off for the region.
+- **`ageAdvice`** (region packs only) turns on the age advice in `report.advice`, which is never
+  scored: `graduationYears` (a graduation year more than this many years before `now`) and
+  `experienceYears` (more than this many years of experience, stated as in "30+ years of
+  experience" or dated across the roles). Set it where an age on a resume invites bias and
+  recruiters expect none; leave it out where a date of birth is customary. `US` sets both to 20.
+  `DE` and `IN` leave it out: a German Lebenslauf and an Indian resume customarily state a date
+  of birth, so advising to hide a graduation year would contradict the convention the pack
+  already keeps (date of birth and photo not judged).
 - **`headingConnectors`** lists the lowercase words a capitalised heading joins its words with
   ("Ausbildung und Weiterbildung"). Without them, any lowercase word after a heading word reads
   as prose, and the heading is missed. Scripts without case don't need them.

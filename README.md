@@ -81,8 +81,11 @@ Failed checks:
 | `--min-score <n>` | Exit with code 2 when the score is below `n`, for CI checks                                        |
 | `--region <code>` | Read the resume as from `US`, `DE` or `IN` instead of guessing                                     |
 | `--text`          | Print the text in the order an ATS reads it                                                        |
+| `--ats <name>`    | Add the documented notes on one ATS (`greenhouse`, `lever`, `taleo`), each with its source         |
 | `--policy <file>` | Use your own scoring policy JSON                                                                   |
 | `--version`       | Print the engine version, for bug reports                                                          |
+
+After the failed checks the CLI prints any **advice** under its own heading, "Advice (not scored)". Advice never changes a score. It covers the file itself: a name like `Resume_final_v3 (2).pdf` (with a suggested `Firstname-Lastname-Resume.pdf`), a file over 2 MB (a common upload limit, not a universal one), a password or encryption, and tracked changes or comments left in a Word document. It also flags details that can invite age bias, such as a graduation year more than 20 years back or "30+ years of experience", where the region calls for it (the US; not Germany or India, where an age on a resume is customary). With `--ats` it adds what that vendor documents publicly, with a link to the page. The engine does not simulate any vendor's parser.
 
 In a terminal the output is coloured and opens with a VeriWorkly banner. Output sent to a pipe, a file or a CI log is plain text, and `NO_COLOR=1` turns colour off everywhere.
 
@@ -179,10 +182,13 @@ const format = detectResumeFormat("resume.pdf"); // "pdf" | "docx" | "text" | nu
 if (!format) throw new Error("Unsupported file type");
 
 const { text, layout } = await extractResume(bytes, format);
-const report = check(text, DEFAULT_POLICY, { layout });
+const report = check(text, DEFAULT_POLICY, {
+  layout,
+  file: { name: "resume.pdf", bytes: bytes.length, format }, // optional: advice on the file
+});
 ```
 
-In a web server, pass the uploaded file's name and MIME type to `detectResumeFormat(fileName, mimeType)` and its bytes to `extractResume`.
+In a web server, pass the uploaded file's name and MIME type to `detectResumeFormat(fileName, mimeType)` and its bytes to `extractResume`. `readResumeFile(path)` does all of this for a file on disk and returns `{ input, layout, file }`. The `file` option (`name`, `bytes`, `format`, and `passwordProtected`, `trackedChanges` or `comments` when your host knows them) is read only for `report.advice`. `targetAts: "greenhouse"` adds that vendor's documented notes there as well.
 
 ### Match against a job posting
 
@@ -230,6 +236,9 @@ check(resumeText, policy, { region: "IN" });
 | `matchedKeywordGroups`               | Found terms as `{ hard, soft }`                                            |
 | `missingKeywordGroups`               | Missing terms as `{ hard, soft }`; soft skills weigh less in the match     |
 | `engine`                             | Engine version and policy fingerprint, to reproduce the result             |
+| `advice`                             | Not scored: `{ id, kind, message, evidence?, fix?, source? }`, see below   |
+
+`advice` is always present and often empty. `kind` is `file` (name, size, password, tracked changes, comments; given only when the caller describes the file), `age` (an old graduation year or a long stated or dated career, only in regions whose pack asks for it) or `ats` (a named target ATS's documented notes, each with the vendor page as `source`). Its text comes from the policy's `advice` section. It is never part of `readinessScore`, `categories`, `failedChecks` or `prioritizedFixes`: the same resume scores the same with or without it. A restricted report (`shapeReport`) keeps each item's `id`, `kind` and `message` and drops the quoted specifics.
 
 `parsed.certifications` holds one row per certification or licence (`name`, `issuer`, `date`, `expires`) and `parsed.spokenLanguages` one per language (`language`, `level` as written, `cefr` from A1 to C2, or null). Both are read from their own sections, and from a "Languages:" or "Certifications:" line among the skills; a JSON Resume's `certificates` and `languages`, and a document's `certifications` and `languages` sections, fill them from their fields.
 

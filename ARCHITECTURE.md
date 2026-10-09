@@ -42,7 +42,14 @@ check(resume, policy, options)                                   check.ts, scori
  6 judgeRequirements      per-requirement status and evidence;    matching/requirements.ts
                           rows first for credentials, languages
  7 assemble               fixes, strengths, categories, stamp     scoring/engine.ts
+ 8 adviceFor              not scored: file, age, target ATS       advice/
 ```
+
+The advice is read last, from the parsed record, the lines, the layout and the caller's `file`
+and `targetAts`, after the score is final. Nothing the score reads comes back from it, so it
+cannot move a number (`tests/scoring/advice-score.test.ts` holds that byte for byte). Its text
+and thresholds are the policy's `advice` section; a region pack's `ageAdvice` turns the age
+advice on. An unknown `targetAts` is refused before anything is read.
 
 ## Layout
 
@@ -58,13 +65,14 @@ Splitting those is welcome where a seam is clear.
 | `types.ts`, `types/`     | report types; `types/parsed.ts` (recovered record, ISCED, provenance), `types/layout.ts` (geometry signals)                                                                                                                                                                                                                       | `.`                    |
 | `input.ts`               | `prepareResume`: kind of input, flattening, size guards                                                                                                                                                                                                                                                                           | `.`                    |
 | `text/`                  | `text.ts` normalisation, word lists, tokens, stemming, bullets; `characters.ts` invisible and tag characters                                                                                                                                                                                                                      | internal               |
-| `policy/`                | `schema.ts` (assembles `schema/rules`, `schema/resumeParse`, `schema/keywordMatch`, `schema/text`, `schema/writing`), `default.ts` (assembles `default/rules`, `default/keywordMatch`, `default/resumeParse`), `parse`, `primitives`, `regex`, `fingerprint`, `errors`                                                            | `.`                    |
+| `policy/`                | `schema.ts` (assembles `schema/rules`, `schema/resumeParse`, `schema/keywordMatch`, `schema/text`, `schema/writing`, `schema/advice`), `default.ts` (assembles `default/rules`, `default/keywordMatch`, `default/resumeParse`), `parse`, `primitives`, `regex`, `fingerprint`, `errors`                                           | `.`                    |
 | `parser/`                | `lines`, `sections`, `dates`, `experience` (roles), `education` (ISCED), `contact` (name, email, date of birth), `phone`, `certifications` and `languages` (rows, CEFR), `record` (derived fields, provenance), `tenure`, `index`                                                                                                 | `.` (`parseResume`)    |
 | `checks/`                | `integrity/text` (injection, homoglyphs, copied posting, stuffing), `timeline`, `skills`, `bullets` (role body lines when list markers were lost), `writing` (style of the bullets and role dates, English), `finding`                                                                                                            | internal               |
 | `scoring/`               | `engine` (pipeline), `context` (what rules read), `score` (arithmetic), `rules` (per-kind evaluation and applicability, `languages` too), `categories` (`writing` apart), `rubric`, `verdict`                                                                                                                                     | `.`                    |
 | `matching/`              | `vocabulary` (terms, synonyms, phrases, soft skills), `alternation` ("Go or Java"), `jobSections`, `proseNames`, `jobMatch` (weights, hard and soft groups), `requirements`                                                                                                                                                       | internal               |
 | `locales/`               | `schema`, `languages` (language detection and vocabulary, no phone metadata), `resolve` (attach, region, date order), `packs/` (`de`, `hi`, `regions`)                                                                                                                                                                            | `/locales`             |
 | `document/`              | structured input: `types`, `render`, `jsonResume` (public); `schema`, `parse` (internal)                                                                                                                                                                                                                                          | `/document`            |
+| `advice/`                | `index` (`adviceFor`, the target ATS), `file` (name, size, password, tracked changes, comments), `age` (graduation year, years of experience)                                                                                                                                                                                     | internal               |
 | `report/`, `repair/`     | `shape` (full / restricted); `grounding`, `merge` (AI repair acceptance)                                                                                                                                                                                                                                                          | `.`                    |
 | `format/`, `job/`        | display helpers; job text from HTML (`html.ts` scanner, whole-page mode skipping navigation and hidden elements; `index.ts` JSON-LD)                                                                                                                                                                                              | `/format`, `/job`      |
 | `ai/`                    | `run` (task runner, retries), `provider`, `http`, `schema`, `redact`, `tasks/`, adapters, `testing/`                                                                                                                                                                                                                              | `/ai`, `/ai/*`         |
@@ -81,8 +89,10 @@ which every time budget uses so a busy machine cannot fail a test. Work bounded 
 tested by the count (`tests/node/visibility-budget.test.ts`), not the clock.
 
 `node/files` reads a resume or a posting from a path (`readResumeFile`, `readJobFile`) with the
-limits and messages the CLI and the MCP server share; `printable` in `/format` strips control
-characters from what either prints. `packages/mcp/` is a separate npm workspace,
+limits and messages the CLI and the MCP server share, and says what the file was (`file`: name,
+size, format) for the file advice; `node/docx` counts tracked changes and comments while it
+measures, and `node/pdf` notes an encrypted PDF that opened without a password. `printable` in
+`/format` strips control characters from what either prints. `packages/mcp/` is a separate npm workspace,
 `@veriworkly/ats-engine-mcp`: an MCP server over the public entry points, with tests in
 `packages/mcp/tests/` that spawn the built server. The root is a workspace too
 (`"workspaces": [".", "packages/*"]`), so the server links the local engine and changesets
@@ -94,12 +104,12 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 | Entry                                                   | Modules | Externals                                                |
 | ------------------------------------------------------- | ------: | -------------------------------------------------------- |
-| `.`                                                     |      68 | zod, libphonenumber-js                                   |
+| `.`                                                     |      72 | zod, libphonenumber-js                                   |
 | `/document`                                             |       4 | none                                                     |
 | `/format`                                               |       2 | none                                                     |
 | `/job`                                                  |       3 | none                                                     |
-| `/locales`                                              |      23 | zod, libphonenumber-js                                   |
-| `/ai`                                                   |      45 | zod, libphonenumber-js                                   |
+| `/locales`                                              |      24 | zod, libphonenumber-js                                   |
+| `/ai`                                                   |      46 | zod, libphonenumber-js                                   |
 | `/ai/openai-compatible`, `/ai/anthropic`, `/ai/testing` |     4–5 | none                                                     |
 | `/node`                                                 |      18 | node:\*, pdfjs-dist, pdf-parse, mammoth (optional peers) |
 
@@ -111,6 +121,10 @@ runtime-agnostic subpath for the browser and runs the core in a bare V8 context 
 - **Report prose is English.** Rule evidence and fixes come from the policy; the few strings the
   engine writes into a report (a timeline sample, an ISCED label in a requirement's detail,
   "Present" in a rendered document) are display text, not vocabulary the engine reads.
+- **Advice is not a rule.** File hygiene, age signals and target-ATS notes are worth saying but
+  are not what an ATS scores, so they live in `report.advice`, outside the rubric. A target-ATS
+  note states only what the vendor documents on a public page, linked as its `source`; the engine
+  never claims to simulate a vendor's parser.
 - **Policy types are inferred from zod.** `AtsEnginePolicy` is `z.infer` of the schema, so the
   published `.d.ts` references zod's types (zod is a dependency, `^4`). Hand-writing the types
   would duplicate the schema; revisit before 1.0 if a zod major changes them.

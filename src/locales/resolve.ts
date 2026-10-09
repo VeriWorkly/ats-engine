@@ -90,6 +90,12 @@ function applyRegion(policy: AtsEnginePolicy, region: AtsRegionPack): AtsEngineP
       dateOrder: region.dateOrder,
       phoneRegions: union([region.phoneCountry], localized.resumeParse.phoneRegions),
     },
+    ...(region.ageAdvice && {
+      advice: {
+        ...localized.advice,
+        age: { ...localized.advice.age, ...region.ageAdvice },
+      },
+    }),
   };
 }
 

@@ -190,6 +190,9 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
       ...hiddenSignals([measured.hiddenText, ...chunked]),
       // Counted whole: the document's hidden text above is cut to its first 5,000 characters.
       hiddenTextChars: measured.hiddenChars + hiddenSignals(chunked).hiddenTextChars,
+      // Left in by an editor: advice on the file, never scored.
+      trackedChanges: measured.trackedChanges,
+      comments: measured.comments,
     },
   };
 }

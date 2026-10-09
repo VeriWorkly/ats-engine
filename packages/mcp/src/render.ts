@@ -4,7 +4,12 @@
  */
 
 import type { AtsReport, AtsRequirement, AtsRubricEntry, AtsVerdict } from "@veriworkly/ats-engine";
-import { categoryLabel, formatRoleDates, formatTenure } from "@veriworkly/ats-engine/format";
+import {
+  adviceLabel,
+  categoryLabel,
+  formatRoleDates,
+  formatTenure,
+} from "@veriworkly/ats-engine/format";
 
 /** Said in every scored answer, so the assistant does not present the score as its own opinion. */
 export function provenance(report: AtsReport): string {
@@ -75,6 +80,17 @@ export function renderCheck(report: AtsReport, verdict: AtsVerdict, withJob: boo
   if (parsed.monthsOfExperience)
     lines.push(`- Experience: ${formatTenure(parsed.monthsOfExperience)}`);
   if (parsed.skills.length) lines.push(`- Skills: ${parsed.skills.join(", ")}`);
+
+  // Apart from the score, and said to be: none of it changes a number above.
+  if (report.advice.length) {
+    lines.push("", "Advice (not scored):");
+    for (const item of report.advice) {
+      lines.push(`- [${adviceLabel(item.kind)}] ${item.message}`);
+      if (item.evidence) lines.push(`  ${item.evidence}`);
+      if (item.fix) lines.push(`  Fix: ${item.fix}`);
+      if (item.source) lines.push(`  Source: ${item.source}`);
+    }
+  }
   return lines.join("\n");
 }
 

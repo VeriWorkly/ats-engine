@@ -57,6 +57,7 @@ function report(overrides: Partial<AtsReport> = {}): AtsReport {
         skills: "parser",
       },
     },
+    advice: [],
     ...overrides,
   };
 }
@@ -93,6 +94,7 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
       missingKeywordCount: 1,
       parsedRoleCount: 1,
       remainingFixCount: 0,
+      advice: [],
     });
 
     // Nothing that would let a visitor reconstruct the report. `categories` is on this list
@@ -110,6 +112,46 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
       "parsed",
     ])
       expect(Object.keys(shaped)).not.toContain(withheld);
+  });
+
+  it("gives an anonymous caller each piece of advice as a message, without its specifics", () => {
+    const shaped = shapeReport(
+      report({
+        advice: [
+          {
+            id: "file.name",
+            kind: "file",
+            message: "The file name does not say whose resume it is.",
+            evidence: 'The file is named "Resume_final_v3 (2).pdf".',
+            fix: "Name it Jane-Doe-Resume.pdf.",
+          },
+          {
+            id: "ats.greenhouse.parseSize",
+            kind: "ats",
+            message: "Greenhouse documents a parse limit.",
+            source: "https://support.greenhouse.io/",
+          },
+        ],
+      }),
+      "restricted",
+    );
+    if (!shaped.restricted) throw new Error("expected a restricted report");
+    // Advice never moves the score and is no part of the rubric's answer key; what it quotes —
+    // the file name, a year, the candidate's name in the suggestion — stays with the full report.
+    expect(shaped.advice).toEqual([
+      {
+        id: "file.name",
+        kind: "file",
+        message: "The file name does not say whose resume it is.",
+      },
+      {
+        id: "ats.greenhouse.parseSize",
+        kind: "ats",
+        message: "Greenhouse documents a parse limit.",
+      },
+    ]);
+    expect(JSON.stringify(shaped)).not.toContain("Jane-Doe");
+    expect(shapeReport(report(), "restricted")).toMatchObject({ advice: [] });
   });
 
   it("never leaks the recovered work history to an anonymous caller", () => {

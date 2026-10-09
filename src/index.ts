@@ -21,9 +21,11 @@
  */
 
 export type {
+  AtsAdvice,
   AtsCategoryScore,
   AtsCefrLevel,
   AtsDegreeLevel,
+  AtsFileInfo,
   AtsIscedLevel,
   AtsKeywordGroups,
   AtsLayoutSignals,

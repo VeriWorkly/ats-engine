@@ -1,5 +1,5 @@
 import { computeVerdict, type AtsVerdict } from "../scoring/verdict.js";
-import type { AtsReport } from "../types.js";
+import type { AtsAdvice, AtsReport } from "../types.js";
 
 /**
  * Two levels of detail for a report, so a host can offer a diagnosis without the prescription.
@@ -34,6 +34,13 @@ export type AtsRestrictedReport = {
   /** Counts only, never the recovered rows. */
   parsedRoleCount: number;
   remainingFixCount: number;
+  /**
+   * Each piece of advice as its id, kind and message, without the evidence, fix or source. Advice
+   * never moves the score and is no part of the rubric's answer key, so stating it gives away
+   * nothing a restricted report withholds; what it quotes — the file name, a year, the
+   * candidate's name in a suggested file name — stays with the full report.
+   */
+  advice: Array<Pick<AtsAdvice, "id" | "kind" | "message">>;
 };
 
 export type AtsShapedReport = AtsFullReport | AtsRestrictedReport;
@@ -76,5 +83,7 @@ export function shapeReport(report: AtsReport, detail: AtsReportDetail): AtsShap
     missingKeywordCount: report.missingKeywords.length,
     parsedRoleCount: report.parsed.roles.length,
     remainingFixCount: Math.max(0, report.failedChecks.length - 1),
+    // A report stored by an engine before advice existed has none.
+    advice: (report.advice ?? []).map(({ id, kind, message }) => ({ id, kind, message })),
   };
 }

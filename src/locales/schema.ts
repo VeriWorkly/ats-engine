@@ -185,6 +185,19 @@ export const regionPackSchema = z.object({
       }),
     )
     .default({}),
+  /**
+   * Turns on the age advice (never scored) where a resume that lets a reader work out the
+   * candidate's age invites age bias and recruiters expect none: a graduation year more than
+   * `graduationYears` back, more than `experienceYears` years of experience stated or dated.
+   * Leave it out where an age on a resume is customary.
+   */
+  ageAdvice: z
+    .object({
+      graduationYears: z.number().int().positive(),
+      experienceYears: z.number().int().positive(),
+    })
+    .partial()
+    .optional(),
 });
 
 export type AtsLanguagePack = z.output<typeof languagePackSchema>;

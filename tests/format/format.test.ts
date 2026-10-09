@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adviceLabel,
   categoryLabel,
   formatCertification,
   formatParsedDate,
@@ -104,5 +105,9 @@ describe("format helpers", () => {
       "German (fluent)",
     );
     expect(formatSpokenLanguage({ language: "Hindi", level: "", cefr: null })).toBe("Hindi");
+  });
+
+  it("labels each kind of advice", () => {
+    expect((["file", "age", "ats"] as const).map(adviceLabel)).toEqual(["File", "Age", "ATS"]);
   });
 });

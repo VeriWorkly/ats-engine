@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { languagePackSchema, regionPackSchema } from "../locales/schema.js";
+import { adviceSchema } from "./schema/advice.js";
 import { keywordMatchSchema } from "./schema/keywordMatch.js";
 import { resumeParseSchema } from "./schema/resumeParse.js";
 import { ruleSchema } from "./schema/rules.js";
@@ -50,6 +51,7 @@ export const atsEngineSchema = z.object({
   resumeParse: resumeParseSchema,
   text: engineTextSchema,
   writing: writingSchema,
+  advice: adviceSchema,
   locales: localesSchema,
 });
 

@@ -118,6 +118,8 @@ describe("resume extraction", () => {
       hiddenTextChars: 0,
       hiddenTextSample: "",
       hiddenText: "",
+      trackedChanges: 0,
+      comments: 0,
     });
   });
 

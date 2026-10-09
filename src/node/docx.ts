@@ -470,7 +470,7 @@ function mammothParts(files: Map<string, ZipEntry>) {
   const packageRelationships = relationships("_rels/.rels");
   if (!packageRelationships) return null;
   const main = find(packageRelationships, "officeDocument", "", "word/document.xml");
-  if (!exists(main)) return { main, reads, styles: null, chunks: [] };
+  if (!exists(main)) return { main, reads, styles: null, chunks: [], comments: null };
   const related = relationships(relationshipsOf(main));
   if (!related) return null;
   const [base] = splitPath(main);
@@ -478,7 +478,8 @@ function mammothParts(files: Map<string, ZipEntry>) {
   const styles = part("styles");
   read(styles);
   read(part("numbering"));
-  for (const path of [...["footnotes", "endnotes", "comments"].map(part), main]) {
+  const comments = part("comments");
+  for (const path of [...["footnotes", "endnotes"].map(part), comments, main]) {
     read(relationshipsOf(path));
     read(path);
   }
@@ -489,7 +490,13 @@ function mammothParts(files: Map<string, ZipEntry>) {
     .filter(exists);
   for (const chunk of chunks) read(chunk);
   for (const key of files.keys()) if (HEADER_OR_FOOTER.test(key)) read(key);
-  return { main, reads, styles: exists(styles) ? styles : null, chunks };
+  return {
+    main,
+    reads,
+    styles: exists(styles) ? styles : null,
+    chunks,
+    comments: exists(comments) ? comments : null,
+  };
 }
 
 /**
@@ -586,7 +593,22 @@ export type DocxMeasure = {
   tableCount: number;
   /** Pictures printed at least 50pt a side — a photo, as for a PDF. */
   imageCount: number;
+  /** Tracked changes left in the main document and its headers and footers. */
+  trackedChanges: number;
+  /** Comments: those in the comments part, else the references to them in the document. */
+  comments: number;
 };
+
+/**
+ * A tracked change: an insertion, a deletion, a move, or a formatting change (`w:rPrChange`,
+ * `w:pPrChange`, …). Not the range marks around a move (`w:moveFromRangeStart`), deleted text
+ * (`w:delText`) or a table's inside borders (`w:insideH`): the name must end where the tag name
+ * does. Bounded, so each `<w:` costs a constant.
+ */
+const REVISION = /<w:(?:ins|del|moveFrom|moveTo|[A-Za-z]{1,12}Pr(?:Ex)?Change)(?=[\s/>])/g;
+const COMMENT = /<w:comment(?=[\s/>])/g;
+const COMMENT_REFERENCE = /<w:commentReference(?=[\s/>])/g;
+const count = (xml: string, pattern: RegExp) => xml.match(pattern)?.length ?? 0;
 
 const MARKUP_OPEN = /<(?:!--|!\[CDATA\[|\?)/g;
 const MARKUP_CLOSE = new Map([
@@ -887,6 +909,7 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
   const behindText = /<wp:anchor\b[^<>]*\bbehindDoc=["'](?:1|true|on)["']/.test(xml);
 
   const hidden = scanRuns(xml, paragraphStyle, page, behindText).hidden;
+  let trackedChanges = count(xml, REVISION);
   // A header's banner — a shape or picture behind its text, as Word's templates draw them — is
   // a background this cannot read: white text on the bare page of a part that draws one is not
   // judged.
@@ -894,9 +917,18 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
     const part = inflate(margin, MAX_XML_BYTES);
     if (!part) continue;
     const content = withoutMarkup(part.toString("utf8"));
+    trackedChanges += count(content, REVISION);
     const drawn = behindText || /<w:(?:drawing|pict)\b/.test(content);
     for (const run of scanRuns(content, paragraphStyle, page, drawn).hidden) hidden.push(run);
   }
+
+  // The comments themselves, from their own part when it is there to read.
+  const commentsEntry = parts.comments ? files.get(parts.comments) : undefined;
+  const commentsPart = commentsEntry && inflate(commentsEntry, MAX_XML_BYTES);
+  const comments = Math.max(
+    commentsPart ? count(withoutMarkup(commentsPart.toString("utf8")), COMMENT) : 0,
+    count(xml, COMMENT_REFERENCE),
+  );
 
   const decoded = xmlText(hidden.join(" ").replace(/\s+/g, " ").trim());
   return {
@@ -905,6 +937,8 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
     hiddenSample: decoded.slice(0, 80),
     tableCount,
     imageCount,
+    trackedChanges,
+    comments,
   };
 }
 
