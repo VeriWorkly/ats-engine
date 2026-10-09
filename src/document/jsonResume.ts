@@ -110,6 +110,11 @@ function entries(
     .filter((entry) => entry.heading || entry.lines.length);
 }
 
+/**
+ * A JSON Resume as an `AtsResumeDocument`, with English section titles: `work`, `volunteer`,
+ * `education`, `projects`, `skills`, `certificates`, `languages` and the rest, in print order. A
+ * field of the wrong type is read as absent; nothing throws.
+ */
 export function fromJsonResume(json: unknown): AtsResumeDocument {
   const resume = isObject(json) ? json : {};
   const basics = isObject(resume.basics) ? resume.basics : {};

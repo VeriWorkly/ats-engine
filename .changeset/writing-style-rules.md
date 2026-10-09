@@ -8,4 +8,5 @@
 - They are English only and are dropped, not failed, for a resume read in another language, and when there is nothing to judge (no bullets, no dated roles).
 - Policy schema: a rule may carry `languages` (ISO 639 codes) and is then dropped for a resume read in any other language; `text.language` (default `"en"`) names the language a resume is read in when no attached language pack recognises it; a new `writing` section holds the word lists and limits, with defaults, so a policy written before it still parses.
 - `localizePolicy` also returns `resumeLanguages`: the language packs the resume itself is read in, without one only the posting is written in.
+- `policyRubric` names a rule's languages in its `measures` ("passiveVoiceRatio (en only)"), and RUBRIC.md lists the eight rules.
 - `/format`: `CATEGORY_ORDER` ends with `writing`, labelled "Writing".

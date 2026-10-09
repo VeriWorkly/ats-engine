@@ -23,6 +23,7 @@ export class AtsFileError extends Error {
  */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
+/** Options of `readResumeFile` and `readJobFile`. */
 export type AtsReadFileOptions = {
   /** Refuse a larger file. Default `MAX_FILE_BYTES`. */
   maxBytes?: number;

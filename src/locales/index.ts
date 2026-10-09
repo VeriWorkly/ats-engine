@@ -28,6 +28,7 @@ export { de, hi, DE, IN, US };
 /** Every pack this package ships. English is the policy's own base vocabulary, not a pack. */
 export const BUILT_IN_LOCALES = { languages: [de, hi], regions: [US, DE, IN] };
 
-/** JSON Schemas for a pack written as JSON. Patterns are checked when the pack is attached. */
+/** JSON Schema for a language pack written as JSON. Patterns are checked when it is attached. */
 export const atsLanguagePackJsonSchema = z.toJSONSchema(languagePackSchema, { io: "input" });
+/** JSON Schema for a region pack written as JSON. Patterns are checked when it is attached. */
 export const atsRegionPackJsonSchema = z.toJSONSchema(regionPackSchema, { io: "input" });

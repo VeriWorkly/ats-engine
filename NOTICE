@@ -24,7 +24,12 @@ Optional peer dependencies (only for reading files with /node)
   mammoth             BSD-2-Clause  https://github.com/mwilliamson/mammoth.js
 
 Education levels follow the International Standard Classification of Education (ISCED 2011),
-published by UNESCO. The level numbers are referenced, not reproduced.
+published by UNESCO. The level numbers are referenced, not reproduced. Spoken-language levels
+follow the Common European Framework of Reference for Languages (CEFR), published by the Council
+of Europe; the level names A1 to C2 are referenced, not reproduced.
+
+Greenhouse, Lever and Oracle Taleo are trademarks of their owners. The advice names them only to
+link to what each documents on its own public pages; this package is not affiliated with them.
 
 The language and region packs, the community policy and the test resumes were written for this
 package. The resumes describe invented people and companies.

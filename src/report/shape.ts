@@ -14,8 +14,10 @@ import type { AtsAdvice, AtsReport } from "../types.js";
 
 export type AtsReportDetail = "full" | "restricted";
 
+/** The whole report, with its verdict. */
 export type AtsFullReport = AtsReport & { restricted: false; verdict: AtsVerdict };
 
+/** The score, the verdict, the top fix and the main warning, and counts in place of lists. */
 export type AtsRestrictedReport = {
   version: AtsReport["version"];
   restricted: true;
@@ -43,6 +45,7 @@ export type AtsRestrictedReport = {
   advice: Array<Pick<AtsAdvice, "id" | "kind" | "message">>;
 };
 
+/** What `shapeReport` returns; `restricted` tells the two apart. */
 export type AtsShapedReport = AtsFullReport | AtsRestrictedReport;
 
 /**
@@ -65,6 +68,7 @@ function primaryWarning({ failedChecks }: AtsReport): string | null {
   );
 }
 
+/** A report at the chosen level of detail, with its verdict. See `AtsReportDetail`. */
 export function shapeReport(report: AtsReport, detail: AtsReportDetail): AtsShapedReport {
   const verdict = computeVerdict(report);
   if (detail === "full") return { ...report, restricted: false, verdict };

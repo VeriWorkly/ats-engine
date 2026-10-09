@@ -8,6 +8,8 @@
     "cv",
     "applicant-tracking-system",
     "resume-parser",
+    "resume-checker",
+    "ats-checker",
     "job-match",
     "scoring",
     "pdf",

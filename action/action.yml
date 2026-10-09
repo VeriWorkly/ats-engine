@@ -26,7 +26,7 @@ inputs:
     required: false
     default: "0.2.1"
   ats:
-    description: Name the ATS you are applying through (greenhouse, lever or taleo) to add its documented notes to the advice. Empty means none.
+    description: Name the ATS you are applying through (greenhouse, lever or taleo) to add its documented notes to the advice, which is never scored. Needs version 0.3.0 or later. Empty means none.
     required: false
     default: ""
   summary:

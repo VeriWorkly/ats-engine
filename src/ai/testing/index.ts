@@ -12,9 +12,14 @@ import type { LlmProvider, LlmRequest, LlmResponse } from "../provider.js";
 import type { AtsAiResult } from "../run.js";
 import { AtsAiError } from "../run.js";
 
+/**
+ * One scripted answer: the response text, a partial response, an error to throw, or a function
+ * of the request.
+ */
 export type ScriptedReply =
   string | Partial<LlmResponse> | Error | ((request: LlmRequest) => string | Partial<LlmResponse>);
 
+/** A provider that answers from a script and records every request. */
 export type ScriptedProvider = LlmProvider & {
   /** Every request received, in order. */
   readonly calls: LlmRequest[];
@@ -41,6 +46,7 @@ export function scriptedProvider(...replies: ScriptedReply[]): ScriptedProvider 
   };
 }
 
+/** One case of an eval: the task to run, the text it may draw on, values it must never output. */
 export type AiEvalCase = {
   id: string;
   /** Runs the task under test. `ai` is the instance passed to `runAiEval`. */
@@ -51,6 +57,7 @@ export type AiEvalCase = {
   forbidden?: string[];
 };
 
+/** The rates an eval measured over every run of every case, with each failure and dropped value. */
 export type AiEvalReport = {
   runs: number;
   /** Share of runs that produced a schema-valid result. */
@@ -85,6 +92,10 @@ export function fabricatedNumbers(output: unknown, source: string): string[] {
 
 const rate = (count: number, total: number) => (total ? count / total : 0);
 
+/**
+ * Runs every case `runs` times (default 1) and measures schema-valid output, grounding, numbers
+ * not in the source, consistency between runs, and leaks of forbidden values.
+ */
 export async function runAiEval(
   ai: AtsAi,
   cases: AiEvalCase[],

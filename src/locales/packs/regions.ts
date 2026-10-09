@@ -24,6 +24,7 @@ const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\
 const LAW = String.raw`(?<!\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\p{L})`;
 const LLM = String.raw`llm(?=\s*[,()]|\s+in\s|\s+(?:19|20)\d{2}(?!\d)|\s*$)(?:(?=[^\n]{0,80}?${LAW})|(?<=${LAW}[^\n]{0,80}llm))`;
 
+/** The United States: month-first dates; a date of birth or a photo is a warning; age advice on. */
 export const US: AtsRegionPackInput = {
   id: "US",
   name: "United States",
@@ -40,6 +41,7 @@ export const US: AtsRegionPackInput = {
   ageAdvice: { graduationYears: 20, experienceYears: 20 },
 };
 
+/** Germany: day-first dates, German credentials; a date of birth or a photo is not judged. */
 export const DE: AtsRegionPackInput = {
   id: "DE",
   name: "Deutschland",
@@ -75,6 +77,7 @@ export const DE: AtsRegionPackInput = {
   },
 };
 
+/** India: day-first dates, Indian credentials and state codes; date of birth and photo not judged. */
 export const IN: AtsRegionPackInput = {
   id: "IN",
   name: "India",

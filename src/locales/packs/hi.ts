@@ -11,6 +11,7 @@ import type { AtsLanguagePackInput } from "../schema.js";
  */
 const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 
+/** The Hindi language pack: recognised by Devanagari script; region IN by default. */
 export const hi: AtsLanguagePackInput = {
   id: "hi",
   name: "हिन्दी",

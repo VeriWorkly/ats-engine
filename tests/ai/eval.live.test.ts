@@ -20,6 +20,7 @@ import { evalCases } from "../fixtures/ai-eval-cases.js";
  *   ATS_EVAL_AI_POLICY   optional path to the private ATS AI policy JSON; its prompts replace the
  *                        package defaults, so the eval measures what production actually sends
  *   ATS_EVAL_RUNS        optional, default 3
+ *   ATS_EVAL_STRUCTURED  optional, `false` to ask for plain JSON instead of JSON Schema output
  *
  *   npm run eval:live
  *

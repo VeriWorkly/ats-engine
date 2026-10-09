@@ -10,6 +10,7 @@ import type { AtsResumeFormat } from "./extract.js";
  */
 export type AtsExtractRequest = { id: number; format: AtsResumeFormat; buffer: string };
 
+/** The child's answer to one request: the extraction, or why it failed. */
 export type AtsExtractResponse =
   | { id: number; ok: true; text: string; layout?: AtsLayoutSignals }
   | { id: number; ok: false; message: string };

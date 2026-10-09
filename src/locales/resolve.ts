@@ -102,10 +102,11 @@ function applyRegion(policy: AtsEnginePolicy, region: AtsRegionPack): AtsEngineP
 /** What `check` read a resume as. Packs are named by id; the policy's base vocabulary is not. */
 export type AtsLocale = { languages: string[]; region: string | null };
 
+/** Set the languages and the region a resume is read in, instead of detecting them. */
 export type AtsLocaleOptions = {
   /** Language pack ids to read with, instead of detecting them. `[]` reads with the base only. */
   languages?: string[];
-  /** The region pack id to apply, instead of inferring one. */
+  /** The region pack id to apply (any case), instead of inferring one; unknown ids throw. */
   region?: string;
 };
 

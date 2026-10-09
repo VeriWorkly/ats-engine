@@ -9,7 +9,8 @@ import type { AtsReport } from "./types.js";
  *
  * The report is a pure function of (resume, policy, options); pass `options.now` to pin the
  * date that tenure and recency are counted to. `resume` may be raw input or a `PreparedResume`.
- * Throws `AtsInputError` for a structured document that fails validation.
+ * Throws `AtsInputError` for a structured document that fails validation, and `AtsPolicyError`
+ * for a `region` or `targetAts` the policy does not have.
  *
  * `AtsScoringService.check` gives the same report, and stays until 1.0.
  */

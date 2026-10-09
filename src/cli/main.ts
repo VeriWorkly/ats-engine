@@ -1,10 +1,13 @@
 /**
- * `ats-engine check <resume> [--job <file>] [--policy <file>] [--json] [--min-score <n>] [--ai]`
+ * `ats-engine check <resume> [--job <file>] [--policy <file>] [--json] [--min-score <n>]
+ * [--region <code>] [--text] [--ats <name>] [--ai …]`
  *
- * Scores a resume file (PDF, DOCX, text, or a JSON resume document) with the bundled default
- * policy, or with `--policy`. `--min-score` makes it usable as a CI gate: the exit code is 2 when the
- * readiness score falls below it. `--ai` adds a model's analysis with the user's own key; the
- * score never depends on it.
+ * Scores a resume file (PDF, DOCX, HTML, text or Markdown, or a JSON resume document) with the
+ * bundled default policy and locale packs, or with `--policy`. `--min-score` makes it usable as a
+ * CI gate: the exit code is 2 when the readiness score falls below it. `--ats` adds a vendor's
+ * documented notes to the advice, which is never scored. `--ai` adds a model's analysis with the
+ * user's own key; the score never depends on it. `USAGE` below is the `--help` text, and the
+ * option table in README.md follows it.
  */
 
 import { parseArgs } from "node:util";
@@ -59,10 +62,11 @@ import {
 } from "./terminal.js";
 import { UsageError } from "./usage.js";
 
-const KEY_VARIABLES = Object.values(PROVIDERS)
+const KEY_NAMES = Object.values(PROVIDERS)
   .map((preset) => preset.keyEnv)
-  .filter(Boolean)
-  .join(", ");
+  .filter(Boolean);
+// Two lines in the help, so it fits a narrow terminal.
+const KEY_VARIABLES = `${KEY_NAMES.slice(0, 3).join(", ")},\n  ${KEY_NAMES.slice(3).join(", ")}`;
 
 const REGIONS = BUILT_IN_LOCALES.regions.map((pack) => pack.id).join(", ");
 const TARGETS = Object.keys(DEFAULT_POLICY.advice.targets).join(", ");
@@ -75,14 +79,18 @@ Options:
   --job <file>        Job posting to match against (.txt, .pdf, .docx, or a saved .html page,
                       whose employer is left out of the keywords)
   --policy <file>     Engine policy JSON (default: the bundled default policy)
-  --json              Print the full report as JSON
+  --json              Print the full report as JSON, advice included
   --min-score <n>     Exit with code 2 when the readiness score is below n
   --region <code>     Read the resume as from this country (${REGIONS}); default: inferred
-  --text              Also print the text as an ATS reads it, line by line
-  --ats <name>        Add the documented notes on one ATS (${TARGETS}), each with its
-                      source; advice only, the score does not change
+  --text              Also print the text as an ATS reads it, line by line (with --json,
+                      as the report's "lines")
+  --ats <name>        Add the documented notes on one ATS (${TARGETS}),
+                      each with its source; advice only, the score does not change
   -h, --help          Show this help
   -v, --version       Print the engine version (ats-engine --version)
+
+The report ends with advice that is never scored: the file's name and size, an encrypted PDF,
+tracked changes or comments in a Word file, and details that can invite age bias (US resumes).
 
 AI analysis (optional, with your own API key):
   --ai                Ask a model to explain the report and suggest improvements
@@ -94,8 +102,8 @@ AI analysis (optional, with your own API key):
   --timeout <s>       Longest wait for the answer in seconds, retries included
                       (default ${DEFAULT_TIMEOUT_SECONDS})
 
-  The key is read from the environment only: ATS_AI_API_KEY, or the provider's own
-  variable (${KEY_VARIABLES}).
+  The key is read from the environment only: the provider's own variable
+  (${KEY_VARIABLES}), then ATS_AI_API_KEY.
   Ollama and other servers on localhost need no key. ATS_AI_PROVIDER, ATS_AI_MODEL,
   ATS_AI_BASE_URL, ATS_AI_MAX_TOKENS and ATS_AI_TIMEOUT stand in for the flags.
 

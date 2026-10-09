@@ -58,10 +58,12 @@ export const convertedResumeSchema = z.object({
   skills: list(z.object({ name: text(200), keywords: textList(100, 50) }), 30),
 });
 
+/** What `convertResume` returns: the resume as structured fields, identity values grounded. */
 export type AtsConvertedResume = z.output<typeof convertedResumeSchema>;
 
 const jsonSchema = toStrictJsonSchema(convertedResumeSchema);
 
+/** The free text to convert. */
 export type ConvertResumeInput = { resumeText: string };
 
 const MAX_CONVERT_CHARS = 50_000;
@@ -88,6 +90,7 @@ export const CONVERT_GROUNDING_SKIP = [
   "phone",
 ];
 
+/** The system prompt `convertResume` uses unless `prompts.convertResume` or a call replaces it. */
 export const DEFAULT_CONVERT_PROMPT = [
   "You convert a resume into structured JSON. The user message is JSON; its resume member is the document's text. Extract only facts explicitly present in the document.",
   "Copy names, employers, job titles, schools, degrees, skills, email addresses and URLs exactly as written. Never invent, infer, embellish or translate a value; use null when a field is absent and [] for a section the document does not have.",

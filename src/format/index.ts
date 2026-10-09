@@ -4,7 +4,7 @@
  * Dependency-free and policy-free, so a browser bundle can import it without pulling in the
  * scorer or its schema library. Everything here is display: nothing changes a score.
  *
- * English only. ponytail: labels are literals; take them as parameters when a second locale ships.
+ * English only: labels are literals, to be taken as parameters when a second locale ships.
  */
 
 import type {
@@ -18,15 +18,17 @@ import type {
 } from "../types.js";
 import { own } from "../util/own.js";
 
+/** The display band of a score: `scoreTone`. */
 export type AtsScoreTone = "good" | "warn" | "bad";
 
 /**
  * Lower bounds of the display bands: the verdict's own (`VERDICT_BANDS` in the main entry), so a
  * score labelled "good" here is one the verdict calls "strong". Copied rather than imported to keep
- * `/format` free of dependencies; `tests/format.test.ts` holds the two equal.
+ * `/format` free of dependencies; `tests/format/format.test.ts` holds the two equal.
  */
 export const SCORE_BANDS = { good: 75, warn: 45 } as const;
 
+/** "good" from 75, "warn" from 45, "bad" below: the bands of `SCORE_BANDS`. */
 export function scoreTone(score: number): AtsScoreTone {
   if (score >= SCORE_BANDS.good) return "good";
   if (score >= SCORE_BANDS.warn) return "warn";
@@ -48,6 +50,7 @@ export const CATEGORY_ORDER = [
   "writing",
 ] as const;
 
+/** What each category id is called on a report: "content" is "Evidence", "format" "Format risk". */
 export const CATEGORY_LABELS: Readonly<Record<string, string>> = {
   parse: "Parsing",
   contact: "Contact & links",
@@ -79,6 +82,7 @@ export const ADVICE_LABELS: Readonly<Record<AtsAdvice["kind"], string>> = {
   ats: "ATS",
 };
 
+/** The label of an advice kind ("File", "Age", "ATS"); an unknown kind as it is. */
 export function adviceLabel(kind: AtsAdvice["kind"]) {
   return own(ADVICE_LABELS, kind) ?? kind;
 }
@@ -141,6 +145,11 @@ export function roleSpanMonths(
   return Math.max(0, to - from + 1);
 }
 
+/**
+ * What each `AtsDegreeLevel` was called on a report.
+ *
+ * @deprecated Use `ISCED_LABELS`; removed in 1.0.
+ */
 export const DEGREE_LABELS: Readonly<Record<AtsDegreeLevel, string>> = {
   diploma: "Diploma",
   associate: "Associate",

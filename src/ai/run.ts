@@ -12,6 +12,7 @@ import {
   type LlmUsage,
 } from "./provider.js";
 
+/** The model-backed tasks `createAtsAi` runs. */
 export type AtsAiTask = "analyze" | "repairParse" | "convertResume";
 
 /** Which model serves a task, and how. Set per task in `createAtsAi`, overridable per call. */
@@ -29,8 +30,10 @@ export type TaskRoute = {
   system?: string;
 };
 
+/** One call's overrides of its task's route, and a signal that aborts the call. */
 export type AtsAiCallOptions = Partial<TaskRoute> & { signal?: AbortSignalLike };
 
+/** What every task returns: its result, the values dropped from it, and what the call cost. */
 export type AtsAiResult<T> = {
   result: T;
   /** Values the model returned that were not grounded in the input, and were dropped. */
@@ -55,6 +58,10 @@ export type AtsAiResult<T> = {
 export type AtsAiErrorCode =
   "config" | "provider" | "refused" | "truncated" | "invalid_output" | "aborted";
 
+/**
+ * A task that produced no result. `code` says why; `status` is the provider's HTTP status when
+ * there was one; `usage` and `attempts` count what was spent before it failed.
+ */
 export class AtsAiError extends Error {
   readonly code: AtsAiErrorCode;
   readonly status?: number;
@@ -75,6 +82,7 @@ export class AtsAiError extends Error {
   }
 }
 
+/** Passed to `hooks.onRetry` before a retry, with the error the failed attempt raised. */
 export type AtsAiRetryEvent = { task: AtsAiTask; attempt: number; error: AtsAiError };
 
 export type RunContext = {

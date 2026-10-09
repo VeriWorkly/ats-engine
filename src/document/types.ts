@@ -14,6 +14,7 @@
  * can read them, but the ISO forms are the contract.
  */
 
+/** The `format` an `AtsResumeDocument` declares, and the version of its shape. */
 export const ATS_DOCUMENT_FORMAT = "ats-resume@1";
 
 /**
@@ -32,6 +33,7 @@ export const DOCUMENT_LIMITS = {
   text: 10_000,
 } as const;
 
+/** A role in an `experience` section. Dates are `YYYY-MM` or `YYYY`. */
 export type AtsDocumentRole = {
   title: string;
   employer: string;
@@ -43,6 +45,7 @@ export type AtsDocumentRole = {
   highlights?: string[];
 };
 
+/** A row of an `education` section. `credential` is the degree as written ("B.Sc."). */
 export type AtsDocumentEducation = {
   school: string;
   credential?: string;
@@ -53,6 +56,7 @@ export type AtsDocumentEducation = {
   summary?: string;
 };
 
+/** A row of a `projects` section. */
 export type AtsDocumentProject = {
   name: string;
   role?: string;
@@ -62,6 +66,7 @@ export type AtsDocumentProject = {
   skills?: string[];
 };
 
+/** A group of a `skills` section: its keywords, under an optional name ("Languages"). */
 export type AtsDocumentSkillGroup = {
   name?: string;
   keywords: string[];
@@ -105,6 +110,7 @@ export type AtsDocumentSection =
   | { kind: "languages"; title: string; items: AtsDocumentLanguage[] }
   | { kind: "other"; title: string; items: AtsDocumentEntry[] };
 
+/** The header of the resume: the name and the contact details. */
 export type AtsDocumentBasics = {
   name: string;
   headline?: string;
@@ -114,6 +120,10 @@ export type AtsDocumentBasics = {
   links?: string[];
 };
 
+/**
+ * A resume as structured data (`format: "ats-resume@1"`). The engine reads its fields directly
+ * (provenance `structured`) and scores a rendering of it with real section headings.
+ */
 export type AtsResumeDocument = {
   format: typeof ATS_DOCUMENT_FORMAT;
   basics: AtsDocumentBasics;

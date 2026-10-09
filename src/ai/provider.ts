@@ -15,6 +15,7 @@ export type AbortSignalLike = {
   removeEventListener(type: "abort", listener: () => void): void;
 };
 
+/** One turn of the conversation sent to the model. */
 export type LlmMessage = { role: "user" | "assistant"; content: string };
 
 /**
@@ -30,6 +31,7 @@ export type LlmOutputFormat = {
   mode: "json_schema" | "json_object";
 };
 
+/** One completion request, as a task builds it and an adapter sends it. */
 export type LlmRequest = {
   model: string;
   system: string;
@@ -54,6 +56,7 @@ export type LlmUsage = {
   cacheWriteTokens?: number;
 };
 
+/** What an adapter reports back: the text, the provider's response id, usage, why it stopped. */
 export type LlmResponse = {
   text: string;
   id?: string;
@@ -62,6 +65,10 @@ export type LlmResponse = {
   finish: "stop" | "length" | "refusal" | "other";
 };
 
+/**
+ * The whole contract a model provider implements: one non-streaming completion that returns
+ * text. `openAiCompatible` and `anthropic` implement it; write your own for any other service.
+ */
 export interface LlmProvider {
   complete(request: LlmRequest): Promise<LlmResponse>;
 }

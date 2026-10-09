@@ -14,6 +14,7 @@ import type { AtsLanguagePackInput } from "../schema.js";
  */
 const compound = (stem: string) => String.raw`\p{L}{0,30}${stem}`;
 
+/** The German language pack: recognised by its function words; region DE by default. */
 export const de: AtsLanguagePackInput = {
   id: "de",
   name: "Deutsch",

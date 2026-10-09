@@ -56,6 +56,7 @@ export const atsEngineSchema = z.object({
   locales: localesSchema,
 });
 
+/** One rule of a validated policy: what it reads, what it weighs, and what it says. */
 export type AtsEngineRule = z.infer<typeof ruleSchema>;
 /** A validated policy, with every default applied. What the engine reads. */
 export type AtsEnginePolicy = z.infer<typeof atsEngineSchema>;

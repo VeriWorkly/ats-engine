@@ -23,9 +23,9 @@ body:
       description: The command you ran, or the smallest code that shows the problem.
       render: ts
       placeholder: |
-        import { AtsScoringService, DEFAULT_POLICY } from "@veriworkly/ats-engine";
+        import { check } from "@veriworkly/ats-engine";
 
-        AtsScoringService.check("...", DEFAULT_POLICY);
+        check("...");
     validations:
       required: true
 
@@ -42,11 +42,16 @@ body:
       label: Part of the package
       options:
         - Scoring or parsing (@veriworkly/ats-engine)
-        - PDF or DOCX extraction (/node)
+        - Advice (file, age or ATS notes)
+        - Structured documents or JSON Resume (/document)
+        - Display helpers (/format)
+        - PDF or DOCX extraction, or reading files (/node)
         - Job postings (/job)
         - Languages and regions (/locales)
         - AI tasks or a provider adapter (/ai)
         - CLI
+        - MCP server (@veriworkly/ats-engine-mcp)
+        - GitHub Action
         - Types, exports or packaging
         - Not sure
     validations:
@@ -64,7 +69,7 @@ body:
     attributes:
       label: Engine version
       description: Run `npx @veriworkly/ats-engine --version`, or read `ENGINE_VERSION`.
-      placeholder: "0.1.2"
+      placeholder: "0.3.0"
     validations:
       required: true
 

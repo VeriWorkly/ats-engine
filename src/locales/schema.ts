@@ -216,9 +216,13 @@ export const regionPackSchema = z.object({
   ),
 });
 
+/** A validated language pack, defaults applied. See LOCALES.md. */
 export type AtsLanguagePack = z.output<typeof languagePackSchema>;
+/** A language pack as written: fields with defaults may be left out. */
 export type AtsLanguagePackInput = z.input<typeof languagePackSchema>;
+/** A validated region pack, defaults applied. See LOCALES.md. */
 export type AtsRegionPack = z.output<typeof regionPackSchema>;
+/** A region pack as written: fields with defaults may be left out. */
 export type AtsRegionPackInput = z.input<typeof regionPackSchema>;
 /** The vocabulary fields both kinds of pack carry. */
 export type AtsVocabulary = Pick<AtsLanguagePack, keyof typeof vocabularyShape>;

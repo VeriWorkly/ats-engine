@@ -54,7 +54,11 @@ export type AtsCheckOptions = {
    * `extractJobPosting`). Every word of it is left out of the job-match keywords.
    */
   jobCompany?: string;
-  /** Page geometry from a file upload. Absent for text and documents; layout rules then drop out. */
+  /**
+   * Layout signals from a file upload (`extractResume`): page geometry, hidden text, and what the
+   * file advice reads (an encrypted PDF, a Word document's tracked changes and comments). Absent
+   * for pasted text and structured documents; the layout rules then drop out.
+   */
   layout?: AtsLayoutSignals;
   /**
    * The reference date for the tenure of a current role and for the plausible-year ceiling.
@@ -69,7 +73,8 @@ export type AtsCheckOptions = {
   includeLines?: boolean;
   /**
    * What the host knows of the uploaded file — its name, size, format, a password, tracked
-   * changes — for the file advice in `report.advice`. Never scored. Absent for pasted text.
+   * changes, comments — for the file advice in `report.advice`. Never scored. Absent for pasted
+   * text.
    */
   file?: AtsFileInfo;
   /**
@@ -81,6 +86,7 @@ export type AtsCheckOptions = {
   targetAts?: string;
 } & AtsLocaleOptions;
 
+/** The scorer behind `check`. `AtsScoringService.check` gives the same report, until 1.0. */
 export class AtsScoringService {
   /**
    * Scores a resume against a policy.

@@ -30,6 +30,7 @@ const TAG = /[\u{E0000}-\u{E007F}]/gu;
 const STRIP =
   /[\u{00AD}\u{200B}\u{2060}-\u{2064}\u{202A}-\u{202E}\u{2066}-\u{2069}\u{E0000}-\u{E007F}]|(?<=\p{Script=Latin})[\u{200C}\u{200D}]+(?=\p{Script=Latin})|(?<!^)\u{FEFF}/gu;
 
+/** Invisible characters found in a resume's raw text, before they are stripped. */
 export type HiddenCharacters = {
   /** Invisible characters that do nothing a reader can see. */
   count: number;

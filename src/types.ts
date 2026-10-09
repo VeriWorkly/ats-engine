@@ -7,14 +7,23 @@ import type { AtsParsedResume } from "./types/parsed.js";
 export type * from "./types/layout.js";
 export type * from "./types/parsed.js";
 
+/** How much a failed rule matters to an ATS, as the rubric states it. */
 export type AtsSeverity = "info" | "warning" | "error";
 
+/** One rule as it applied to this resume: whether it passed, what was found, and what to do. */
 export type AtsRuleResult = {
+  /** The rule's id in the policy: "ats-v2.writing.tense". */
   id: string;
+  /**
+   * In the community policy "parse", "contact", "structure", "content", "format", "writing" or
+   * "integrity".
+   */
   category: string;
   severity: AtsSeverity;
   passed: boolean;
+  /** What was found, quoted where it can be: "1 bullet speaks in the first person, such as …". */
   evidence: string;
+  /** The weight the rule cost here (for an integrity rule, the points deducted); 0 when passed. */
   scoreImpact: number;
   fix: string;
 };
@@ -55,14 +64,17 @@ export type AtsRequirement = {
   detail?: string;
 };
 
-/** Posting terms by kind: hard skills and every other word, then soft skills. */
+/**
+ * Posting terms by kind: `hard` holds named skills and every other word, `soft` the policy's soft
+ * skills (`keywordMatch.softSkills`).
+ */
 export type AtsKeywordGroups = { hard: string[]; soft: string[] };
 
 /**
  * Something worth knowing that is not scored: about the file (its name, size, a password, tracked
- * changes left in), about details that can invite age bias where the region pack says so, and
- * about a target ATS the caller named. Never part of the readiness score, the categories, the
- * failed checks or the fixes. The text comes from the policy (`advice`).
+ * changes or comments left in), about details that can invite age bias where the region pack
+ * says so, and about a target ATS the caller named. Never part of the readiness score, the
+ * categories, the failed checks or the fixes. The text comes from the policy (`advice`).
  */
 export type AtsAdvice = {
   /** "file.name", "age.graduationYear", "ats.greenhouse.parseSize", … */
@@ -92,6 +104,11 @@ export type AtsFileInfo = {
   comments?: boolean;
 };
 
+/**
+ * What `check` returns: the readiness score and the rules behind it, the fields an ATS would store,
+ * the job match when a posting was given, and advice that is never scored. A pure function of the
+ * resume, the policy and the options (`now` included); `engine` names what produced it.
+ */
 export type AtsReport = {
   /** The scoring policy's declared `version` ("ats-v2" for the community policy). */
   version: string;
