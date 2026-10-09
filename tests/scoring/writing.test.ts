@@ -206,7 +206,9 @@ describe("bullet length and count", () => {
     );
     expect(LONG.split(" ").length).toBeGreaterThan(40);
     expect(found).toMatchObject({ passed: false, scoreImpact: 1 });
-    expect(found?.evidence).toBe(`1 bullet runs past two lines, such as "${LONG.slice(0, 80)}".`);
+    expect(found?.evidence).toBe(
+      '1 bullet runs past two lines, such as "Coordinated the migration of every payment service, every reporting job and…".',
+    );
   });
 
   it("flags a role with one bullet and a role with nine", () => {

@@ -57,3 +57,31 @@ describe("a role header with its location", () => {
     expect(roles.map((role) => role.employer)).not.toContain("the ledger service");
   });
 });
+
+describe("an employer whose name holds an employer word", () => {
+  it.each([
+    [
+      "Teaching Assistant, The University of Texas at Austin",
+      "Teaching Assistant",
+      "The University of Texas at Austin",
+    ],
+    [
+      "Research Assistant, University of Michigan at Ann Arbor",
+      "Research Assistant",
+      "University of Michigan at Ann Arbor",
+    ],
+  ])("keeps %j whole", (header, title, employer) => {
+    expect(roleOf(header)).toMatchObject({ title, employer });
+  });
+
+  it("still splits a title from its employer at the word", () => {
+    expect(roleOf("Research Assistant at University of Michigan")).toMatchObject({
+      title: "Research Assistant",
+      employer: "University of Michigan",
+    });
+    expect(roleOf("Senior Engineer at Acme Corporation")).toMatchObject({
+      title: "Senior Engineer",
+      employer: "Acme Corporation",
+    });
+  });
+});

@@ -145,6 +145,20 @@ const parsedResume = z.looseObject({
   roles: z.array(z.looseObject({ title: z.string(), employer: z.string() })),
   education: z.array(z.looseObject({ school: z.string(), credential: z.string() })),
   skills: z.array(z.string()),
+  certifications: z.array(
+    z
+      .looseObject({ name: z.string(), issuer: z.string() })
+      .describe("A certification or licence, with when it was earned and when it expires."),
+  ),
+  spokenLanguages: z.array(
+    z
+      .looseObject({
+        language: z.string(),
+        level: z.string(),
+        cefr: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]).nullable(),
+      })
+      .describe("A language the candidate speaks, with its level as written and on the CEFR."),
+  ),
   monthsOfExperience: z.number().nullable(),
 });
 

@@ -7,7 +7,9 @@ import type { AtsReport, AtsRequirement, AtsRubricEntry, AtsVerdict } from "@ver
 import {
   adviceLabel,
   categoryLabel,
+  formatCertification,
   formatRoleDates,
+  formatSpokenLanguage,
   formatTenure,
 } from "@veriworkly/ats-engine/format";
 
@@ -80,6 +82,10 @@ export function renderCheck(report: AtsReport, verdict: AtsVerdict, withJob: boo
   if (parsed.monthsOfExperience)
     lines.push(`- Experience: ${formatTenure(parsed.monthsOfExperience)}`);
   if (parsed.skills.length) lines.push(`- Skills: ${parsed.skills.join(", ")}`);
+  for (const row of parsed.certifications)
+    lines.push(`- Certification: ${formatCertification(row)}`);
+  if (parsed.spokenLanguages.length)
+    lines.push(`- Speaks: ${parsed.spokenLanguages.map(formatSpokenLanguage).join(", ")}`);
 
   // Apart from the score, and said to be: none of it changes a number above.
   if (report.advice.length) {

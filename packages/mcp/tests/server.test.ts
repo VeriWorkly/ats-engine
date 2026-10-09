@@ -318,3 +318,24 @@ describe("registry metadata", () => {
     expect(server.description.length).toBeLessThanOrEqual(100);
   });
 });
+
+describe("certifications and spoken languages", () => {
+  it("reads them out in the text and returns them in the structured result", async () => {
+    const resume = [
+      ...RESUME,
+      "",
+      "Certifications",
+      "AWS Certified Solutions Architect – Associate, Amazon Web Services, 2023",
+      "",
+      "Languages",
+      "English (native), German (B2)",
+    ].join("\n");
+    const result = await call("check_resume", { text: resume });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain("- Certification: AWS Certified Solutions Architect");
+    expect(textOf(result)).toMatch(/- Speaks: English.*German/);
+    const parsed = (result.structuredContent as { parsed: Record<string, unknown[]> }).parsed;
+    expect(parsed.certifications).toHaveLength(1);
+    expect(parsed.spokenLanguages).toHaveLength(2);
+  });
+});
