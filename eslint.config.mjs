@@ -3,7 +3,16 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // .claude/ and .agents/ hold local agent files and worktrees, gitignored like dist/.
-  { ignores: ["dist/**", "coverage/**", "node_modules/**", ".claude/**", ".agents/**"] },
+  {
+    ignores: [
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      "packages/*/dist/**",
+      ".claude/**",
+      ".agents/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

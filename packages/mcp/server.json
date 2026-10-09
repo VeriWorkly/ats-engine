@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.veriworkly/ats-engine",
+  "title": "ATS Engine",
+  "description": "Read your own resume the way an ATS does and score it with a published, deterministic rubric.",
+  "repository": {
+    "url": "https://github.com/VeriWorkly/ats-engine",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "websiteUrl": "https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme",
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@veriworkly/ats-engine-mcp",
+      "version": "0.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

@@ -23,9 +23,11 @@ const BUDGETS = {
   // 17: reading order by geometry, DOCX headers, footers, styles and links, and the PDF link
   // annotations (0.2) took it from 9.7 to 14.0; list-bullet and tab-stop checks, hidden text in
   // DOCX headers, soft masks and HTML resumes, and encoding repair (0.2) to 16.0.
-  // 18: ruled tables found in the page's own drawing, filled CSS borders included (tables.ts,
-  // about 1.2 of it), took it to 17.3.
-  "./node": 18,
+  // 19.5: ruled tables found in the page's own drawing, filled CSS borders included (tables.ts,
+  // 1.3), and reading a resume or a posting from a path (`readResumeFile`, `readJobFile`, shared
+  // by the CLI and the MCP server, which validate a .json resume with `/document`'s guards, 1.6),
+  // took it to 18.9 (0.2).
+  "./node": 19.5,
 };
 
 let failed = false;

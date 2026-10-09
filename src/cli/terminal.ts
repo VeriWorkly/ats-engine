@@ -54,23 +54,8 @@ export function detectTerminal(stream: OutputStream, env: Env): Terminal {
   };
 }
 
-/**
- * Control characters, which text from a resume, a posting or a model can carry: an escape
- * sequence printed raw recolours the terminal, clears it, or sets its title. Line breaks and tabs
- * stay.
- */
-const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g; // eslint-disable-line no-control-regex
-
-/** Every string in `value` made safe to print, at any depth. */
-export function printable<T>(value: T): T {
-  if (typeof value === "string") return value.replace(CONTROLS, "") as T;
-  if (Array.isArray(value)) return value.map(printable) as T;
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value).map(([key, child]) => [key, printable(child)]),
-    ) as T;
-  return value;
-}
+/** Shared with the MCP server, which prints into a terminal too; it lives in `/format`. */
+export { printable } from "../format/index.js";
 
 export type Style = Record<
   "bold" | "dim" | "red" | "green" | "yellow" | "accent",

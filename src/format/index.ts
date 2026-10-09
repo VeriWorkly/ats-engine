@@ -128,3 +128,24 @@ export const ISCED_LABELS: Readonly<Record<AtsIscedLevel, string>> = {
   7: "Master's or equivalent",
   8: "Doctorate",
 };
+
+/**
+ * Control characters, which text from a resume, a posting or a model can carry: an escape
+ * sequence printed raw recolours the terminal, clears it, or sets its title. Line breaks and tabs
+ * stay.
+ */
+const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g; // eslint-disable-line no-control-regex
+
+/**
+ * Every string in `value`, at any depth, made safe to print in a terminal: control characters
+ * removed. JSON escapes C0 controls but not C1 (U+0080–U+009F), which a terminal still acts on.
+ */
+export function printable<T>(value: T): T {
+  if (typeof value === "string") return value.replace(CONTROLS, "") as T;
+  if (Array.isArray(value)) return value.map(printable) as T;
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([key, child]) => [key, printable(child)]),
+    ) as T;
+  return value;
+}

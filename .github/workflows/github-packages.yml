@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to publish, e.g. v0.1.0"
+        description: "Release tag to publish, e.g. @veriworkly/ats-engine@0.2.0 (v0.1.x before the workspace)"
         required: true
 
 permissions:

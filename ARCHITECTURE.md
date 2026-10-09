@@ -77,6 +77,14 @@ files and the labelled corpus, and `timing.ts` has `expectFast`, which time budg
 busy machine cannot fail a test. Two long extraction tests in `review-node.test.ts` still time a
 single run against a 15 s budget.
 
+`node/files` reads a resume or a posting from a path (`readResumeFile`, `readJobFile`) with the
+limits and messages the CLI and the MCP server share; `printable` in `/format` strips control
+characters from what either prints. `packages/mcp/` is a separate npm workspace,
+`@veriworkly/ats-engine-mcp`: an MCP server over the public entry points, with tests in
+`packages/mcp/tests/` that spawn the built server. The root is a workspace too
+(`"workspaces": [".", "packages/*"]`), so the server links the local engine and changesets
+versions both packages.
+
 ## Dependencies
 
 No import cycles, value or type. Value closure per entry (internal modules / runtime externals):
@@ -90,7 +98,7 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 | `/locales`                                              |      22 | zod, libphonenumber-js                                   |
 | `/ai`                                                   |      41 | zod, libphonenumber-js                                   |
 | `/ai/openai-compatible`, `/ai/anthropic`, `/ai/testing` |     4–5 | none                                                     |
-| `/node`                                                 |      12 | node:\*, pdfjs-dist, pdf-parse, mammoth (optional peers) |
+| `/node`                                                 |      18 | node:\*, pdfjs-dist, pdf-parse, mammoth (optional peers) |
 
 Bundle budgets per subpath are enforced by `npm run size`; `npm run smoke` bundles every
 runtime-agnostic subpath for the browser and runs the core in a bare V8 context (edge).

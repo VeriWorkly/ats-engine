@@ -7,12 +7,9 @@
  * score never depends on it.
  */
 
-import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
 import { parseArgs } from "node:util";
 
 import type { FetchLike } from "../ai/http.js";
-import { isJsonResume, isResumeDocument } from "../document/index.js";
 import { categoryLabel, formatRoleDates, formatTenure, scoreTone } from "../format/index.js";
 import {
   AtsScoringService,
@@ -22,12 +19,16 @@ import {
   prepareResume,
   type AtsReport,
   type AtsRequirement,
-  type AtsResumeInput,
   type AtsSeverity,
 } from "../index.js";
-import { jobTextFromHtml, normalizeJobText } from "../job/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../locales/index.js";
-import { detectResumeFormat, extractResume, type AtsExtraction } from "../node/extract.js";
+import {
+  AtsFileError,
+  parseJsonFile,
+  readFileBytes,
+  readJobFile,
+  readResumeFile,
+} from "../node/files.js";
 import { ENGINE_VERSION } from "../version.js";
 import {
   aiJson,
@@ -100,64 +101,6 @@ export type CliContext = {
 
 function defaultContext(): CliContext {
   return { terminal: detectTerminal(process.stdout, process.env), env: process.env };
-}
-
-/** A file's bytes, with the two usual mistakes named plainly. */
-async function readBytes(path: string): Promise<Buffer> {
-  try {
-    return await readFile(path);
-  } catch (error) {
-    const code = (error as { code?: string }).code;
-    if (code === "ENOENT") throw new UsageError(`No such file: ${path}`);
-    if (code === "EISDIR") throw new UsageError(`${path} is a folder, not a file.`);
-    throw error;
-  }
-}
-
-/** A file's JSON, or a usage error naming the file. */
-function parseJson(data: Buffer, path: string): unknown {
-  try {
-    return JSON.parse(data.toString("utf8"));
-  } catch (error) {
-    throw new UsageError(`${path} is not valid JSON (${(error as Error).message}).`);
-  }
-}
-
-async function readResume(
-  path: string,
-): Promise<{ input: AtsResumeInput } & Partial<AtsExtraction>> {
-  const format = detectResumeFormat(path);
-  if (!format)
-    throw new UsageError(
-      `Unsupported resume file type "${extname(path) || path}". Use .pdf, .docx, .html, .txt, .md or .json.`,
-    );
-  const data = await readBytes(path);
-  if (extname(path).toLowerCase() === ".json") {
-    const input = parseJson(data, path);
-    if (!isResumeDocument(input) && !isJsonResume(input))
-      throw new UsageError(`${path} is neither a JSON Resume nor an ats-resume document.`);
-    return { input: input as AtsResumeInput };
-  }
-  const { text, layout } = await extractResume(data, format);
-  if (text.length < 50)
-    throw new UsageError(
-      format === "pdf"
-        ? "The PDF has no readable text layer (a scan or a flattened image). An ATS cannot read it either."
-        : "The file does not contain enough readable text.",
-    );
-  return { input: text, layout };
-}
-
-async function readJob(path: string): Promise<string> {
-  const data = await readBytes(path);
-  if (/\.html?$/i.test(path)) return jobTextFromHtml(data.toString("utf8"));
-  // A posting saved as a PDF or a Word file is read the way a resume is.
-  const format = detectResumeFormat(path);
-  const text =
-    format === "pdf" || format === "docx"
-      ? (await extractResume(data, format)).text
-      : data.toString("utf8");
-  return normalizeJobText(text);
 }
 
 function render(report: AtsReport, style: Style): string {
@@ -313,7 +256,7 @@ async function check(argv: string[], context: CliContext): Promise<number> {
   // The bundled language and region packs ride on whichever policy is used.
   const policy = withLocales(
     values.policy
-      ? parseAtsPolicy(parseJson(await readBytes(values.policy), values.policy))
+      ? parseAtsPolicy(parseJsonFile(await readFileBytes(values.policy), values.policy))
       : DEFAULT_POLICY,
     BUILT_IN_LOCALES,
   );
@@ -323,8 +266,8 @@ async function check(argv: string[], context: CliContext): Promise<number> {
 
   if (terminal.interactive && !values.json) console.log(banner(terminal));
 
-  const { input, layout } = await readResume(positionals[0]!);
-  const jobDescription = values.job ? await readJob(values.job) : undefined;
+  const { input, layout } = await readResumeFile(positionals[0]!);
+  const jobDescription = values.job ? await readJobFile(values.job) : undefined;
   const resume = prepareResume(input);
   const report = AtsScoringService.check(resume, policy, {
     jobDescription,
@@ -393,7 +336,8 @@ export async function main(argv: string[], context = defaultContext()): Promise<
     console.error(
       `ats-engine: ${printable(error instanceof Error ? error.message : String(error))}`,
     );
-    if (!(error instanceof UsageError) && context.env.DEBUG) console.error(error);
+    const usage = error instanceof UsageError || error instanceof AtsFileError;
+    if (!usage && context.env.DEBUG) console.error(error);
     return 1;
   }
 }

@@ -111,6 +111,16 @@ The CLI reads the API key from the environment, never from a flag, so it stays o
 
 Before the resume is sent, the CLI names the provider and host it is about to send to, and the candidate's name, email, phone number and links are replaced with placeholders. With `--json`, the analysis is added to the report as an `ai` field. If the provider call fails, the CLI still prints the report and exits with code 1, or 2 when the score is also below `--min-score`.
 
+## Use it from an AI assistant (MCP)
+
+[`@veriworkly/ats-engine-mcp`](https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme) is an MCP server for checking your own resume from Claude, Cursor, VS Code or any other MCP client. Its tools are `check_resume`, `match_job`, `explain_rule` and `extract_text`. It runs on your machine over stdio, makes no network requests and calls no model. The assistant explains the result, but the score still comes from the rubric.
+
+```sh
+claude mcp add ats-engine -- npx -y @veriworkly/ats-engine-mcp
+```
+
+The [package README](https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme) has setup for Claude Desktop, Cursor and VS Code.
+
 ## Use it in your app
 
 ### Score resume text
