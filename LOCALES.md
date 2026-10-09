@@ -88,7 +88,7 @@ Things to know:
 ## Testing a pack
 
 Add synthetic resumes to `tests/fixtures/locale-resumes.ts`, each with the fields an ATS should
-recover. Use invented people and companies, never a real person's resume. `tests/locales.test.ts`
+recover. Use invented people and companies, never a real person's resume. `tests/locales/locales.test.ts`
 then holds the set to:
 
 - the expected locale;

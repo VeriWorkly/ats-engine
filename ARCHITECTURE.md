@@ -69,13 +69,13 @@ Splitting those is welcome where a seam is clear.
 | `cli/`                   | `main` (`ats-engine check`, arguments, the text report), `terminal` (colour, banner, control-character stripping), `ai` (`--ai` provider presets over the two adapters), `usage`                                                                                                                                                  | bin                    |
 | `util/`                  | `memo`, `own` (own-property lookup), `hash`                                                                                                                                                                                                                                                                                       | internal               |
 
-Tests are named after the area they cover (`parser-fixes`, `matching-fixes`, `node-extract`,
-`requirements`, …). Older files named after a review or an audit (`audit-*`, `review-*`,
-`regressions`) hold one block per fixed defect, and are being folded into the area files.
-`tests/properties.test.ts` holds generated-input properties. `tests/fixtures/` builds PDFs, DOCX
-files and the labelled corpus, and `timing.ts` has `expectFast`, which time budgets use so a
-busy machine cannot fail a test. Two long extraction tests in `review-node.test.ts` still time a
-single run against a 15 s budget.
+Tests mirror `src/`: `tests/parser/`, `tests/matching/`, `tests/scoring/`, `tests/node/`,
+`tests/ai/`, `tests/cli/`, `tests/locales/` and so on, one folder per module, each file named
+for what it covers. `tests/integration/` holds what crosses modules: hostile input
+(`adversarial`), generated-input properties (`properties`), Unicode, and end-to-end regressions.
+`tests/fixtures/` builds PDFs, DOCX files and the labelled corpus; `timing.ts` has `expectFast`,
+which every time budget uses so a busy machine cannot fail a test. Work bounded by a count is
+tested by the count (`tests/node/visibility-budget.test.ts`), not the clock.
 
 `node/files` reads a resume or a posting from a path (`readResumeFile`, `readJobFile`) with the
 limits and messages the CLI and the MCP server share; `printable` in `/format` strips control

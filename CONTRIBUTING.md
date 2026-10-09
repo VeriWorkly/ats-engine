@@ -14,7 +14,10 @@ Node 20.19 or later. `npm run bench` prints field accuracy over the labelled cor
 ## The rules
 
 1. **A failing test first.** Every bug fix starts with a test that fails without it and stays as a
-   regression. Every behaviour change says, in the test, what it protects.
+   regression. Every behaviour change says, in the test, what it protects. Tests live in the
+   folder that mirrors the module they cover (`src/parser/` → `tests/parser/`), in a file named
+   for the behaviour, never for a review or a date; what crosses modules goes in
+   `tests/integration/`.
 2. **Language lives in data.** No month name, heading, title word or stopword in source: they
    belong in the policy (`src/policy/default/`) or a locale pack (`src/locales/packs/`). Policy
    patterns compile in Unicode mode; word lists go through `wordListPattern` (JS `\b` is
@@ -51,7 +54,7 @@ fixtures in `tests/fixtures/locale-resumes.ts` — invented people only.
 | A new kind of rule (a new metric)             | `src/policy/schema/rules.ts`, `src/scoring/rules.ts`, `src/scoring/context.ts`, `src/checks/`   | Ask in an issue first: a new metric changes the policy schema.                                                                                                                                 |
 | Job matching and requirement judgements       | `src/matching/`; vocabulary in `src/policy/default/keywordMatch.ts`                             |                                                                                                                                                                                                |
 | A language or a country                       | `src/locales/packs/`                                                                            | See [LOCALES.md](LOCALES.md).                                                                                                                                                                  |
-| An AI prompt                                  | The `DEFAULT_*_PROMPT` constants in `src/ai/tasks/`                                             | Changes every result's `promptVersion`. `tests/ai-prompts.test.ts` checks each prompt names its schema's keys; `npm run eval:live` measures quality against a real model and needs a paid key. |
+| An AI prompt                                  | The `DEFAULT_*_PROMPT` constants in `src/ai/tasks/`                                             | Changes every result's `promptVersion`. `tests/ai/prompts.test.ts` checks each prompt names its schema's keys; `npm run eval:live` measures quality against a real model and needs a paid key. |
 | What is kept from a model's answer            | `src/repair/grounding.ts`, `src/repair/merge.ts`                                                |                                                                                                                                                                                                |
 | PDF reading order, columns, hidden text       | `src/node/pdf.ts`, `src/node/lines.ts`, `src/node/layout.ts`, `src/node/hidden.ts`              | Build test PDFs in code with `tests/fixtures/buildPdf.ts`; never check in a real resume.                                                                                                       |
 | DOCX reading                                  | `src/node/docx.ts`, `src/node/extract.ts`                                                       | `tests/fixtures/buildDocx.ts` builds test files.                                                                                                                                               |

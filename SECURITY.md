@@ -18,9 +18,9 @@ file. These are the guarantees, each held by a test.
 **Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 50
 shapes (letter runs, digit runs, unclosed tags, comma lists, mixed scripts…), placed in the name
 line, a bullet and the posting at once, scores in tens of milliseconds under the community policy
-with every locale pack applied (`tests/adversarial.test.ts`, which fails past 1.5 s). Patterns in a _policy_ or a _pack_
+with every locale pack applied (`tests/integration/adversarial.test.ts`, which fails past 1.5 s). Patterns in a _policy_ or a _pack_
 are operator-supplied: `parseAtsPolicy` checks that they compile, not that they are linear, so
-review a policy's patterns as you would code — `tests/regressions.test.ts` re-runs the
+review a policy's patterns as you would code — `tests/integration/regressions.test.ts` re-runs the
 adversarial suite against a private policy when one is present.
 
 **Size.** Resume text is cut at 50 000 characters, postings at 20 000, a structured document is
