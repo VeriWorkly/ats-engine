@@ -17,7 +17,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     // Build scripts run on Node.
-    files: ["scripts/**/*.mjs", "*.mjs"],
+    files: ["scripts/**/*.mjs", "action/**/*.mjs", "*.mjs"],
     languageOptions: {
       globals: Object.fromEntries(
         ["process", "console", "TextEncoder", "TextDecoder", "URL"].map((name) => [

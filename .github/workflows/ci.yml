@@ -40,6 +40,28 @@ jobs:
       - run: npm test
       - run: npm pack --dry-run
 
+  action:
+    # The GitHub Action as a workflow uses it: the composite step, the published engine it pins.
+    name: GitHub Action on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - id: check
+        uses: ./action
+        with:
+          resume: action/test/resume.md
+          job: action/test/job.txt
+          min-score: "1"
+      - shell: bash
+        env:
+          SCORE: ${{ steps.check.outputs.score }}
+          REPORT: ${{ steps.check.outputs.report }}
+        run: test "$SCORE" -ge 1 && test -f "$REPORT"
+
   package:
     name: Bundle size, exports, browser and edge smoke, benchmark
     runs-on: ubuntu-latest

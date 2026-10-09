@@ -121,6 +121,30 @@ claude mcp add ats-engine -- npx -y @veriworkly/ats-engine-mcp
 
 The [package README](https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme) has setup for Claude Desktop, Cursor and VS Code.
 
+## Use it in GitHub Actions
+
+Keep your resume in a repository and check it on every push. The step fails when the score drops below `min-score`, and the report appears in the run's job summary.
+
+```yaml
+- uses: actions/checkout@v5
+- uses: VeriWorkly/ats-engine/action@main
+  with:
+    resume: resume.pdf
+    job: jobs/backend-engineer.txt # optional
+    min-score: 80 # optional
+```
+
+| Input       | What it does                                                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------------------------------- |
+| `resume`    | Path to the resume (required)                                                                                     |
+| `job`       | Path to a job posting to match against                                                                            |
+| `min-score` | Fail the step below this readiness score (0–100)                                                                  |
+| `region`    | Read the resume as from this country (`US`, `DE`, `IN`)                                                           |
+| `version`   | Engine version to run. Defaults to the release the action ships with, so your score only moves when you change it |
+| `summary`   | `false` to leave the job summary out                                                                              |
+
+Outputs: `score`, `job-match`, `failed-checks` (JSON) and `report` (the path of the full JSON report). Pin `@main` to a commit SHA if you want the action itself fixed too.
+
 ## Use it in your app
 
 ### Score resume text
