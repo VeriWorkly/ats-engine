@@ -72,7 +72,8 @@ export function parseEducation(
     const isSchool = schools.test(line);
     if (!degree && !isSchool) return;
 
-    const range = findDateRange(line, policy.resumeParse, now);
+    // A degree's end may be ahead of today: an expected graduation, up to a degree's length.
+    const range = findDateRange(line, policy.resumeParse, now, { aheadYears: DEGREE_YEARS });
 
     // The date range comes out before the institution is read, otherwise it rides along on the
     // end of the school name — an entry reading "University of California - 2014 - 2018" is not
@@ -118,6 +119,8 @@ export function parseEducation(
 }
 
 const YEAR = /(?<!\d)(?:19|20)\d{2}(?!\d)/g;
+/** How far ahead an expected graduation's short end year may run: "2023–27". */
+const DEGREE_YEARS = 6;
 
 /** The separators an education line's parts are printed between, kept by `split`. */
 // A dash's spaces are matched from the start of their run: from inside it, a long run of spaces
