@@ -24,7 +24,7 @@ inputs:
   version:
     description: Version of @veriworkly/ats-engine to run. Defaults to the engine release this action ships with, so a later release cannot change your score until you move to it.
     required: false
-    default: "0.3.0"
+    default: "0.3.1"
   ats:
     description: Name the ATS you are applying through (greenhouse, lever or taleo) to add its documented notes to the advice, which is never scored. Needs version 0.3.0 or later. Empty means none.
     required: false

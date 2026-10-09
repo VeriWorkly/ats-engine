@@ -3,6 +3,12 @@
 Release notes are generated from `.changeset/` by `changeset version`. See
 [.changeset/README.md](.changeset/README.md) for what counts as breaking.
 
+## 0.3.1
+
+### Patch Changes
+
+- 532d886: A spoken language marked only "limited" ("German (limited)", "limited proficiency") is read as A2. It had no level, so a requirement asking for a level treated it as unstated. "Limited working proficiency" stays B1.
+
 ## 0.3.0
 
 ### Minor Changes
