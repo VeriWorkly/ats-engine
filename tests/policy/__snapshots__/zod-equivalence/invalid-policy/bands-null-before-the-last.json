@@ -1,0 +1,24 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.bands.0.upTo",
+        "message": "Only the last band may have a null upper bound."
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "bands",
+        0,
+        "upTo"
+      ]
+    }
+  ]
+}

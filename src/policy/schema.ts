@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import { languagePackSchema, regionPackSchema } from "../locales/schema.js";
 import { adviceSchema } from "./schema/advice.js";
@@ -22,20 +22,20 @@ import { writingSchema } from "./schema/writing.js";
  * in effect for every resume; a language pack's vocabulary joins it only for resumes and postings
  * detected as written in that language, and one region pack applies per resume.
  */
-const localesSchema = z
-  .object({
-    languages: z.array(languagePackSchema).default([]),
-    regions: z.array(regionPackSchema).default([]),
-  })
-  .prefault({});
+const localesSchema = z.prefault(
+  z.object({
+    languages: z._default(z.array(languagePackSchema), []),
+    regions: z._default(z.array(regionPackSchema), []),
+  }),
+  {},
+);
 
 export const atsEngineSchema = z.object({
-  version: z.string().min(1),
+  version: z.string().check(z.minLength(1)),
   // Unique ids: a region pack adjusts rules by id, and would adjust every rule sharing one.
-  rules: z
-    .array(ruleSchema)
-    .min(1)
-    .superRefine((rules, ctx) => {
+  rules: z.array(ruleSchema).check(
+    z.minLength(1),
+    z.superRefine((rules, ctx) => {
       const seen = new Set<string>();
       rules.forEach((rule, index) => {
         if (seen.has(rule.id))
@@ -47,6 +47,7 @@ export const atsEngineSchema = z.object({
         seen.add(rule.id);
       });
     }),
+  ),
   keywordMatch: keywordMatchSchema,
   resumeParse: resumeParseSchema,
   text: engineTextSchema,

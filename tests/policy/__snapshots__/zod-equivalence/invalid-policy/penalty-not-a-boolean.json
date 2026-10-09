@@ -1,0 +1,23 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.penalty",
+        "message": "Invalid input: expected boolean, received string"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "boolean",
+      "code": "invalid_type",
+      "path": [
+        "rules",
+        0,
+        "penalty"
+      ]
+    }
+  ]
+}

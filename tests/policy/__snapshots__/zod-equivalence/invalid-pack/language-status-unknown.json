@@ -1,0 +1,26 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.languages.0.status",
+        "message": "Invalid option: expected one of \"verified\"|\"community\""
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "code": "invalid_value",
+        "values": [
+          "verified",
+          "community"
+        ],
+        "path": [
+          "status"
+        ]
+      }
+    ]
+  ]
+}

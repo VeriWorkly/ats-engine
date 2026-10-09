@@ -1,4 +1,5 @@
 import { normalizeText } from "../text/text.js";
+import { ENGLISH_ISSUES } from "../util/issues.js";
 import { AtsPolicyError } from "./errors.js";
 import { atsEngineSchema, type AtsEnginePolicy } from "./schema.js";
 
@@ -24,7 +25,7 @@ function normalizeStrings(value: unknown): unknown {
  * and when it changes — so this function does exactly what its signature says and nothing more.
  */
 export function parseAtsPolicy(json: unknown): AtsEnginePolicy {
-  const result = atsEngineSchema.safeParse(normalizeStrings(json));
+  const result = atsEngineSchema.safeParse(normalizeStrings(json), ENGLISH_ISSUES);
   if (result.success) return result.data;
 
   throw new AtsPolicyError(

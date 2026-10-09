@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { findGroundingViolations, type GroundingViolation } from "../../repair/grounding.js";

@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.languages.0.script",
+        "message": "\"Klingon\" is not a Unicode script name"
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "code": "custom",
+        "path": [
+          "script"
+        ]
+      }
+    ]
+  ]
+}

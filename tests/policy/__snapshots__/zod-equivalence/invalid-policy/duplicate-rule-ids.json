@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.1.id",
+        "message": "rule id \"ats-v2.contact.email\" is used by more than one rule"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        1,
+        "id"
+      ]
+    }
+  ]
+}

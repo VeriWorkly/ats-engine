@@ -1,7 +1,8 @@
-import type { z } from "zod";
+import type * as z from "zod/mini";
 
 import type { GroundingViolation } from "../repair/grounding.js";
 import { fnv1a } from "../util/hash.js";
+import { ENGLISH_ISSUES } from "../util/issues.js";
 import { AbortedError, type AbortSignalLike } from "./http.js";
 import {
   isRetryableStatus,
@@ -87,7 +88,7 @@ export type RunContext = {
 export type TaskSpec<Raw, Result> = {
   task: AtsAiTask;
   outputName: string;
-  schema: z.ZodType<Raw>;
+  schema: z.ZodMiniType<Raw>;
   /** `schema` as the strict JSON Schema sent to the model. */
   jsonSchema: Record<string, unknown>;
   defaultPrompt: string;
@@ -170,7 +171,7 @@ function unfence(text: string): string {
 }
 
 /** Parses one response. Throws an `AtsAiError` whose code says whether a retry can help. */
-function readReply<Raw>(response: LlmResponse, schema: z.ZodType<Raw>): Raw {
+function readReply<Raw>(response: LlmResponse, schema: z.ZodMiniType<Raw>): Raw {
   if (response.finish === "refusal") throw new AtsAiError("refused", "The model declined.");
   const truncated = response.finish === "length";
   if (!response.text.trim())
@@ -187,7 +188,7 @@ function readReply<Raw>(response: LlmResponse, schema: z.ZodType<Raw>): Raw {
       : new AtsAiError("invalid_output", "Response was not valid JSON.", { cause: error });
   }
 
-  const parsed = schema.safeParse(json);
+  const parsed = schema.safeParse(json, ENGLISH_ISSUES);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .slice(0, 5)

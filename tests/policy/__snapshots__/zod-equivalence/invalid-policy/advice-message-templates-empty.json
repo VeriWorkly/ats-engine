@@ -1,0 +1,73 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "advice.messages.fileName.message",
+        "message": "Too small: expected string to have >=1 characters"
+      },
+      {
+        "path": "advice.messages.fileName.evidence",
+        "message": "Too small: expected string to have >=1 characters"
+      },
+      {
+        "path": "advice.messages.fileName.fix",
+        "message": "Too small: expected string to have >=1 characters"
+      },
+      {
+        "path": "advice.messages.fileNameDraft",
+        "message": "Too small: expected string to have >=1 characters"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "string",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "advice",
+        "messages",
+        "fileName",
+        "message"
+      ]
+    },
+    {
+      "origin": "string",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "advice",
+        "messages",
+        "fileName",
+        "evidence"
+      ]
+    },
+    {
+      "origin": "string",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "advice",
+        "messages",
+        "fileName",
+        "fix"
+      ]
+    },
+    {
+      "origin": "string",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "advice",
+        "messages",
+        "fileNameDraft"
+      ]
+    }
+  ]
+}

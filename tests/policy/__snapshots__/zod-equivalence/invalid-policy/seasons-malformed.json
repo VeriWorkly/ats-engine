@@ -1,0 +1,40 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.seasons.spring",
+        "message": "Too small: expected array to have >=2 items"
+      },
+      {
+        "path": "resumeParse.seasons.fall",
+        "message": "Too big: expected array to have <=2 items"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "too_small",
+      "minimum": 2,
+      "inclusive": true,
+      "origin": "array",
+      "path": [
+        "resumeParse",
+        "seasons",
+        "spring"
+      ]
+    },
+    {
+      "code": "too_big",
+      "maximum": 2,
+      "inclusive": true,
+      "origin": "array",
+      "path": [
+        "resumeParse",
+        "seasons",
+        "fall"
+      ]
+    }
+  ]
+}

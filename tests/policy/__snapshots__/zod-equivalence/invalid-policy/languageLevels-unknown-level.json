@@ -1,0 +1,30 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.languageLevels.fluent",
+        "message": "Invalid option: expected one of \"A1\"|\"A2\"|\"B1\"|\"B2\"|\"C1\"|\"C2\""
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_value",
+      "values": [
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ],
+      "path": [
+        "resumeParse",
+        "languageLevels",
+        "fluent"
+      ]
+    }
+  ]
+}

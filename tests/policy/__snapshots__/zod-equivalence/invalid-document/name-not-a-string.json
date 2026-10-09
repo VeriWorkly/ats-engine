@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsInputError",
+    "message": "Resume document is invalid.",
+    "issues": [
+      {
+        "path": "basics.name",
+        "message": "Invalid input: expected string, received number"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "basics",
+        "name"
+      ]
+    }
+  ]
+}

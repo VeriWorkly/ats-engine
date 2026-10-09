@@ -1,0 +1,24 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.bands.1.upTo",
+        "message": "Band upper bounds must be strictly ascending."
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "bands",
+        1,
+        "upTo"
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import { regexString, wordList } from "../primitives.js";
 
@@ -13,25 +13,29 @@ import { regexString, wordList } from "../primitives.js";
 
 /** A message, what was found (quoted into `evidence`) and what to do, as templates. */
 const text = (message: string, evidence: string | undefined, fix: string) =>
-  z
-    .object({
-      message: z.string().min(1),
-      evidence: z.string().min(1).optional(),
-      fix: z.string().min(1),
-    })
-    .default(evidence === undefined ? { message, fix } : { message, evidence, fix });
+  z._default(
+    z.object({
+      message: z.string().check(z.minLength(1)),
+      evidence: z.optional(z.string().check(z.minLength(1))),
+      fix: z.string().check(z.minLength(1)),
+    }),
+    evidence === undefined ? { message, fix } : { message, evidence, fix },
+  );
 
 /**
  * One documented behaviour of a vendor's ATS. `source` is the vendor's own public page that says
  * so: a note nobody can check is not one to give.
  */
 const atsNote = z.object({
-  id: z.string().regex(/^[A-Za-z][\w-]*$/, "a note id: letters, digits, '-' or '_'"),
-  message: z.string().min(1),
-  source: z.string().regex(/^https:\/\/\S+$/, "an https URL"),
+  id: z.string().check(z.regex(/^[A-Za-z][\w-]*$/, "a note id: letters, digits, '-' or '_'")),
+  message: z.string().check(z.minLength(1)),
+  source: z.string().check(z.regex(/^https:\/\/\S+$/, "an https URL")),
 });
 
-const atsTarget = z.object({ name: z.string().min(1), notes: z.array(atsNote).min(1) });
+const atsTarget = z.object({
+  name: z.string().check(z.minLength(1)),
+  notes: z.array(atsNote).check(z.minLength(1)),
+});
 
 const GREENHOUSE_PARSE =
   "https://support.greenhouse.io/hc/en-us/articles/200989175-Unsuccessful-resume-parse";
@@ -91,16 +95,16 @@ const DEFAULT_TARGETS: Record<string, z.input<typeof atsTarget>> = {
   },
 };
 
-export const adviceSchema = z
-  .object({
-    file: z
-      .object({
+export const adviceSchema = z.prefault(
+  z.object({
+    file: z.prefault(
+      z.object({
         /**
          * Words that say nothing about whose resume a file is. A name made of these alone (and
          * digits) is flagged: "resume.pdf", "CV.docx", "Document1.docx", "scan0001.pdf". Matched
          * as whole words, with `_`, `-` and `.` read as spaces.
          */
-        genericNames: wordList("advice.file.genericNames").default([
+        genericNames: z._default(wordList("advice.file.genericNames"), [
           "resume",
           "résumé",
           "resumé",
@@ -121,7 +125,7 @@ export const adviceSchema = z
           String.raw`page\d*`,
         ]),
         /** Marks of a draft or a duplicate, flagged wherever they stand in the name. */
-        draftMarks: wordList("advice.file.draftMarks").default([
+        draftMarks: z._default(wordList("advice.file.draftMarks"), [
           "final",
           "draft",
           "copy",
@@ -138,53 +142,50 @@ export const adviceSchema = z
           String.raw`\(\d{1,3}\)`,
         ]),
         /** The name suggested instead; `{name}` is the candidate's, `{ext}` the extension. */
-        suggestedName: z.string().min(1).default("{name}-Resume{ext}"),
+        suggestedName: z._default(z.string().check(z.minLength(1)), "{name}-Resume{ext}"),
         /** `{name}` when the parser read none. */
-        placeholderName: z.string().min(1).default("Firstname-Lastname"),
+        placeholderName: z._default(z.string().check(z.minLength(1)), "Firstname-Lastname"),
         /** Over this many bytes the size is advised on: a common upload limit, not a universal one. */
-        maxBytes: z
-          .number()
-          .int()
-          .positive()
-          .default(2 * 1024 * 1024),
-      })
-      .prefault({}),
-    age: z
-      .object({
+        maxBytes: z._default(z.number().check(z.int(), z.gt(0)), 2 * 1024 * 1024),
+      }),
+      {},
+    ),
+    age: z.prefault(
+      z.object({
         /**
          * A graduation year more than this many years before the reference date is advised on.
          * Unset (the default) turns the advice off; a region pack sets it (`ageAdvice`).
          */
-        graduationYears: z.number().int().positive().optional(),
+        graduationYears: z.optional(z.number().check(z.int(), z.gt(0))),
         /** More than this many years of experience, stated or dated, is advised on. Unset: off. */
-        experienceYears: z.number().int().positive().optional(),
+        experienceYears: z.optional(z.number().check(z.int(), z.gt(0))),
         /**
          * A stated total: "30+ years of experience". The first capture group is the number of
          * years. Bounded repetition only: these run over the whole resume.
          */
-        experiencePatterns: z
-          .array(regexString("advice.age.experiencePatterns"))
-          .default([
-            String.raw`(?<!\p{N})(\d{1,2})\s?\+?\s?(?:years?|yrs\.?)['’]?\s(?:of\s)?(?:[\p{L}-]{1,30}\s){0,2}?experience`,
-          ]),
-      })
-      .prefault({}),
+        experiencePatterns: z._default(z.array(regexString("advice.age.experiencePatterns")), [
+          String.raw`(?<!\p{N})(\d{1,2})\s?\+?\s?(?:years?|yrs\.?)['’]?\s(?:of\s)?(?:[\p{L}-]{1,30}\s){0,2}?experience`,
+        ]),
+      }),
+      {},
+    ),
     /** Notes per target ATS, by the id a caller names (`targetAts`, `--ats`). */
-    targets: z
-      .record(z.string().regex(/^[a-z][a-z0-9-]*$/, "a lower-case id"), atsTarget)
-      .default(DEFAULT_TARGETS as Record<string, z.output<typeof atsTarget>>),
-    messages: z
-      .object({
+    targets: z._default(
+      z.record(z.string().check(z.regex(/^[a-z][a-z0-9-]*$/, "a lower-case id")), atsTarget),
+      DEFAULT_TARGETS as Record<string, z.output<typeof atsTarget>>,
+    ),
+    messages: z.prefault(
+      z.object({
         fileName: text(
           "The file name does not say whose resume it is, or reads as a draft. Recruiters see it in the ATS and in their downloads, beside everyone else's.",
           'The file is named "{name}".',
           "Name it {suggestion}.",
         ),
         /** For a name with draft marks: `{marks}` lists them, quoted. */
-        fileNameDraft: z
-          .string()
-          .min(1)
-          .default('The file is named "{name}", which reads as a draft: {marks}.'),
+        fileNameDraft: z._default(
+          z.string().check(z.minLength(1)),
+          'The file is named "{name}", which reads as a draft: {marks}.',
+        ),
         fileSize: text(
           "The file is larger than {limit}. Many ATS upload forms and parsers stop at about that size; it is a common limit, not a universal one.",
           "The file is {size}.",
@@ -216,8 +217,13 @@ export const adviceSchema = z
           'Show the last 15 years or so in detail, sum up earlier roles in a line without dates, and write "15+ years" rather than the full count.',
         ),
         /** For a total read from the dated roles rather than stated. */
-        experienceHistory: z.string().min(1).default("{n} years of work history are dated."),
-      })
-      .prefault({}),
-  })
-  .prefault({});
+        experienceHistory: z._default(
+          z.string().check(z.minLength(1)),
+          "{n} years of work history are dated.",
+        ),
+      }),
+      {},
+    ),
+  }),
+  {},
+);

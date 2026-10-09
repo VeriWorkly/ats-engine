@@ -1,0 +1,23 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "advice.age.experiencePatterns.0",
+        "message": "advice.age.experiencePatterns is not a valid regular expression in Unicode mode: Invalid regular expression: /(?<x/u: Invalid capture group name"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "advice",
+        "age",
+        "experiencePatterns",
+        0
+      ]
+    }
+  ]
+}

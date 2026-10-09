@@ -11,7 +11,7 @@ These hold everywhere, and each has a test:
   `report.engine = { version, policy fingerprint }`. `ENGINE_VERSION` equals package.json.
 - **No I/O, no global state in the core** (`src/` minus `node/`, `cli/`). Caches are `memo` — a
   WeakMap on the object the value is derived from. `/document`, `/format` and `/job` have no
-  dependencies; zod is internal and never exported as a value.
+  dependencies; zod (`zod/mini`) is internal and never exported as a value.
 - **Language is data.** Month names, headings, degrees, title and school words, stopwords, verbs
   and injection phrases live in the policy or a locale pack. Policy patterns compile in Unicode
   mode (`policyRegex`); word lists use `wordListPattern` (JS `\b` is ASCII-only). Text is
@@ -104,12 +104,12 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 | Entry                                                   | Modules | Externals                                                |
 | ------------------------------------------------------- | ------: | -------------------------------------------------------- |
-| `.`                                                     |      72 | zod, libphonenumber-js                                   |
+| `.`                                                     |      73 | zod/mini, libphonenumber-js                              |
 | `/document`                                             |       4 | none                                                     |
 | `/format`                                               |       2 | none                                                     |
 | `/job`                                                  |       3 | none                                                     |
-| `/locales`                                              |      24 | zod, libphonenumber-js                                   |
-| `/ai`                                                   |      46 | zod, libphonenumber-js                                   |
+| `/locales`                                              |      25 | zod/mini, libphonenumber-js                              |
+| `/ai`                                                   |      47 | zod/mini, libphonenumber-js                              |
 | `/ai/openai-compatible`, `/ai/anthropic`, `/ai/testing` |     4–5 | none                                                     |
 | `/node`                                                 |      18 | node:\*, pdfjs-dist, pdf-parse, mammoth (optional peers) |
 
@@ -128,6 +128,12 @@ runtime-agnostic subpath for the browser and runs the core in a bare V8 context 
 - **Policy types are inferred from zod.** `AtsEnginePolicy` is `z.infer` of the schema, so the
   published `.d.ts` references zod's types (zod is a dependency, `^4`). Hand-writing the types
   would duplicate the schema; revisit before 1.0 if a zod major changes them.
+- **Schemas use `zod/mini`.** Its functional API tree-shakes where full `zod`'s methods cannot,
+  which took 74–80 KB gzipped off each of `.`, `/locales` and `/ai` (`.`: 171.9 to 91.7 KB). It
+  ships no locale, so every `safeParse` whose issues reach a caller passes `ENGLISH_ISSUES`
+  (`util/issues.ts`): the messages are the ones `zod` gives, set per parse rather than in zod's
+  global config. `tests/policy/zod-equivalence.test.ts` holds parsed policies, issues and JSON
+  Schemas to what `zod` produced.
 - **One file per private policy.** Hosts load a policy from one path or one JSON value; the code
   is split by area, the data file is not.
 - **PDF text is assembled here**, not by pdf-parse, which loses the gap between a job title and

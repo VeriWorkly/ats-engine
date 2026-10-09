@@ -1,0 +1,25 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.phoneRegions.0",
+        "message": "a two-letter ISO 3166 country code"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "string",
+      "code": "invalid_format",
+      "format": "regex",
+      "pattern": "/^[A-Z]{2}$/",
+      "path": [
+        "resumeParse",
+        "phoneRegions",
+        0
+      ]
+    }
+  ]
+}

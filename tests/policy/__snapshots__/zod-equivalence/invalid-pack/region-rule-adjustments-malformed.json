@@ -1,0 +1,33 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.regions.0.rules.",
+        "message": "Invalid key in record"
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "code": "invalid_key",
+        "origin": "record",
+        "issues": [
+          {
+            "origin": "string",
+            "code": "too_small",
+            "minimum": 1,
+            "inclusive": true,
+            "path": []
+          }
+        ],
+        "path": [
+          "rules",
+          ""
+        ]
+      }
+    ]
+  ]
+}

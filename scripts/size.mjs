@@ -8,23 +8,17 @@ const { exports } = JSON.parse(readFileSync("package.json", "utf8"));
 
 /** Gzipped KB. */
 const BUDGETS = {
-  // 165: the October audit's vocabulary (headings, degrees, title and place words) filled 160;
-  // Markdown reading, role headers with a location and names left out of a posting's keywords
-  // (proseNames) took it to 160.2 (0.2). Most of the bundle is policy data, not code.
-  // 170: certifications and spoken languages read as rows (their parsers, CEFR level words and
-  // the requirement judging over them, 4.1) and the writing rules (their checks and word lists,
-  // 2.7) took it from 161.2 to 168.0 (0.3). zod is about half of the entry: zod/mini is the trim.
-  // 172: the advice, which is not scored (policy.advice: file-name words, every advice message and
-  // the sourced target-ATS notes, 2.3; the file, age and ATS checks, 1.0), took it to 171.3.
-  ".": 172,
+  // 95: zod/mini in place of zod (same schemas and messages) took it from 171.9 to 91.7.
+  ".": 95,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
   // optional end tags, a tag scan that skips scripts and comments, and hidden-element rules (0.2).
   "./job": 3.8,
-  "./locales": 145,
-  // 141: the policy schema it validates against gained `advice` (its defaults), 140.7.
-  "./ai": 141,
+  // 70: zod/mini in place of zod took it from 141.1 to 67.5.
+  "./locales": 70,
+  // 70: zod/mini in place of zod took it from 141.0 to 67.5.
+  "./ai": 70,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,

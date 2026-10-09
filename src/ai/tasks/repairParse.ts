@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { mergeGrounded, type AtsRepairCandidate } from "../../repair/merge.js";
@@ -7,18 +7,21 @@ import type { TaskSpec } from "../run.js";
 import { toStrictJsonSchema } from "../schema.js";
 import { flag, list, trimmedText } from "./fields.js";
 
-const repairedDate = z
-  .object({
-    year: z.number().int().min(1900).max(2100).nullable().optional(),
-    month: z.number().int().min(1).max(12).nullable().optional(),
-  })
-  .nullable()
-  .optional()
-  .transform((value) =>
+const repairedDate = z.pipe(
+  z.optional(
+    z.nullable(
+      z.object({
+        year: z.optional(z.nullable(z.number().check(z.int(), z.gte(1900), z.lte(2100)))),
+        month: z.optional(z.nullable(z.number().check(z.int(), z.gte(1), z.lte(12)))),
+      }),
+    ),
+  ),
+  z.transform((value) =>
     value && typeof value.year === "number"
       ? { year: value.year, month: typeof value.month === "number" ? value.month : null }
       : null,
-  );
+  ),
+);
 
 export const repairedResumeSchema = z.object({
   name: trimmedText(200),
@@ -39,7 +42,7 @@ export const repairedResumeSchema = z.object({
     20,
   ),
   skills: list(trimmedText(100), 60),
-}) satisfies z.ZodType<AtsRepairCandidate, unknown>;
+}) satisfies z.ZodMiniType<AtsRepairCandidate, unknown>;
 
 const jsonSchema = toStrictJsonSchema(repairedResumeSchema);
 

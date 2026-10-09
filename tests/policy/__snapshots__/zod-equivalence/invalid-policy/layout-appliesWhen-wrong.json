@@ -1,0 +1,25 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.appliesWhen",
+        "message": "Invalid input: expected \"layout\""
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_value",
+      "values": [
+        "layout"
+      ],
+      "path": [
+        "rules",
+        0,
+        "appliesWhen"
+      ]
+    }
+  ]
+}

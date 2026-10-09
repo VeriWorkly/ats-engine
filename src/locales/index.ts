@@ -9,7 +9,7 @@
  *
  * A pack is data — see LOCALES.md for writing one, and the JSON Schemas below for checking it.
  */
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import { de } from "./packs/de.js";
 import { hi } from "./packs/hi.js";

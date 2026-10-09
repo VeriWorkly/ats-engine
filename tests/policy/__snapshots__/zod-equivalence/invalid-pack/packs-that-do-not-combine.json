@@ -1,0 +1,16 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "Locale packs xx, XX combine with the policy into an invalid one.",
+    "issues": [
+      {
+        "path": "resumeParse.sections.experience",
+        "message": "sections.experience is not a valid regular expression in Unicode mode: Invalid regular expression: duplicate capture group name \"experience\""
+      }
+    ]
+  },
+  "raw": [
+    "success",
+    "success"
+  ]
+}

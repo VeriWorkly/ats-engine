@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 /**
  * Lenient field parsers for model output.
@@ -9,33 +9,26 @@ import { z } from "zod";
  */
 
 export const text = (maxLength: number) =>
-  z
-    .string()
-    .max(maxLength)
-    .nullable()
-    .optional()
-    .transform((value) => value ?? "");
+  z.pipe(
+    z.optional(z.nullable(z.string().check(z.maxLength(maxLength)))),
+    z.transform((value) => value ?? ""),
+  );
 
 export const trimmedText = (maxLength: number) =>
-  z
-    .string()
-    .max(maxLength)
-    .nullable()
-    .optional()
-    .transform((value) => value?.trim() ?? "");
+  z.pipe(
+    z.optional(z.nullable(z.string().check(z.maxLength(maxLength)))),
+    z.transform((value) => value?.trim() ?? ""),
+  );
 
-export const flag = z
-  .boolean()
-  .nullable()
-  .optional()
-  .transform((value) => value ?? false);
+export const flag = z.pipe(
+  z.optional(z.nullable(z.boolean())),
+  z.transform((value) => value ?? false),
+);
 
-export const list = <T extends z.ZodType>(item: T, maxItems: number) =>
-  z
-    .array(item)
-    .max(maxItems)
-    .nullable()
-    .optional()
-    .transform((value): z.output<T>[] => value ?? []);
+export const list = <T extends z.ZodMiniType>(item: T, maxItems: number) =>
+  z.pipe(
+    z.optional(z.nullable(z.array(item).check(z.maxLength(maxItems)))),
+    z.transform((value): z.output<T>[] => value ?? []),
+  );
 
 export const textList = (maxLength: number, maxItems: number) => list(text(maxLength), maxItems);

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import { wordListRegex } from "../text/text.js";
 import { policyRegex } from "./regex.js";
@@ -19,10 +19,9 @@ import { policyRegex } from "./regex.js";
  * calibration suite is for.
  */
 export const regexString = (label: string) =>
-  z
-    .string()
-    .min(1)
-    .superRefine((pattern, ctx) => {
+  z.string().check(
+    z.minLength(1),
+    z.superRefine((pattern, ctx) => {
       try {
         policyRegex(pattern);
       } catch (error) {
@@ -33,7 +32,8 @@ export const regexString = (label: string) =>
           }`,
         });
       }
-    });
+    }),
+  );
 
 /**
  * Regex flags, which `new RegExp` rejects just as loudly as a malformed pattern — an unknown
@@ -42,10 +42,8 @@ export const regexString = (label: string) =>
  * `y` (sticky) compiles but tests one position only — wherever the last match left off — so a
  * rule carrying it passes or fails at random rather than reading the text; it is refused.
  */
-export const regexFlags = z
-  .string()
-  .default("")
-  .superRefine((flags, ctx) => {
+export const regexFlags = z._default(z.string(), "").check(
+  z.superRefine((flags, ctx) => {
     try {
       new RegExp("", flags);
     } catch (error) {
@@ -62,7 +60,8 @@ export const regexFlags = z
         code: "custom",
         message: `flags "${flags}": the sticky flag "y" is not supported`,
       });
-  });
+  }),
+);
 
 /**
  * A rule's pattern compiled with the rule's own flags, as the scorer compiles it. Each is valid
@@ -71,7 +70,7 @@ export const regexFlags = z
  */
 export function checkPatternWithFlags(
   rule: { pattern?: string; flags: string },
-  ctx: z.RefinementCtx,
+  ctx: z.core.$RefinementCtx,
 ) {
   if (!rule.pattern) return;
   try {
@@ -97,10 +96,9 @@ export function checkPatternWithFlags(
  * thing that actually has to hold.
  */
 export const wordList = (label: string) =>
-  z
-    .array(z.string().min(1))
-    .min(1)
-    .superRefine((words, ctx) => {
+  z.array(z.string().check(z.minLength(1))).check(
+    z.minLength(1),
+    z.superRefine((words, ctx) => {
       try {
         wordListRegex(words);
       } catch (error) {
@@ -111,26 +109,27 @@ export const wordList = (label: string) =>
           }`,
         });
       }
-    });
+    }),
+  );
 
 /**
  * A word the matcher compares with lower-cased text: lower-cased here, so "Event Sourcing" in a
  * policy matches as written, and never empty, since "" matches everywhere.
  */
-export const term = z
-  .string()
-  .min(1)
-  .transform((value) => value.toLowerCase());
+export const term = z.pipe(
+  z.string().check(z.minLength(1)),
+  z.transform((value) => value.toLowerCase()),
+);
 
 /** Credential patterns keyed by ISCED 2011 level; see `resumeParse.degrees`. */
 export const iscedDegrees = z.object({
-  "2": regexString("degrees.2").optional(),
-  "3": regexString("degrees.3").optional(),
-  "4": regexString("degrees.4").optional(),
-  "5": regexString("degrees.5").optional(),
-  "6": regexString("degrees.6").optional(),
-  "7": regexString("degrees.7").optional(),
-  "8": regexString("degrees.8").optional(),
+  "2": z.optional(regexString("degrees.2")),
+  "3": z.optional(regexString("degrees.3")),
+  "4": z.optional(regexString("degrees.4")),
+  "5": z.optional(regexString("degrees.5")),
+  "6": z.optional(regexString("degrees.6")),
+  "7": z.optional(regexString("degrees.7")),
+  "8": z.optional(regexString("degrees.8")),
 });
 
 export type IscedDegrees = z.output<typeof iscedDegrees>;
@@ -143,24 +142,26 @@ export const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
  * a word list is, so they are checked the same way: the assembled pattern must compile.
  */
 export const cefrLevels = (label: string) =>
-  z.record(z.string().min(1), z.enum(CEFR_LEVELS)).superRefine((levels, ctx) => {
-    const words = Object.keys(levels);
-    if (!words.length) return;
-    try {
-      wordListRegex(words);
-    } catch (error) {
-      ctx.addIssue({
-        code: "custom",
-        message: `${label} does not assemble into a valid regular expression: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      });
-    }
-  });
+  z.record(z.string().check(z.minLength(1)), z.enum(CEFR_LEVELS)).check(
+    z.superRefine((levels, ctx) => {
+      const words = Object.keys(levels);
+      if (!words.length) return;
+      try {
+        wordListRegex(words);
+      } catch (error) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${label} does not assemble into a valid regular expression: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+    }),
+  );
 
 /** The words around a certification's dates and issuer; see `resumeParse.credentialWords`. */
 export const credentialWords = z.object({
-  issued: wordList("credentialWords.issued").default([
+  issued: z._default(wordList("credentialWords.issued"), [
     "issued",
     "obtained",
     "earned",
@@ -168,7 +169,7 @@ export const credentialWords = z.object({
     "achieved",
     "completed",
   ]),
-  expires: wordList("credentialWords.expires").default([
+  expires: z._default(wordList("credentialWords.expires"), [
     "expires",
     "expired",
     "expiry",
@@ -178,8 +179,8 @@ export const credentialWords = z.object({
     String.raw`valid\s+(?:until|through|thru|till|to)`,
     String.raw`renew(?:s|al)?(?:\s+due)?`,
   ]),
-  issuer: wordList("credentialWords.issuer").default([String.raw`issued\s+by`, "by", "from"]),
-  id: wordList("credentialWords.id").default([
+  issuer: z._default(wordList("credentialWords.issuer"), [String.raw`issued\s+by`, "by", "from"]),
+  id: z._default(wordList("credentialWords.id"), [
     String.raw`credential(?:\s+id)?`,
     String.raw`(?:certificate|licen[cs]e|registration)\s*(?:id|no\.?|number|#)`,
     "id",

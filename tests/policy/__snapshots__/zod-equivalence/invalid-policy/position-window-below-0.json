@@ -1,0 +1,25 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.windowFraction",
+        "message": "Too small: expected number to be >=0"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "number",
+      "code": "too_small",
+      "minimum": 0,
+      "inclusive": true,
+      "path": [
+        "rules",
+        0,
+        "windowFraction"
+      ]
+    }
+  ]
+}

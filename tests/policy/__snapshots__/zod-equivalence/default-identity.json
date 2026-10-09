@@ -1,0 +1,14 @@
+{
+  "openEnded": false,
+  "months": false,
+  "stemming": false,
+  "stemmingItem": true,
+  "qualifiersItem": true,
+  "bulletsPerRole": false,
+  "targets": false,
+  "targetsItem": true,
+  "messagesFileName": false,
+  "seasonsItem": true,
+  "text": false,
+  "inputUntouched": 873
+}

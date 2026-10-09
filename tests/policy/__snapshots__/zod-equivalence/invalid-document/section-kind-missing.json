@@ -1,0 +1,35 @@
+{
+  "error": {
+    "name": "AtsInputError",
+    "message": "Resume document is invalid.",
+    "issues": [
+      {
+        "path": "sections.0.kind",
+        "message": "Invalid discriminator value. Expected 'summary' | 'experience' | 'education' | 'projects' | 'skills' | 'certifications' | 'languages' | 'other'"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_union",
+      "errors": [],
+      "note": "No matching discriminator",
+      "discriminator": "kind",
+      "options": [
+        "summary",
+        "experience",
+        "education",
+        "projects",
+        "skills",
+        "certifications",
+        "languages",
+        "other"
+      ],
+      "path": [
+        "sections",
+        0,
+        "kind"
+      ]
+    }
+  ]
+}

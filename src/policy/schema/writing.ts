@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import { wordList } from "../primitives.js";
 
@@ -12,13 +12,13 @@ import { wordList } from "../primitives.js";
  * Every list is matched against whole words, case-insensitively; entries may be small patterns,
  * as in every other word list.
  */
-export const writingSchema = z
-  .object({
+export const writingSchema = z.prefault(
+  z.object({
     /**
      * A bullet speaking in the first person. "I" is not read before a dot or slash and a letter:
      * "i.e." and "I/O" are not pronouns. "us" is left out for "US".
      */
-    firstPersonPronouns: wordList("writing.firstPersonPronouns").default([
+    firstPersonPronouns: z._default(wordList("writing.firstPersonPronouns"), [
       String.raw`I(?![./&]\p{L})`,
       "me",
       "my",
@@ -30,7 +30,7 @@ export const writingSchema = z
       "ourselves",
     ]),
     /** An auxiliary that, followed by a participle, makes a clause passive. */
-    passiveAuxiliaries: wordList("writing.passiveAuxiliaries").default([
+    passiveAuxiliaries: z._default(wordList("writing.passiveAuxiliaries"), [
       "was",
       "were",
       "been",
@@ -42,11 +42,11 @@ export const writingSchema = z
      * Shapes of a regular past tense or past participle, matched against a whole word: "-ed",
      * with at least two letters before it ("used", not "red") and not "-eed" ("need", "speed").
      */
-    pastForms: wordList("writing.pastForms").default([String.raw`\p{L}{2,}(?<!e)ed`]),
+    pastForms: z._default(wordList("writing.pastForms"), [String.raw`\p{L}{2,}(?<!e)ed`]),
     /** A word that may stand between the auxiliary and the participle: "was quickly adopted". */
-    adverbForms: wordList("writing.adverbForms").default([String.raw`\p{L}{2,}ly`]),
+    adverbForms: z._default(wordList("writing.adverbForms"), [String.raw`\p{L}{2,}ly`]),
     /** Past participles that do not end in "-ed": "was built", "were led". */
-    irregularParticiples: wordList("writing.irregularParticiples").default([
+    irregularParticiples: z._default(wordList("writing.irregularParticiples"), [
       "built",
       "rebuilt",
       "led",
@@ -87,7 +87,7 @@ export const writingSchema = z
       "run",
     ]),
     /** Openings that state a duty rather than an action. Matched at the start of a bullet. */
-    weakOpeners: wordList("writing.weakOpeners").default([
+    weakOpeners: z._default(wordList("writing.weakOpeners"), [
       String.raw`responsible\s+for`,
       String.raw`duties\s+included`,
       String.raw`duties\s+include`,
@@ -102,7 +102,7 @@ export const writingSchema = z
      * Past tenses that do not end in "-ed", for a bullet's first word. Words that read as past
      * and present alike ("cut", "set", "read") are in neither list, so they are never judged.
      */
-    pastTenseVerbs: wordList("writing.pastTenseVerbs").default([
+    pastTenseVerbs: z._default(wordList("writing.pastTenseVerbs"), [
       "led",
       "built",
       "rebuilt",
@@ -145,7 +145,7 @@ export const writingSchema = z
      * Present tenses a bullet opens with: the base form and, where it is not as often a plural
      * noun ("reports", "tests"), the third person.
      */
-    presentTenseVerbs: wordList("writing.presentTenseVerbs").default([
+    presentTenseVerbs: z._default(wordList("writing.presentTenseVerbs"), [
       "lead",
       "leads",
       "manage",
@@ -241,14 +241,20 @@ export const writingSchema = z
       "supports",
     ]),
     /** A bullet longer than this many words runs past about two printed lines. */
-    maxBulletWords: z.number().int().positive().default(40),
+    maxBulletWords: z._default(z.number().check(z.int(), z.gt(0)), 40),
     /** A role with bullets should have this many; one with none is not counted. */
-    bulletsPerRole: z
-      .object({ min: z.number().int().nonnegative(), max: z.number().int().positive() })
-      .refine((range) => range.min <= range.max, { message: "min must not exceed max" })
-      .default({ min: 2, max: 8 }),
+    bulletsPerRole: z._default(
+      z
+        .object({
+          min: z.number().check(z.int(), z.gte(0)),
+          max: z.number().check(z.int(), z.gt(0)),
+        })
+        .check(z.refine((range) => range.min <= range.max, { message: "min must not exceed max" })),
+      { min: 2, max: 8 },
+    ),
     /** This many bullets in a row opening with the same word is a run. */
-    repeatedOpenerRun: z.number().int().min(2).default(3),
-  })
+    repeatedOpenerRun: z._default(z.number().check(z.int(), z.gte(2)), 3),
+  }),
   // `prefault`, as `text`: a policy written before these existed still parses, with the defaults.
-  .prefault({});
+  {},
+);

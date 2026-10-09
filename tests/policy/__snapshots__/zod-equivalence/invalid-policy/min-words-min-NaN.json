@@ -1,0 +1,24 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.min",
+        "message": "Invalid input: expected number, received NaN"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "number",
+      "code": "invalid_type",
+      "received": "NaN",
+      "path": [
+        "rules",
+        0,
+        "min"
+      ]
+    }
+  ]
+}

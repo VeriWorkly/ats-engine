@@ -1,0 +1,29 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.metric",
+        "message": "Invalid option: expected one of \"columnRatio\"|\"tableCount\"|\"imageCount\"|\"hiddenTextChars\"|\"imageOnlyPages\""
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_value",
+      "values": [
+        "columnRatio",
+        "tableCount",
+        "imageCount",
+        "hiddenTextChars",
+        "imageOnlyPages"
+      ],
+      "path": [
+        "rules",
+        0,
+        "metric"
+      ]
+    }
+  ]
+}

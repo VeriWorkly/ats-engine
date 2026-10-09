@@ -1,0 +1,25 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.bands.0.upTo",
+        "message": "Invalid input: expected number, received undefined"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "number",
+      "code": "invalid_type",
+      "path": [
+        "rules",
+        0,
+        "bands",
+        0,
+        "upTo"
+      ]
+    }
+  ]
+}

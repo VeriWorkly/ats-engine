@@ -1,0 +1,336 @@
+{
+  "empty object": {
+    "insightsSchema": {
+      "data": {
+        "explanation": "",
+        "missingEvidence": [],
+        "keywordOpportunities": [],
+        "recommendedImprovements": [],
+        "priorityOrder": []
+      }
+    },
+    "convertedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": [
+          "basics"
+        ]
+      }
+    ],
+    "repairedResumeSchema": {
+      "data": {
+        "name": "",
+        "email": "",
+        "phone": "",
+        "roles": [],
+        "education": [],
+        "skills": []
+      }
+    }
+  },
+  "valid for every task": {
+    "insightsSchema": {
+      "data": {
+        "explanation": "Solid.",
+        "missingEvidence": [
+          "metrics"
+        ],
+        "keywordOpportunities": [],
+        "recommendedImprovements": [],
+        "priorityOrder": []
+      }
+    },
+    "convertedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": [
+          "skills",
+          0
+        ]
+      },
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": [
+          "skills",
+          1
+        ]
+      }
+    ],
+    "repairedResumeSchema": {
+      "data": {
+        "name": "Jane Doe",
+        "email": "jane@example.com",
+        "phone": "",
+        "roles": [
+          {
+            "title": "Senior Engineer",
+            "employer": "Acme Corporation",
+            "start": {
+              "year": 2020,
+              "month": 1
+            },
+            "end": null,
+            "current": true
+          }
+        ],
+        "education": [
+          {
+            "school": "State University",
+            "credential": "BSc",
+            "end": {
+              "year": 2016,
+              "month": null
+            }
+          }
+        ],
+        "skills": [
+          "TypeScript",
+          ""
+        ]
+      }
+    }
+  },
+  "wrong types": {
+    "insightsSchema": [
+      {
+        "expected": "string",
+        "code": "invalid_type",
+        "path": [
+          "explanation"
+        ]
+      }
+    ],
+    "convertedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": [
+          "basics"
+        ]
+      },
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": [
+          "skills",
+          0
+        ]
+      }
+    ],
+    "repairedResumeSchema": [
+      {
+        "expected": "array",
+        "code": "invalid_type",
+        "path": [
+          "roles"
+        ]
+      },
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": [
+          "education",
+          0,
+          "end"
+        ]
+      },
+      {
+        "expected": "string",
+        "code": "invalid_type",
+        "path": [
+          "skills",
+          0
+        ]
+      }
+    ]
+  },
+  "over limits": {
+    "insightsSchema": [
+      {
+        "origin": "string",
+        "code": "too_big",
+        "maximum": 4000,
+        "inclusive": true,
+        "path": [
+          "explanation"
+        ]
+      },
+      {
+        "origin": "array",
+        "code": "too_big",
+        "maximum": 12,
+        "inclusive": true,
+        "path": [
+          "missingEvidence"
+        ]
+      }
+    ],
+    "convertedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": [
+          "basics"
+        ]
+      },
+      {
+        "origin": "string",
+        "code": "too_big",
+        "maximum": 100,
+        "inclusive": true,
+        "path": [
+          "links",
+          0,
+          "label"
+        ]
+      },
+      {
+        "origin": "string",
+        "code": "too_big",
+        "maximum": 4000,
+        "inclusive": true,
+        "path": [
+          "summary"
+        ]
+      }
+    ],
+    "repairedResumeSchema": [
+      {
+        "origin": "string",
+        "code": "too_big",
+        "maximum": 200,
+        "inclusive": true,
+        "path": [
+          "name"
+        ]
+      },
+      {
+        "origin": "array",
+        "code": "too_big",
+        "maximum": 30,
+        "inclusive": true,
+        "path": [
+          "roles"
+        ]
+      }
+    ]
+  },
+  "dates out of range": {
+    "insightsSchema": {
+      "data": {
+        "explanation": "",
+        "missingEvidence": [],
+        "keywordOpportunities": [],
+        "recommendedImprovements": [],
+        "priorityOrder": []
+      }
+    },
+    "convertedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": [
+          "basics"
+        ]
+      }
+    ],
+    "repairedResumeSchema": [
+      {
+        "origin": "number",
+        "code": "too_small",
+        "minimum": 1900,
+        "inclusive": true,
+        "path": [
+          "roles",
+          0,
+          "start",
+          "year"
+        ]
+      },
+      {
+        "origin": "number",
+        "code": "too_small",
+        "minimum": 1,
+        "inclusive": true,
+        "path": [
+          "roles",
+          0,
+          "start",
+          "month"
+        ]
+      },
+      {
+        "expected": "int",
+        "format": "safeint",
+        "code": "invalid_type",
+        "path": [
+          "roles",
+          0,
+          "end",
+          "year"
+        ]
+      },
+      {
+        "origin": "number",
+        "code": "too_big",
+        "maximum": 12,
+        "inclusive": true,
+        "path": [
+          "roles",
+          0,
+          "end",
+          "month"
+        ]
+      }
+    ]
+  },
+  "a JSON array": {
+    "insightsSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": []
+      }
+    ],
+    "convertedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": []
+      }
+    ],
+    "repairedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": []
+      }
+    ]
+  },
+  "null": {
+    "insightsSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": []
+      }
+    ],
+    "convertedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": []
+      }
+    ],
+    "repairedResumeSchema": [
+      {
+        "expected": "object",
+        "code": "invalid_type",
+        "path": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.pattern",
+        "message": "pattern is not a valid regular expression in Unicode mode: Invalid regular expression: /*/u: Nothing to repeat"
+      },
+      {
+        "path": "rules.0.pattern",
+        "message": "pattern is not a valid regular expression with flags \"\": Invalid regular expression: /*/u: Nothing to repeat"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "pattern"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "pattern"
+      ]
+    }
+  ]
+}

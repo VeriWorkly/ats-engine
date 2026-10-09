@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.regions.0.phoneCountry",
+        "message": "not a country libphonenumber supports"
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "code": "custom",
+        "path": [
+          "phoneCountry"
+        ]
+      }
+    ]
+  ]
+}

@@ -4,6 +4,7 @@ import { resumeDocumentSchema } from "./document/schema.js";
 import { DOCUMENT_LIMITS, isResumeDocument, type AtsResumeDocument } from "./document/types.js";
 import { readHiddenCharacters, type HiddenCharacters } from "./text/characters.js";
 import { cut, normalizeText } from "./text/text.js";
+import { ENGLISH_ISSUES } from "./util/issues.js";
 
 /**
  * What the engine accepts as a resume.
@@ -118,7 +119,7 @@ function isOversized(value: unknown): boolean {
 
 /** The document as the schema reads it, or `AtsInputError` naming the first issues. */
 function validDocument(input: unknown): AtsResumeDocument {
-  const result = resumeDocumentSchema.safeParse(input);
+  const result = resumeDocumentSchema.safeParse(input, ENGLISH_ISSUES);
   if (result.success) return result.data;
   throw new AtsInputError(
     "Resume document is invalid.",

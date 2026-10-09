@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.pattern",
+        "message": "pattern is not a valid regular expression with flags \"v\": Invalid regular expression: /[(]/v: Invalid character in character class"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "pattern"
+      ]
+    }
+  ]
+}

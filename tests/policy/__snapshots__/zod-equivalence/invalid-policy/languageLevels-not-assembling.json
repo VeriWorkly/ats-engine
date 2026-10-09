@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.languageLevels",
+        "message": "languageLevels does not assemble into a valid regular expression: Invalid regular expression: /(?<![\\p{L}\\p{M}\\p{N}_])(?:a))(?![\\p{L}\\p{M}\\p{N}_])/iu: Unmatched ')'"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "resumeParse",
+        "languageLevels"
+      ]
+    }
+  ]
+}

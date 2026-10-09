@@ -1,0 +1,24 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "text.language",
+        "message": "an ISO 639 language code"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "string",
+      "code": "invalid_format",
+      "format": "regex",
+      "pattern": "/^[a-z]{2,3}$/",
+      "path": [
+        "text",
+        "language"
+      ]
+    }
+  ]
+}

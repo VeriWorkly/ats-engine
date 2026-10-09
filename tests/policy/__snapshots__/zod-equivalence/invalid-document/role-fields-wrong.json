@@ -1,0 +1,70 @@
+{
+  "error": {
+    "name": "AtsInputError",
+    "message": "Resume document is invalid.",
+    "issues": [
+      {
+        "path": "sections.0.items.0.title",
+        "message": "Invalid input: expected string, received null"
+      },
+      {
+        "path": "sections.0.items.0.start",
+        "message": "Invalid input: expected string, received number"
+      },
+      {
+        "path": "sections.0.items.0.current",
+        "message": "Invalid input: expected boolean, received string"
+      },
+      {
+        "path": "sections.0.items.0.highlights",
+        "message": "Invalid input: expected array, received string"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "sections",
+        0,
+        "items",
+        0,
+        "title"
+      ]
+    },
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "sections",
+        0,
+        "items",
+        0,
+        "start"
+      ]
+    },
+    {
+      "expected": "boolean",
+      "code": "invalid_type",
+      "path": [
+        "sections",
+        0,
+        "items",
+        0,
+        "current"
+      ]
+    },
+    {
+      "expected": "array",
+      "code": "invalid_type",
+      "path": [
+        "sections",
+        0,
+        "items",
+        0,
+        "highlights"
+      ]
+    }
+  ]
+}

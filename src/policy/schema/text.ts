@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import { wordList } from "../primitives.js";
 
@@ -16,18 +16,18 @@ import { wordList } from "../primitives.js";
  * counted. The default below is the exact list this replaced, so a policy that does not mention
  * the field behaves identically to the code that came before it.
  */
-export const engineTextSchema = z
-  .object({
+export const engineTextSchema = z.prefault(
+  z.object({
     /**
      * The language this policy's own vocabulary is written in (ISO 639): what a resume is read as
      * when no attached language pack recognises it. A rule limited to some `languages` applies
      * only to a resume read in one of them.
      */
-    language: z
-      .string()
-      .regex(/^[a-z]{2,3}$/, "an ISO 639 language code")
-      .default("en"),
-    contentLineVerbs: wordList("text.contentLineVerbs").default([
+    language: z._default(
+      z.string().check(z.regex(/^[a-z]{2,3}$/, "an ISO 639 language code")),
+      "en",
+    ),
+    contentLineVerbs: z._default(wordList("text.contentLineVerbs"), [
       "managed",
       "led",
       "built",
@@ -55,7 +55,7 @@ export const engineTextSchema = z
      * extends it the way it extends every other word list. Regular past tenses need no entry:
      * see `actionVerbForms`.
      */
-    actionVerbs: wordList("text.actionVerbs").default([
+    actionVerbs: z._default(wordList("text.actionVerbs"), [
       "led",
       "lead",
       "leads",
@@ -342,18 +342,18 @@ export const engineTextSchema = z
      * in English, a regular past tense ("Shepherded", "Reorganized"). Matched against the whole
      * first word; "-eed" words ("Speed", "Need") are nouns as often as not and are left out.
      */
-    actionVerbForms: wordList("text.actionVerbForms").default([String.raw`\p{L}{3,}(?<!e)ed`]),
+    actionVerbForms: z._default(wordList("text.actionVerbForms"), [String.raw`\p{L}{3,}(?<!e)ed`]),
     /**
      * Whether an action verb counts anywhere in a line rather than only in its opening words.
      * Set for a verb-final language: in Hindi "टीम का नेतृत्व किया" the verb ends the bullet.
      */
-    actionVerbAnywhere: z.boolean().default(false),
+    actionVerbAnywhere: z._default(z.boolean(), false),
     /**
      * Instructions addressed to an AI screener rather than to a person. Patterns, so each can
      * cover its variants; a tool's name alone is never one ("Built with the ChatGPT API" is a
      * skill). Language packs add their own.
      */
-    injectionPhrases: wordList("text.injectionPhrases").default([
+    injectionPhrases: z._default(wordList("text.injectionPhrases"), [
       // Up to three determiners: "ignore all the previous", "disregard all of the above". Said
       // of a system an engineer built it is a description, not an instruction: "our model must
       // ignore previous instructions embedded in uploads", "taught the classifier to ignore
@@ -386,7 +386,8 @@ export const engineTextSchema = z
       // A markdown "### System Design" heading is not a prompt delimiter; "### System:" is.
       String.raw`<\|?(?:im_start|system|endoftext)\|?>|\[/?(?:inst|system)\]|###\s*(?:instructions?|system\s*:)`,
     ]),
-  })
+  }),
   // `prefault`, not `default`: zod 4's `default` returns the fallback as-is without parsing it,
   // which would hand the scorer `{}` and silently drop the verb list above.
-  .prefault({});
+  {},
+);

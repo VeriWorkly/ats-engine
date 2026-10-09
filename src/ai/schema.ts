@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 /**
  * The JSON Schema a task asks the model for, derived from the zod schema that parses the reply.
@@ -74,7 +74,7 @@ function tighten(input: Node): Node {
   return node;
 }
 
-export function toStrictJsonSchema(schema: z.ZodType): Record<string, unknown> {
+export function toStrictJsonSchema(schema: z.ZodMiniType): Record<string, unknown> {
   const generated = z.toJSONSchema(schema, { io: "input", unrepresentable: "any" }) as Node;
   delete generated.$schema;
   return tighten(generated);

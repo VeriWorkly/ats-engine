@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.synonyms",
+        "message": "Invalid input: expected record, received array"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "record",
+      "code": "invalid_type",
+      "path": [
+        "keywordMatch",
+        "synonyms"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.generalTermWeight",
+        "message": "Too big: expected number to be <=1"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "number",
+      "code": "too_big",
+      "maximum": 1,
+      "inclusive": true,
+      "path": [
+        "keywordMatch",
+        "generalTermWeight"
+      ]
+    }
+  ]
+}
