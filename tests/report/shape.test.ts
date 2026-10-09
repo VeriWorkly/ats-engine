@@ -9,6 +9,8 @@ function report(overrides: Partial<AtsReport> = {}): AtsReport {
     jobMatchScore: null,
     matchedKeywords: ["react"],
     missingKeywords: ["kubernetes"],
+    matchedKeywordGroups: { hard: ["react"], soft: [] },
+    missingKeywordGroups: { hard: ["kubernetes"], soft: [] },
     parsingWarnings: [],
     strengths: ["Email detected"],
     failedChecks: [],
@@ -100,6 +102,8 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
       "categories",
       "matchedKeywords",
       "missingKeywords",
+      "matchedKeywordGroups",
+      "missingKeywordGroups",
       "failedChecks",
       "prioritizedFixes",
       "strengths",
@@ -178,15 +182,19 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
     const shaped = shapeReport(
       report({
         matchedKeywords: ["react", "typescript", "graphql"],
-        missingKeywords: ["kubernetes", "terraform"],
+        missingKeywords: ["kubernetes", "terraform", "communication"],
+        matchedKeywordGroups: { hard: ["react", "typescript", "graphql"], soft: [] },
+        missingKeywordGroups: { hard: ["kubernetes", "terraform"], soft: ["communication"] },
       }),
       "restricted",
     );
 
     if (!shaped.restricted) throw new Error("expected a restricted report");
     expect(shaped.matchedKeywordCount).toBe(3);
-    expect(shaped.missingKeywordCount).toBe(2);
+    // The count is of the flat list, soft skills included; the groups are not split out.
+    expect(shaped.missingKeywordCount).toBe(3);
     expect(JSON.stringify(shaped)).not.toContain("kubernetes");
+    expect(JSON.stringify(shaped)).not.toContain("communication");
   });
 
   it("gives authenticated callers the full report untouched, flagged as unrestricted", () => {

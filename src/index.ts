@@ -25,6 +25,7 @@ export type {
   AtsCefrLevel,
   AtsDegreeLevel,
   AtsIscedLevel,
+  AtsKeywordGroups,
   AtsLayoutSignals,
   AtsParsedCertification,
   AtsParsedDate,

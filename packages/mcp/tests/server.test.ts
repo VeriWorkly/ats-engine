@@ -51,6 +51,7 @@ const JOB = [
   "- 3+ years of experience with TypeScript and Go",
   "- Experience running services on Kubernetes",
   "- Familiarity with Terraform",
+  "- Strong communication and teamwork",
   "Nice to have: Rust",
 ].join("\n");
 
@@ -115,6 +116,8 @@ function expectedCheck(report: AtsReport, withJob: boolean) {
               requirements: report.requirements,
               matchedKeywords: report.matchedKeywords,
               missingKeywords: report.missingKeywords,
+              matchedKeywordGroups: report.matchedKeywordGroups,
+              missingKeywordGroups: report.missingKeywordGroups,
             }
           : null,
       }),
@@ -186,10 +189,13 @@ describe("ats-engine-mcp over stdio", () => {
           jobMatchScore: report.jobMatchScore,
           requirements: report.requirements,
           missingKeywords: report.missingKeywords,
+          missingKeywordGroups: report.missingKeywordGroups,
         }),
       ),
     );
     expect(textOf(result)).toContain(`Job match: ${report.jobMatchScore}/100`);
+    expect(report.missingKeywordGroups.soft).toEqual(["communication", "teamwork"]);
+    expect(textOf(result)).toContain("Missing soft skills (weigh less): communication, teamwork");
   });
 
   it("extract_text gives the PDF's text in reading order and its measured layout", async () => {

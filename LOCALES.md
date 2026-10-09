@@ -91,6 +91,11 @@ Things to know:
   around a certification's dates and issuer (`issued`, `expires` such as "gültig bis", `issuer`,
   `id`). A language is recognised by `requirements.languageNames`, so a pack that adds level
   words for its language also names the languages in it ("Englisch").
+- **`softSkills`** lists the soft skills a posting in the language asks for ("Teamfähigkeit",
+  "नेतृत्व"), added to the policy's. The job match lists them apart from the hard skills
+  (`missingKeywordGroups.soft`) and weighs them by the policy's `softSkillWeight`. They are
+  folded as every keyword is, and a multi-word one ("समस्या समाधान") is matched as a phrase. Put
+  a language's word for "skills" in `stopwords`, as English does, so "संचार कौशल" asks for "संचार".
 
 ## Testing a pack
 

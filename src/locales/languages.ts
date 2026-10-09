@@ -79,6 +79,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       },
       alternationWords: union(km.alternationWords, v.alternationWords),
       stopwords: union(km.stopwords, v.stopwords),
+      softSkills: union(km.softSkills, v.softSkills),
       buzzwords: union(km.buzzwords, v.buzzwords),
       pluralSuffixes: union(km.pluralSuffixes, v.pluralSuffixes),
       nounsCapitalized: km.nounsCapitalized || Boolean(v.nounsCapitalized),

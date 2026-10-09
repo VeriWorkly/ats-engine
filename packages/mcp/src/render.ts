@@ -27,8 +27,9 @@ export function renderJobMatch(report: AtsReport): string[] {
     lines.push(`Requirements met: ${met} of ${report.requirements.length}`);
     lines.push(...report.requirements.map(requirementLine));
   }
-  if (report.missingKeywords.length)
-    lines.push(`Missing keywords: ${report.missingKeywords.join(", ")}`);
+  const { hard, soft } = report.missingKeywordGroups;
+  if (hard.length) lines.push(`Missing keywords: ${hard.join(", ")}`);
+  if (soft.length) lines.push(`Missing soft skills (weigh less): ${soft.join(", ")}`);
   return lines;
 }
 

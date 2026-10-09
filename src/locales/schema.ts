@@ -100,6 +100,11 @@ const vocabularyShape = {
     .optional(),
   alternationWords: optionalList("alternationWords"),
   stopwords: z.array(term).optional(),
+  /**
+   * Soft skills a posting asks for in the language ("Teamfähigkeit", "नेतृत्व"), added to
+   * `keywordMatch.softSkills`; a multi-word one is matched as a phrase.
+   */
+  softSkills: z.array(term).optional(),
   buzzwords: z.array(term).optional(),
   pluralSuffixes: optionalList("pluralSuffixes"),
   /** Set for a language that capitalises every noun; see `keywordMatch.nounsCapitalized`. */

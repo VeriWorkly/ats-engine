@@ -27,6 +27,20 @@ export const keywordMatchSchema = z
      * requirement in lowercase prose — but it cannot outvote the skills the role actually asks for.
      */
     generalTermWeight: z.number().min(0).max(1),
+    /**
+     * Soft skills ("communication", "teamwork"): what a posting asks of a person rather than of
+     * their work. A resume claims them and seldom evidences them, and an ATS's keyword match
+     * gives them little value, so each is weighed as an ordinary word (`generalTermWeight`)
+     * whatever its capitals, times this. The report lists them apart (`missingKeywordGroups`).
+     */
+    softSkillWeight: z.number().min(0).max(1).default(0.4),
+    /**
+     * The terms that are soft skills, folded as every term is (`synonyms`, `stemming`): "soft
+     * skills" in the report, weighed by `softSkillWeight`, never a recognised hard skill even
+     * when `phrases` or `synonyms` name them. A multi-word entry is matched as a phrase. Language
+     * packs add their own.
+     */
+    softSkills: z.array(term).default([]),
     sections: jobSectionSchema,
     /**
      * The words a posting offers alternatives with: "Go or Java". The missing-keyword label
@@ -368,7 +382,8 @@ export const keywordMatchSchema = z
      * posting scatters it into unrelated single words and the implication silently does nothing.
      * Catching it here turns a quiet scoring hole into a startup failure naming the term.
      */
-    const phrases = new Set(km.phrases);
+    // A multi-word soft skill is matched as a phrase too.
+    const phrases = new Set([...km.phrases, ...km.softSkills]);
     const multiWord = new Set<string>();
 
     for (const [skill, capabilities] of Object.entries(km.implies)) {
@@ -384,6 +399,6 @@ export const keywordMatchSchema = z
         ctx.addIssue({
           code: "custom",
           path: ["phrases"],
-          message: `multi-word term "${term}" is referenced by implies/synonyms but missing from phrases, so it can never match`,
+          message: `multi-word term "${term}" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match`,
         });
   });

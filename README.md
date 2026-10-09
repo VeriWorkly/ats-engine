@@ -18,7 +18,7 @@ To try it without installing anything, upload a resume to the [VeriWorkly ATS ch
 - Recovers the fields an ATS stores: name, contact details, each job (title, employer, dates), education on the ISCED scale, skills, certifications (name, issuer, date earned, expiry) and spoken languages with their CEFR level, each with a note on where in the resume it came from.
 - Scores readiness from 0 to 100 across parsing, contact, structure, content and format, minus any integrity penalties. Every failed check comes with evidence and a suggested fix.
 - Notes writing style in English resumes: bullets in the first person or the passive voice, duties instead of actions ("Responsible for"), a past role written in the present tense, bullets too long or too many, the same opening word again and again, and dates written two ways. These rules have their own `writing` category and carry 12 points of weight against 190 for the rest of the rubric, so the score still mostly measures whether an ATS can read the resume. They are left out for resumes in other languages.
-- Matches a resume to a job posting. Each requirement is marked met, partly met, missing or unverifiable, with the resume lines that support it. Years of experience, degrees and languages are compared as values, not as keywords: "Fluent German" asks for C1 and is met by German at C1 or above, and "AWS certification" is met by a certification row that names AWS.
+- Matches a resume to a job posting. Each requirement is marked met, partly met, missing or unverifiable, with the resume lines that support it. Years of experience, degrees and languages are compared as values, not as keywords: "Fluent German" asks for C1 and is met by German at C1 or above, and "AWS certification" is met by a certification row that names AWS. The posting's keywords are split into hard skills and soft skills ("communication", "teamwork"). A resume claims a soft skill more often than it shows one, so a soft skill counts for a tenth of a named skill in the match score.
 - Flags integrity problems: hidden text (white, tiny, off-page or covered), instructions aimed at AI screeners, invisible and look-alike characters, a pasted job posting, and keyword stuffing.
 - Reads German and Hindi resumes, and applies US, German and Indian conventions for dates, phone numbers, degrees, and whether a photo or date of birth belongs on the page. [LOCALES.md](./LOCALES.md) explains how to add more.
 - Adds optional AI analysis, parse repair and resume conversion with your own API key. Any name, employer, title, school, email, URL or skill a model returns is checked against the resume text and dropped if it is not there.
@@ -199,6 +199,7 @@ const report = check(resumeText, DEFAULT_POLICY, {
 
 report.jobMatchScore; // 0-100, or null without a posting
 report.missingKeywords; // terms in the posting the resume never mentions, names left out
+report.missingKeywordGroups; // the same terms by kind: { hard: [...], soft: ["communication"] }
 report.requirements; // [{ text, status: "met" | "partial" | "missing" | "unverifiable", evidence }]
 ```
 
@@ -225,7 +226,9 @@ check(resumeText, policy, { region: "IN" });
 | `prioritizedFixes`                   | Fixes in the order the rubric ranks them                                   |
 | `parsed`                             | Contact, roles, education, skills, certifications, languages               |
 | `jobMatchScore`, `requirements`      | Job match results, when a posting was given                                |
-| `matchedKeywords`, `missingKeywords` | Posting terms found and not found in the resume                            |
+| `matchedKeywords`, `missingKeywords` | Posting terms found and not found in the resume, hard skills first         |
+| `matchedKeywordGroups`               | Found terms as `{ hard, soft }`                                            |
+| `missingKeywordGroups`               | Missing terms as `{ hard, soft }`; soft skills weigh less in the match     |
 | `engine`                             | Engine version and policy fingerprint, to reproduce the result             |
 
 `parsed.certifications` holds one row per certification or licence (`name`, `issuer`, `date`, `expires`) and `parsed.spokenLanguages` one per language (`language`, `level` as written, `cefr` from A1 to C2, or null). Both are read from their own sections, and from a "Languages:" or "Certifications:" line among the skills; a JSON Resume's `certificates` and `languages`, and a document's `certifications` and `languages` sections, fill them from their fields.

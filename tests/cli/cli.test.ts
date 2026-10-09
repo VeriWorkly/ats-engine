@@ -93,6 +93,18 @@ describe("ats-engine check", () => {
     expect(report.missingKeywords).toContain("kubernetes");
   });
 
+  it("prints a posting's missing soft skills apart from its missing keywords", async () => {
+    const job = file(
+      "soft.txt",
+      "Requirements\n- Kubernetes and Terraform\n- Excellent communication skills\n- Teamwork",
+    );
+    expect(await main(["check", file("r3.txt", RESUME), "--job", job])).toBe(0);
+
+    const printed = out.join("\n");
+    expect(printed).toMatch(/Missing keywords: kubernetes, terraform\n/);
+    expect(printed).toContain("Missing soft skills (weigh less): communication, teamwork");
+  });
+
   it("reads PDF and DOCX files, measuring a PDF's layout", async () => {
     const ops = LEFT_COLUMN.flatMap((line: string, index: number) => [
       text(45, 720 - index * 26, line),

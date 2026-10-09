@@ -145,10 +145,10 @@ function render(report: AtsReport, style: Style): string {
       for (const requirement of report.requirements)
         lines.push(renderRequirement(requirement, style));
     }
-    if (report.missingKeywords.length)
-      lines.push(
-        `  Missing keywords: ${style.yellow(report.missingKeywords.slice(0, 15).join(", "))}`,
-      );
+    const { hard, soft } = report.missingKeywordGroups;
+    if (hard.length) lines.push(`  Missing keywords: ${style.yellow(hard.join(", "))}`);
+    if (soft.length)
+      lines.push(`  Missing soft skills (weigh less): ${style.dim(soft.join(", "))}`);
   }
 
   const read = [...report.locale.languages, report.locale.region].filter(Boolean);

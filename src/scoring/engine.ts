@@ -148,6 +148,8 @@ export class AtsScoringService {
       jobMatchScore,
       matchedKeywords: jobMatch.matched,
       missingKeywords: jobMatch.missing,
+      matchedKeywordGroups: jobMatch.matchedGroups,
+      missingKeywordGroups: jobMatch.missingGroups,
       // What stops an ATS reading the document: every parse check, and the format checks that
       // measure how the text extracts (columns, tables, letter spacing). Length and a photo are
       // format choices, not reading problems, and stay out. Matched on category and metric rather

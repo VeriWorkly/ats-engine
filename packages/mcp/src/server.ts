@@ -136,10 +136,15 @@ const parsedResume = z.looseObject({
   monthsOfExperience: z.number().nullable(),
 });
 
+const keywordGroups = z
+  .object({ hard: z.array(z.string()), soft: z.array(z.string()) })
+  .describe("The same terms by kind; soft skills weigh less in the match.");
+
 const jobMatchOutput = {
   jobMatchScore: z.number().nullable().describe("0-100, how well the resume meets the posting."),
   requirements: z.array(requirement).describe("Each requirement of the posting, judged."),
   missingKeywords: z.array(z.string()),
+  missingKeywordGroups: keywordGroups,
 };
 
 const checkOutput = {
@@ -157,7 +162,11 @@ const checkOutput = {
   locale: z.object({ languages: z.array(z.string()), region: z.string().nullable() }),
   engine: z.object({ version: z.string(), policy: z.string() }),
   job: z
-    .object({ ...jobMatchOutput, matchedKeywords: z.array(z.string()) })
+    .object({
+      ...jobMatchOutput,
+      matchedKeywords: z.array(z.string()),
+      matchedKeywordGroups: keywordGroups,
+    })
     .nullable()
     .describe("The match against the posting; null when no posting was given."),
 };
@@ -206,6 +215,8 @@ export function checkResult(report: AtsReport, withJob: boolean) {
           requirements: report.requirements,
           matchedKeywords: report.matchedKeywords,
           missingKeywords: report.missingKeywords,
+          matchedKeywordGroups: report.matchedKeywordGroups,
+          missingKeywordGroups: report.missingKeywordGroups,
         }
       : null,
   };
@@ -308,6 +319,7 @@ export function createServer(): McpServer {
             jobMatchScore: report.jobMatchScore,
             requirements: report.requirements,
             missingKeywords: report.missingKeywords,
+            missingKeywordGroups: report.missingKeywordGroups,
           },
         };
       }),

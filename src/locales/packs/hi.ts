@@ -195,5 +195,25 @@ export const hi: AtsLanguagePackInput = {
     "जो",
     "अनुभव",
     "वर्ष",
+    // "Skill" and "ability", as English "skills" and "ability" are: "संचार कौशल" asks for संचार.
+    "कौशल",
+    "क्षमता",
+  ],
+  // Asked of the person, as "communication" and "teamwork" are; placed as the English list is.
+  softSkills: [
+    "संचार",
+    "संवाद",
+    "नेतृत्व",
+    "टीमवर्क",
+    "टीम भावना",
+    "सहयोग",
+    "पहल",
+    "समस्या समाधान",
+    "निर्णय क्षमता",
+    "आलोचनात्मक सोच",
+    "समय प्रबंधन",
+    "अनुकूलनशीलता",
+    "रचनात्मकता",
+    "सहानुभूति",
   ],
 };

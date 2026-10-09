@@ -55,13 +55,27 @@ export type AtsRequirement = {
   detail?: string;
 };
 
+/** Posting terms by kind: hard skills and every other word, then soft skills. */
+export type AtsKeywordGroups = { hard: string[]; soft: string[] };
+
 export type AtsReport = {
   /** The scoring policy's declared `version` ("ats-v2" for the community policy). */
   version: string;
   readinessScore: number;
   jobMatchScore: number | null;
+  /**
+   * Posting terms the resume has and lacks, hard skills (and every other word) first, then soft
+   * skills; at most 12. The two groups joined, cut to 12.
+   */
   matchedKeywords: string[];
   missingKeywords: string[];
+  /**
+   * The same terms by kind, each group at most 12. `soft` holds the policy's soft skills
+   * (`keywordMatch.softSkills`: "communication", "teamwork"), which weigh less in
+   * `jobMatchScore` (`keywordMatch.softSkillWeight`); `hard` holds everything else.
+   */
+  matchedKeywordGroups: AtsKeywordGroups;
+  missingKeywordGroups: AtsKeywordGroups;
   /**
    * Evidence of every failed check that stops an ATS reading the document: the parse checks, and
    * the format checks on how the text extracts (columns, tables, letter spacing).

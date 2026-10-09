@@ -79,6 +79,10 @@ const SHAPES: Record<string, string> = {
   "cefr run": rep("B2 "),
   "level phrase run": rep("professional working "),
   "fließend run": rep("fließend "),
+  // Soft skills matched as phrases, the English and a language pack's.
+  "soft phrase run": rep("problem solving "),
+  "soft phrase prefix run": rep("attention to "),
+  "devanagari soft phrase run": rep("समस्या समाधान "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
