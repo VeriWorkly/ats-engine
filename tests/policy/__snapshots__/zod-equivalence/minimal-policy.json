@@ -543,6 +543,7 @@
       "business[\\s-]level": "B2",
       "upper[\\s-]intermediate": "B2",
       "limited\\s+working(?:\\s+proficiency)?": "B1",
+      "limited(?:\\s+proficiency)?": "A2",
       "working\\s+knowledge": "B1",
       "conversational": "B1",
       "intermediate": "B1",

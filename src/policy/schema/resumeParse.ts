@@ -64,6 +64,9 @@ export const resumeParseSchema = z.object({
     [String.raw`business[\s-]level`]: "B2",
     [String.raw`upper[\s-]intermediate`]: "B2",
     [String.raw`limited\s+working(?:\s+proficiency)?`]: "B1",
+    // Alone, "limited" claims less than LinkedIn's "limited working proficiency": read as A2,
+    // as "elementary" is, rather than credit a level the resume does not state.
+    [String.raw`limited(?:\s+proficiency)?`]: "A2",
     [String.raw`working\s+knowledge`]: "B1",
     conversational: "B1",
     intermediate: "B1",

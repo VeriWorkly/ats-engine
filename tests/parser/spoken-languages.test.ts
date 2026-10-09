@@ -35,6 +35,8 @@ describe("level words map to CEFR", () => {
     ["conversational", "B1"],
     ["intermediate", "B1"],
     ["Limited working proficiency", "B1"],
+    ["limited", "A2"],
+    ["Limited proficiency", "A2"],
     ["basic", "A2"],
     ["Elementary proficiency", "A2"],
     ["beginner", "A1"],
