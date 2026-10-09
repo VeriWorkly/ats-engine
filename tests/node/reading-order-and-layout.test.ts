@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { fromJsonResume } from "../../src/document/jsonResume.js";
+import { check, DEFAULT_POLICY } from "../../src/index.js";
 import { extractJobPosting, jobHtmlToText, jobTextFromHtml } from "../../src/job/index.js";
 import { measureDocx } from "../../src/node/docx.js";
 import { detectResumeFormat, extractResume } from "../../src/node/extract.js";
+import { pageText } from "../../src/node/lines.js";
 import {
   buildDocxBody,
   buildRichDocx,
@@ -649,5 +651,55 @@ describe("the new scans stay linear on hostile input", () => {
     ["entities", "&eacute;&Scaron;&euro;&bogus;".repeat(70_000)],
   ])("reads a 2 MB page of %s as a job page quickly", (_, html) => {
     expect(fastest(() => jobHtmlToText(html))).toBeLessThan(2_000);
+  });
+});
+
+describe("a centred heading over a short block is not a second column", () => {
+  // The last page of a two-page @react-pdf resume, as pdf.js reports it: a centred "SKILLS"
+  // heading, then four short lines at the left margin, each a bold label, a colon and values.
+  // No text crosses the strip between the lines' ends and the heading, but the heading sits above
+  // the block, not beside it; read as a column of its own it came after its lines, and the
+  // parser found an empty skills section.
+  const item = (str: string, size: number, x: number, y: number, width: number) => ({
+    str,
+    transform: [size, 0, 0, size, x, y],
+    width,
+    height: str.trim() ? size : 0,
+    hasEOL: false,
+  });
+  const row = (y: number, label: string, colon: number, values: string, width: number) => [
+    { ...item("", 10.5, 24, y, 0), hasEOL: true },
+    item(label, 10.5, 24, y, colon - 24),
+    item(":", 10.5, colon, y, 3.3),
+    item(" ", 10.5, colon + 3.2, y, 2.4),
+    item(values, 10.5, colon + 5.6, y, width),
+  ];
+  const lastPage = [
+    item("SKILLS", 9, 280.9, 787.5, 33.2),
+    ...row(766.1, "Languages", 80.7, "TypeScript, JavaScript, SQL", 133.8),
+    ...row(747.4, "Frontend", 70.3, "React, Next.js, Tailwind CSS", 133.8),
+    ...row(728.6, "Backend", 68.8, "Node.js, Express, PostgreSQL", 141.2),
+    ...row(709.9, "Other", 53.5, "System Design, Performance, UX Thinking", 199.8),
+  ];
+  const read = () => pageText(lastPage, (x, y) => [x, 841.5 - y], 595.5);
+
+  it("reads the heading before the lines under it, and reports no second column", () => {
+    const { text: extracted, columns } = read();
+    expect(extracted.split("\n")).toEqual([
+      "SKILLS",
+      "Languages: TypeScript, JavaScript, SQL",
+      "Frontend: React, Next.js, Tailwind CSS",
+      "Backend: Node.js, Express, PostgreSQL",
+      "Other: System Design, Performance, UX Thinking",
+    ]);
+    expect(columns).toBe(0);
+  });
+
+  it("finds the skills under it", () => {
+    const resume = ["Jane Doe", "jane.doe@example.com | +1 415 555 0142", read().text].join("\n");
+    const report = check(resume, DEFAULT_POLICY, { now: new Date("2026-10-01T00:00:00Z") });
+    expect(report.parsed.skills).toEqual(
+      expect.arrayContaining(["TypeScript", "React", "PostgreSQL", "System Design"]),
+    );
   });
 });

@@ -125,9 +125,17 @@ export function pageText(
 
   const runs: PositionedRun[] = [];
   rows.forEach((row) => {
-    for (const { x, right, str, size, blank } of row)
+    for (const { x, y, right, str, size, blank } of row)
       if (!blank)
-        runs.push({ left: x, right, mass: str.trim().length, row, size, stop: /[\d,]/.test(str) });
+        runs.push({
+          left: x,
+          right,
+          mass: str.trim().length,
+          row,
+          size,
+          stop: /[\d,]/.test(str),
+          y,
+        });
   });
   const gutter = findGutter(runs, pageWidth);
 
