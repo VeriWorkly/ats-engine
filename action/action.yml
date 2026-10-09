@@ -24,7 +24,7 @@ inputs:
   version:
     description: Version of @veriworkly/ats-engine to run. Defaults to the engine release this action ships with, so a later release cannot change your score until you move to it.
     required: false
-    default: "0.1.1"
+    default: "0.2.0"
   summary:
     description: Write the report to the job summary.
     required: false
