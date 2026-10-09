@@ -22,12 +22,15 @@
 
 export type {
   AtsCategoryScore,
+  AtsCefrLevel,
   AtsDegreeLevel,
   AtsIscedLevel,
   AtsLayoutSignals,
+  AtsParsedCertification,
   AtsParsedDate,
   AtsParsedEducation,
   AtsParsedField,
+  AtsParsedLanguage,
   AtsParsedResume,
   AtsParsedRole,
   AtsProvenance,

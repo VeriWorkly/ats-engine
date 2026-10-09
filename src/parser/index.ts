@@ -1,14 +1,21 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
-import type { AtsParsedResume } from "../types.js";
+import type { AtsParsedCertification, AtsParsedLanguage, AtsParsedResume } from "../types.js";
+import { parseCertificationList, parseCertifications } from "./certifications.js";
 import { EMAIL, LINK, findName } from "./contact.js";
 import { findDateRange } from "./dates.js";
 import { degreeLevel, parseEducation } from "./education.js";
 import { BULLET, BULLET_PREFIX } from "../text/text.js";
 import { opensWithVerb, parseRoles, titleWordsOf } from "./experience.js";
+import { parseSpokenLanguages, readLanguages } from "./languages.js";
 import { finalizeParsed } from "./record.js";
 import { readResumeLines } from "./lines.js";
 import { findPhone } from "./phone.js";
-import { segmentResume, type ResumeSectionKind } from "./sections.js";
+import {
+  labelledLine,
+  segmentResume,
+  type ResumeSection,
+  type ResumeSectionKind,
+} from "./sections.js";
 
 /**
  * The category label on a skills line — "Languages: " in "Languages: TypeScript, Go". Needs a
@@ -46,6 +53,51 @@ function splitSkills(line: string): string[] {
   if (depth > 0) return line.split(SKILL_SEPARATOR);
   parts.push(line.slice(from));
   return parts;
+}
+
+/** Certifications in a list, each once by name, in the order first read. */
+function addCertifications(into: AtsParsedCertification[], rows: AtsParsedCertification[]) {
+  for (const row of rows)
+    if (!into.some((kept) => kept.name.toLowerCase() === row.name.toLowerCase())) into.push(row);
+}
+
+/**
+ * The certification and spoken-language rows, in page order: from their own sections, and from
+ * a labelled line among the skills ("Languages: English (native)", "Certifications: PMP"). What
+ * such a line names as rows is not also a skill, so the line comes back without it in `skillLines`
+ * ("Languages: English, Python" leaves "Python"); "Languages: Go, Rust" names no language and
+ * stays a skills line whole.
+ */
+export function readCredentialRows(
+  sections: readonly ResumeSection[],
+  policy: AtsEnginePolicy,
+  now: Date,
+) {
+  const certifications: AtsParsedCertification[] = [];
+  const spokenLanguages: AtsParsedLanguage[] = [];
+  const skillLines = new Map<string, string>();
+  for (const section of sections) {
+    if (section.kind === "certifications")
+      addCertifications(certifications, parseCertifications(section.lines, policy, now));
+    else if (section.kind === "languages")
+      parseSpokenLanguages(section.lines, policy, spokenLanguages);
+    else if (section.kind === "skills")
+      for (const line of section.lines) {
+        const labelled = labelledLine(line.replace(BULLET_PREFIX, ""), policy);
+        if (labelled?.kind === "languages" && readLanguages(labelled.rest, policy).rows.length) {
+          parseSpokenLanguages([labelled.rest], policy, spokenLanguages);
+          const others = splitSkills(labelled.rest).filter(
+            (item) => !readLanguages(item, policy).rows.length,
+          );
+          skillLines.set(line, others.join(", "));
+        } else if (labelled?.kind === "certifications") {
+          const rows = parseCertificationList(labelled.rest, policy, now);
+          if (rows.length) skillLines.set(line, "");
+          addCertifications(certifications, rows);
+        }
+      }
+  }
+  return { certifications, spokenLanguages, skillLines };
 }
 
 /**
@@ -87,12 +139,18 @@ export function parseReadLines(
   const experienceLines = take("experience");
   // A resume with no recognisable Experience heading still has a work history somewhere, so the
   // fallback reads every block except the ones known not to hold jobs: a degree's "2010 - 2014"
-  // read as a role once added four years of experience nobody worked.
+  // read as a role once added four years of experience nobody worked, and a licence's dates
+  // would too.
   const roles = parseRoles(
     experienceLines.length
       ? experienceLines
       : sections
-          .filter((section) => !["education", "skills", "projects"].includes(section.kind))
+          .filter(
+            (section) =>
+              !["education", "skills", "projects", "certifications", "languages"].includes(
+                section.kind,
+              ),
+          )
           .flatMap((section) => section.lines),
     policy,
     now,
@@ -124,8 +182,11 @@ export function parseReadLines(
     now,
   );
 
+  const { certifications, spokenLanguages, skillLines } = readCredentialRows(sections, policy, now);
   const skills = take("skills")
-    .flatMap((line) => splitSkills(line.replace(BULLET_PREFIX, "").replace(SKILL_LABEL, "")))
+    .flatMap((line) =>
+      splitSkills(skillLines.get(line) ?? line.replace(BULLET_PREFIX, "").replace(SKILL_LABEL, "")),
+    )
     .map((skill) => skill.replace(BULLET_PREFIX, "").trim())
     // A skill names something, so it has a letter: a date or a number under the Skills heading
     // ("Geburtsdatum: 04.05.1990", once its label is dropped) is not one.
@@ -150,6 +211,8 @@ export function parseReadLines(
       roles,
       education,
       skills,
+      certifications,
+      spokenLanguages,
     },
     () => "parser",
     now,

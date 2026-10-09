@@ -222,13 +222,16 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
   });
 
   add({
-    kind: "other",
+    kind: "certifications",
     title: title.certificates,
-    items: entries(
-      objects(resume.certificates),
-      (item) => [str(item.name), str(item.issuer), date(item.date)],
-      () => [],
-    ),
+    items: objects(resume.certificates)
+      .map((item) => ({
+        name: str(item.name),
+        issuer: optional(str(item.issuer)),
+        date: date(item.date),
+        url: optional(str(item.url)),
+      }))
+      .filter((item) => item.name),
   });
 
   add({
@@ -252,13 +255,11 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
   });
 
   add({
-    kind: "other",
+    kind: "languages",
     title: title.languages,
-    items: entries(
-      objects(resume.languages),
-      (item) => [str(item.language), str(item.fluency)],
-      () => [],
-    ),
+    items: objects(resume.languages)
+      .map((item) => ({ language: str(item.language), level: optional(str(item.fluency)) }))
+      .filter((item) => item.language),
   });
 
   add({

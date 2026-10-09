@@ -47,14 +47,16 @@ export const DEFAULT_RESUME_PARSE = {
   // courses and board seats below the work history are not read as jobs, and "Contact", which a
   // two-column resume prints above the name. Education goes by other names too ("Academic
   // Background", "Educational Qualifications"); unknown, its degrees were folded into the section
-  // above and lost. Licences ("Licenses & Certifications", "Licensure") are "other", so a
-  // licence's dates are not read as a job.
+  // above and lost. Certifications and licences ("Licenses & Certifications", "Licensure") and
+  // spoken languages have kinds of their own, read as rows; their headings are the schema's
+  // defaults (`sections.certifications`, `sections.languages`), so a licence's dates are never
+  // read as a job.
   sections: {
     experience: String.raw`^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment)\s+)?(?:experience|employment|history)|^internships?|^academic\s+(?:appointments|positions)|^professional\s+background`,
     education: String.raw`^educational\s+(?:background|qualifications?|history|details)|^education|^academic\s+(?:background|qualifications?|history|record|credentials)`,
     skills: String.raw`^(?:(?:technical|core|key)\s+)?skills|^technologies|^core\s+competenc(?:y|ies)|^areas\s+of\s+expertise`,
     projects: String.raw`^projects`,
-    other: String.raw`^(?:summary|objective|profile|certifications?|certificates|licen[cs]es?|licensure|awards?|publications?|languages|interests|volunteering|references|links|online\s+profiles?|achievements|hobbies|contact(?:\s+(?:details|information|info))?|personal\s+(?:details|information|data)|honou?rs|grants|funding|fellowships|patents|presentations|invited\s+talks|talks|conferences|memberships|affiliations|professional\s+(?:affiliations|memberships|service|development)|editorial\s+(?:boards?|service|activities)|board\s+(?:memberships|positions|service|seats)|boards|courses(?:\s+taught)?|coursework|relevant\s+coursework|training|activities|extra[\s-]?curricular(?:\s+activities)?|declaration)`,
+    other: String.raw`^(?:summary|objective|profile|awards?|publications?|interests|volunteering|references|links|online\s+profiles?|achievements|hobbies|contact(?:\s+(?:details|information|info))?|personal\s+(?:details|information|data)|honou?rs|grants|funding|fellowships|patents|presentations|invited\s+talks|talks|conferences|memberships|affiliations|professional\s+(?:affiliations|memberships|service|development)|editorial\s+(?:boards?|service|activities)|board\s+(?:memberships|positions|service|seats)|boards|courses(?:\s+taught)?|coursework|relevant\s+coursework|training|activities|extra[\s-]?curricular(?:\s+activities)?|declaration)`,
   },
   titleWords: [
     "engineer",

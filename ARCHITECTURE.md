@@ -35,10 +35,12 @@ check(resume, policy, options)                                   check.ts, scori
      readResumeLines      rejoin wrapped lines, read spaced ones  parser/lines.ts
      segmentResume        headings → sections                     parser/sections.ts
      parseReadLines | parseResumeDocument                          parser/, document/parse.ts
+       readCredentialRows certification and language rows         parser/certifications.ts, languages.ts
      checks               integrity, timeline, skills, writing    checks/
  4 scoreRules             applicable rules → results, score       scoring/score.ts, rules.ts
  5 computeJobMatch        posting terms, names left out, weights  matching/jobMatch.ts
- 6 judgeRequirements      per-requirement status and evidence     matching/requirements.ts
+ 6 judgeRequirements      per-requirement status and evidence;    matching/requirements.ts
+                          rows first for credentials, languages
  7 assemble               fixes, strengths, categories, stamp     scoring/engine.ts
 ```
 
@@ -57,7 +59,7 @@ Splitting those is welcome where a seam is clear.
 | `input.ts`               | `prepareResume`: kind of input, flattening, size guards                                                                                                                                                                                                                                                                           | `.`                    |
 | `text/`                  | `text.ts` normalisation, word lists, tokens, stemming, bullets; `characters.ts` invisible and tag characters                                                                                                                                                                                                                      | internal               |
 | `policy/`                | `schema.ts` (assembles `schema/rules`, `schema/resumeParse`, `schema/keywordMatch`, `schema/text`, `schema/writing`), `default.ts` (assembles `default/rules`, `default/keywordMatch`, `default/resumeParse`), `parse`, `primitives`, `regex`, `fingerprint`, `errors`                                                            | `.`                    |
-| `parser/`                | `lines`, `sections`, `dates`, `experience` (roles), `education` (ISCED), `contact` (name, email, date of birth), `phone`, `record` (derived fields, provenance), `tenure`, `index`                                                                                                                                                | `.` (`parseResume`)    |
+| `parser/`                | `lines`, `sections`, `dates`, `experience` (roles), `education` (ISCED), `contact` (name, email, date of birth), `phone`, `certifications` and `languages` (rows, CEFR), `record` (derived fields, provenance), `tenure`, `index`                                                                                                 | `.` (`parseResume`)    |
 | `checks/`                | `integrity/text` (injection, homoglyphs, copied posting, stuffing), `timeline`, `skills`, `bullets` (role body lines when list markers were lost), `writing` (style of the bullets and role dates, English), `finding`                                                                                                            | internal               |
 | `scoring/`               | `engine` (pipeline), `context` (what rules read), `score` (arithmetic), `rules` (per-kind evaluation and applicability, `languages` too), `categories` (`writing` apart), `rubric`, `verdict`                                                                                                                                     | `.`                    |
 | `matching/`              | `vocabulary` (terms, synonyms, phrases), `alternation` ("Go or Java"), `jobSections`, `proseNames`, `jobMatch`, `requirements`                                                                                                                                                                                                    | internal               |
@@ -92,12 +94,12 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 | Entry                                                   | Modules | Externals                                                |
 | ------------------------------------------------------- | ------: | -------------------------------------------------------- |
-| `.`                                                     |      66 | zod, libphonenumber-js                                   |
+| `.`                                                     |      68 | zod, libphonenumber-js                                   |
 | `/document`                                             |       4 | none                                                     |
 | `/format`                                               |       2 | none                                                     |
 | `/job`                                                  |       3 | none                                                     |
 | `/locales`                                              |      23 | zod, libphonenumber-js                                   |
-| `/ai`                                                   |      42 | zod, libphonenumber-js                                   |
+| `/ai`                                                   |      45 | zod, libphonenumber-js                                   |
 | `/ai/openai-compatible`, `/ai/anthropic`, `/ai/testing` |     4–5 | none                                                     |
 | `/node`                                                 |      18 | node:\*, pdfjs-dist, pdf-parse, mammoth (optional peers) |
 

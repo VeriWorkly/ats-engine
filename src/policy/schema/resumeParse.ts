@@ -1,6 +1,13 @@
 import { z } from "zod";
 
-import { iscedDegrees, regexString, wordList, type IscedDegrees } from "../primitives.js";
+import {
+  cefrLevels,
+  credentialWords,
+  iscedDegrees,
+  regexString,
+  wordList,
+  type IscedDegrees,
+} from "../primitives.js";
 
 /**
  * Vocabulary the resume parser needs. Data, so it lives in the policy alongside the rules rather
@@ -12,9 +19,62 @@ export const resumeParseSchema = z.object({
     education: regexString("sections.education"),
     skills: regexString("sections.skills"),
     projects: regexString("sections.projects"),
+    /**
+     * Certifications and licences, each line read as a row: name, issuer, dates. Tried before
+     * `other`, so a policy whose `other` still names them reads them here; "Education and
+     * Certifications" stays education, which is tried first.
+     */
+    certifications: regexString("sections.certifications").default(
+      String.raw`^(?:(?:professional\s+)?certifications?|certificates|licen[cs]es?|licensure|credentials)`,
+    ),
+    /**
+     * Spoken languages, each read as a row with its level. Not "Programming Languages", and a
+     * "Languages: Go, Rust" line among the skills stays a skills line.
+     */
+    languages: regexString("sections.languages").default(
+      String.raw`^(?:(?:spoken|foreign)\s+)?languages|^language\s+(?:skills|proficienc(?:y|ies)|competenc(?:y|ies))`,
+    ),
     /** Any other heading. Classified only so that it terminates the block above it. */
     other: regexString("sections.other"),
   }),
+  /**
+   * The words that state how well a language is spoken — whole words or small patterns, matched
+   * ignoring case — and the CEFR level each stands for. An explicit level ("B2") needs no entry
+   * and wins over a word beside it. "Fluent" is C1; "native" C2, as the ILR scale's native or
+   * bilingual proficiency; "professional working proficiency" (ILR 3) C1. "Bilingual" alone is
+   * C1: a posting asking for "bilingual English/Spanish" is met by fluent Spanish. The same words
+   * read a posting's ask, so "fluent German" asks for C1. Packs add their own.
+   */
+  languageLevels: cefrLevels("languageLevels").default({
+    [String.raw`native\s+or\s+bilingual(?:\s+proficiency)?`]: "C2",
+    [String.raw`full\s+professional(?:\s+proficiency)?`]: "C2",
+    [String.raw`native(?:\s+speaker)?`]: "C2",
+    [String.raw`mother\s+tongue`]: "C2",
+    [String.raw`first\s+language`]: "C2",
+    bilingual: "C1",
+    [String.raw`professional\s+working(?:\s+proficiency)?`]: "C1",
+    professional: "C1",
+    fluent: "C1",
+    fluency: "C1",
+    proficient: "C1",
+    advanced: "C1",
+    [String.raw`business\s+fluent`]: "C1",
+    [String.raw`business[\s-]level`]: "B2",
+    [String.raw`upper[\s-]intermediate`]: "B2",
+    [String.raw`limited\s+working(?:\s+proficiency)?`]: "B1",
+    [String.raw`working\s+knowledge`]: "B1",
+    conversational: "B1",
+    intermediate: "B1",
+    [String.raw`elementary(?:\s+proficiency)?`]: "A2",
+    basic: "A2",
+    beginner: "A1",
+  }),
+  /**
+   * The words around a certification's dates and issuer: "Issued Mar 2022", "expires 2027",
+   * "from Google Cloud", "Credential ID 9X7Y". A date after an `expires` word is the expiry; a
+   * part opening with an `id` word is dropped.
+   */
+  credentialWords: credentialWords.prefault({}),
   /**
    * Month name -> month number, for the date spellings a resume actually uses.
    *

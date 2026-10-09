@@ -134,3 +134,55 @@ export const iscedDegrees = z.object({
 });
 
 export type IscedDegrees = z.output<typeof iscedDegrees>;
+
+/** The six CEFR levels, lowest first: the order a language requirement is judged in. */
+export const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+
+/**
+ * Level words keyed to the CEFR level each states. The keys are joined into one alternation, as
+ * a word list is, so they are checked the same way: the assembled pattern must compile.
+ */
+export const cefrLevels = (label: string) =>
+  z.record(z.string().min(1), z.enum(CEFR_LEVELS)).superRefine((levels, ctx) => {
+    const words = Object.keys(levels);
+    if (!words.length) return;
+    try {
+      wordListRegex(words);
+    } catch (error) {
+      ctx.addIssue({
+        code: "custom",
+        message: `${label} does not assemble into a valid regular expression: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+    }
+  });
+
+/** The words around a certification's dates and issuer; see `resumeParse.credentialWords`. */
+export const credentialWords = z.object({
+  issued: wordList("credentialWords.issued").default([
+    "issued",
+    "obtained",
+    "earned",
+    "awarded",
+    "achieved",
+    "completed",
+  ]),
+  expires: wordList("credentialWords.expires").default([
+    "expires",
+    "expired",
+    "expiry",
+    "expiring",
+    String.raw`expiration(?:\s+date)?`,
+    String.raw`exp\.?`,
+    String.raw`valid\s+(?:until|through|thru|till|to)`,
+    String.raw`renew(?:s|al)?(?:\s+due)?`,
+  ]),
+  issuer: wordList("credentialWords.issuer").default([String.raw`issued\s+by`, "by", "from"]),
+  id: wordList("credentialWords.id").default([
+    String.raw`credential(?:\s+id)?`,
+    String.raw`(?:certificate|licen[cs]e|registration)\s*(?:id|no\.?|number|#)`,
+    "id",
+    String.raw`no\.`,
+  ]),
+});

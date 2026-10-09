@@ -1,11 +1,12 @@
 import { isDatedLine } from "../checks/bullets.js";
-import { ISCED_LABELS } from "../format/index.js";
+import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../format/index.js";
 import { degreeLevels } from "../parser/education.js";
+import { canonicalLanguage, cefrLevel, compareCefr } from "../parser/languages.js";
 import { monthsOfExperience } from "../parser/tenure.js";
 import type { ResumeSection, ResumeSectionKind } from "../parser/sections.js";
 import { policyRegex } from "../policy/regex.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
-import type { AtsParsedResume, AtsRequirement } from "../types.js";
+import type { AtsCefrLevel, AtsParsedResume, AtsRequirement } from "../types.js";
 import { memo } from "../util/memo.js";
 import { own } from "../util/own.js";
 import { alternationGroups } from "./alternation.js";
@@ -94,6 +95,8 @@ const stronger = (a: Status, b: Status) => (STRENGTH[a] >= STRENGTH[b] ? a : b);
 const EVIDENCE_RANK: Record<ResumeSectionKind, number> = {
   experience: 0,
   projects: 1,
+  certifications: 2,
+  languages: 2,
   other: 2,
   education: 3,
   skills: 4,
@@ -226,6 +229,31 @@ const clauseBreak = memo(
   (rp: AtsEnginePolicy["resumeParse"]) =>
     new RegExp(`[,;]|${wordListPattern(rp.headingConnectors)}`, "iu"),
 );
+
+/**
+ * The CEFR level asked of each language: the level its own clause states ("Fluent English, basic
+ * Spanish"), else the one level the whole ask states ("Fluent in English and Spanish"), else none.
+ * The level words are the resume's (`languageLevels`), so "fluent" asks for C1.
+ */
+function askedLevels(ask: string, languages: readonly string[], policy: AtsEnginePolicy) {
+  const clauses = ask.split(clauseBreak(policy.resumeParse)).map((clause) => ({
+    text: clause.toLowerCase(),
+    level: cefrLevel(clause, policy),
+  }));
+  const stated = new Set(clauses.flatMap(({ level }) => (level ? [level] : [])));
+  const whole = stated.size === 1 ? [...stated][0]! : null;
+  return new Map(
+    languages.map((name) => [
+      name,
+      clauses.find(({ text, level }) => level && text.includes(name))?.level ?? whole,
+    ]),
+  );
+}
+
+/** A row below the level asked still counts for something from B1 up, or one step short. */
+function belowLevel(have: AtsCefrLevel, asked: AtsCefrLevel): Status {
+  return compareCefr(have, "B1") >= 0 || compareCefr(have, asked) === -1 ? "partial" : "missing";
+}
 
 /**
  * Whether the text between two asks offers them as alternatives: an alternation word joins
@@ -391,14 +419,17 @@ export function judgeRequirements(
   const ranked = sections
     .flatMap((section) => {
       const heading = (section as HeadedSection).heading;
+      // Every line of a certifications section is a credential, whatever its heading calls it.
       let context =
-        heading && section.kind === "other"
-          ? new Set(
-              [...extractVocabulary(heading, km, vocab).keys()].filter((t) =>
-                credentialTokens.has(t),
-              ),
-            )
-          : NONE;
+        section.kind === "certifications"
+          ? credentialTokens
+          : heading && (section.kind === "other" || section.kind === "languages")
+            ? new Set(
+                [...extractVocabulary(heading, km, vocab).keys()].filter((t) =>
+                  credentialTokens.has(t),
+                ),
+              )
+            : NONE;
       return section.lines.map((line) => {
         const opens =
           !BULLET.test(line) && line.split(/\s+/).length <= 5 && !/\d/u.test(line)
@@ -430,9 +461,16 @@ export function judgeRequirements(
       .map((entry) => entry.line.replace(BULLET_PREFIX, "").trim().slice(0, 160));
   let lists: boolean | undefined;
   const listsAny = () =>
-    (lists ??= resumeLines.some((entry) =>
-      listsLanguages(entry.line, matchers, km.requirements.languageNames),
-    ));
+    (lists ??=
+      parsed.spokenLanguages.length > 0 ||
+      resumeLines.some((entry) =>
+        listsLanguages(entry.line, matchers, km.requirements.languageNames),
+      ));
+  // The certification rows, each with what it names: a credential asked for is met by one.
+  const certificationRows = parsed.certifications.map((row) => ({
+    line: formatCertification(row),
+    holds: resumeCapabilities(extractVocabulary(`${row.name} ${row.issuer}`, km, vocab), vocab),
+  }));
 
   // What each dated role's lines hold. A role is anchored on its own lines — its dated line and
   // the header lines just above it that name its title or employer — never on a bullet that
@@ -537,6 +575,7 @@ export function judgeRequirements(
     const languages = askedLanguages(ask, matchers, km, vocab, !(years || levels.length));
     if (languages.length) {
       const names = km.requirements.languageNames;
+      const asked = askedLevels(ask, languages, policy);
       const states = languages.map((name) => {
         const english = own(names, name) ?? name;
         const aliases = [
@@ -548,9 +587,37 @@ export function judgeRequirements(
           named.test(entry.line) &&
           !WEAK_LANGUAGE.test(entry.line) &&
           !matchers.nationality.test(entry.line.replace(BULLET_PREFIX, ""));
-        return { name, shows, found: resumeLines.some(shows) };
+        // A spoken-language row decides, at the level asked; without one, a line naming the
+        // language does, as it always has.
+        const row = parsed.spokenLanguages.find(
+          (spoken) => canonicalLanguage(spoken.language, policy) === english,
+        );
+        const level = asked.get(name) ?? null;
+        const status: Status | null = row
+          ? !level || !row.cefr || compareCefr(row.cefr, level) >= 0
+            ? "met"
+            : belowLevel(row.cefr, level)
+          : resumeLines.some(shows)
+            ? "met"
+            : null;
+        const short = row?.cefr && level && compareCefr(row.cefr, level) < 0;
+        return {
+          name,
+          shows,
+          row,
+          status,
+          detail: short ? `${row.language}: ${row.cefr} read, ${level} asked` : null,
+        };
       });
-      const found = states.filter((state) => state.found).length;
+      const met = states.filter((state) => state.status === "met").length;
+      const some = states.some((state) => state.status === "met" || state.status === "partial");
+      const fromRows = states.flatMap((state) =>
+        state.row && state.status !== "missing" ? [formatSpokenLanguage(state.row)] : [],
+      );
+      const fromLines = evidenceFor((entry) =>
+        states.some((state) => !state.row && state.shows(entry)),
+      );
+      const detail = states.flatMap((state) => (state.detail ? [state.detail] : [])).join("; ");
       return {
         ...base,
         kind: "language",
@@ -558,15 +625,19 @@ export function judgeRequirements(
         // lists its languages and leaves one off is missing it; one that lists none (a language
         // named in passing is not a list) leaves the question to the application.
         status:
-          found === states.length
+          met === states.length
             ? "met"
-            : found
+            : some
               ? "partial"
               : listsAny()
                 ? "missing"
                 : "unverifiable",
-        terms: states.map(({ name, found }) => ({ term: name, found })),
-        evidence: evidenceFor((entry) => states.some((state) => state.shows(entry))),
+        terms: states.map(({ name, status }) => ({
+          term: name,
+          found: status === "met" || status === "partial",
+        })),
+        evidence: [...new Set([...fromRows, ...fromLines])].slice(0, MAX_EVIDENCE),
+        ...(detail ? { detail } : {}),
       } satisfies AtsRequirement;
     }
 
@@ -656,19 +727,35 @@ export function judgeRequirements(
         (token) => entry.holds.has(token) || (qualifier.sameLine && entry.context.has(token)),
       ) &&
       (!qualifier.sameLine || !skills.length || picked.some(([token]) => entry.holds.has(token)));
-    const qualifiersShown = qualifiers.map((qualifier) =>
-      resumeLines.some((entry) => showsQualifier(entry, qualifier)),
+    // A credential asked for ("AWS certification", "PMP certified") is met by a certification
+    // row naming the skill, or by any row when the ask names none; the row is the evidence.
+    const rowShows = (row: (typeof certificationRows)[number]) =>
+      !skills.length || picked.some(([token]) => row.holds.has(token));
+    const credentialRows = qualifiers.some((qualifier) => qualifier.sameLine)
+      ? certificationRows.filter(rowShows)
+      : [];
+    const qualifiersShown = qualifiers.map(
+      (qualifier) =>
+        (qualifier.sameLine && credentialRows.length > 0) ||
+        resumeLines.some((entry) => showsQualifier(entry, qualifier)),
     );
     const qualifiersMet = qualifiersShown.every(Boolean);
     const terms = [
       ...picked.map(([token, term]) => ({ term: term.label, found: held.has(token) })),
       ...qualifiers.map((qualifier, i) => ({ term: qualifier.label, found: qualifiersShown[i]! })),
     ];
-    const termEvidence = evidenceFor(
-      (entry) =>
-        picked.some(([token]) => entry.holds.has(token)) ||
-        qualifiers.some((qualifier) => showsQualifier(entry, qualifier)),
-    );
+    // Beside a row, the certifications section's own lines would only repeat it.
+    const termEvidence = [
+      ...new Set([
+        ...credentialRows.map((row) => row.line),
+        ...evidenceFor(
+          (entry) =>
+            (!credentialRows.length || entry.kind !== "certifications") &&
+            (picked.some(([token]) => entry.holds.has(token)) ||
+              qualifiers.some((qualifier) => showsQualifier(entry, qualifier))),
+        ),
+      ]),
+    ].slice(0, MAX_EVIDENCE);
     /** An unshown activity or credential holds a requirement below met. */
     const qualified = (status: Status): Status =>
       qualifiersMet ? status : weaker(status, "partial");

@@ -10,7 +10,14 @@
 import { parseArgs } from "node:util";
 
 import type { FetchLike } from "../ai/http.js";
-import { categoryLabel, formatRoleDates, formatTenure, scoreTone } from "../format/index.js";
+import {
+  categoryLabel,
+  formatCertification,
+  formatRoleDates,
+  formatSpokenLanguage,
+  formatTenure,
+  scoreTone,
+} from "../format/index.js";
 import {
   AtsScoringService,
   computeVerdict,
@@ -165,6 +172,10 @@ function render(report: AtsReport, style: Style): string {
   if (parsed.monthsOfExperience)
     lines.push(field("Tenure", formatTenure(parsed.monthsOfExperience)));
   if (parsed.skills.length) lines.push(field("Skills", parsed.skills.slice(0, 20).join(", ")));
+  for (const row of parsed.certifications.slice(0, 8))
+    lines.push(field("Cert", formatCertification(row)));
+  if (parsed.spokenLanguages.length)
+    lines.push(field("Speaks", parsed.spokenLanguages.map(formatSpokenLanguage).join(", ")));
 
   if (report.failedChecks.length) {
     lines.push("", style.bold("Failed checks:"));

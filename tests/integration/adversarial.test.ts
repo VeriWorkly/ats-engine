@@ -73,6 +73,12 @@ const SHAPES: Record<string, string> = {
   "passive run": rep("was quickly used "),
   "pronoun slash": rep("I/"),
   "weak opener run": rep("responsible for "),
+  "expires run": rep("expires 2027 "),
+  "issued dot run": rep("Issued Jan 2021 · "),
+  "language level run": rep("English (native), "),
+  "cefr run": rep("B2 "),
+  "level phrase run": rep("professional working "),
+  "fließend run": rep("fließend "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -93,6 +99,23 @@ describe("50 KB adversarial input", () => {
       jobTextFromHtml(html);
     }, 1_500);
   });
+
+  // Certification and language rows are read only under their headings and on a labelled line.
+  it.each(Object.entries(SHAPES))(
+    "%s under Certifications and Languages, in bounded time",
+    (_, input) => {
+      const resume = `Jane Doe\njane@example.com\nCertifications\n${input}\nLanguages\n${input}\nSkills\nLanguages: ${input}\nCertifications: ${input}`;
+      expectFast(
+        () =>
+          AtsScoringService.check(resume, POLICY, {
+            now: NOW,
+            jobDescription: `Requirements\n- Fluent ${input}\n- ${input} certification`,
+            languages: ["de", "hi"],
+          }),
+        1_500,
+      );
+    },
+  );
 
   // English, with lists to compare with, so the posting's prose is read for names.
   it.each(Object.entries(SHAPES))(

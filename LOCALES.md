@@ -84,6 +84,13 @@ Things to know:
   as prose, and the heading is missed. Scripts without case don't need them.
 - **Credentials are regional, not linguistic.** "Abitur" and "Class XII" go in the region pack,
   because English resumes from those countries carry them too.
+- **Certifications and spoken languages** have headings of their own (`sections.certifications`,
+  `sections.languages`: "Zertifikate", "भाषाएँ"), read as rows. `languageLevels` maps the words
+  a resume or a posting states a level with to a CEFR level: "fließend" to C1, "Muttersprache"
+  to C2. Its keys may be small patterns, for inflections. `credentialWords` lists the words
+  around a certification's dates and issuer (`issued`, `expires` such as "gültig bis", `issuer`,
+  `id`). A language is recognised by `requirements.languageNames`, so a pack that adds level
+  words for its language also names the languages in it ("Englisch").
 
 ## Testing a pack
 

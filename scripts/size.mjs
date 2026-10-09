@@ -11,7 +11,10 @@ const BUDGETS = {
   // 165: the October audit's vocabulary (headings, degrees, title and place words) filled 160;
   // Markdown reading, role headers with a location and names left out of a posting's keywords
   // (proseNames) took it to 160.2 (0.2). Most of the bundle is policy data, not code.
-  ".": 165,
+  // 170: certifications and spoken languages read as rows (their parsers, CEFR level words and
+  // the requirement judging over them, 4.1) and the writing rules (their checks and word lists,
+  // 2.7) took it from 161.2 to 168.0 (0.3). zod is about half of the entry: zod/mini is the trim.
+  ".": 170,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then

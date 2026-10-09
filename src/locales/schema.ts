@@ -1,7 +1,7 @@
 import { isSupportedCountry } from "libphonenumber-js/min";
 import { z } from "zod";
 
-import { iscedDegrees, regexString, term, wordList } from "../policy/primitives.js";
+import { cefrLevels, iscedDegrees, regexString, term, wordList } from "../policy/primitives.js";
 
 /**
  * Locale packs: the vocabulary a resume in one language, or from one country, is written in.
@@ -26,9 +26,22 @@ const vocabularyShape = {
       education: regexString("sections.education"),
       skills: regexString("sections.skills"),
       projects: regexString("sections.projects"),
+      certifications: regexString("sections.certifications"),
+      languages: regexString("sections.languages"),
       other: regexString("sections.other"),
     })
     .partial()
+    .optional(),
+  /** Level words of spoken languages and the CEFR level each states: "fließend" → C1. */
+  languageLevels: cefrLevels("languageLevels").optional(),
+  /** Words around a certification's dates and issuer: "gültig bis", "ausgestellt von". */
+  credentialWords: z
+    .object({
+      issued: optionalList("credentialWords.issued"),
+      expires: optionalList("credentialWords.expires"),
+      issuer: optionalList("credentialWords.issuer"),
+      id: optionalList("credentialWords.id"),
+    })
     .optional(),
   months: z.record(z.string().min(1), z.number().int().min(1).max(12)).optional(),
   /** Seasons a term is dated by, as the first and last month each covers: "Sommer 2019". */

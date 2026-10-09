@@ -52,6 +52,14 @@ const project = z.object({
 
 const skillGroup = z.object({ name: optional(200), keywords: z.array(text(200)).max(L.keywords) });
 const entry = z.object({ heading: optional(), lines: list(L.lines) });
+const certification = z.object({
+  name: text(),
+  issuer: optional(),
+  date,
+  expires: date,
+  url: optional(2_048),
+});
+const language = z.object({ language: text(200), level: optional(200) });
 
 const items = <T extends z.ZodType>(item: T) => z.array(item).max(L.items);
 const title = text(200);
@@ -62,6 +70,8 @@ const section = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("education"), title, items: items(education) }),
   z.object({ kind: z.literal("projects"), title, items: items(project) }),
   z.object({ kind: z.literal("skills"), title, items: items(skillGroup) }),
+  z.object({ kind: z.literal("certifications"), title, items: items(certification) }),
+  z.object({ kind: z.literal("languages"), title, items: items(language) }),
   z.object({ kind: z.literal("other"), title, items: items(entry) }),
 ]);
 

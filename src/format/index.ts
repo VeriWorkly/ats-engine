@@ -7,7 +7,14 @@
  * English only. ponytail: labels are literals; take them as parameters when a second locale ships.
  */
 
-import type { AtsDegreeLevel, AtsIscedLevel, AtsParsedDate, AtsParsedRole } from "../types.js";
+import type {
+  AtsDegreeLevel,
+  AtsIscedLevel,
+  AtsParsedCertification,
+  AtsParsedDate,
+  AtsParsedLanguage,
+  AtsParsedRole,
+} from "../types.js";
 import { own } from "../util/own.js";
 
 export type AtsScoreTone = "good" | "warn" | "bad";
@@ -80,6 +87,18 @@ export function formatRoleDates(role: Pick<AtsParsedRole, "start" | "end" | "cur
   if (!from) return null;
   const to = role.current ? "Present" : (formatParsedDate(role.end) ?? "?");
   return `${from} – ${to}`;
+}
+
+/** "PMP, PMI, Mar 2021, expires 2027": a certification row on one line. */
+export function formatCertification(row: AtsParsedCertification): string {
+  const earned = formatParsedDate(row.date);
+  const expires = formatParsedDate(row.expires);
+  return [row.name, row.issuer, earned, expires && `expires ${expires}`].filter(Boolean).join(", ");
+}
+
+/** "German (B2)", "German (fluent)", or the language alone when no level was read. */
+export function formatSpokenLanguage(row: AtsParsedLanguage): string {
+  return row.level ? `${row.language} (${row.level})` : row.language;
 }
 
 /** "3 yr 2 mo", "3 yr", "7 mo". Whole months; anything not a positive number reads as "0 mo". */

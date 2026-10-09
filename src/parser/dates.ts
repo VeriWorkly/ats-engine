@@ -22,6 +22,8 @@ type DateMatchers = {
   months: Record<string, number>;
   seasons: Record<string, readonly [number, number]>;
   range: RegExp;
+  /** Any one date, globally: what `findDates` lists. */
+  single: RegExp;
   named: RegExp;
   season: RegExp;
   openEnded: RegExp;
@@ -101,6 +103,7 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
       String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})`,
       "giu",
     ),
+    single: new RegExp(date, "giu"),
     named: new RegExp(
       String.raw`^(?:${DAY_BEFORE})?(${monthNames})\.?[\s-]*${DAY_AFTER}(\d{4}|${SHORT_YEAR})$`,
       "u",
@@ -286,6 +289,29 @@ export function findDateRange(
     return { range: { start, end, current }, matched: match[0] };
   }
   return term;
+}
+
+/**
+ * Every plausible date written on the line, one by one, where each stands: a certification's
+ * "Issued Mar 2022 · Expires Mar 2025" holds two dates and no range. A two-digit year ("Jan
+ * '20") is placed as a range's start would be.
+ */
+export function findDates(
+  line: string,
+  rp: AtsEnginePolicy["resumeParse"],
+  now: Date,
+): Array<{ date: AtsParsedDate; index: number; end: number }> {
+  const found: Array<{ date: AtsParsedDate; index: number; end: number }> = [];
+  for (const match of line.matchAll(buildMatchers(rp).single)) {
+    const raw = match[0];
+    const parsed = parseDate(raw, rp);
+    const date = TWO_DIGIT_YEAR.test(raw.trim())
+      ? withCentury(parsed, now.getUTCFullYear() + YEARS_AHEAD)
+      : parsed;
+    if (isPlausibleDate(date, now))
+      found.push({ date, index: match.index, end: match.index + raw.length });
+  }
+  return found;
 }
 
 /** A word straight after a date, one space away at most: "30 Main St", not a column. */

@@ -114,7 +114,10 @@ const emptyParsed: AtsParsedResume = {
   roles: [],
   education: [],
   skills: [],
+  certifications: [],
+  spokenLanguages: [],
   monthsOfExperience: null,
+  highestIsced: null,
   highestDegree: null,
   provenance: {
     name: "none",
@@ -123,8 +126,24 @@ const emptyParsed: AtsParsedResume = {
     roles: "none",
     education: "none",
     skills: "none",
+    certifications: "none",
+    spokenLanguages: "none",
   },
 };
+
+describe("merge: a record from before certifications and languages were read", () => {
+  it("keeps working, with the new rows empty", () => {
+    const { certifications, spokenLanguages, provenance, ...older } = emptyParsed;
+    void certifications;
+    void spokenLanguages;
+    const { merged } = merge(
+      { ...older, provenance } as AtsParsedResume,
+      candidate({ name: "Jane Q. Doe" }),
+      SOURCE,
+    );
+    expect(merged).toMatchObject({ name: "Jane Q. Doe", certifications: [], spokenLanguages: [] });
+  });
+});
 
 const candidate = (overrides: Partial<AtsRepairCandidate> = {}): AtsRepairCandidate => ({
   name: "",

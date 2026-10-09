@@ -55,6 +55,14 @@ describe("ats-engine check", () => {
     expect(printed).toMatch(/Role {5}Senior Engineer, Acme Corporation \(Jan 2020 – Present\)/);
   });
 
+  it("prints the certifications and languages an ATS reads", async () => {
+    const resume = `${RESUME}\n\nCertifications\nPMP (PMI), expires 2027\n\nLanguages\nEnglish (native), German (B2)`;
+    expect(await main(["check", file("credentials.txt", resume)])).toBe(0);
+    const printed = out.join("\n");
+    expect(printed).toContain("Cert     PMP, PMI, expires 2027");
+    expect(printed).toContain("Speaks   English (native), German (B2)");
+  });
+
   it("prints the text as read with --text, and the region it was read in", async () => {
     expect(await main(["check", file("text.txt", RESUME), "--text", "--region", "US"])).toBe(0);
     const printed = out.join("\n");

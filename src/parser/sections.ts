@@ -5,7 +5,8 @@ import { memo } from "../util/memo.js";
 import { findDateRange } from "./dates.js";
 import { degreeLevel } from "./education.js";
 
-export type ResumeSectionKind = "experience" | "education" | "skills" | "projects" | "other";
+export type ResumeSectionKind =
+  "experience" | "education" | "skills" | "projects" | "certifications" | "languages" | "other";
 
 /** `headed`: opened by a heading, as opposed to the lines above the first one. */
 export type ResumeSection = { kind: ResumeSectionKind; lines: string[]; headed: boolean };
@@ -106,6 +107,9 @@ const matchersOf = memo((rp: AtsEnginePolicy["resumeParse"]): SectionMatchers =>
     { kind: "education", re: policyRegex(rp.sections.education, "i") },
     { kind: "skills", re: policyRegex(rp.sections.skills, "i") },
     { kind: "projects", re: policyRegex(rp.sections.projects, "i") },
+    // Defaulted by the schema; a policy object built by hand, unparsed, may not have them.
+    { kind: "certifications", re: policyRegex(rp.sections.certifications ?? "(?!)", "i") },
+    { kind: "languages", re: policyRegex(rp.sections.languages ?? "(?!)", "i") },
     { kind: "other", re: policyRegex(rp.sections.other, "i") },
   ],
   connector: headingConnector(rp),
@@ -123,6 +127,15 @@ export function isSectionHeading(line: string, policy: AtsEnginePolicy) {
 /** The kind of section the line heads, or null when it is not a heading. */
 export function sectionKind(line: string, policy: AtsEnginePolicy) {
   return classifyHeading(line, sectionMatchers(policy))?.kind ?? null;
+}
+
+/**
+ * A heading with its content after a colon — "Languages: English (native)" — as the kind it
+ * names and that content; null for a bare heading or any other line.
+ */
+export function labelledLine(line: string, policy: AtsEnginePolicy) {
+  const heading = classifyHeading(line, sectionMatchers(policy));
+  return heading?.rest ? { kind: heading.kind, rest: heading.rest } : null;
 }
 
 /**
@@ -281,14 +294,14 @@ function unknownHeadings(
 /**
  * Splits the resume at its headings.
  *
- * Every heading terminates the previous block, including headings we do not classify —
- * "Certifications", "Awards", "Publications". Without that, a certifications list sitting below
- * the last job would be read as part of the work history and every line in it examined for a
- * date range.
+ * Every heading terminates the previous block, including the ones read as nothing more than
+ * "other" — "Awards", "Publications". Without that, a list sitting below the last job would be
+ * read as part of the work history and every line in it examined for a date range.
  *
  * Except inside Skills: there "Languages: TypeScript, Go" is a category of skills, not the
- * Languages section, so a heading word with content after its colon stays a skills line. A bare
- * "Languages" on its own line still opens a section.
+ * Languages section, so a heading word with content after its colon stays a skills line (the
+ * parser still reads it for spoken languages). A bare "Languages" on its own line still opens a
+ * section.
  *
  * A heading word with a word after it that joins no heading ("Experience Strategist") over a
  * line of bare dates is a role, not a heading. And an Education section is closed by a heading the policy

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   categoryLabel,
+  formatCertification,
   formatParsedDate,
+  formatSpokenLanguage,
   formatRoleDates,
   formatTenure,
   roleSpanMonths,
@@ -83,5 +85,24 @@ describe("format helpers", () => {
       9,
     );
     expect(roleSpanMonths({ start: null, end: null, current: true }, now)).toBe(0);
+  });
+
+  it("formats a certification row and a spoken-language row", () => {
+    expect(
+      formatCertification({
+        name: "PMP",
+        issuer: "PMI",
+        date: { year: 2021, month: 3 },
+        expires: { year: 2027, month: null },
+      }),
+    ).toBe("PMP, PMI, Mar 2021, expires 2027");
+    expect(formatCertification({ name: "CKA", issuer: "", date: null, expires: null })).toBe("CKA");
+    expect(formatSpokenLanguage({ language: "German", level: "B2", cefr: "B2" })).toBe(
+      "German (B2)",
+    );
+    expect(formatSpokenLanguage({ language: "German", level: "fluent", cefr: "C1" })).toBe(
+      "German (fluent)",
+    );
+    expect(formatSpokenLanguage({ language: "Hindi", level: "", cefr: null })).toBe("Hindi");
   });
 });

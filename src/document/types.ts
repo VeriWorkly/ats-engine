@@ -67,7 +67,25 @@ export type AtsDocumentSkillGroup = {
   keywords: string[];
 };
 
-/** A row in any section without a dedicated shape: certifications, awards, languages, … */
+/** A certification or licence. `date` when it was earned, `expires` when it lapses. */
+export type AtsDocumentCertification = {
+  name: string;
+  issuer?: string;
+  date?: string;
+  expires?: string;
+  url?: string;
+};
+
+/**
+ * A language spoken. `level` as the resume states it: a word ("Native", "fließend") or a CEFR
+ * level ("B2"); the engine reads its CEFR level from either.
+ */
+export type AtsDocumentLanguage = {
+  language: string;
+  level?: string;
+};
+
+/** A row in any section without a dedicated shape: awards, publications, interests, … */
 export type AtsDocumentEntry = {
   heading?: string;
   lines?: string[];
@@ -83,6 +101,8 @@ export type AtsDocumentSection =
   | { kind: "education"; title: string; items: AtsDocumentEducation[] }
   | { kind: "projects"; title: string; items: AtsDocumentProject[] }
   | { kind: "skills"; title: string; items: AtsDocumentSkillGroup[] }
+  | { kind: "certifications"; title: string; items: AtsDocumentCertification[] }
+  | { kind: "languages"; title: string; items: AtsDocumentLanguage[] }
   | { kind: "other"; title: string; items: AtsDocumentEntry[] };
 
 export type AtsDocumentBasics = {
