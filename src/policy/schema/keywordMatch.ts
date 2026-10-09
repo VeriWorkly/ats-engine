@@ -72,6 +72,15 @@ export const keywordMatchSchema = z
         { suffix: "us", minLength: 2, replacement: "u" },
         { suffix: "ases", minLength: 4, replacement: "as" },
         { suffix: "ase", minLength: 3, replacement: "as" },
+        // Greek plurals in "-es" for "-is": "analysis" and "analyses" both to "analys". Only
+        // the endings that are always such a pair: a general "-ses" rule would part "response"
+        // from "responses", and "-oses" would part "close" from "closes".
+        { suffix: "ysis", minLength: 5, replacement: "ys" },
+        { suffix: "yses", minLength: 5, replacement: "ys" },
+        { suffix: "thesis", minLength: 6, replacement: "thes" },
+        { suffix: "theses", minLength: 6, replacement: "thes" },
+        { suffix: "gnosis", minLength: 6, replacement: "gnos" },
+        { suffix: "gnoses", minLength: 6, replacement: "gnos" },
         // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
         { suffix: "s", minLength: 3, replacement: "", unless: "ss" },
       ]),

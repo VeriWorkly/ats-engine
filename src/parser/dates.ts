@@ -231,7 +231,8 @@ function toIndex(date: AtsParsedDate, edge: "start" | "end") {
  * than ten years ahead of `now`, an end's in the first year on or after the start that ends in
  * those digits ("2019–21", "1998–02"). A bare two-digit end follows only a bare year, and not
  * after an unspaced hyphen when it could be a month: "2021-03" is March. Nor is it one when it
- * lands after `now`, or when a word follows it as in an address ("Suite 2021 - 30 Main St").
+ * lands after `now` — by more than `aheadYears`, for an expected graduation ("2023–27") — or when
+ * a word follows it as in an address ("Suite 2021 - 30 Main St").
  *
  * A season alone ("Summer 2018") is read only when the line holds no range, and only at an edge
  * of the line or in a column of its own: in "Led the Fall 2021 recruiting season" or "Fall 2019
@@ -241,6 +242,7 @@ export function findDateRange(
   line: string,
   rp: AtsEnginePolicy["resumeParse"],
   now: Date = new Date(),
+  { aheadYears = 0 }: { aheadYears?: number } = {},
 ): { range: DateRange; matched: string } | null {
   const matchers = buildMatchers(rp);
   let term: { range: DateRange; matched: string } | null = null;
@@ -279,7 +281,7 @@ export function findDateRange(
     if (!isPlausibleDate(start, now)) continue;
     if (!current && (!isPlausibleDate(end, now) || toIndex(end, "end") < toIndex(start, "start")))
       continue;
-    if (shortEnd && end && end.year > now.getUTCFullYear()) continue;
+    if (shortEnd && end && end.year > now.getUTCFullYear() + aheadYears) continue;
 
     return { range: { start, end, current }, matched: match[0] };
   }

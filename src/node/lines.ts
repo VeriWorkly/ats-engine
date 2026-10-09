@@ -354,10 +354,18 @@ export function pageText(
     } else if (mark !== undefined && out.trim().split(/\s+/).length >= 6) add(mark, 1);
     at = end;
   }
+  // Where a mark stands beside a short line — a title on a timeline's rail, a label — a mark at
+  // that place is decoration, however long the line beside it.
+  const decorative = new Set<number>();
+  for (const { mark, out } of texts)
+    if (mark !== undefined && out.trim().split(/\s+/).length < 6)
+      for (const dx of [-1, 0, 1]) decorative.add(Math.round(mark) + dx);
   texts.forEach(({ mark, out }, at) => {
-    const listed = (dx: number) => (lists.get(Math.round(mark!) + dx) ?? 0) >= 2;
-    if (mark !== undefined && out.trim().split(/\s+/).length >= 6 && [-1, 0, 1].some(listed))
-      bulleted.add(at);
+    if (mark === undefined || out.trim().split(/\s+/).length < 6) return;
+    const listed = (dx: number) => (lists.get(Math.round(mark) + dx) ?? 0) >= 2;
+    // A list of one: the only item of a role with one bullet, a sentence with nothing on the
+    // page to say its mark is a timeline's.
+    if ([-1, 0, 1].some(listed) || !decorative.has(Math.round(mark))) bulleted.add(at);
   });
   const text = texts.map(({ out }, at) => (bulleted.has(at) ? `• ${out}` : out)).join("\n");
 

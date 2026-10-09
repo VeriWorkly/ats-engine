@@ -411,6 +411,34 @@ describe("list markers drawn as shapes are read as bullets", () => {
       "Staff Engineer, Datadog",
     ]);
   });
+
+  it("reads the one bullet of a role with one item as a bullet", async () => {
+    const ops = [
+      at(45, 712, "Experience"),
+      at(45, 698, "Staff Engineer, Datadog 2021 - Present"),
+      `40 685 3 3 re f`,
+      at(50, 684, "Cut paging volume 45% by rebuilding the alerting pipeline."),
+    ].join("\n");
+    expect(lines((await pdf(ops)).text)).toEqual([
+      "Experience",
+      "Staff Engineer, Datadog 2021 - Present",
+      "• Cut paging volume 45% by rebuilding the alerting pipeline.",
+    ]);
+  });
+
+  it("leaves a lone dot before a short line a dot", async () => {
+    const ops = [
+      at(45, 712, "Experience"),
+      `40 699 3 3 re f`,
+      at(50, 698, "Staff Engineer, Datadog"),
+      at(50, 684, "Cut paging volume 45% by rebuilding the alerting pipeline."),
+    ].join("\n");
+    expect(lines((await pdf(ops)).text)).toEqual([
+      "Experience",
+      "Staff Engineer, Datadog",
+      "Cut paging volume 45% by rebuilding the alerting pipeline.",
+    ]);
+  });
 });
 
 describe("only pictures count as photos in a DOCX", () => {
