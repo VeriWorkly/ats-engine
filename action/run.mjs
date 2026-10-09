@@ -10,6 +10,7 @@ const resume = env.ATS_RESUME?.trim();
 const job = env.ATS_JOB?.trim();
 const minScoreText = env.ATS_MIN_SCORE?.trim();
 const region = env.ATS_REGION?.trim();
+const target = env.ATS_TARGET?.trim();
 const version = env.ATS_VERSION?.trim() || "latest";
 
 function fail(message) {
@@ -27,6 +28,7 @@ if (minScore !== null && !(minScore >= 0 && minScore <= 100))
 const args = ["--yes", `@veriworkly/ats-engine@${version}`, "check", resolve(resume), "--json"];
 if (job) args.push("--job", resolve(job));
 if (region) args.push("--region", region);
+if (target) args.push("--ats", target);
 
 // On Windows `npx` is a .cmd file, which only a shell runs, and a shell would split a path with
 // spaces: npx's own script is run with this Node instead. ATS_ENGINE_CLI runs a local build of
@@ -103,8 +105,21 @@ if (report.requirements?.length) {
     lines.push(`| ${cell(requirement.status)} | ${cell(requirement.text)} |`);
   lines.push("");
 }
-if (report.missingKeywords?.length)
+// Grouped when the engine reports groups (0.3 and later), flat otherwise.
+const groups = report.missingKeywordGroups;
+if (groups) {
+  if (groups.hard.length) lines.push(`**Missing keywords:** ${cell(groups.hard.join(", "))}`, "");
+  if (groups.soft.length)
+    lines.push(`**Missing soft skills (weigh less):** ${cell(groups.soft.join(", "))}`, "");
+} else if (report.missingKeywords?.length)
   lines.push(`**Missing keywords:** ${cell(report.missingKeywords.join(", "))}`, "");
+// Not scored: the file's name and size, details that can invite age bias, notes on a target ATS.
+if (report.advice?.length) {
+  lines.push("### Advice (not scored)", "");
+  for (const item of report.advice)
+    lines.push(`- ${cell(item.message)}${item.fix ? ` ${cell(item.fix)}` : ""}`);
+  lines.push("");
+}
 lines.push(
   `<sub>Scored by @veriworkly/ats-engine ${cell(report.engine?.version ?? version)} with a deterministic, published rubric. No AI model is involved in the score.</sub>`,
 );

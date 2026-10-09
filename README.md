@@ -145,6 +145,7 @@ Keep your resume in a repository and check it on every push. The step fails when
 | `min-score` | Fail the step below this readiness score (0–100)                                                                  |
 | `region`    | Read the resume as from this country (`US`, `DE`, `IN`)                                                           |
 | `version`   | Engine version to run. Defaults to the release the action ships with, so your score only moves when you change it |
+| `ats`       | Add the documented notes for the ATS you apply through (`greenhouse`, `lever`, `taleo`) to the advice             |
 | `summary`   | `false` to leave the job summary out                                                                              |
 
 Outputs: `score`, `job-match`, `failed-checks` (JSON) and `report` (the path of the full JSON report). Pin `@main` to a commit SHA if you want the action itself fixed too.

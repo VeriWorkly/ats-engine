@@ -25,6 +25,10 @@ inputs:
     description: Version of @veriworkly/ats-engine to run. Defaults to the engine release this action ships with, so a later release cannot change your score until you move to it.
     required: false
     default: "0.2.1"
+  ats:
+    description: Name the ATS you are applying through (greenhouse, lever or taleo) to add its documented notes to the advice. Empty means none.
+    required: false
+    default: ""
   summary:
     description: Write the report to the job summary.
     required: false
@@ -56,6 +60,7 @@ runs:
         ATS_JOB: ${{ inputs.job }}
         ATS_MIN_SCORE: ${{ inputs.min-score }}
         ATS_REGION: ${{ inputs.region }}
+        ATS_TARGET: ${{ inputs.ats }}
         ATS_VERSION: ${{ inputs.version }}
         ATS_SUMMARY: ${{ inputs.summary }}
         NO_COLOR: "1"
