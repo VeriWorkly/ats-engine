@@ -39,6 +39,19 @@ describe("format helpers", () => {
     expect(categoryLabel("content")).toBe("Evidence");
   });
 
+  it("labels writing and places it after every category about whether the ATS reads the resume", () => {
+    expect(categoryLabel("writing")).toBe("Writing");
+    const sorted = sortByCategoryOrder(
+      ["writing", "format", "content", "integrity"].map((category) => ({ category })),
+    );
+    expect(sorted.map((item) => item.category)).toEqual([
+      "integrity",
+      "content",
+      "format",
+      "writing",
+    ]);
+  });
+
   it("formats dates, spans and tenure", () => {
     expect(formatParsedDate({ year: 2021, month: 3 })).toBe("Mar 2021");
     expect(formatParsedDate({ year: 2021, month: null })).toBe("2021");

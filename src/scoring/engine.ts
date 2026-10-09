@@ -96,7 +96,7 @@ export class AtsScoringService {
         ? normalizeText(options.jobDescription.slice(0, MAX_JOB_DESCRIPTION_CHARS))
         : undefined;
     const prepared = prepareResume(resume);
-    const { policy, locale } = localizePolicy(
+    const { policy, locale, resumeLanguages } = localizePolicy(
       basePolicy,
       jobDescription === undefined ? prepared.text : `${prepared.text}\n${jobDescription}`,
       options,
@@ -107,6 +107,7 @@ export class AtsScoringService {
       jobDescription,
       layout,
       now,
+      languages: resumeLanguages,
     });
     const { active, results, readinessScore } = scoreRules(policy.rules, ctx);
     const failedChecks = results.filter((rule) => !rule.passed);

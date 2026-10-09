@@ -138,7 +138,15 @@ export function localizePolicy(
   options: AtsLocaleOptions = {},
   /** The resume alone, without a posting: what names the region and the date order. */
   resumeText = text,
-): { policy: AtsEnginePolicy; locale: AtsLocale } {
+): {
+  policy: AtsEnginePolicy;
+  locale: AtsLocale;
+  /**
+   * The language packs the resume itself is read in — those asked for, else those it is detected
+   * as written in — leaving out a language only the posting is written in. Empty for the base.
+   */
+  resumeLanguages: string[];
+} {
   const { languages: packs, regions } = policy.locales;
   // A region asked for by name is applied or refused, never dropped: ignoring it would also skip
   // the inference from the phone number, and score the resume under no region without a word.
@@ -154,7 +162,7 @@ export function localizePolicy(
   }
   const dateOrder = dateOrderIn(resumeText.slice(0, DETECTION_SAMPLE));
   if (packs.length === 0 && regions.length === 0 && dateOrder === undefined)
-    return { policy, locale: { languages: [], region: null } };
+    return { policy, locale: { languages: [], region: null }, resumeLanguages: [] };
 
   // The resume and the posting are detected apart, each in its own language: measured together,
   // a long English posting dilutes a German resume below the share that recognises it.
@@ -210,5 +218,6 @@ export function localizePolicy(
       localized = { ...localized, resumeParse: { ...localized.resumeParse, dateOrder } };
     cached.set(key, localized);
   }
-  return { policy: localized, locale };
+  const resumeLanguages = (options.languages ? languages : inResume).map((pack) => pack.id);
+  return { policy: localized, locale, resumeLanguages };
 }

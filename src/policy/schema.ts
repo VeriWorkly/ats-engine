@@ -5,6 +5,7 @@ import { keywordMatchSchema } from "./schema/keywordMatch.js";
 import { resumeParseSchema } from "./schema/resumeParse.js";
 import { ruleSchema } from "./schema/rules.js";
 import { engineTextSchema } from "./schema/text.js";
+import { writingSchema } from "./schema/writing.js";
 
 /**
  * The scoring policy schema.
@@ -48,6 +49,7 @@ export const atsEngineSchema = z.object({
   keywordMatch: keywordMatchSchema,
   resumeParse: resumeParseSchema,
   text: engineTextSchema,
+  writing: writingSchema,
   locales: localesSchema,
 });
 

@@ -27,7 +27,8 @@ export function scoreTone(score: number): AtsScoreTone {
 
 /**
  * Category ids in the order a report reads best: can it be trusted, read, found, navigated,
- * believed. Integrity leads because a finding there outweighs everything below it.
+ * believed, and then how well it reads. Integrity leads because a finding there outweighs
+ * everything below it; writing style comes last because no ATS filters on it.
  */
 export const CATEGORY_ORDER = [
   "integrity",
@@ -36,6 +37,7 @@ export const CATEGORY_ORDER = [
   "structure",
   "content",
   "format",
+  "writing",
 ] as const;
 
 export const CATEGORY_LABELS: Readonly<Record<string, string>> = {
@@ -45,6 +47,7 @@ export const CATEGORY_LABELS: Readonly<Record<string, string>> = {
   content: "Evidence",
   format: "Format risk",
   integrity: "Integrity",
+  writing: "Writing",
 };
 
 /** A policy may define categories this list does not know; they are title-cased, not hidden. */

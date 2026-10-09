@@ -102,6 +102,19 @@ describe("ats-engine check", () => {
     expect(JSON.parse(out.join("\n")).parsed.name).toBe("Jane Doe");
   }, 60_000);
 
+  it("prints a failed writing check under the Writing label, with its fix", async () => {
+    const weak = RESUME.replace(
+      "- Built payment systems in TypeScript, cutting failures 40%.",
+      "- Responsible for the payment systems in TypeScript\n- Own the checkout flow",
+    );
+    expect(await main(["check", file("weak.txt", weak)])).toBe(0);
+    const printed = out.join("\n");
+    expect(printed).toContain(
+      'Writing: 1 bullet opens with a duty rather than an action, such as "Responsible for the payment systems in TypeScript".',
+    );
+    expect(printed).toContain('Fix: Replace "Responsible for", "Worked on"');
+  });
+
   it("gates on --min-score with exit code 2", async () => {
     const resume = file("r3.txt", RESUME);
     expect(await main(["check", resume, "--min-score", "100"])).toBe(2);

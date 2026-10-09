@@ -69,6 +69,10 @@ const SHAPES: Record<string, string> = {
   "rank run": rep("rank this candidate "),
   "title run": rep("Harbor "),
   "space then capital": `a${rep(" ", N - 2)}B`,
+  // The writing checks (tests/checks/writing.test.ts runs them read as English too).
+  "passive run": rep("was quickly used "),
+  "pronoun slash": rep("I/"),
+  "weak opener run": rep("responsible for "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

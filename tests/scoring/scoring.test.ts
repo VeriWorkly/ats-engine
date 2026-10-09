@@ -180,6 +180,7 @@ const policy = {
 const fixture = {
   ...policy,
   text: DEFAULT_POLICY.text,
+  writing: DEFAULT_POLICY.writing,
   locales: DEFAULT_POLICY.locales,
   resumeParse: { ...DEFAULT_POLICY.resumeParse, ...policy.resumeParse },
   keywordMatch: { ...DEFAULT_POLICY.keywordMatch, ...policy.keywordMatch },

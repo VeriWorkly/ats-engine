@@ -2,7 +2,7 @@
 
 Generated from the community policy (`DEFAULT_POLICY`) by `npm run rubric`; do not edit by hand.
 
-- Engine 0.2.1, policy `ats-v2+bae0aaa7`.
+- Engine 0.2.1, policy `ats-v2+06289639`.
 - **Score.** Each rule that applies can lose its weight. The readiness score is the share of the
   applicable weight kept, 0–100. A rule whose evidence is absent — page geometry for pasted
   text, a posting for the copied-posting check — is left out of both the report and the score.
@@ -41,3 +41,11 @@ Generated from the community policy (`DEFAULT_POLICY`) by `npm run rubric`; do n
 | `ats-v2.format.columns` | Format risk | error | columnRatio | 15 | The document reads as a single column. | Use a single-column layout; columns extract in a scrambled order. |
 | `ats-v2.format.tables` | Format risk | warning | tableCount | 10 | No ruled tables were found. | Replace tables with plain paragraphs and bullets. |
 | `ats-v2.format.photo` | Format risk | info | imageCount | 2 | No photo was found. | Leave the photo off unless the country you are applying in expects one. |
+| `ats-v2.writing.firstPerson` | Writing | info | firstPersonLines (en only) | 2 | No bullet speaks in the first person. | Leave out "I", "my" and "we": open each bullet with what you did ("Led the payments team"). |
+| `ats-v2.writing.passiveVoice` | Writing | info | passiveVoiceRatio (en only) | 2 | Most bullets are in the active voice. | Say who acted: "Rebuilt the payments service in Go", not "The payments service was rebuilt". |
+| `ats-v2.writing.weakOpeners` | Writing | warning | weakOpeners (en only) | 2 | Bullets open with an action rather than a duty. | Replace "Responsible for", "Worked on" and the like with the verb for what you did, and say what came of it. |
+| `ats-v2.writing.tense` | Writing | info | tenseMismatches (en only) | 2 | Past roles are written in the past tense, the current one in the present. | Write the role you hold now in the present tense ("Lead") and past roles in the past ("Led"). |
+| `ats-v2.writing.bulletLength` | Writing | info | longBullets (en only) | 1 | No bullet runs past two lines. | Keep each bullet to one or two lines, one action and its result; split a longer one in two. |
+| `ats-v2.writing.bulletsPerRole` | Writing | info | bulletsPerRole (en only) | 1 | Each role has a readable number of bullets. | Give each role two to eight bullets: enough to show what you did, few enough to read. |
+| `ats-v2.writing.repeatedOpeners` | Writing | info | repeatedOpeners (en only) | 1 | Bullets in a row open with different words. | Vary the opening verbs, so each bullet reads as its own result rather than one duty repeated. |
+| `ats-v2.writing.dateFormats` | Writing | info | dateFormats (en only) | 1 | Role dates are written one way throughout. | Write every date the same way, such as "Jan 2020 – Mar 2023". |

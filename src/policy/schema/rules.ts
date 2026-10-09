@@ -53,6 +53,15 @@ const ruleBase = z.object({
    * merely existing, shift the score of every honest one.
    */
   penalty: z.boolean().default(false),
+  /**
+   * The languages (ISO 639) the rule can judge, for a rule that reads words of one language.
+   * Dropped — neither passed nor failed — for a resume read in any other: see `text.language`
+   * and the language packs. Without it a rule applies whatever the language.
+   */
+  languages: z
+    .array(z.string().regex(/^[a-z]{2,3}$/, "an ISO 639 language code"))
+    .min(1)
+    .optional(),
 });
 
 const minWordsRule = z.object({
@@ -119,6 +128,22 @@ const bandsRule = z
       "timelineIssues",
       /** Share of listed skills (three or more) that no other section mentions. */
       "unsupportedSkills",
+      /** Writing: bullets in the first person (`writing.firstPersonPronouns`). */
+      "firstPersonLines",
+      /** Writing: share of bullets with an auxiliary before a participle ("was built"). */
+      "passiveVoiceRatio",
+      /** Writing: bullets opening with a duty (`writing.weakOpeners`). */
+      "weakOpeners",
+      /** Writing: bullets whose first verb's tense does not fit the role (current or past). */
+      "tenseMismatches",
+      /** Writing: bullets longer than `writing.maxBulletWords`. */
+      "longBullets",
+      /** Writing: roles with bullets outside `writing.bulletsPerRole`. */
+      "bulletsPerRole",
+      /** Writing: runs of `writing.repeatedOpenerRun` bullets opening with the same word. */
+      "repeatedOpeners",
+      /** Writing: how many formats the roles' dates are written in ("Jan 2020", "03/2021"). */
+      "dateFormats",
     ]),
     /**
      * What `metricsRatio` and `actionVerbRatio` look for. An `actionVerbRatio` rule without one

@@ -18,6 +18,15 @@ import { wordList } from "../primitives.js";
  */
 export const engineTextSchema = z
   .object({
+    /**
+     * The language this policy's own vocabulary is written in (ISO 639): what a resume is read as
+     * when no attached language pack recognises it. A rule limited to some `languages` applies
+     * only to a resume read in one of them.
+     */
+    language: z
+      .string()
+      .regex(/^[a-z]{2,3}$/, "an ISO 639 language code")
+      .default("en"),
     contentLineVerbs: wordList("text.contentLineVerbs").default([
       "managed",
       "led",

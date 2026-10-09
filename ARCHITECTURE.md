@@ -17,8 +17,9 @@ These hold everywhere, and each has a test:
   mode (`policyRegex`); word lists use `wordListPattern` (JS `\b` is ASCII-only). Text is
   normalised once (`normalizeText`: NFKC, digits of every script, invisible characters).
 - **Evidence or nothing.** A rule whose evidence is absent (no geometry, no posting) is dropped
-  from the report, never passed or failed. Integrity rules are penalties outside the denominator:
-  an honest resume scores exactly as if they did not exist.
+  from the report, never passed or failed. So is a rule limited to some `languages` (the writing
+  rules: English) for a resume read in another. Integrity rules are penalties outside the
+  denominator: an honest resume scores exactly as if they did not exist.
 - **Linear time on hostile input**, with every input bounded (see [SECURITY.md](./SECURITY.md)).
 - **AI output is grounded.** Resume text goes to a model as data; every identity value it returns
   must occur in the source. The tuned private policy and prompts never ship; `DEFAULT_POLICY` is
@@ -34,7 +35,7 @@ check(resume, policy, options)                                   check.ts, scori
      readResumeLines      rejoin wrapped lines, read spaced ones  parser/lines.ts
      segmentResume        headings → sections                     parser/sections.ts
      parseReadLines | parseResumeDocument                          parser/, document/parse.ts
-     checks               integrity, timeline, skills             checks/
+     checks               integrity, timeline, skills, writing    checks/
  4 scoreRules             applicable rules → results, score       scoring/score.ts, rules.ts
  5 computeJobMatch        posting terms, names left out, weights  matching/jobMatch.ts
  6 judgeRequirements      per-requirement status and evidence     matching/requirements.ts
@@ -55,10 +56,10 @@ Splitting those is welcome where a seam is clear.
 | `types.ts`, `types/`     | report types; `types/parsed.ts` (recovered record, ISCED, provenance), `types/layout.ts` (geometry signals)                                                                                                                                                                                                                       | `.`                    |
 | `input.ts`               | `prepareResume`: kind of input, flattening, size guards                                                                                                                                                                                                                                                                           | `.`                    |
 | `text/`                  | `text.ts` normalisation, word lists, tokens, stemming, bullets; `characters.ts` invisible and tag characters                                                                                                                                                                                                                      | internal               |
-| `policy/`                | `schema.ts` (assembles `schema/rules`, `schema/resumeParse`, `schema/keywordMatch`, `schema/text`), `default.ts` (assembles `default/rules`, `default/keywordMatch`, `default/resumeParse`), `parse`, `primitives`, `regex`, `fingerprint`, `errors`                                                                              | `.`                    |
+| `policy/`                | `schema.ts` (assembles `schema/rules`, `schema/resumeParse`, `schema/keywordMatch`, `schema/text`, `schema/writing`), `default.ts` (assembles `default/rules`, `default/keywordMatch`, `default/resumeParse`), `parse`, `primitives`, `regex`, `fingerprint`, `errors`                                                            | `.`                    |
 | `parser/`                | `lines`, `sections`, `dates`, `experience` (roles), `education` (ISCED), `contact` (name, email, date of birth), `phone`, `record` (derived fields, provenance), `tenure`, `index`                                                                                                                                                | `.` (`parseResume`)    |
-| `checks/`                | `integrity/text` (injection, homoglyphs, copied posting, stuffing), `timeline`, `skills`, `bullets` (role body lines when list markers were lost), `finding`                                                                                                                                                                      | internal               |
-| `scoring/`               | `engine` (pipeline), `context` (what rules read), `score` (arithmetic), `rules` (per-kind evaluation and applicability), `categories`, `rubric`, `verdict`                                                                                                                                                                        | `.`                    |
+| `checks/`                | `integrity/text` (injection, homoglyphs, copied posting, stuffing), `timeline`, `skills`, `bullets` (role body lines when list markers were lost), `writing` (style of the bullets and role dates, English), `finding`                                                                                                            | internal               |
+| `scoring/`               | `engine` (pipeline), `context` (what rules read), `score` (arithmetic), `rules` (per-kind evaluation and applicability, `languages` too), `categories` (`writing` apart), `rubric`, `verdict`                                                                                                                                     | `.`                    |
 | `matching/`              | `vocabulary` (terms, synonyms, phrases), `alternation` ("Go or Java"), `jobSections`, `proseNames`, `jobMatch`, `requirements`                                                                                                                                                                                                    | internal               |
 | `locales/`               | `schema`, `languages` (language detection and vocabulary, no phone metadata), `resolve` (attach, region, date order), `packs/` (`de`, `hi`, `regions`)                                                                                                                                                                            | `/locales`             |
 | `document/`              | structured input: `types`, `render`, `jsonResume` (public); `schema`, `parse` (internal)                                                                                                                                                                                                                                          | `/document`            |
@@ -91,12 +92,12 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 | Entry                                                   | Modules | Externals                                                |
 | ------------------------------------------------------- | ------: | -------------------------------------------------------- |
-| `.`                                                     |      64 | zod, libphonenumber-js                                   |
+| `.`                                                     |      66 | zod, libphonenumber-js                                   |
 | `/document`                                             |       4 | none                                                     |
 | `/format`                                               |       2 | none                                                     |
 | `/job`                                                  |       3 | none                                                     |
-| `/locales`                                              |      22 | zod, libphonenumber-js                                   |
-| `/ai`                                                   |      41 | zod, libphonenumber-js                                   |
+| `/locales`                                              |      23 | zod, libphonenumber-js                                   |
+| `/ai`                                                   |      42 | zod, libphonenumber-js                                   |
 | `/ai/openai-compatible`, `/ai/anthropic`, `/ai/testing` |     4–5 | none                                                     |
 | `/node`                                                 |      18 | node:\*, pdfjs-dist, pdf-parse, mammoth (optional peers) |
 
