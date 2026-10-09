@@ -17,6 +17,9 @@ export type PositionedRun = {
   /** Whether its text could be a tab stop's — a date or a place has a digit or a comma — rather
    * than a word of a second column. Unknown is taken as could. */
   stop?: boolean;
+  /** Its baseline, top of the page first. Given, a side whose text lies above or below all of
+   * the other side's is not a column beside it. */
+  y?: number;
 };
 
 /** The best gutter: the share of text beyond it, where it is, and whether right-aligned runs
@@ -65,6 +68,36 @@ const TAB_STOP_CHARS = 40;
  * candidate split has no text at all on the far side, so the share is zero and no gutter is
  * reported. Returns `null` when the page has too little text to say.
  */
+/**
+ * Whether the text left and right of `split` sits side by side: at least half the thinner
+ * side's characters lie between the other side's first and last baselines. A centred heading
+ * over a block of short lines leaves an empty strip down the page too, but it is above the
+ * block, not beside it, and read as a column of its own it came after the lines it heads.
+ * Without baselines, as with a caller that has none, the sides are taken as beside.
+ */
+function besideEachOther(rows: Iterable<PositionedRun[]>, split: number): boolean {
+  const sides = [
+    { mass: 0, top: Infinity, bottom: -Infinity, runs: [] as PositionedRun[] },
+    { mass: 0, top: Infinity, bottom: -Infinity, runs: [] as PositionedRun[] },
+  ];
+  for (const row of rows)
+    for (const run of row) {
+      if (run.y === undefined) return true;
+      if (run.left < split && run.right > split) continue;
+      const side = sides[run.right <= split ? 0 : 1]!;
+      side.mass += run.mass;
+      side.top = Math.min(side.top, run.y);
+      side.bottom = Math.max(side.bottom, run.y);
+      side.runs.push(run);
+    }
+  const [thin, thick] = sides[0]!.mass <= sides[1]!.mass ? sides : [sides[1]!, sides[0]!];
+  if (!thin.mass) return true;
+  let within = 0;
+  for (const run of thin.runs)
+    if (run.y! >= thick.top - 1 && run.y! <= thick.bottom + 1) within += run.mass;
+  return within >= thin.mass / 2;
+}
+
 export function findGutter(runs: readonly PositionedRun[], pageWidth: number): Gutter | null {
   if (runs.length < MIN_ITEMS_FOR_COLUMN_SIGNAL || pageWidth <= 0) return null;
 
@@ -121,6 +154,8 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
         if (r <= TAB_STOP_CHARS && stop) short += 1;
       } else if (r && !l) rightOnly += 1;
     }
+
+    if (!besideEachOther(rows.values(), split)) continue;
 
     // Tab stops: flush right, each beside text on its left, and a date or a place — a few
     // characters with a digit or a comma. A right side of words — a sidebar's skills, its email
