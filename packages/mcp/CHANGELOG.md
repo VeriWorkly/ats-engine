@@ -1,5 +1,27 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.2.0
+
+### Minor Changes
+
+- 18f77de: **Breaking:** the server runs engine 0.3, so scores and results change for the same file: the readiness score now weighs the writing-style rules (a `writing` entry in `categories`), soft skills weigh less in the job match, and certifications and spoken languages are read as rows of their own.
+
+  - `check_resume` takes `target_ats` (`greenhouse`, `lever` or `taleo`) to add what that vendor documents publicly, each note with a link to its page. An unknown name is a tool error.
+  - `check_resume` returns `advice`, never scored, in its structured result and under "Advice (not scored)" in its text: the file's name and size, a password, tracked changes or comments left in a Word document, details that can invite age bias where the region calls for it, and the `target_ats` notes.
+  - `match_job` returns `missingKeywordGroups`, and `check_resume`'s `job` returns `matchedKeywordGroups` and `missingKeywordGroups` (`{ hard, soft }`). Both texts print missing soft skills on a line of their own ("Missing soft skills (weigh less): …") under the missing keywords, which now list only hard skills.
+  - `check_resume`'s structured `parsed` carries `certifications` and `spokenLanguages` with the rest of what an ATS stores, declared in its output schema, and its text lists them under "What an ATS reads" ("Certification: …", "Speaks: …").
+
+### Patch Changes
+
+- Updated dependencies [b5a7c35]
+- Updated dependencies [05c6155]
+- Updated dependencies [7d87fbe]
+- Updated dependencies [8ba9767]
+- Updated dependencies [1998fc2]
+- Updated dependencies [1f025ac]
+- Updated dependencies [ecee416]
+  - @veriworkly/ats-engine@0.3.0
+
 ## 0.1.0
 
 ### Minor Changes

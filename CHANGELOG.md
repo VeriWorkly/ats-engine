@@ -3,6 +3,72 @@
 Release notes are generated from `.changeset/` by `changeset version`. See
 [.changeset/README.md](.changeset/README.md) for what counts as breaking.
 
+## 0.3.0
+
+### Minor Changes
+
+- b5a7c35: **Breaking:** certifications and spoken languages are read as rows of their own, so the report's shape, the policy schema and some requirement judgements change for the same input.
+
+  - `parsed.certifications` (`AtsParsedCertification[]`): one row per certification or licence, `{ name, issuer, date, expires }`. "AWS Certified Solutions Architect – Associate, Amazon Web Services, 2023" and "PMP (PMI), expires 2027" both read whole; LinkedIn's "Issued Mar 2022 · Expires Mar 2025", on the line or the line below, too. Read from a Certifications or Licenses section and from a "Certifications:" line among the skills.
+  - `parsed.spokenLanguages` (`AtsParsedLanguage[]`): one row per language, `{ language, level, cefr }` (`cefr` an `AtsCefrLevel` or null), with the level as written and its CEFR level (A1–C2) read from words in the policy ("native" C2, "fluent" C1, "professional working proficiency" C1, "conversational" B1, "basic" A2) or written out ("B2"). Read from a Languages section and from a "Languages: English (native), German (B2)" line among the skills, which is then no longer read as skills; "Languages: Go, Rust" still is. Each language once.
+  - `provenance` gains `certifications` and `spokenLanguages`, and so does `AtsParsedField`. A record built before this (handed back to `mergeGrounded`) still merges, with both empty.
+  - Requirements: a certification asked for ("AWS certification") is met by a certification row naming it, and the row is the evidence. A language asked for is judged against its row at the level asked: "Fluent German" asks for C1, so German (B2) is now partial with a detail ("German: B2 read, C1 asked") where it was met, and a beginner's row stays missing. An ask with no level is met by any row. A language with no row is judged on the resume's lines as before.
+  - Policy: `resumeParse.sections.certifications` and `resumeParse.sections.languages` (headings, defaulted; tried before `other`, and the community policy's `other` no longer names them), `resumeParse.languageLevels` (level words → CEFR) and `resumeParse.credentialWords` (`issued`, `expires`, `issuer`, `id`). Language packs can add all four; the German and Hindi packs do ("Zertifikate", "Sprachen", "fließend", "verhandlungssicher", "gültig bis"; "प्रमाणपत्र", "भाषाएँ", "मातृभाषा", "धाराप्रवाह", "समाप्ति"). A resume with no Experience heading no longer reads its certifications or languages for roles.
+  - Structured input: an `AtsResumeDocument` takes `certifications` (`AtsDocumentCertification`: `{ name, issuer?, date?, expires?, url? }`) and `languages` (`AtsDocumentLanguage`: `{ language, level? }`) sections, and an `other` section titled as one is read too. `fromJsonResume` maps `certificates` and `languages` to them, and `renderResumeDocument` writes both out.
+  - `/format` adds `formatCertification` and `formatSpokenLanguage`; the CLI shows both under "What an ATS reads", one "Cert" line per certification and a "Speaks" line for the languages.
+
+- 05c6155: **Breaking:** the report gains `advice`, a list of notes that are never scored. The report's shape, the policy schema and the policy fingerprint change. Scores do not: the same resume scores byte for byte the same with or without anything that produces advice.
+
+  - `report.advice` (`AtsAdvice[]`): always present, often empty. Each item is `{ id, kind: "file" | "age" | "ats", message, evidence?, fix?, source? }`, with its text taken from the policy. It is never part of `readinessScore`, `categories`, `failedChecks` or `prioritizedFixes`.
+  - File advice, only for what the caller describes with the new `file` option (`AtsFileInfo`: `{ name?, bytes?, format?, passwordProtected?, trackedChanges?, comments? }`) or extraction measured:
+    - `file.name`: a name that says nothing about whose resume it is ("resume.pdf", "CV.docx", "Document1.docx", "scan0001.pdf") or reads as a draft ("Resume_final_v3 (2).pdf"). It suggests `Firstname-Lastname-Resume.pdf` built from the parsed name. A name with a word the lists do not know, in any script, is left alone unless it reads as a draft.
+    - `file.size`: over 2 MB, described as a common upload limit rather than a universal one.
+    - `file.passwordProtected`: from the caller, or from a PDF that is encrypted but opened without a password.
+    - `file.trackedChanges` and `file.comments`: for a Word document still holding them, with their counts when extraction counted them.
+  - Age advice, only where the region pack sets `ageAdvice` (the US: 20 and 20; not Germany or India, where an age on a resume is customary). `age.graduationYear` covers a graduation year more than 20 years back. `age.experienceYears` covers "30+ years of experience" or a work history dated across more than 20 years.
+  - Target-ATS notes: the new `targetAts` option (`greenhouse`, `lever`, `taleo` in the community policy) adds what that vendor documents on a public page, each note with that page as `source`. An id the policy has no notes on throws `AtsPolicyError` before anything is read.
+  - Layout signals (`AtsLayoutSignals`): `encrypted` (PDF), and `trackedChanges` and `comments` (DOCX, counted while the document is measured). `extractResume` returns them.
+  - `readResumeFile` also returns `file` (`name`, `bytes`, `format`) to pass to `check`.
+  - Policy: a new `advice` section (file-name word lists, size limit, age thresholds and patterns, target notes, every message), with defaults so an older policy still parses. Region packs take `ageAdvice` (`graduationYears`, `experienceYears`).
+  - `shapeReport`: a restricted report gains `advice` with each item's `id`, `kind` and `message` only; the evidence, fix and source stay in the full report.
+  - `/format` adds `adviceLabel` and `ADVICE_LABELS` ("File", "Age", "ATS").
+  - CLI: an "Advice (not scored)" section after the failed checks, `--ats <name>`, and `advice` in `--json`.
+
+- 7d87fbe: **Breaking:** three readings that dropped information are fixed, so recovered fields and scores change for the same input.
+
+  - An expected graduation written with a two-digit end year ("B.Tech, IIT Delhi, 2023–27") ends in 2027, not 2023. A degree's short end year may run up to six years past today; a role's still may not, so "2019 - 45" in a bullet stays a number.
+  - Greek plurals meet their singular in job matching: "analyses" counts for "analysis", as do "hypotheses", "syntheses" and "diagnoses". New stemming rules in the policy (`-ysis`/`-yses`, `-thesis`/`-theses`, `-gnosis`/`-gnoses`) do it; "response" and "responses", "close" and "closes" match as before.
+  - In a PDF, a list marker drawn as a shape in front of the only bullet of a role now reads as "•". A lone mark still stays a mark before a short line, and wherever marks at the same place stand beside short lines on the page, as a timeline's do.
+
+- 8ba9767: **Breaking:** the job match tells hard skills from soft skills ("communication", "teamwork") and weighs soft skills less, so `jobMatchScore` changes for the same input whenever a posting names one, and the report gains two fields.
+
+  - `matchedKeywordGroups` and `missingKeywordGroups` (`AtsKeywordGroups`: `{ hard: string[]; soft: string[] }`, each at most 12) list the posting's terms by kind. `matchedKeywords` and `missingKeywords` keep their type and their cap of 12, but their order changes: they are now the hard group followed by the soft one, where a soft skill used to rank among the ordinary words.
+  - A soft skill weighs `softSkillWeight` (0.4) of an ordinary word, a tenth of a named skill, whatever its capitals: a resume claims it more often than it shows it, and an ATS's keyword match gives it little value. A resume missing only soft skills now scores above one missing as many hard skills.
+  - Policy schema: `keywordMatch.softSkills` (default empty; the community policy lists 29) and `keywordMatch.softSkillWeight` (default 0.4). A multi-word soft skill is matched as a phrase ("problem solving", "attention to detail"), so a requirement naming one lists it as one term. Soft skills are never recognised hard skills, even when `phrases` or `synonyms` name them. The community policy adds synonyms that fold a soft skill's other spellings ("communicating", "collaborative", "problem-solving") together. Mentoring, coaching, project management and negotiation stay hard skills: a resume shows them with outcomes.
+  - Language packs: a `softSkills` field, added to the policy's. The German pack lists 32 ("Teamfähigkeit", "Kommunikationsstärke", "belastbar"), the Hindi pack 14 ("संचार", "नेतृत्व", "समस्या समाधान"), and the Hindi pack's stopwords gain "कौशल" and "क्षमता" ("skill", "ability"), as English "skills" and "ability" are.
+  - The CLI prints missing soft skills on a line of their own ("Missing soft skills (weigh less): …") under the missing keywords, which now list only the hard group.
+  - A restricted report (`shapeReport(…, "restricted")`) carries no groups; its `missingKeywordCount` counts the flat list.
+
+- 1998fc2: **Breaking:** two readings are corrected, so recovered fields and evidence text change for the same input.
+
+  - An employer whose name holds a joining word keeps it: "Teaching Assistant, The University of Texas at Austin" reads the employer as "The University of Texas at Austin", not "The University of Texas, Austin". The joining words ("at", "bei", …) still part a title from its employer everywhere else: "Research Assistant at University of Michigan" is a title and an employer.
+  - A rule's quoted evidence longer than 80 characters is cut where a word ends and ends in "…", instead of stopping mid-word ("from 52% t").
+
+- 1f025ac: **Breaking:** the community policy gains eight writing-style rules in a new `writing` category, so the readiness score and `categories` change for the same input. The scores of the existing categories do not move; the total does, because it now weighs `writing` too (12 points of weight, against 190 for the rest of the rubric).
+
+  - `ats-v2.writing.firstPerson`, `passiveVoice`, `weakOpeners`, `tense`, `bulletLength`, `bulletsPerRole`, `repeatedOpeners` and `dateFormats` flag bullets in the first person or the passive voice, bullets that open with a duty ("Responsible for"), a present tense in a role already left (the current role may use either), bullets over 40 words, roles with fewer than 2 or more than 8 bullets, three bullets in a row opening with the same word, and role dates written in more than one format. Each quotes what it found and says how to fix it.
+  - They are English only and are dropped, not failed, for a resume read in another language, and when there is nothing to judge (no bullets, no dated roles).
+  - Policy schema: a rule may carry `languages` (ISO 639 codes) and is then dropped for a resume read in any other language; `text.language` (default `"en"`) names the language a resume is read in when no attached language pack recognises it; a new `writing` section holds the word lists and limits, with defaults, so a policy written before it still parses.
+  - `localizePolicy` also returns `resumeLanguages`: the language packs the resume itself is read in, without one only the posting is written in.
+  - `policyRubric` names a rule's languages in its `measures` ("passiveVoiceRatio (en only)"), and RUBRIC.md lists the eight rules.
+  - `/format`: `CATEGORY_ORDER` ends with `writing`, labelled "Writing".
+
+### Patch Changes
+
+- ecee416: Smaller bundles. The schemas are written with `zod/mini`, which tree-shakes, so the main entry is 91.7 KB gzipped where it was 171.9, and `/locales` and `/ai` are 67.5 KB where they were 141. Parsed policies, defaults, error messages (`AtsPolicyError`, `AtsInputError`, `AtsAiError`), the locale packs' JSON Schemas and the published types are the same, and so is every report.
+
+  Two things outside those guarantees change. The raw validation error attached as `AtsAiError.cause` is now zod's core error class (`$ZodError`), with the same issues and message but without `ZodError`'s `format()` and `flatten()` helpers; read `cause.issues` instead. And loading the engine no longer switches zod's global error messages to English: the engine passes English messages to its own parses, so its errors read as before, but a host that relied on that side effect for its own `zod/mini` schemas should call `z.config(z.locales.en())` itself.
+
 ## 0.2.1
 
 ### Patch Changes
