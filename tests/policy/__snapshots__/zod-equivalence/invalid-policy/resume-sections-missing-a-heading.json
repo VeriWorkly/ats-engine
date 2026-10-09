@@ -1,0 +1,62 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.sections.education",
+        "message": "Invalid input: expected string, received undefined"
+      },
+      {
+        "path": "resumeParse.sections.skills",
+        "message": "Invalid input: expected string, received undefined"
+      },
+      {
+        "path": "resumeParse.sections.projects",
+        "message": "Invalid input: expected string, received undefined"
+      },
+      {
+        "path": "resumeParse.sections.other",
+        "message": "Invalid input: expected string, received undefined"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "resumeParse",
+        "sections",
+        "education"
+      ]
+    },
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "resumeParse",
+        "sections",
+        "skills"
+      ]
+    },
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "resumeParse",
+        "sections",
+        "projects"
+      ]
+    },
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "resumeParse",
+        "sections",
+        "other"
+      ]
+    }
+  ]
+}

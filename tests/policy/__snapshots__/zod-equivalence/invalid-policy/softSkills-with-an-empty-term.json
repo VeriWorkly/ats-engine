@@ -1,0 +1,58 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.softSkills.0",
+        "message": "Too small: expected string to have >=1 characters"
+      },
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"problem solving\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      },
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"decision making\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      },
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"attention to detail\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "string",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "keywordMatch",
+        "softSkills",
+        0
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
+      ]
+    }
+  ]
+}

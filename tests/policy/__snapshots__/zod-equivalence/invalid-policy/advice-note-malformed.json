@@ -1,0 +1,80 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "advice.targets.acme.name",
+        "message": "Too small: expected string to have >=1 characters"
+      },
+      {
+        "path": "advice.targets.acme.notes.0.id",
+        "message": "a note id: letters, digits, '-' or '_'"
+      },
+      {
+        "path": "advice.targets.acme.notes.0.message",
+        "message": "Too small: expected string to have >=1 characters"
+      },
+      {
+        "path": "advice.targets.acme.notes.0.source",
+        "message": "an https URL"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "string",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "advice",
+        "targets",
+        "acme",
+        "name"
+      ]
+    },
+    {
+      "origin": "string",
+      "code": "invalid_format",
+      "format": "regex",
+      "pattern": "/^[A-Za-z][\\w-]*$/",
+      "path": [
+        "advice",
+        "targets",
+        "acme",
+        "notes",
+        0,
+        "id"
+      ]
+    },
+    {
+      "origin": "string",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "advice",
+        "targets",
+        "acme",
+        "notes",
+        0,
+        "message"
+      ]
+    },
+    {
+      "origin": "string",
+      "code": "invalid_format",
+      "format": "regex",
+      "pattern": "/^https:\\/\\/\\S+$/",
+      "path": [
+        "advice",
+        "targets",
+        "acme",
+        "notes",
+        0,
+        "source"
+      ]
+    }
+  ]
+}

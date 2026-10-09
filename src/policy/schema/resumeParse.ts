@@ -1,6 +1,13 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
-import { iscedDegrees, regexString, wordList, type IscedDegrees } from "../primitives.js";
+import {
+  cefrLevels,
+  credentialWords,
+  iscedDegrees,
+  regexString,
+  wordList,
+  type IscedDegrees,
+} from "../primitives.js";
 
 /**
  * Vocabulary the resume parser needs. Data, so it lives in the policy alongside the rules rather
@@ -12,9 +19,64 @@ export const resumeParseSchema = z.object({
     education: regexString("sections.education"),
     skills: regexString("sections.skills"),
     projects: regexString("sections.projects"),
+    /**
+     * Certifications and licences, each line read as a row: name, issuer, dates. Tried before
+     * `other`, so a policy whose `other` still names them reads them here; "Education and
+     * Certifications" stays education, which is tried first.
+     */
+    certifications: z._default(
+      regexString("sections.certifications"),
+      String.raw`^(?:(?:professional\s+)?certifications?|certificates|licen[cs]es?|licensure|credentials)`,
+    ),
+    /**
+     * Spoken languages, each read as a row with its level. Not "Programming Languages", and a
+     * "Languages: Go, Rust" line among the skills stays a skills line.
+     */
+    languages: z._default(
+      regexString("sections.languages"),
+      String.raw`^(?:(?:spoken|foreign)\s+)?languages|^language\s+(?:skills|proficienc(?:y|ies)|competenc(?:y|ies))`,
+    ),
     /** Any other heading. Classified only so that it terminates the block above it. */
     other: regexString("sections.other"),
   }),
+  /**
+   * The words that state how well a language is spoken — whole words or small patterns, matched
+   * ignoring case — and the CEFR level each stands for. An explicit level ("B2") needs no entry
+   * and wins over a word beside it. "Fluent" is C1; "native" C2, as the ILR scale's native or
+   * bilingual proficiency; "professional working proficiency" (ILR 3) C1. "Bilingual" alone is
+   * C1: a posting asking for "bilingual English/Spanish" is met by fluent Spanish. The same words
+   * read a posting's ask, so "fluent German" asks for C1. Packs add their own.
+   */
+  languageLevels: z._default(cefrLevels("languageLevels"), {
+    [String.raw`native\s+or\s+bilingual(?:\s+proficiency)?`]: "C2",
+    [String.raw`full\s+professional(?:\s+proficiency)?`]: "C2",
+    [String.raw`native(?:\s+speaker)?`]: "C2",
+    [String.raw`mother\s+tongue`]: "C2",
+    [String.raw`first\s+language`]: "C2",
+    bilingual: "C1",
+    [String.raw`professional\s+working(?:\s+proficiency)?`]: "C1",
+    professional: "C1",
+    fluent: "C1",
+    fluency: "C1",
+    proficient: "C1",
+    advanced: "C1",
+    [String.raw`business\s+fluent`]: "C1",
+    [String.raw`business[\s-]level`]: "B2",
+    [String.raw`upper[\s-]intermediate`]: "B2",
+    [String.raw`limited\s+working(?:\s+proficiency)?`]: "B1",
+    [String.raw`working\s+knowledge`]: "B1",
+    conversational: "B1",
+    intermediate: "B1",
+    [String.raw`elementary(?:\s+proficiency)?`]: "A2",
+    basic: "A2",
+    beginner: "A1",
+  }),
+  /**
+   * The words around a certification's dates and issuer: "Issued Mar 2022", "expires 2027",
+   * "from Google Cloud", "Credential ID 9X7Y". A date after an `expires` word is the expiry; a
+   * part opening with an `id` word is dropped.
+   */
+  credentialWords: z.prefault(credentialWords, {}),
   /**
    * Month name -> month number, for the date spellings a resume actually uses.
    *
@@ -26,7 +88,7 @@ export const resumeParseSchema = z.object({
    * "jan" and "january" alike. (An abbreviation used to stretch to any longer word, which read
    * "Novartis 2018" as November.)
    */
-  months: z.record(z.string(), z.number().int().min(1).max(12)).default({
+  months: z._default(z.record(z.string(), z.number().check(z.int(), z.gte(1), z.lte(12))), {
     jan: 1,
     january: 1,
     feb: 2,
@@ -57,29 +119,38 @@ export const resumeParseSchema = z.object({
    * and last month each covers. A range starts at its first season's first month and ends at its
    * last season's last month; a season standing alone is a term of its own.
    */
-  seasons: z
-    .record(
-      z.string().min(1),
-      z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]),
-    )
-    .default({
+  seasons: z._default(
+    z.record(
+      z.string().check(z.minLength(1)),
+      z.tuple([
+        z.number().check(z.int(), z.gte(1), z.lte(12)),
+        z.number().check(z.int(), z.gte(1), z.lte(12)),
+      ]),
+    ),
+    {
       spring: [3, 5],
       summer: [6, 8],
       fall: [9, 11],
       autumn: [9, 11],
       winter: [1, 3],
-    }),
+    },
+  ),
   /** The ways a resume says a role is still current. Language-bound, hence data. */
-  openEnded: z
-    .array(z.string().min(1))
-    .min(1)
-    .default(["present", "current", "now", "ongoing", "to date", "till date", "today"]),
+  openEnded: z._default(z.array(z.string().check(z.minLength(1))).check(z.minLength(1)), [
+    "present",
+    "current",
+    "now",
+    "ongoing",
+    "to date",
+    "till date",
+    "today",
+  ]),
   /**
    * Units of a length of time written beside a date range, which LinkedIn exports print:
    * "Jan 2020 - Present · 4 yrs 9 mos", "(4 years 9 months)". A number before one of these is
    * the role's duration, not its title or employer.
    */
-  durationUnits: wordList("durationUnits").default([
+  durationUnits: z._default(wordList("durationUnits"), [
     "yr",
     "yrs",
     "year",
@@ -90,18 +161,18 @@ export const resumeParseSchema = z.object({
     "months",
   ]),
   /** Labels a resume writes its owner's name under: "Name: Jane Doe". */
-  nameLabels: wordList("nameLabels").default(["name", "full name"]),
+  nameLabels: z._default(wordList("nameLabels"), ["name", "full name"]),
   /** Words between the two ends of a date range besides a dash: "2019 to 2022", "2019 bis 2022". */
-  rangeWords: wordList("rangeWords").default(["to", "until", "through"]),
+  rangeWords: z._default(wordList("rangeWords"), ["to", "until", "through"]),
   /** Words before a lone start date that make it a current role: "since 2019", "seit 03/2019". */
-  sinceWords: wordList("sinceWords").default(["since"]),
+  sinceWords: z._default(wordList("sinceWords"), ["since"]),
   /** Words joining a job title to its employer on one line: "Engineer at Acme". */
-  employerWords: wordList("employerWords").default(["at"]),
+  employerWords: z._default(wordList("employerWords"), ["at"]),
   /**
    * What the top of a resume says in place of a name. Never taken as the candidate's name,
    * which matters now that a single word can be one.
    */
-  documentTitles: wordList("documentTitles").default([
+  documentTitles: z._default(wordList("documentTitles"), [
     "resume",
     "résumé",
     "curriculum vitae",
@@ -111,7 +182,7 @@ export const resumeParseSchema = z.object({
    * Lowercase words a name may hold between its capitalised ones: "Ludwig van Beethoven",
    * "María de la Cruz", "Ahmad bin Ismail". One list for every language, because names travel.
    */
-  nameParticles: wordList("nameParticles").default([
+  nameParticles: z._default(wordList("nameParticles"), [
     "van",
     "von",
     "der",
@@ -139,7 +210,7 @@ export const resumeParseSchema = z.object({
    * Credentials written after a name ("Priya Raman, MBA", "Jane Doe, MD"): a name cut from one of
    * these is the name, wherever a company over a title sits below it. Matched whole, ignoring case.
    */
-  postNominals: wordList("postNominals").default([
+  postNominals: z._default(wordList("postNominals"), [
     String.raw`ph\.?d\.?`,
     String.raw`m\.?d\.?`,
     String.raw`d\.?o\.?`,
@@ -174,7 +245,8 @@ export const resumeParseSchema = z.object({
    * A name cut from one of these is a place, unless the code is also a credential the
    * `postNominals` list ("MD"). Matched whole and case-sensitively.
    */
-  regionCodes: wordList("regionCodes").default(
+  regionCodes: z._default(
+    wordList("regionCodes"),
     (
       "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ " +
       "NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY " +
@@ -182,7 +254,7 @@ export const resumeParseSchema = z.object({
     ).split(" "),
   ),
   /** Words that say how or where a role is worked rather than for whom: "Remote", "Hybrid". */
-  workplaceWords: wordList("workplaceWords").default([
+  workplaceWords: z._default(wordList("workplaceWords"), [
     "remote",
     "hybrid",
     "on-?site",
@@ -194,9 +266,9 @@ export const resumeParseSchema = z.object({
    * Lowercase words a capitalised heading may join its words with: "Skills and Tools". Any other
    * lowercase word after the heading word reads as prose ("History of Art BA").
    */
-  headingConnectors: wordList("headingConnectors").default(["and"]),
+  headingConnectors: z._default(wordList("headingConnectors"), ["and"]),
   /** Labels a resume states a date of birth under: "Date of birth: 4 May 1990". */
-  dateOfBirthLabels: wordList("dateOfBirthLabels").default([
+  dateOfBirthLabels: z._default(wordList("dateOfBirthLabels"), [
     "date of birth",
     String.raw`d\.o\.b\.?`,
     "dob",
@@ -207,15 +279,17 @@ export const resumeParseSchema = z.object({
    * in Germany and India. Only the month matters to tenure, so a wrong guess costs at most a
    * month or two; a part over 12 settles it either way. Set by a region pack.
    */
-  dateOrder: z.enum(["MDY", "DMY", "YMD"]).default("MDY"),
+  dateOrder: z._default(z.enum(["MDY", "DMY", "YMD"]), "MDY"),
   /**
    * ISO 3166 countries a phone number without a country code is tried as, in order. A number
    * with one ("+49 30 1234567") is read as what it says. Set by a region pack.
    */
-  phoneRegions: z
-    .array(z.string().regex(/^[A-Z]{2}$/, "a two-letter ISO 3166 country code"))
-    .min(1)
-    .default(["US"]),
+  phoneRegions: z._default(
+    z
+      .array(z.string().check(z.regex(/^[A-Z]{2}$/, "a two-letter ISO 3166 country code")))
+      .check(z.minLength(1)),
+    ["US"],
+  ),
   /** Words that mark a fragment as a job title rather than an employer name. */
   titleWords: wordList("titleWords"),
   /** Words that mark a fragment as an institution. */
@@ -229,24 +303,27 @@ export const resumeParseSchema = z.object({
    */
   degrees: z
     .union([
-      z
-        .object({
+      z.pipe(
+        z.object({
           diploma: regexString("degrees.diploma"),
           associate: regexString("degrees.associate"),
           bachelor: regexString("degrees.bachelor"),
           master: regexString("degrees.master"),
           doctorate: regexString("degrees.doctorate"),
-        })
-        .transform((legacy): IscedDegrees => ({
+        }),
+        z.transform((legacy): IscedDegrees => ({
           "4": legacy.diploma,
           "5": legacy.associate,
           "6": legacy.bachelor,
           "7": legacy.master,
           "8": legacy.doctorate,
         })),
+      ),
       iscedDegrees,
     ])
-    .refine((degrees) => Object.values(degrees).some(Boolean), {
-      message: "degrees must name at least one level",
-    }),
+    .check(
+      z.refine((degrees) => Object.values(degrees).some(Boolean), {
+        message: "degrees must name at least one level",
+      }),
+    ),
 });

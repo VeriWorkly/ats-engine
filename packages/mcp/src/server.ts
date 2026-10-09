@@ -21,12 +21,14 @@ import { z } from "zod";
 
 import {
   checkRegion,
+  checkTarget,
   isUserError,
   MAX_TEXT_CHARS,
   POLICY,
   readJob,
   readResume,
   REGIONS,
+  TARGETS,
   ToolInputError,
   type JobArgs,
   type ResumeArgs,
@@ -83,6 +85,16 @@ const jobInput = (required: boolean) => {
   };
 };
 
+const targetInput = {
+  target_ats: z
+    .string()
+    .optional()
+    .describe(
+      `The applicant tracking system the user is applying through (${TARGETS.join(", ")}), to ` +
+        "add its vendor's documented notes, each with its source. Advice only; never scored.",
+    ),
+};
+
 const regionInput = {
   region: z
     .string()
@@ -133,13 +145,32 @@ const parsedResume = z.looseObject({
   roles: z.array(z.looseObject({ title: z.string(), employer: z.string() })),
   education: z.array(z.looseObject({ school: z.string(), credential: z.string() })),
   skills: z.array(z.string()),
+  certifications: z.array(
+    z
+      .looseObject({ name: z.string(), issuer: z.string() })
+      .describe("A certification or licence, with when it was earned and when it expires."),
+  ),
+  spokenLanguages: z.array(
+    z
+      .looseObject({
+        language: z.string(),
+        level: z.string(),
+        cefr: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]).nullable(),
+      })
+      .describe("A language the candidate speaks, with its level as written and on the CEFR."),
+  ),
   monthsOfExperience: z.number().nullable(),
 });
+
+const keywordGroups = z
+  .object({ hard: z.array(z.string()), soft: z.array(z.string()) })
+  .describe("The same terms by kind; soft skills weigh less in the match.");
 
 const jobMatchOutput = {
   jobMatchScore: z.number().nullable().describe("0-100, how well the resume meets the posting."),
   requirements: z.array(requirement).describe("Each requirement of the posting, judged."),
   missingKeywords: z.array(z.string()),
+  missingKeywordGroups: keywordGroups,
 };
 
 const checkOutput = {
@@ -156,8 +187,27 @@ const checkOutput = {
   parsed: parsedResume.describe("The fields an ATS would store from this resume."),
   locale: z.object({ languages: z.array(z.string()), region: z.string().nullable() }),
   engine: z.object({ version: z.string(), policy: z.string() }),
+  advice: z
+    .array(
+      z.looseObject({
+        id: z.string(),
+        kind: z.enum(["file", "age", "ats"]),
+        message: z.string(),
+        evidence: z.string().optional(),
+        fix: z.string().optional(),
+        source: z.string().optional(),
+      }),
+    )
+    .describe(
+      "Not scored: the file (name, size, password, tracked changes), details that can invite " +
+        "age bias where the region calls for it, and a named ATS's documented notes.",
+    ),
   job: z
-    .object({ ...jobMatchOutput, matchedKeywords: z.array(z.string()) })
+    .object({
+      ...jobMatchOutput,
+      matchedKeywords: z.array(z.string()),
+      matchedKeywordGroups: keywordGroups,
+    })
     .nullable()
     .describe("The match against the posting; null when no posting was given."),
 };
@@ -200,12 +250,15 @@ export function checkResult(report: AtsReport, withJob: boolean) {
     parsed: report.parsed,
     locale: report.locale,
     engine: report.engine,
+    advice: report.advice,
     job: withJob
       ? {
           jobMatchScore: report.jobMatchScore,
           requirements: report.requirements,
           matchedKeywords: report.matchedKeywords,
           missingKeywords: report.missingKeywords,
+          matchedKeywordGroups: report.matchedKeywordGroups,
+          missingKeywordGroups: report.missingKeywordGroups,
         }
       : null,
   };
@@ -234,15 +287,21 @@ async function answer(run: () => Promise<Answer>): Promise<CallToolResult> {
   }
 }
 
-async function score(args: ResumeArgs & JobArgs & { region?: string }, includeLines = false) {
+async function score(
+  args: ResumeArgs & JobArgs & { region?: string; target_ats?: string },
+  includeLines = false,
+) {
   checkRegion(args.region);
-  const { input, layout } = await readResume(args);
+  checkTarget(args.target_ats);
+  const { input, layout, file } = await readResume(args);
   const job = await readJob(args);
   const jobDescription = job?.text;
   const report = check(input, POLICY, {
     jobDescription,
     jobCompany: job?.company,
     layout,
+    file,
+    targetAts: args.target_ats,
     region: args.region,
     includeLines,
   });
@@ -271,8 +330,9 @@ export function createServer(): McpServer {
         "readiness score (0-100), verdict, per-category scores, every failed check with its " +
         "evidence and fix, and the fields an ATS would store (name, contact, roles, education, " +
         "skills). With a job posting it adds the job match score and each requirement judged. " +
-        `${DETERMINISTIC} ${INTENDED_USE} ${LOCAL}`,
-      inputSchema: { ...resumeInput, ...jobInput(false), ...regionInput },
+        "Advice that is not scored (the file, age signals, a named ATS's documented notes) " +
+        `comes apart from the score. ${DETERMINISTIC} ${INTENDED_USE} ${LOCAL}`,
+      inputSchema: { ...resumeInput, ...jobInput(false), ...regionInput, ...targetInput },
       outputSchema: checkOutput,
       annotations: { title: "Check my resume", ...READ_ONLY },
     },
@@ -308,6 +368,7 @@ export function createServer(): McpServer {
             jobMatchScore: report.jobMatchScore,
             requirements: report.requirements,
             missingKeywords: report.missingKeywords,
+            missingKeywordGroups: report.missingKeywordGroups,
           },
         };
       }),

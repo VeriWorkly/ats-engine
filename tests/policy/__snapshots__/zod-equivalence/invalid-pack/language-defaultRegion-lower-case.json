@@ -1,0 +1,25 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.languages.0.defaultRegion",
+        "message": "Invalid string: must match pattern /^[A-Z]{2}$/"
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "origin": "string",
+        "code": "invalid_format",
+        "format": "regex",
+        "pattern": "/^[A-Z]{2}$/",
+        "path": [
+          "defaultRegion"
+        ]
+      }
+    ]
+  ]
+}

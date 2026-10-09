@@ -1,0 +1,661 @@
+{
+  "outcomes": {
+    "analyze": {
+      "result": {
+        "explanation": "",
+        "missingEvidence": [],
+        "keywordOpportunities": [],
+        "recommendedImprovements": [],
+        "priorityOrder": []
+      },
+      "rejected": []
+    },
+    "repairParse": {
+      "result": {
+        "name": "Jane Doe",
+        "email": "jane@example.com",
+        "phone": "+1 415 555 0142",
+        "links": [],
+        "roles": [
+          {
+            "start": {
+              "year": 2020,
+              "month": 1
+            },
+            "end": null,
+            "current": true,
+            "title": "Senior Engineer",
+            "employer": "Acme Corporation"
+          }
+        ],
+        "education": [
+          {
+            "school": "State University",
+            "credential": "BSc",
+            "isced": 6,
+            "level": "bachelor",
+            "end": {
+              "year": 2016,
+              "month": null
+            }
+          }
+        ],
+        "skills": [
+          "TypeScript",
+          "Go"
+        ],
+        "certifications": [],
+        "spokenLanguages": [],
+        "monthsOfExperience": 81,
+        "highestIsced": 6,
+        "highestDegree": "bachelor",
+        "provenance": {
+          "name": "parser",
+          "email": "parser",
+          "phone": "parser",
+          "roles": "parser",
+          "education": "parser",
+          "skills": "parser",
+          "certifications": "none",
+          "spokenLanguages": "none"
+        }
+      },
+      "rejected": []
+    },
+    "convertResume": {
+      "error": {
+        "name": "AtsAiError",
+        "code": "invalid_output",
+        "message": "Response did not match the schema: basics: Invalid input: expected object, received undefined"
+      },
+      "cause": [
+        {
+          "expected": "object",
+          "code": "invalid_type",
+          "path": [
+            "basics"
+          ]
+        }
+      ]
+    }
+  },
+  "requests": {
+    "analyze": {
+      "name": "ats_insights",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "explanation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "missingEvidence": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "keywordOpportunities": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommendedImprovements": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "priorityOrder": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "explanation",
+          "missingEvidence",
+          "keywordOpportunities",
+          "recommendedImprovements",
+          "priorityOrder"
+        ],
+        "additionalProperties": false
+      },
+      "mode": "json_object"
+    },
+    "repairParse": {
+      "name": "repaired_resume",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "roles": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "employer": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "start": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "year": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "month": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "year",
+                    "month"
+                  ],
+                  "additionalProperties": false
+                },
+                "end": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "year": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "month": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "year",
+                    "month"
+                  ],
+                  "additionalProperties": false
+                },
+                "current": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "title",
+                "employer",
+                "start",
+                "end",
+                "current"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "education": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "school": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "credential": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "end": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "year": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "month": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "year",
+                    "month"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "school",
+                "credential",
+                "end"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "skills": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "phone",
+          "roles",
+          "education",
+          "skills"
+        ],
+        "additionalProperties": false
+      },
+      "mode": "json_object"
+    },
+    "convertResume": {
+      "name": "converted_resume",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "basics": {
+            "type": "object",
+            "properties": {
+              "fullName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "role": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "headline": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "location": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "fullName",
+              "role",
+              "headline",
+              "email",
+              "phone",
+              "location"
+            ],
+            "additionalProperties": false
+          },
+          "links": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "label",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "experience": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "company": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "role": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "location": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "startDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "endDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "current": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "summary": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "highlights": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "company",
+                "role",
+                "location",
+                "startDate",
+                "endDate",
+                "current",
+                "summary",
+                "highlights"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "education": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "school": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "degree": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "field": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "startDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "endDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "current": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "summary": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "school",
+                "degree",
+                "field",
+                "startDate",
+                "endDate",
+                "current",
+                "summary"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "projects": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "role": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "link": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "summary": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "highlights": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "skills": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "role",
+                "link",
+                "summary",
+                "highlights",
+                "skills"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "skills": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "keywords": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "keywords"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "basics",
+          "links",
+          "summary",
+          "experience",
+          "education",
+          "projects",
+          "skills"
+        ],
+        "additionalProperties": false
+      },
+      "mode": "json_object"
+    }
+  }
+}

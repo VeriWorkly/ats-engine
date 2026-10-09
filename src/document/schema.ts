@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import { cut, normalizeText } from "../text/text.js";
 import { ATS_DOCUMENT_FORMAT, DOCUMENT_LIMITS as L, type AtsResumeDocument } from "./types.js";
@@ -14,10 +14,14 @@ import { ATS_DOCUMENT_FORMAT, DOCUMENT_LIMITS as L, type AtsResumeDocument } fro
 // Normalised as text input is (see `normalizeText`), so a field and the page rendered from it
 // read the same: a fullwidth "２０２０" date or a ligature in a title would otherwise differ.
 const text = (max: number = L.field) =>
-  z.string().transform((value) => cut(normalizeText(value), max));
-const optional = (max?: number) => text(max).optional();
-const list = (max: number, itemMax: number = L.line) => z.array(text(itemMax)).max(max).optional();
-const flag = z.boolean().optional();
+  z.pipe(
+    z.string(),
+    z.transform((value) => cut(normalizeText(value), max)),
+  );
+const optional = (max?: number) => z.optional(text(max));
+const list = (max: number, itemMax: number = L.line) =>
+  z.optional(z.array(text(itemMax)).check(z.maxLength(max)));
+const flag = z.optional(z.boolean());
 const date = optional(32);
 
 const role = z.object({
@@ -50,10 +54,21 @@ const project = z.object({
   skills: list(L.keywords, 200),
 });
 
-const skillGroup = z.object({ name: optional(200), keywords: z.array(text(200)).max(L.keywords) });
+const skillGroup = z.object({
+  name: optional(200),
+  keywords: z.array(text(200)).check(z.maxLength(L.keywords)),
+});
 const entry = z.object({ heading: optional(), lines: list(L.lines) });
+const certification = z.object({
+  name: text(),
+  issuer: optional(),
+  date,
+  expires: date,
+  url: optional(2_048),
+});
+const language = z.object({ language: text(200), level: optional(200) });
 
-const items = <T extends z.ZodType>(item: T) => z.array(item).max(L.items);
+const items = <T extends z.ZodMiniType>(item: T) => z.array(item).check(z.maxLength(L.items));
 const title = text(200);
 
 const section = z.discriminatedUnion("kind", [
@@ -62,6 +77,8 @@ const section = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("education"), title, items: items(education) }),
   z.object({ kind: z.literal("projects"), title, items: items(project) }),
   z.object({ kind: z.literal("skills"), title, items: items(skillGroup) }),
+  z.object({ kind: z.literal("certifications"), title, items: items(certification) }),
+  z.object({ kind: z.literal("languages"), title, items: items(language) }),
   z.object({ kind: z.literal("other"), title, items: items(entry) }),
 ]);
 
@@ -75,5 +92,5 @@ export const resumeDocumentSchema = z.object({
     location: optional(300),
     links: list(L.links, 2_048),
   }),
-  sections: z.array(section).max(L.sections),
-}) satisfies z.ZodType<AtsResumeDocument, unknown>;
+  sections: z.array(section).check(z.maxLength(L.sections)),
+}) satisfies z.ZodMiniType<AtsResumeDocument, unknown>;

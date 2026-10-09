@@ -13,6 +13,12 @@ export type RuleContext = {
   lines: string[];
   headingLines: string[];
   contentLines: string[];
+  /**
+   * The languages the resume is read in: the attached language packs it is written in, or the
+   * policy's own `text.language` when it is written in none. A rule with `languages` applies only
+   * when each of these is among them.
+   */
+  languages: readonly string[];
   /** Lines that extracted letter-spaced ("E X P E R I E N C E") and were read back as words. */
   letterSpacedLines: number;
   layout: AtsLayoutSignals | undefined;
@@ -39,6 +45,14 @@ export const FINDING_METRICS = [
   "stuffedTerms",
   "timelineIssues",
   "unsupportedSkills",
+  "firstPersonLines",
+  "passiveVoiceRatio",
+  "weakOpeners",
+  "tenseMismatches",
+  "longBullets",
+  "bulletsPerRole",
+  "repeatedOpeners",
+  "dateFormats",
 ] as const;
 
 export type FindingMetric = (typeof FINDING_METRICS)[number];
@@ -71,6 +85,9 @@ function earliestContact(rule: Extract<AtsEngineRule, { kind: "position" }>, ctx
 }
 
 export function isApplicable(rule: AtsEngineRule, ctx: RuleContext) {
+  // A rule that reads one language's words has nothing to judge in another.
+  const { languages } = rule;
+  if (languages && !ctx.languages.every((language) => languages.includes(language))) return false;
   // Where the contact details sit means nothing when there are none; the email rule says so.
   if (rule.kind === "position") return Number.isFinite(earliestContact(rule, ctx));
   // With no line structure at all (a pasted single paragraph, or a resume that extracted as one

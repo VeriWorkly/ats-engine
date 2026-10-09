@@ -1,3 +1,4 @@
+import { adviceFor, targetOf } from "../advice/index.js";
 import { prepareResume, type AtsResumeInput, type PreparedResume } from "../input.js";
 import { localizePolicy, type AtsLocaleOptions } from "../locales/resolve.js";
 import { computeJobMatch } from "../matching/jobMatch.js";
@@ -5,7 +6,7 @@ import { judgeRequirements, withHeadings, type HeadedSection } from "../matching
 import { policyFingerprint } from "../policy/fingerprint.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { BULLET_PREFIX, normalizeText } from "../text/text.js";
-import type { AtsLayoutSignals, AtsReport } from "../types.js";
+import type { AtsFileInfo, AtsLayoutSignals, AtsReport } from "../types.js";
 import { ENGINE_VERSION } from "../version.js";
 import { rollUpCategories } from "./categories.js";
 import { readResume } from "./context.js";
@@ -53,7 +54,11 @@ export type AtsCheckOptions = {
    * `extractJobPosting`). Every word of it is left out of the job-match keywords.
    */
   jobCompany?: string;
-  /** Page geometry from a file upload. Absent for text and documents; layout rules then drop out. */
+  /**
+   * Layout signals from a file upload (`extractResume`): page geometry, hidden text, and what the
+   * file advice reads (an encrypted PDF, a Word document's tracked changes and comments). Absent
+   * for pasted text and structured documents; the layout rules then drop out.
+   */
   layout?: AtsLayoutSignals;
   /**
    * The reference date for the tenure of a current role and for the plausible-year ceiling.
@@ -66,8 +71,22 @@ export type AtsCheckOptions = {
    * as such — is what breaks a multi-column layout, and it is visible only here.
    */
   includeLines?: boolean;
+  /**
+   * What the host knows of the uploaded file — its name, size, format, a password, tracked
+   * changes, comments — for the file advice in `report.advice`. Never scored. Absent for pasted
+   * text.
+   */
+  file?: AtsFileInfo;
+  /**
+   * An applicant tracking system the resume is headed for, by its id in the policy
+   * (`advice.targets`: "greenhouse", "lever", "taleo" in the community policy). Adds that
+   * vendor's documented notes to `report.advice`, each with its source; never scored. Throws
+   * `AtsPolicyError` for an id the policy has no notes on.
+   */
+  targetAts?: string;
 } & AtsLocaleOptions;
 
+/** The scorer behind `check`. `AtsScoringService.check` gives the same report, until 1.0. */
 export class AtsScoringService {
   /**
    * Scores a resume against a policy.
@@ -95,8 +114,10 @@ export class AtsScoringService {
       typeof options.jobDescription === "string"
         ? normalizeText(options.jobDescription.slice(0, MAX_JOB_DESCRIPTION_CHARS))
         : undefined;
+    // Refused before any work, as an unknown region is.
+    const target = targetOf(basePolicy, options.targetAts);
     const prepared = prepareResume(resume);
-    const { policy, locale } = localizePolicy(
+    const { policy, locale, resumeLanguages } = localizePolicy(
       basePolicy,
       jobDescription === undefined ? prepared.text : `${prepared.text}\n${jobDescription}`,
       options,
@@ -107,6 +128,7 @@ export class AtsScoringService {
       jobDescription,
       layout,
       now,
+      languages: resumeLanguages,
     });
     const { active, results, readinessScore } = scoreRules(policy.rules, ctx);
     const failedChecks = results.filter((rule) => !rule.passed);
@@ -147,6 +169,8 @@ export class AtsScoringService {
       jobMatchScore,
       matchedKeywords: jobMatch.matched,
       missingKeywords: jobMatch.missing,
+      matchedKeywordGroups: jobMatch.matchedGroups,
+      missingKeywordGroups: jobMatch.missingGroups,
       // What stops an ATS reading the document: every parse check, and the format checks that
       // measure how the text extracts (columns, tables, letter spacing). Length and a photo are
       // format choices, not reading problems, and stay out. Matched on category and metric rather
@@ -173,6 +197,8 @@ export class AtsScoringService {
       locale,
       engine: { version: ENGINE_VERSION, policy: policyFingerprint(policy) },
       requirements: judgeRequirements(jobDescription, shownSections, parsed, policy, now),
+      // Read after the score is final, from nothing the score reads: advice cannot move it.
+      advice: adviceFor(policy, { parsed, lines, now, file: options.file, layout, target }),
       ...(options.includeLines && { lines: lines.slice(0, MAX_REPORTED_LINES) }),
     };
   }

@@ -14,6 +14,7 @@ import type { AtsLanguagePackInput } from "../schema.js";
  */
 const compound = (stem: string) => String.raw`\p{L}{0,30}${stem}`;
 
+/** The German language pack: recognised by its function words; region DE by default. */
 export const de: AtsLanguagePackInput = {
   id: "de",
   name: "Deutsch",
@@ -57,7 +58,27 @@ export const de: AtsLanguagePackInput = {
     education: String.raw`^(?:ausbildung|bildungsweg|bildung|schulbildung|schulische\s+ausbildung|studium|akademische\s+ausbildung|hochschulbildung)`,
     skills: String.raw`^(?:kenntnisse|f[äa]higkeiten|kompetenzen|fachkenntnisse|it[\s-]kenntnisse|edv[\s-]kenntnisse|technische\s+(?:kenntnisse|f[äa]higkeiten))`,
     projects: String.raw`^(?:projekte|projekterfahrung|ausgew[äa]hlte\s+projekte)`,
-    other: String.raw`^(?:profil|kurzprofil|zusammenfassung|[üu]ber\s+mich|zertifikate|zertifizierungen|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|sprachen|sprachkenntnisse|interessen|hobbys|ehrenamt|ehrenamtliches\s+engagement|referenzen|pers[öo]nliche\s+(?:daten|angaben))`,
+    certifications: String.raw`^(?:zertifikate|zertifizierungen|lizenzen)`,
+    languages: String.raw`^(?:sprachen|sprachkenntnisse|fremdsprachen|fremdsprachenkenntnisse)`,
+    other: String.raw`^(?:profil|kurzprofil|zusammenfassung|[üu]ber\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\s+engagement|referenzen|pers[öo]nliche\s+(?:daten|angaben))`,
+  },
+  // How well a language is spoken, as a German CV says it. "Verhandlungssicher" (fit to
+  // negotiate in) is C1, as "fließend" is; "sehr gute Kenntnisse" B2, "gute Kenntnisse" B1.
+  languageLevels: {
+    [String.raw`muttersprache|muttersprachlich(?:e[mnrs]?)?|muttersprachler(?:in)?`]: "C2",
+    [String.raw`zweisprachig(?:e[mnrs]?)?`]: "C1",
+    [String.raw`verhandlungssicher(?:e[mnrs]?)?`]: "C1",
+    [String.raw`fließend(?:e[mnrs]?)?`]: "C1",
+    [String.raw`sehr\s+gute?[mnrs]?(?:\s+kenntnisse)?`]: "B2",
+    [String.raw`gute?[mnrs]?\s+kenntnisse`]: "B1",
+    grundkenntnisse: "A2",
+    [String.raw`anfänger(?:in|kenntnisse)?`]: "A1",
+  },
+  credentialWords: {
+    issued: [String.raw`ausgestellt(?:\s+am)?`, String.raw`erworben(?:\s+am)?`, "erteilt"],
+    expires: [String.raw`gültig\s+bis`, String.raw`läuft\s+ab`, String.raw`ablauf(?:datum)?`],
+    issuer: [String.raw`ausgestellt\s+von`, "von"],
+    id: [String.raw`zertifikats?-?(?:nr\.?|nummer|id)`, String.raw`nr\.`, "lizenznummer"],
   },
   // The English base already has jan, feb, apr, aug, sep, nov, april, august, september and
   // november; every other German spelling is listed whole.
@@ -333,6 +354,43 @@ export const de: AtsLanguagePackInput = {
     "w/m/d",
     "m/f/d",
     "d/m/w",
+  ],
+  // Asked of the person, as "communication" and "teamwork" are; placed as the English list is
+  // ("Verhandlungsgeschick" is a hard skill, as "negotiation" is). Predicative adjectives too:
+  // "Sie sind kommunikativ, teamfähig und belastbar".
+  softSkills: [
+    "kommunikationsfähigkeit",
+    "kommunikationsstärke",
+    "kommunikationsstark",
+    "kommunikativ",
+    "teamfähigkeit",
+    "teamfähig",
+    "teamgeist",
+    "teamplayer",
+    "führungskompetenz",
+    "führungsstärke",
+    "eigeninitiative",
+    "selbstständigkeit",
+    "selbständigkeit",
+    "verantwortungsbewusstsein",
+    "zuverlässigkeit",
+    "zuverlässig",
+    "belastbarkeit",
+    "belastbar",
+    "flexibilität",
+    "flexibel",
+    "sorgfalt",
+    "sorgfältig",
+    "organisationstalent",
+    "organisationsfähigkeit",
+    "zeitmanagement",
+    "problemlösungskompetenz",
+    "problemlösungsfähigkeit",
+    "konfliktfähigkeit",
+    "einsatzbereitschaft",
+    "lernbereitschaft",
+    "kreativität",
+    "empathie",
   ],
   buzzwords: [
     "teamfähig",

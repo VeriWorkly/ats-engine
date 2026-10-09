@@ -8,7 +8,7 @@ import { BULLET } from "../text/text.js";
  * dated header, so the clock's plausibility ceiling adds nothing, and leaving it out keeps the
  * result a function of the text.
  */
-const ANY_YEAR = new Date(Date.UTC(9999, 0, 1));
+export const ANY_YEAR = new Date(Date.UTC(9999, 0, 1));
 
 /** Whether a line carries a role's date range. A bullet's numbers are achievements, never one. */
 export function isDatedLine(line: string, policy: AtsEnginePolicy, now: Date = ANY_YEAR) {
@@ -24,7 +24,7 @@ const CAPITALIZED = /^\p{Lu}/u;
  * "Softwareentwickler bei Nordwind GmbH" do not; "Led the migration of 40 services" and
  * "Entwicklung von Microservices" do. Letters without case (Devanagari) count as lower case.
  */
-function readsAsSentence(line: string) {
+export function readsAsSentence(line: string) {
   const lettered = line.split(/\s+/).filter((word) => LETTER_WORD.test(word));
   if (lettered.length < 3) return false;
   const lower = lettered.filter((word) => !CAPITALIZED.test(word)).length;

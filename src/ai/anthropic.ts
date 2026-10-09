@@ -19,6 +19,7 @@ import {
   type LlmResponse,
 } from "./provider.js";
 
+/** The key, the endpoint and the API version. */
 export type AnthropicOptions = HttpOptions & {
   apiKey: string;
   /** Defaults to `https://api.anthropic.com`. */
@@ -88,6 +89,10 @@ export function messagesBody(request: LlmRequest) {
   };
 }
 
+/**
+ * A provider for the Anthropic Messages API (`POST {baseUrl}/v1/messages`). One HTTP call per
+ * `complete()`, never retried here. Throws `LlmProviderError` without an API key.
+ */
 export function anthropic(options: AnthropicOptions): LlmProvider {
   if (!options.apiKey) throw new LlmProviderError("An API key is required.", { retryable: false });
   const url = `${(options.baseUrl || "https://api.anthropic.com").replace(/\/+$/, "")}/v1/messages`;

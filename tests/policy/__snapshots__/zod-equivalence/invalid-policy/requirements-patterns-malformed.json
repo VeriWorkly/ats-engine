@@ -1,0 +1,46 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.requirements.yearsPatterns.0",
+        "message": "requirements.yearsPatterns is not a valid regular expression in Unicode mode: Invalid regular expression: /(/u: Unterminated group"
+      },
+      {
+        "path": "keywordMatch.requirements.languageNames.",
+        "message": "Invalid key in record"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "requirements",
+        "yearsPatterns",
+        0
+      ]
+    },
+    {
+      "code": "invalid_key",
+      "origin": "record",
+      "issues": [
+        {
+          "origin": "string",
+          "code": "too_small",
+          "minimum": 1,
+          "inclusive": true,
+          "path": []
+        }
+      ],
+      "path": [
+        "keywordMatch",
+        "requirements",
+        "languageNames",
+        ""
+      ]
+    }
+  ]
+}

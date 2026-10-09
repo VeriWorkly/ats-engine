@@ -9,6 +9,8 @@ function report(overrides: Partial<AtsReport> = {}): AtsReport {
     jobMatchScore: null,
     matchedKeywords: ["react"],
     missingKeywords: ["kubernetes"],
+    matchedKeywordGroups: { hard: ["react"], soft: [] },
+    missingKeywordGroups: { hard: ["kubernetes"], soft: [] },
     parsingWarnings: [],
     strengths: ["Email detected"],
     failedChecks: [],
@@ -55,6 +57,7 @@ function report(overrides: Partial<AtsReport> = {}): AtsReport {
         skills: "parser",
       },
     },
+    advice: [],
     ...overrides,
   };
 }
@@ -91,6 +94,7 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
       missingKeywordCount: 1,
       parsedRoleCount: 1,
       remainingFixCount: 0,
+      advice: [],
     });
 
     // Nothing that would let a visitor reconstruct the report. `categories` is on this list
@@ -100,12 +104,54 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
       "categories",
       "matchedKeywords",
       "missingKeywords",
+      "matchedKeywordGroups",
+      "missingKeywordGroups",
       "failedChecks",
       "prioritizedFixes",
       "strengths",
       "parsed",
     ])
       expect(Object.keys(shaped)).not.toContain(withheld);
+  });
+
+  it("gives an anonymous caller each piece of advice as a message, without its specifics", () => {
+    const shaped = shapeReport(
+      report({
+        advice: [
+          {
+            id: "file.name",
+            kind: "file",
+            message: "The file name does not say whose resume it is.",
+            evidence: 'The file is named "Resume_final_v3 (2).pdf".',
+            fix: "Name it Jane-Doe-Resume.pdf.",
+          },
+          {
+            id: "ats.greenhouse.parseSize",
+            kind: "ats",
+            message: "Greenhouse documents a parse limit.",
+            source: "https://support.greenhouse.io/",
+          },
+        ],
+      }),
+      "restricted",
+    );
+    if (!shaped.restricted) throw new Error("expected a restricted report");
+    // Advice never moves the score and is no part of the rubric's answer key; what it quotes —
+    // the file name, a year, the candidate's name in the suggestion — stays with the full report.
+    expect(shaped.advice).toEqual([
+      {
+        id: "file.name",
+        kind: "file",
+        message: "The file name does not say whose resume it is.",
+      },
+      {
+        id: "ats.greenhouse.parseSize",
+        kind: "ats",
+        message: "Greenhouse documents a parse limit.",
+      },
+    ]);
+    expect(JSON.stringify(shaped)).not.toContain("Jane-Doe");
+    expect(shapeReport(report(), "restricted")).toMatchObject({ advice: [] });
   });
 
   it("never leaks the recovered work history to an anonymous caller", () => {
@@ -178,15 +224,19 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
     const shaped = shapeReport(
       report({
         matchedKeywords: ["react", "typescript", "graphql"],
-        missingKeywords: ["kubernetes", "terraform"],
+        missingKeywords: ["kubernetes", "terraform", "communication"],
+        matchedKeywordGroups: { hard: ["react", "typescript", "graphql"], soft: [] },
+        missingKeywordGroups: { hard: ["kubernetes", "terraform"], soft: ["communication"] },
       }),
       "restricted",
     );
 
     if (!shaped.restricted) throw new Error("expected a restricted report");
     expect(shaped.matchedKeywordCount).toBe(3);
-    expect(shaped.missingKeywordCount).toBe(2);
+    // The count is of the flat list, soft skills included; the groups are not split out.
+    expect(shaped.missingKeywordCount).toBe(3);
     expect(JSON.stringify(shaped)).not.toContain("kubernetes");
+    expect(JSON.stringify(shaped)).not.toContain("communication");
   });
 
   it("gives authenticated callers the full report untouched, flagged as unrestricted", () => {

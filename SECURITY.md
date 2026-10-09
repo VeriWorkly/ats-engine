@@ -25,13 +25,23 @@ adversarial suite against a private policy when one is present.
 
 **Size.** Resume text is cut at 50 000 characters, postings at 20 000, a structured document is
 bounded in depth, array length and node count before it is validated, a DOCX may expand to at
-most 64 MB, and PDF text reading stops at the cap. A host should still bound request bodies.
+most 64 MB, and PDF text reading stops at the cap. A file name is read to its first 255
+characters. The CLI and the MCP server refuse a file over 20 MB before reading it, and the MCP
+server refuses pasted text over 200 000 characters. A host should still bound request bodies.
 
 **Crashes.** Words from the input are never used as plain-object keys, JSON-LD is read to a fixed
 depth, and malformed PDF or DOCX structure degrades to "not measured" rather than throwing past
-the extractor. PDF parsing itself (pdf.js) is CPU-bound: run `/node` extraction in the forkable
-`/node/child` process with a timeout and a memory limit, so a pathological file costs a killed
-process, not a worker.
+the extractor. A DOCX's tracked changes and comments are counted in the same pass, and under the
+same budget, as the rest of its measurement. PDF parsing itself (pdf.js) is CPU-bound: run
+`/node` extraction in the forkable `/node/child` process with a timeout and a memory limit, so a
+pathological file costs a killed process, not a worker.
+
+**Advice inputs.** The `file` option and the file name are read only for `report.advice`, never
+for the score. The name is quoted back in the advice's `evidence` as given, so a host that shows
+advice in a page escapes it as it escapes any other report text; the CLI and the MCP server strip
+control characters from everything they print. `targetAts` (`--ats`, `target_ats`) must be an id
+the policy has notes on, or the call throws before anything is read. The notes are text from the
+policy with a link to the vendor's page; the engine never fetches that page.
 
 **Prompt injection (`/ai`).** Resume and posting text are passed to the model as JSON data, with a
 system prompt that says so, never as instructions. That lowers the risk; no prompt removes it.
@@ -49,7 +59,24 @@ What does not depend on the model:
 
 **API keys in the CLI.** `ats-engine check --ai` reads the key from the environment only, never
 from a flag, so it does not land in shell history or the process list, and never prints it. The
-CLI says which provider and model the resume is about to be sent to before the request leaves.
+CLI says which provider and model the resume is about to be sent to before the request leaves,
+and refuses to send a key over plain `http` to any host but this machine (`localhost`,
+`127.0.0.1`, `[::1]`). The live AI eval (`npm run eval:live`) reads its key from the environment
+or from a `.env` file, which is never committed.
 
 **State.** The core holds no global state, does no I/O and makes no network calls; only `/ai`
 calls the provider you configure, and only `/node` reads files you pass it.
+
+## Around the engine
+
+**The MCP server.** `@veriworkly/ats-engine-mcp` talks over stdio only, makes no network
+requests and calls no model. It reads the files a tool call names, with the rights of the user
+running it, and nothing else; folders and files over 20 MB are refused. Its stdout carries only
+the protocol. Its answers include text from the resume, which the assistant sends to its own
+model provider.
+
+**The GitHub Action.** Its inputs reach `run.mjs` as environment variables, never pasted into a
+shell command, so a file name cannot inject code. `version` must look like a version or a
+dist-tag. The CLI runs through `npx` outside the checkout, so a repository's own `package.json`
+cannot swap in another engine. Resume and posting text written to the job summary is escaped for
+Markdown and cut to 300 characters per cell.

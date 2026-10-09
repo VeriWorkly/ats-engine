@@ -25,11 +25,16 @@ body:
         - Dates or current role
         - Education or degree level
         - Skills
+        - Certifications
+        - Spoken languages or their level
         - Section headings
         - Language or region detected
         - A check passed or failed wrongly
         - The readiness score
         - Job match or a requirement's status
+        - Hard or soft skills in the job match
+        - Writing-style check
+        - Advice (file, age or ATS notes)
         - Integrity check (false alarm)
         - Integrity check (missed a problem)
     validations:
@@ -70,6 +75,7 @@ body:
         - PDF
         - DOCX
         - Plain text or Markdown
+        - HTML page
         - JSON Resume or ats-resume document
     validations:
       required: true
@@ -87,6 +93,8 @@ body:
       label: How you ran it
       options:
         - CLI (ats-engine check)
+        - MCP server (@veriworkly/ats-engine-mcp)
+        - GitHub Action
         - Library on Node
         - Library in a browser or edge runtime
     validations:
@@ -97,7 +105,7 @@ body:
     attributes:
       label: Engine version
       description: Run `npx @veriworkly/ats-engine --version`, or read `report.engine.version`. If you use your own policy, add `report.engine.policy` too.
-      placeholder: "0.1.2"
+      placeholder: "0.3.0"
     validations:
       required: true
 

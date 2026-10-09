@@ -51,6 +51,7 @@ const JOB = [
   "- 3+ years of experience with TypeScript and Go",
   "- Experience running services on Kubernetes",
   "- Familiarity with Terraform",
+  "- Strong communication and teamwork",
   "Nice to have: Rust",
 ].join("\n");
 
@@ -109,12 +110,15 @@ function expectedCheck(report: AtsReport, withJob: boolean) {
         parsed: report.parsed,
         locale: report.locale,
         engine: report.engine,
+        advice: report.advice,
         job: withJob
           ? {
               jobMatchScore: report.jobMatchScore,
               requirements: report.requirements,
               matchedKeywords: report.matchedKeywords,
               missingKeywords: report.missingKeywords,
+              matchedKeywordGroups: report.matchedKeywordGroups,
+              missingKeywordGroups: report.missingKeywordGroups,
             }
           : null,
       }),
@@ -124,7 +128,8 @@ function expectedCheck(report: AtsReport, withJob: boolean) {
 
 async function pdfReport(options: { jobDescription?: string; includeLines?: boolean } = {}) {
   const { text: extracted, layout } = await extractResume(pdf, "pdf");
-  return { report: check(extracted, POLICY, { ...options, layout }), layout };
+  const file = { name: "resume.pdf", bytes: pdf.length, format: "pdf" as const };
+  return { report: check(extracted, POLICY, { ...options, layout, file }), layout };
 }
 
 describe("ats-engine-mcp over stdio", () => {
@@ -164,7 +169,22 @@ describe("ats-engine-mcp over stdio", () => {
     expect(said).toContain(`Job match: ${report.jobMatchScore}/100`);
     expect(said).toContain("no AI model produced this score");
     expect(said).toContain("- Name: Jane Doe");
+    // The file's name says nothing about whose resume it is: advice, after the failed checks.
+    expect(report.advice.map((item) => item.id)).toContain("file.name");
+    expect(said.indexOf("Advice (not scored):")).toBeGreaterThan(said.indexOf("Failed checks"));
+    expect(said).toContain("Jane-Doe-Resume.pdf");
   }, 60_000);
+
+  it("check_resume adds a named ATS's documented notes, with their sources", async () => {
+    const result = await call("check_resume", { text: RESUME.join("\n"), target_ats: "lever" });
+    expect(result.isError).toBeFalsy();
+    const resume = normalizeExtractedText(RESUME.join("\n"));
+    const report = check(resume, POLICY, { targetAts: "lever" });
+    expect(result.structuredContent).toEqual(expectedCheck(report, false));
+    const notes = report.advice.filter((item) => item.kind === "ats");
+    expect(notes.length).toBeGreaterThan(0);
+    for (const note of notes) expect(textOf(result)).toContain(note.source!);
+  });
 
   it("check_resume on text is check() on the same text, with no job", async () => {
     const result = await call("check_resume", { text: RESUME.join("\n"), region: "US" });
@@ -186,10 +206,13 @@ describe("ats-engine-mcp over stdio", () => {
           jobMatchScore: report.jobMatchScore,
           requirements: report.requirements,
           missingKeywords: report.missingKeywords,
+          missingKeywordGroups: report.missingKeywordGroups,
         }),
       ),
     );
     expect(textOf(result)).toContain(`Job match: ${report.jobMatchScore}/100`);
+    expect(report.missingKeywordGroups.soft).toEqual(["communication", "teamwork"]);
+    expect(textOf(result)).toContain("Missing soft skills (weigh less): communication, teamwork");
   });
 
   it("extract_text gives the PDF's text in reading order and its measured layout", async () => {
@@ -245,6 +268,11 @@ describe("ats-engine-mcp refuses a bad call with a tool error", () => {
     ["both job_path and job_text", { path: pdfPath, job_path: jobPath, job_text: JOB }, /not both/],
     ["a missing job file", { path: pdfPath, job_path: join(dir, "nope.txt") }, /No such file/],
     ["an unknown region", { path: pdfPath, region: "XX" }, /Unknown region "XX"; use one of US/],
+    [
+      "an ATS with no notes",
+      { path: pdfPath, target_ats: "acme" },
+      /Unknown target_ats "acme"; use one of greenhouse, lever, taleo\./,
+    ],
   ])("check_resume: %s", async (_, args, message) => {
     const result = await call("check_resume", args);
     expect(result.isError).toBe(true);
@@ -288,5 +316,26 @@ describe("registry metadata", () => {
     ]);
     // The registry's limit.
     expect(server.description.length).toBeLessThanOrEqual(100);
+  });
+});
+
+describe("certifications and spoken languages", () => {
+  it("reads them out in the text and returns them in the structured result", async () => {
+    const resume = [
+      ...RESUME,
+      "",
+      "Certifications",
+      "AWS Certified Solutions Architect – Associate, Amazon Web Services, 2023",
+      "",
+      "Languages",
+      "English (native), German (B2)",
+    ].join("\n");
+    const result = await call("check_resume", { text: resume });
+    expect(result.isError).toBeFalsy();
+    expect(textOf(result)).toContain("- Certification: AWS Certified Solutions Architect");
+    expect(textOf(result)).toMatch(/- Speaks: English.*German/);
+    const parsed = (result.structuredContent as { parsed: Record<string, unknown[]> }).parsed;
+    expect(parsed.certifications).toHaveLength(1);
+    expect(parsed.spokenLanguages).toHaveLength(2);
   });
 });

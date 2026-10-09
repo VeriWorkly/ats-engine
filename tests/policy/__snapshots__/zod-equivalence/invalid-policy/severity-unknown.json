@@ -1,0 +1,27 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.severity",
+        "message": "Invalid option: expected one of \"info\"|\"warning\"|\"error\""
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_value",
+      "values": [
+        "info",
+        "warning",
+        "error"
+      ],
+      "path": [
+        "rules",
+        0,
+        "severity"
+      ]
+    }
+  ]
+}

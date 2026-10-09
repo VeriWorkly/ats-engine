@@ -8,8 +8,12 @@ export type Term = { token: string; label: string; skill: boolean };
 export type Vocabulary = {
   /** Stopwords stored both raw and stemmed, so "experiences" is filtered like "experience". */
   stopwords: Set<string>;
-  /** Canonical tokens the policy explicitly recognises as skills. */
+  /** Canonical tokens the policy explicitly recognises as (hard) skills. */
   skillTokens: Set<string>;
+  /** Canonical tokens of the policy's soft skills; never in `skillTokens`. */
+  softTokens: Set<string>;
+  /** The multi-word soft skills `phrases` does not name, matched as phrases too. */
+  softPhrases: string[];
   /** Canonical skill -> canonical capabilities it demonstrates. Resume side only. */
   implies: Map<string, string[]>;
 };
@@ -35,16 +39,39 @@ export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocab
     stopwords.add(stem(word, km.stemming));
   }
 
-  // Everything the policy names explicitly — phrases plus both sides of the synonym map — is a
-  // known skill by construction. Anything else has to earn the classification at match time.
   const skillTokens = new Set<string>();
-  for (const phrase of km.phrases) skillTokens.add(phrase);
-  for (const [abbreviation, canonical] of Object.entries(km.synonyms)) {
-    skillTokens.add(stem(abbreviation, km.stemming));
-    skillTokens.add(canonical.includes(" ") ? canonical : stem(canonical, km.stemming));
+  const softTokens = new Set<string>();
+  const vocabulary: Vocabulary = {
+    stopwords,
+    skillTokens,
+    softTokens,
+    softPhrases: [],
+    implies: new Map(),
+  };
+
+  // Soft skills fold as every term does: "communicating" (a synonym of "communication") and
+  // "communications" (stemmed) are the one soft skill.
+  const phrases = new Set(km.phrases);
+  for (const skill of km.softSkills) {
+    const token = canonicalize(skill, km, vocabulary);
+    if (!token) continue;
+    softTokens.add(token);
+    if (token.includes(" ") && !phrases.has(token)) {
+      phrases.add(token);
+      vocabulary.softPhrases.push(token);
+    }
   }
 
-  const vocabulary: Vocabulary = { stopwords, skillTokens, implies: new Map() };
+  // Everything else the policy names explicitly — phrases plus both sides of the synonym map —
+  // is a known skill by construction. Anything else has to earn the classification at match time.
+  for (const phrase of km.phrases) if (!softTokens.has(phrase)) skillTokens.add(phrase);
+  for (const [abbreviation, canonical] of Object.entries(km.synonyms)) {
+    const token = canonical.includes(" ") ? canonical : stem(canonical, km.stemming);
+    // "communicates" stems to the key "communicate", a soft skill's spelling too.
+    if (softTokens.has(token)) continue;
+    skillTokens.add(stem(abbreviation, km.stemming));
+    skillTokens.add(token);
+  }
 
   // Both sides of the implication map are folded through the same canonicalisation the term
   // maps use, so "PostgreSQL" -> "relational database" lines up with whatever spelling the
@@ -106,14 +133,14 @@ export function extractVocabulary(
   // Character mask marking spans already claimed by a multi-word phrase.
   const claimed = new Uint8Array(lower.length);
 
-  for (const phrase of km.phrases) {
+  for (const phrase of [...km.phrases, ...vocab.softPhrases]) {
     // Most of a large phrase list is absent from any one text, and a substring test is far
     // cheaper than compiling and running a Unicode-boundary pattern the first time.
     if (!lower.includes(phrase.toLowerCase())) continue;
     const re = phrasePattern(phrase, km.pluralSuffixes);
     let match: RegExpExecArray | null;
     while ((match = re.exec(lower))) {
-      map.set(phrase, { token: phrase, label: phrase, skill: true });
+      map.set(phrase, { token: phrase, label: phrase, skill: !vocab.softTokens.has(phrase) });
       claimed.fill(1, match.index, match.index + match[0].length);
       if (match.index === re.lastIndex) re.lastIndex += 1;
     }
@@ -145,7 +172,8 @@ export function extractVocabulary(
 
     const mapped = own(km.synonyms, raw) ?? raw;
     if (mapped.includes(" ")) {
-      if (!map.has(mapped)) map.set(mapped, { token: mapped, label: mapped, skill: true });
+      if (!map.has(mapped))
+        map.set(mapped, { token: mapped, label: mapped, skill: !vocab.softTokens.has(mapped) });
       continue;
     }
     const token = stem(mapped, km.stemming);

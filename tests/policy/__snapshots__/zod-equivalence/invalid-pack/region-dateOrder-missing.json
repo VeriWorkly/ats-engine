@@ -1,0 +1,27 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.regions.0.dateOrder",
+        "message": "Invalid option: expected one of \"MDY\"|\"DMY\"|\"YMD\""
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "code": "invalid_value",
+        "values": [
+          "MDY",
+          "DMY",
+          "YMD"
+        ],
+        "path": [
+          "dateOrder"
+        ]
+      }
+    ]
+  ]
+}

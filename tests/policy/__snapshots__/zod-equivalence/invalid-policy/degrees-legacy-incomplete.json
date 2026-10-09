@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.degrees",
+        "message": "degrees must name at least one level"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "resumeParse",
+        "degrees"
+      ]
+    }
+  ]
+}

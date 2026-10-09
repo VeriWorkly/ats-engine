@@ -1,0 +1,23 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.weight",
+        "message": "Invalid input: expected number, received string"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "number",
+      "code": "invalid_type",
+      "path": [
+        "rules",
+        0,
+        "weight"
+      ]
+    }
+  ]
+}

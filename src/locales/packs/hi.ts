@@ -11,6 +11,7 @@ import type { AtsLanguagePackInput } from "../schema.js";
  */
 const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 
+/** The Hindi language pack: recognised by Devanagari script; region IN by default. */
 export const hi: AtsLanguagePackInput = {
   id: "hi",
   name: "हिन्दी",
@@ -23,7 +24,26 @@ export const hi: AtsLanguagePackInput = {
     education: String.raw`^(?:शैक्षिक\s+योग्यता|शैक्षणिक\s+योग्यता|शिक्षा|योग्यता)`,
     skills: String.raw`^(?:तकनीकी\s+कौशल|कौशल|दक्षताएँ|दक्षता|विशेषज्ञता)`,
     projects: String.raw`^(?:परियोजनाएँ|परियोजनाएं|परियोजना|प्रोजेक्ट्स|प्रोजेक्ट)`,
-    other: String.raw`^(?:सारांश|उद्देश्य|परिचय|प्रोफ़ाइल|प्रमाणपत्र|प्रमाणन|पुरस्कार|उपलब्धियाँ|उपलब्धियां|भाषाएँ|भाषाएं|रुचियाँ|रुचियां|शौक|संदर्भ|व्यक्तिगत\s+विवरण)`,
+    certifications: String.raw`^(?:प्रमाणपत्र|प्रमाणन)`,
+    languages: String.raw`^(?:भाषाएँ|भाषाएं|भाषा\s+ज्ञान|भाषाई\s+दक्षता)`,
+    other: String.raw`^(?:सारांश|उद्देश्य|परिचय|प्रोफ़ाइल|पुरस्कार|उपलब्धियाँ|उपलब्धियां|रुचियाँ|रुचियां|शौक|संदर्भ|व्यक्तिगत\s+विवरण)`,
+  },
+  // How well a language is spoken: "मातृभाषा" (mother tongue) C2, "धाराप्रवाह" (fluent) C1,
+  // "कार्यसाधक ज्ञान" (working knowledge) B1, "बुनियादी ज्ञान" (basic knowledge) A2.
+  languageLevels: {
+    मातृभाषा: "C2",
+    धाराप्रवाह: "C1",
+    [String.raw`प्रवीण(?:ता)?`]: "C1",
+    [String.raw`कार्यसाधक(?:\s+ज्ञान)?`]: "B1",
+    [String.raw`बातचीत(?:\s+योग्य)?`]: "B1",
+    [String.raw`बुनियादी(?:\s+ज्ञान)?`]: "A2",
+    प्रारंभिक: "A1",
+  },
+  // "जारी" (issued), "समाप्ति" (expiry), "वैधता" (validity): each before its date.
+  credentialWords: {
+    issued: [String.raw`जारी(?:\s+किया)?`, "प्राप्त"],
+    expires: ["समाप्ति", "वैधता", String.raw`वैध\s+तक`],
+    id: [String.raw`प्रमाणपत्र\s+संख्या`, "क्रमांक"],
   },
   months: {
     जनवरी: 1,
@@ -176,5 +196,25 @@ export const hi: AtsLanguagePackInput = {
     "जो",
     "अनुभव",
     "वर्ष",
+    // "Skill" and "ability", as English "skills" and "ability" are: "संचार कौशल" asks for संचार.
+    "कौशल",
+    "क्षमता",
+  ],
+  // Asked of the person, as "communication" and "teamwork" are; placed as the English list is.
+  softSkills: [
+    "संचार",
+    "संवाद",
+    "नेतृत्व",
+    "टीमवर्क",
+    "टीम भावना",
+    "सहयोग",
+    "पहल",
+    "समस्या समाधान",
+    "निर्णय क्षमता",
+    "आलोचनात्मक सोच",
+    "समय प्रबंधन",
+    "अनुकूलनशीलता",
+    "रचनात्मकता",
+    "सहानुभूति",
   ],
 };

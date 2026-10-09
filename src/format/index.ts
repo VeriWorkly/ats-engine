@@ -4,21 +4,31 @@
  * Dependency-free and policy-free, so a browser bundle can import it without pulling in the
  * scorer or its schema library. Everything here is display: nothing changes a score.
  *
- * English only. ponytail: labels are literals; take them as parameters when a second locale ships.
+ * English only: labels are literals, to be taken as parameters when a second locale ships.
  */
 
-import type { AtsDegreeLevel, AtsIscedLevel, AtsParsedDate, AtsParsedRole } from "../types.js";
+import type {
+  AtsAdvice,
+  AtsDegreeLevel,
+  AtsIscedLevel,
+  AtsParsedCertification,
+  AtsParsedDate,
+  AtsParsedLanguage,
+  AtsParsedRole,
+} from "../types.js";
 import { own } from "../util/own.js";
 
+/** The display band of a score: `scoreTone`. */
 export type AtsScoreTone = "good" | "warn" | "bad";
 
 /**
  * Lower bounds of the display bands: the verdict's own (`VERDICT_BANDS` in the main entry), so a
  * score labelled "good" here is one the verdict calls "strong". Copied rather than imported to keep
- * `/format` free of dependencies; `tests/format.test.ts` holds the two equal.
+ * `/format` free of dependencies; `tests/format/format.test.ts` holds the two equal.
  */
 export const SCORE_BANDS = { good: 75, warn: 45 } as const;
 
+/** "good" from 75, "warn" from 45, "bad" below: the bands of `SCORE_BANDS`. */
 export function scoreTone(score: number): AtsScoreTone {
   if (score >= SCORE_BANDS.good) return "good";
   if (score >= SCORE_BANDS.warn) return "warn";
@@ -27,7 +37,8 @@ export function scoreTone(score: number): AtsScoreTone {
 
 /**
  * Category ids in the order a report reads best: can it be trusted, read, found, navigated,
- * believed. Integrity leads because a finding there outweighs everything below it.
+ * believed, and then how well it reads. Integrity leads because a finding there outweighs
+ * everything below it; writing style comes last because no ATS filters on it.
  */
 export const CATEGORY_ORDER = [
   "integrity",
@@ -36,8 +47,10 @@ export const CATEGORY_ORDER = [
   "structure",
   "content",
   "format",
+  "writing",
 ] as const;
 
+/** What each category id is called on a report: "content" is "Evidence", "format" "Format risk". */
 export const CATEGORY_LABELS: Readonly<Record<string, string>> = {
   parse: "Parsing",
   contact: "Contact & links",
@@ -45,6 +58,7 @@ export const CATEGORY_LABELS: Readonly<Record<string, string>> = {
   content: "Evidence",
   format: "Format risk",
   integrity: "Integrity",
+  writing: "Writing",
 };
 
 /** A policy may define categories this list does not know; they are title-cased, not hidden. */
@@ -59,6 +73,18 @@ export function sortByCategoryOrder<T extends { category: string }>(items: reado
     return index === -1 ? CATEGORY_ORDER.length : index;
   };
   return [...items].sort((a, b) => rank(a.category) - rank(b.category));
+}
+
+/** Labels of the kinds of advice (`report.advice`), which is shown apart from the score. */
+export const ADVICE_LABELS: Readonly<Record<AtsAdvice["kind"], string>> = {
+  file: "File",
+  age: "Age",
+  ats: "ATS",
+};
+
+/** The label of an advice kind ("File", "Age", "ATS"); an unknown kind as it is. */
+export function adviceLabel(kind: AtsAdvice["kind"]) {
+  return own(ADVICE_LABELS, kind) ?? kind;
 }
 
 const MONTH_LABELS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
@@ -77,6 +103,18 @@ export function formatRoleDates(role: Pick<AtsParsedRole, "start" | "end" | "cur
   if (!from) return null;
   const to = role.current ? "Present" : (formatParsedDate(role.end) ?? "?");
   return `${from} – ${to}`;
+}
+
+/** "PMP, PMI, Mar 2021, expires 2027": a certification row on one line. */
+export function formatCertification(row: AtsParsedCertification): string {
+  const earned = formatParsedDate(row.date);
+  const expires = formatParsedDate(row.expires);
+  return [row.name, row.issuer, earned, expires && `expires ${expires}`].filter(Boolean).join(", ");
+}
+
+/** "German (B2)", "German (fluent)", or the language alone when no level was read. */
+export function formatSpokenLanguage(row: AtsParsedLanguage): string {
+  return row.level ? `${row.language} (${row.level})` : row.language;
 }
 
 /** "3 yr 2 mo", "3 yr", "7 mo". Whole months; anything not a positive number reads as "0 mo". */
@@ -107,6 +145,11 @@ export function roleSpanMonths(
   return Math.max(0, to - from + 1);
 }
 
+/**
+ * What each `AtsDegreeLevel` was called on a report.
+ *
+ * @deprecated Use `ISCED_LABELS`; removed in 1.0.
+ */
 export const DEGREE_LABELS: Readonly<Record<AtsDegreeLevel, string>> = {
   diploma: "Diploma",
   associate: "Associate",

@@ -9,6 +9,8 @@ export const DEFAULT_KEYWORD_MATCH = {
   responsibilitiesWeight: 0.5,
   defaultWeight: 1,
   generalTermWeight: 0.25,
+  // A soft skill weighs this much of an ordinary word: 0.1 of a recognised skill.
+  softSkillWeight: 0.4,
   sections: {
     // "Minimum qualifications", "Basic Qualifications", "Must-haves", "What you bring", "About
     // you": a posting whose required heading went unread lost every required item.
@@ -193,7 +195,72 @@ export const DEFAULT_KEYWORD_MATCH = {
     node: "node.js",
     reactjs: "react",
     "react.js": "react",
+    // A soft skill's other spellings, so "communicating" in a posting meets "communication" on a
+    // resume. Each is a soft skill, never a hard one (see `softSkills`).
+    communicate: "communication",
+    communicates: "communication",
+    communicated: "communication",
+    communicating: "communication",
+    communicator: "communication",
+    communicative: "communication",
+    collaborate: "collaboration",
+    collaborates: "collaboration",
+    collaborated: "collaboration",
+    collaborating: "collaboration",
+    collaborative: "collaboration",
+    collaboratively: "collaboration",
+    adaptable: "adaptability",
+    empathetic: "empathy",
+    "multi-tasking": "multitasking",
+    "problem-solving": "problem solving",
+    "decision-making": "decision making",
+    "detail-oriented": "attention to detail",
   },
+  // What a posting asks of the person rather than of their work. They weigh `softSkillWeight` of
+  // an ordinary word and the report lists them apart. Placed by one test: does a resume evidence
+  // it with an outcome, or only claim it? Borderline terms stay hard skills:
+  // - "mentoring" and "coaching": a duty with an object a resume shows ("Mentored four
+  //   engineers"); the requirements judge already holds a mentoring ask to a line that shows it.
+  // - "project management": a discipline with methods, tools and certifications (PMP, PRINCE2).
+  // - "negotiation": in the roles that name it (sales, procurement) the job itself, measured in
+  //   deals and terms; a soft discount would hide a sales resume's real gap.
+  // - "customer service", "presentation", "creative", "prioritization": a trade, a deliverable,
+  //   a marketing noun ("ad creative"), a product manager's method ("backlog prioritization").
+  // - "integrity", "resilience", "reliability": engineering asks ("data integrity", "system
+  //   resilience") as often as traits.
+  // "leadership" and "stakeholder management" are soft: postings ask for them in every field,
+  // and "led a team of five" is evidence of leading, which stays the requirements judge's work.
+  softSkills: [
+    "communication",
+    "interpersonal",
+    "teamwork",
+    "team player",
+    "collaboration",
+    "leadership",
+    "ownership",
+    "accountability",
+    "initiative",
+    "proactive",
+    "problem solving",
+    "critical thinking",
+    "decision making",
+    "attention to detail",
+    "time management",
+    "multitasking",
+    "organizational",
+    "organisational",
+    "stakeholder management",
+    "conflict resolution",
+    "public speaking",
+    "adaptability",
+    "flexibility",
+    "creativity",
+    "curiosity",
+    "empathy",
+    "compassion",
+    "emotional intelligence",
+    "work ethic",
+  ],
   implies: {
     terraform: ["infrastructure as code"],
     kubernetes: ["containers"],

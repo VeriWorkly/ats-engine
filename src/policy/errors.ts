@@ -1,5 +1,13 @@
+/** One problem with a policy: where it is, and what is wrong. */
+export type AtsPolicyIssue = {
+  /** Dotted path to the offending field, e.g. `rules.3.weight`. */
+  path: string;
+  message: string;
+};
+
 /**
- * Raised when a supplied policy does not satisfy the schema.
+ * Raised when a supplied policy or locale pack does not satisfy the schema, and when a call names
+ * a region or a target ATS the policy does not have.
  *
  * The package deliberately has no idea what an HTTP status code is: it is a library that scores
  * text, and a caller might be a server, a CLI, or a browser tab. So an invalid policy surfaces as
@@ -10,12 +18,6 @@
  * `issues` is kept structured rather than pre-formatted for the same reason: the host chooses how
  * much of it to log and how much (usually none) to show a caller.
  */
-export type AtsPolicyIssue = {
-  /** Dotted path to the offending field, e.g. `rules.3.weight`. */
-  path: string;
-  message: string;
-};
-
 export class AtsPolicyError extends Error {
   readonly issues: AtsPolicyIssue[];
 

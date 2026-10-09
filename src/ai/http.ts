@@ -11,12 +11,14 @@ import { isRetryableStatus, LlmProviderError, type AbortSignalLike } from "./pro
 
 export type { AbortSignalLike };
 
+/** Just enough of a `fetch` response for the adapters. */
 export type FetchResponseLike = {
   ok: boolean;
   status: number;
   text(): Promise<string>;
 };
 
+/** Just enough of `fetch` for the adapters: one POST. Pass your own to proxy or record calls. */
 export type FetchLike = (
   url: string,
   init: {

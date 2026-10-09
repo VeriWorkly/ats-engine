@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import { regexString, term, wordList } from "../primitives.js";
 
@@ -17,39 +17,53 @@ const jobSectionSchema = z.object({
 
 export const keywordMatchSchema = z
   .object({
-    requiredWeight: z.number().positive(),
-    preferredWeight: z.number().positive(),
-    responsibilitiesWeight: z.number().positive(),
-    defaultWeight: z.number().positive(),
+    requiredWeight: z.number().check(z.gt(0)),
+    preferredWeight: z.number().check(z.gt(0)),
+    responsibilitiesWeight: z.number().check(z.gt(0)),
+    defaultWeight: z.number().check(z.gt(0)),
     /**
      * Multiplier applied to terms that are not recognised skills and do not read as proper nouns
      * or acronyms in the posting. Ordinary English still counts — a posting can name a real
      * requirement in lowercase prose — but it cannot outvote the skills the role actually asks for.
      */
-    generalTermWeight: z.number().min(0).max(1),
+    generalTermWeight: z.number().check(z.gte(0), z.lte(1)),
+    /**
+     * Soft skills ("communication", "teamwork"): what a posting asks of a person rather than of
+     * their work. A resume claims them and seldom evidences them, and an ATS's keyword match
+     * gives them little value, so each is weighed as an ordinary word (`generalTermWeight`)
+     * whatever its capitals, times this. The report lists them apart (`missingKeywordGroups`).
+     */
+    softSkillWeight: z._default(z.number().check(z.gte(0), z.lte(1)), 0.4),
+    /**
+     * The terms that are soft skills, folded as every term is (`synonyms`, `stemming`): "soft
+     * skills" in the report, weighed by `softSkillWeight`, never a recognised hard skill even
+     * when `phrases` or `synonyms` name them. A multi-word entry is matched as a phrase. Language
+     * packs add their own.
+     */
+    softSkills: z._default(z.array(term), []),
     sections: jobSectionSchema,
     /**
      * The words a posting offers alternatives with: "Go or Java". The missing-keyword label
      * joins the alternatives with the word the posting itself used.
      */
-    alternationWords: wordList("alternationWords").default(["or"]),
+    alternationWords: z._default(wordList("alternationWords"), ["or"]),
     /**
      * Suffix rules that fold inflections together ("managing" → "manag", like "managed"),
      * applied to every token on both sides of a match, in order, first match wins. One rule set
      * per policy, not per language: a German rule stripping "-er" would fold "engineer" into
      * "engine" on every English token too, so language packs do not change it.
      */
-    stemming: z
-      .array(
+    stemming: z._default(
+      z.array(
         z.object({
-          suffix: z.string().min(1),
-          minLength: z.number().int().nonnegative(),
+          suffix: z.string().check(z.minLength(1)),
+          minLength: z.number().check(z.int(), z.gte(0)),
           replacement: z.string(),
           /** Skip the rule when the word ends in this instead: "s" but not "ss". */
-          unless: z.string().min(1).optional(),
+          unless: z.optional(z.string().check(z.minLength(1))),
         }),
-      )
-      .default([
+      ),
+      [
         { suffix: "ing", minLength: 6, replacement: "" },
         { suffix: "ies", minLength: 5, replacement: "y" },
         { suffix: "ed", minLength: 5, replacement: "" },
@@ -83,15 +97,16 @@ export const keywordMatchSchema = z
         { suffix: "gnoses", minLength: 6, replacement: "gnos" },
         // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
         { suffix: "s", minLength: 3, replacement: "", unless: "ss" },
-      ]),
+      ],
+    ),
     /** Endings a multi-word phrase may carry on its last word and still be the same phrase. */
-    pluralSuffixes: wordList("pluralSuffixes").default(["s", "es"]),
+    pluralSuffixes: z._default(wordList("pluralSuffixes"), ["s", "es"]),
     /**
      * Whether the language capitalises every noun, as German does. A capital letter
      * mid-sentence then says nothing about a word being a product or a skill, so only acronyms
      * and inner capitals ("PostgreSQL") count as proper nouns.
      */
-    nounsCapitalized: z.boolean().default(false),
+    nounsCapitalized: z._default(z.boolean(), false),
     /**
      * Leave out a word the posting writes only as a name: always capitalised, mid-sentence, only
      * in its prose, never in a list, not in this policy's vocabulary, and written the way a name
@@ -104,12 +119,13 @@ export const keywordMatchSchema = z
      * required or preferred heading) to compare with; never where `nounsCapitalized` holds, and
      * off in a language pack that says so.
      */
-    proseNames: z
-      .object({
-        enabled: z.boolean().default(true),
-        minListLines: z.number().int().positive().default(3),
-        cues: z.array(term).default(["the", "our", "at", "join", "across", "near"]),
-        skills: z.array(term).default(
+    proseNames: z.prefault(
+      z.object({
+        enabled: z._default(z.boolean(), true),
+        minListLines: z._default(z.number().check(z.int(), z.gt(0)), 3),
+        cues: z._default(z.array(term), ["the", "our", "at", "join", "across", "near"]),
+        skills: z._default(
+          z.array(term),
           [
             // Languages
             "rust swift ruby scala kotlin julia dart elixir haskell erlang clojure groovy " +
@@ -135,16 +151,17 @@ export const keywordMatchSchema = z
               "asana trello slack",
           ].flatMap((group) => group.split(" ")),
         ),
-      })
-      .prefault({}),
+      }),
+      {},
+    ),
     /**
      * How a posting states the requirements that filter before any reading: years, a degree,
      * the right to work, a clearance, a language. Each a pattern; years and language patterns
      * capture the number and the language in group 1. Language packs add their own.
      */
-    requirements: z
-      .object({
-        yearsPatterns: z.array(regexString("requirements.yearsPatterns")).default([
+    requirements: z.prefault(
+      z.object({
+        yearsPatterns: z._default(z.array(regexString("requirements.yearsPatterns")), [
           // Not an age: "at least 18 years of age", "21 years or older", "18 years old".
           // `\s*(?:\+\s*)?`, not `\s*\+?\s*`: two adjacent `\s*` split a long run of spaces
           // every possible way, which is quadratic.
@@ -157,12 +174,12 @@ export const keywordMatchSchema = z
           String.raw`(?<![\p{L}])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)\s*(?:\(\s*\d{1,2}\s*(?:\+\s*)?\)\s*)?(?:\+\s*)?(?:years?|yrs?)(?![\p{L}])(?![\s-]+(?:of\s+age|old|or\s+older)(?![\p{L}]))`,
         ]),
         /** Words that let experience stand in for the stated degree: "or equivalent experience". */
-        equivalence: wordList("requirements.equivalence").default([
+        equivalence: z._default(wordList("requirements.equivalence"), [
           String.raw`or\s+equivalent`,
           String.raw`equivalent\s+(?:practical\s+|work\s+)?experience`,
           String.raw`or\s+related\s+field`,
         ]),
-        authorization: wordList("requirements.authorization").default([
+        authorization: z._default(wordList("requirements.authorization"), [
           String.raw`authori[sz]ed\s+to\s+work`,
           String.raw`work\s+authori[sz]ation`,
           String.raw`right\s+to\s+work`,
@@ -175,15 +192,13 @@ export const keywordMatchSchema = z
           String.raw`permanent\s+resident`,
         ]),
         // Qualified, never bare: "customs clearance" is logistics, not a security vetting.
-        clearance: wordList("requirements.clearance").default([
+        clearance: z._default(wordList("requirements.clearance"), [
           String.raw`(?:security|secret|top\s+secret|ts/sci|dv|sc|government|federal)\s+clearance`,
           String.raw`ts/sci`,
         ]),
-        languagePatterns: z
-          .array(regexString("requirements.languagePatterns"))
-          .default([
-            String.raw`(?:fluent|fluency|proficien(?:t|cy)|native|business[\s-]level|working\s+proficiency|professional\s+proficiency)\s+(?:in\s+|with\s+)?(\p{L}+)`,
-          ]),
+        languagePatterns: z._default(z.array(regexString("requirements.languagePatterns")), [
+          String.raw`(?:fluent|fluency|proficien(?:t|cy)|native|business[\s-]level|working\s+proficiency|professional\s+proficiency)\s+(?:in\s+|with\s+)?(\p{L}+)`,
+        ]),
         /**
          * A language's name in other languages, keyed to its English name, lowercase: a German
          * posting asks for "Englisch", the resume says "English". Language packs fill it in.
@@ -192,69 +207,69 @@ export const keywordMatchSchema = z
          * requirement only when it is a key or a value here, so "proficient in Python" is judged
          * as the skill it names. The English names map to themselves.
          */
-        languageNames: z
-          .record(z.string().min(1), z.string().min(1))
-          .default(
-            Object.fromEntries(
-              [
-                "arabic",
-                "bengali",
-                "bulgarian",
-                "cantonese",
-                "chinese",
-                "croatian",
-                "czech",
-                "danish",
-                "dutch",
-                "english",
-                "filipino",
-                "finnish",
-                "french",
-                "german",
-                "greek",
-                "gujarati",
-                "hebrew",
-                "hindi",
-                "hungarian",
-                "indonesian",
-                "italian",
-                "japanese",
-                "kannada",
-                "korean",
-                "malay",
-                "malayalam",
-                "mandarin",
-                "marathi",
-                "norwegian",
-                "persian",
-                "polish",
-                "portuguese",
-                "punjabi",
-                "romanian",
-                "russian",
-                "serbian",
-                "slovak",
-                "spanish",
-                "swahili",
-                "swedish",
-                "tagalog",
-                "tamil",
-                "telugu",
-                "thai",
-                "turkish",
-                "ukrainian",
-                "urdu",
-                "vietnamese",
-              ].map((name) => [name, name]),
-            ),
+        languageNames: z._default(
+          z.record(z.string().check(z.minLength(1)), z.string().check(z.minLength(1))),
+          Object.fromEntries(
+            [
+              "arabic",
+              "bengali",
+              "bulgarian",
+              "cantonese",
+              "chinese",
+              "croatian",
+              "czech",
+              "danish",
+              "dutch",
+              "english",
+              "filipino",
+              "finnish",
+              "french",
+              "german",
+              "greek",
+              "gujarati",
+              "hebrew",
+              "hindi",
+              "hungarian",
+              "indonesian",
+              "italian",
+              "japanese",
+              "kannada",
+              "korean",
+              "malay",
+              "malayalam",
+              "mandarin",
+              "marathi",
+              "norwegian",
+              "persian",
+              "polish",
+              "portuguese",
+              "punjabi",
+              "romanian",
+              "russian",
+              "serbian",
+              "slovak",
+              "spanish",
+              "swahili",
+              "swedish",
+              "tagalog",
+              "tamil",
+              "telugu",
+              "thai",
+              "turkish",
+              "ukrainian",
+              "urdu",
+              "vietnamese",
+            ].map((name) => [name, name]),
           ),
-      })
-      .prefault({}),
+        ),
+      }),
+      {},
+    ),
     /**
      * Number words a years pattern may capture instead of a figure: "five years". Also never
      * keywords: "five" is not a skill a candidate is missing.
      */
-    numberWords: z.record(term, z.number().int().positive()).default({
+    numberWords: z._default(z.record(term, z.number().check(z.int(), z.gt(0))), {
       one: 1,
       two: 2,
       three: 3,
@@ -277,9 +292,14 @@ export const keywordMatchSchema = z
      * `sameLine` group must appear on a resume line that also names the requirement's skill
      * (the certificate *in* AWS).
      */
-    qualifiers: z
-      .array(z.object({ words: z.array(term).min(1), sameLine: z.boolean().default(false) }))
-      .default([
+    qualifiers: z._default(
+      z.array(
+        z.object({
+          words: z.array(term).check(z.minLength(1)),
+          sameLine: z._default(z.boolean(), false),
+        }),
+      ),
+      [
         {
           words: ["mentoring", "mentor", "mentored", "mentorship", "coaching", "coached"],
           sameLine: false,
@@ -292,12 +312,13 @@ export const keywordMatchSchema = z
           sameLine: true,
         },
         { words: ["license", "licence", "licensed", "licensure"], sameLine: true },
-      ]),
+      ],
+    ),
     /**
      * What marks a clause of a requirement as optional: "Bachelor's degree required; MBA a
      * plus". The clause is read as preferred and does not raise the level the line asks for.
      */
-    preferredMarkers: wordList("preferredMarkers").default([
+    preferredMarkers: z._default(wordList("preferredMarkers"), [
       String.raw`a\s+plus`,
       String.raw`is\s+a\s+plus`,
       "preferred",
@@ -311,7 +332,7 @@ export const keywordMatchSchema = z
      * Text in a posting that is never a keyword: a "City, ST" location. Compiled
      * case-sensitively and globally; each must be linear on hostile input.
      */
-    ignorePatterns: z.array(regexString("ignorePatterns")).default([
+    ignorePatterns: z._default(z.array(regexString("ignorePatterns")), [
       String.raw`(?<![\p{L}])\p{Lu}[\p{L}'.-]{0,30}(?:\s\p{Lu}[\p{L}'.-]{0,30}){0,2},\s{0,3}(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(?![\p{L}\p{N}/+#])`,
       // Without the comma, only where an address ends — the line, a stop or a ZIP code: "Office
       // in Boston MA", "Cambridge MA 02139". Not "Requires MS in Computer Science", where the
@@ -324,7 +345,7 @@ export const keywordMatchSchema = z
      * range"), or names one beside an amount of money, is not a requirement. Only then, so
      * "Compensation analysis experience" and "Equity research" stay requirements.
      */
-    offerWords: wordList("offerWords").default([
+    offerWords: z._default(wordList("offerWords"), [
       "salary",
       "compensation",
       String.raw`pay\s+range`,
@@ -340,7 +361,7 @@ export const keywordMatchSchema = z
      * Labels of a line that states a nationality, never a language: "Nationality: German",
      * "Staatsangehörigkeit: deutsch". Such a line is no evidence of speaking the language.
      */
-    nationalityLabels: wordList("nationalityLabels").default([
+    nationalityLabels: z._default(wordList("nationalityLabels"), [
       "nationality",
       "citizenship",
       String.raw`staatsangeh(?:ö|oe)rigkeit`,
@@ -361,29 +382,32 @@ export const keywordMatchSchema = z
     phrases: z.array(term),
     buzzwords: z.array(term),
   })
-  .superRefine((km, ctx) => {
-    /**
-     * A multi-word term only ever becomes a single token by matching the phrase list first. One
-     * that appears in `implies` or `synonyms` but not in `phrases` therefore never resolves: the
-     * posting scatters it into unrelated single words and the implication silently does nothing.
-     * Catching it here turns a quiet scoring hole into a startup failure naming the term.
-     */
-    const phrases = new Set(km.phrases);
-    const multiWord = new Set<string>();
+  .check(
+    z.superRefine((km, ctx) => {
+      /**
+       * A multi-word term only ever becomes a single token by matching the phrase list first. One
+       * that appears in `implies` or `synonyms` but not in `phrases` therefore never resolves: the
+       * posting scatters it into unrelated single words and the implication silently does nothing.
+       * Catching it here turns a quiet scoring hole into a startup failure naming the term.
+       */
+      // A multi-word soft skill is matched as a phrase too.
+      const phrases = new Set([...km.phrases, ...km.softSkills]);
+      const multiWord = new Set<string>();
 
-    for (const [skill, capabilities] of Object.entries(km.implies)) {
-      if (skill.includes(" ")) multiWord.add(skill);
-      for (const capability of capabilities)
-        if (capability.includes(" ")) multiWord.add(capability);
-    }
-    for (const canonical of Object.values(km.synonyms))
-      if (canonical.includes(" ")) multiWord.add(canonical);
+      for (const [skill, capabilities] of Object.entries(km.implies)) {
+        if (skill.includes(" ")) multiWord.add(skill);
+        for (const capability of capabilities)
+          if (capability.includes(" ")) multiWord.add(capability);
+      }
+      for (const canonical of Object.values(km.synonyms))
+        if (canonical.includes(" ")) multiWord.add(canonical);
 
-    for (const term of multiWord)
-      if (!phrases.has(term))
-        ctx.addIssue({
-          code: "custom",
-          path: ["phrases"],
-          message: `multi-word term "${term}" is referenced by implies/synonyms but missing from phrases, so it can never match`,
-        });
-  });
+      for (const term of multiWord)
+        if (!phrases.has(term))
+          ctx.addIssue({
+            code: "custom",
+            path: ["phrases"],
+            message: `multi-word term "${term}" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match`,
+          });
+    }),
+  );

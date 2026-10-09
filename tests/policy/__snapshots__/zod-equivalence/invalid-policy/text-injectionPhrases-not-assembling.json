@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "text.injectionPhrases",
+        "message": "text.injectionPhrases does not assemble into a valid regular expression: Invalid regular expression: /(?<![\\p{L}\\p{M}\\p{N}_])(?:(?<)(?![\\p{L}\\p{M}\\p{N}_])/iu: Invalid capture group name"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "text",
+        "injectionPhrases"
+      ]
+    }
+  ]
+}

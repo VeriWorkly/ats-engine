@@ -7,7 +7,12 @@ import { memo } from "../util/memo.js";
 
 type HeaderMatchers = {
   titleWords: RegExp;
-  splitter: RegExp;
+  /** What parts a header: separators, a column gap, or a joining word. Global, to walk them. */
+  separators: RegExp;
+  /** A separator that is one of the words joining a title to its employer ("at", "bei"). */
+  employerWord: RegExp;
+  /** A school's word: "University", "College", "Institute". */
+  school: RegExp;
   verbOpener: RegExp;
   duration: RegExp;
 };
@@ -24,10 +29,12 @@ const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatc
   // that join a title to its employer ("Engineer at Acme", "Entwickler bei Acme") are data; an
   // "@" standing alone ("Data Scientist @ Netflix") is the symbol for them, and spaced so an
   // email address is never cut.
-  splitter: new RegExp(
+  separators: new RegExp(
     String.raw`\s*[|·•]\s*|\s+[-–—@]\s+|\t+|\s{2,}|,\s+|\s+${wordListPattern(rp.employerWords)}\s+`,
-    "iu",
+    "giu",
   ),
+  employerWord: new RegExp(String.raw`^\s+${wordListPattern(rp.employerWords)}\s+$`, "iu"),
+  school: wordListRegex(rp.schoolWords),
   verbOpener: new RegExp(`^${wordListPattern(text.contentLineVerbs)}`, "iu"),
 }));
 
@@ -75,13 +82,33 @@ export const opensWithVerb = (line: string, policy: AtsEnginePolicy) =>
  */
 const WRAP_WIDTH = 48;
 
+/**
+ * A header cut at its separators. A joining word inside a school's name is not one: "The
+ * University of Texas at Austin" is one employer, where "Research Assistant at University of
+ * Michigan" is a title and an employer.
+ */
+function splitHeader(header: string, policy: AtsEnginePolicy): string[] {
+  const { separators, employerWord, school } = matchersOf(policy);
+  const parts: string[] = [];
+  let part = "";
+  let from = 0;
+  for (const match of header.matchAll(separators)) {
+    part += header.slice(from, match.index);
+    from = match.index + match[0].length;
+    if (employerWord.test(match[0]) && school.test(part)) part += match[0];
+    else {
+      parts.push(part);
+      part = "";
+    }
+  }
+  parts.push(part + header.slice(from));
+  return parts;
+}
+
 function headerParts(header: string, policy: AtsEnginePolicy) {
   // Empty brackets are what is left of "(Jan 2020 - Present)" once the dates are taken out. A
   // leading "." is kept when a word follows it: ".NET Developer".
-  return header
-    .replace(BULLET_PREFIX, "")
-    .replace(/\(\s*\)|\[\s*\]/g, " ")
-    .split(matchersOf(policy).splitter)
+  return splitHeader(header.replace(BULLET_PREFIX, "").replace(/\(\s*\)|\[\s*\]/g, " "), policy)
     .map((part) =>
       // The trailing run is matched from its first character only: unanchored, a long run of
       // separators would be retried from every position in it.

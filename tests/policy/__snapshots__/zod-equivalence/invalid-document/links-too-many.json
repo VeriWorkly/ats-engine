@@ -1,0 +1,24 @@
+{
+  "error": {
+    "name": "AtsInputError",
+    "message": "Resume document is invalid.",
+    "issues": [
+      {
+        "path": "basics.links",
+        "message": "Too big: expected array to have <=50 items"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "array",
+      "code": "too_big",
+      "maximum": 50,
+      "inclusive": true,
+      "path": [
+        "basics",
+        "links"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "language": {
+    "months": {
+      "janvier": 1
+    },
+    "id": "xx",
+    "name": "Example",
+    "status": "community",
+    "maintainers": [],
+    "script": "Latin",
+    "detectionWords": []
+  },
+  "languageWithWords": {
+    "months": {
+      "janvier": 1
+    },
+    "stopwords": [
+      "le"
+    ],
+    "softSkills": [
+      "esprit d'équipe"
+    ],
+    "id": "xx",
+    "name": "Example",
+    "status": "community",
+    "maintainers": [],
+    "script": "<undefined>",
+    "detectionWords": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f",
+      "g",
+      "h",
+      "i",
+      "j"
+    ]
+  },
+  "region": {
+    "id": "XX",
+    "name": "Example",
+    "status": "community",
+    "maintainers": [],
+    "phoneCountry": "FR",
+    "dateOrder": "DMY",
+    "rules": {}
+  },
+  "attached": {
+    "languages": [
+      {
+        "months": {
+          "janvier": 1
+        },
+        "id": "xx",
+        "name": "Example",
+        "status": "community",
+        "maintainers": [],
+        "script": "Latin",
+        "detectionWords": []
+      }
+    ],
+    "regions": [
+      {
+        "id": "XX",
+        "name": "Example",
+        "status": "community",
+        "maintainers": [],
+        "phoneCountry": "FR",
+        "dateOrder": "DMY",
+        "rules": {}
+      }
+    ]
+  }
+}

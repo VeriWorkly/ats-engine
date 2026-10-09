@@ -11,6 +11,7 @@
 
 import { decodeEntities, htmlText, indexOfIgnoreCase } from "./html.js";
 
+/** The schema.org `JobPosting` a page publishes, as text: `extractJobPosting`. */
 export type AtsJobPosting = {
   title: string;
   company: string;

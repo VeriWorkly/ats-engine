@@ -6,8 +6,10 @@
     "mcp",
     "model-context-protocol",
     "ats",
+    "applicant-tracking-system",
     "resume",
     "cv",
+    "resume-checker",
     "job-match"
   ],
   "license": "MIT",

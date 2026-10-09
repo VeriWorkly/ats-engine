@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.alternationWords",
+        "message": "alternationWords does not assemble into a valid regular expression: Invalid regular expression: /(?<![\\p{L}\\p{M}\\p{N}_])(?:c++)(?![\\p{L}\\p{M}\\p{N}_])/iu: Nothing to repeat"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "alternationWords"
+      ]
+    }
+  ]
+}

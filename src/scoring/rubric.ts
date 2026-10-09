@@ -18,7 +18,13 @@ export type AtsRubricEntry = {
   fix: string;
 };
 
+/** What the rule reads, and the languages it is limited to, if any: "passiveVoiceRatio (en only)". */
 function measures(rule: AtsEngineRule): string {
+  const read = reads(rule);
+  return rule.languages ? `${read} (${rule.languages.join(", ")} only)` : read;
+}
+
+function reads(rule: AtsEngineRule): string {
   switch (rule.kind) {
     case "min-words":
       return `at least ${rule.min} words`;

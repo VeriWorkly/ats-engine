@@ -153,8 +153,12 @@ async function readPdf(
     // The document's own description fields, which no reader sees and an instruction to an AI
     // can hide in. Read for that alone: an ATS does not index them.
     let metadataText: string | undefined;
+    // Encrypted, yet opened without a password: an owner password restricts the file. pdf.js
+    // names the security handler only for an encrypted document.
+    let encrypted = false;
     try {
       const info = (await document.getMetadata()).info as Record<string, unknown> | undefined;
+      encrypted = typeof info?.EncryptFilterName === "string";
       metadataText = ["Title", "Subject", "Keywords", "Author"]
         .map((field) => info?.[field])
         .filter((value): value is string => typeof value === "string" && value.trim() !== "")
@@ -169,6 +173,7 @@ async function readPdf(
       text: withLinks(text, links),
       geometry: {
         ...(metadataText && { metadataText }),
+        ...(encrypted && { encrypted }),
         columnRatio,
         pageCount: document.numPages,
         ...(visibilityRead && {

@@ -7,7 +7,12 @@
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
-import { DEFAULT_POLICY, type AtsLayoutSignals, type AtsResumeInput } from "@veriworkly/ats-engine";
+import {
+  DEFAULT_POLICY,
+  type AtsFileInfo,
+  type AtsLayoutSignals,
+  type AtsResumeInput,
+} from "@veriworkly/ats-engine";
 import { normalizeJobText } from "@veriworkly/ats-engine/job";
 import { BUILT_IN_LOCALES, withLocales } from "@veriworkly/ats-engine/locales";
 import {
@@ -50,7 +55,7 @@ export type JobArgs = { job_path?: string; job_text?: string };
 /** The resume a call names, read from its file or taken from its text. */
 export async function readResume(
   args: ResumeArgs,
-): Promise<{ input: AtsResumeInput; layout?: AtsLayoutSignals }> {
+): Promise<{ input: AtsResumeInput; layout?: AtsLayoutSignals; file?: AtsFileInfo }> {
   exactlyOne(args.path, args.text, "resume", ["path", "text"]);
   if (args.path !== undefined) return readResumeFile(absolute(args.path));
   if (args.text === undefined)
@@ -83,6 +88,14 @@ export async function readJob(
 export function checkRegion(region: string | undefined): void {
   if (region !== undefined && !REGIONS.includes(region.toUpperCase()))
     throw new ToolInputError(`Unknown region "${region}"; use one of ${REGIONS.join(", ")}.`);
+}
+
+/** The applicant tracking systems the policy has documented notes on. */
+export const TARGETS = Object.keys(POLICY.advice.targets);
+
+export function checkTarget(target: string | undefined): void {
+  if (target !== undefined && !TARGETS.includes(target.toLowerCase()))
+    throw new ToolInputError(`Unknown target_ats "${target}"; use one of ${TARGETS.join(", ")}.`);
 }
 
 /** Whether an error's message is meant for the person: their mistake, not the server's. */

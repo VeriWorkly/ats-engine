@@ -1,0 +1,39 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.numberWords.one",
+        "message": "Too small: expected number to be >0"
+      },
+      {
+        "path": "keywordMatch.numberWords.two",
+        "message": "Invalid input: expected int, received number"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "number",
+      "code": "too_small",
+      "minimum": 0,
+      "inclusive": false,
+      "path": [
+        "keywordMatch",
+        "numberWords",
+        "one"
+      ]
+    },
+    {
+      "expected": "int",
+      "format": "safeint",
+      "code": "invalid_type",
+      "path": [
+        "keywordMatch",
+        "numberWords",
+        "two"
+      ]
+    }
+  ]
+}

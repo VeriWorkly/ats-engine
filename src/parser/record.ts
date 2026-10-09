@@ -15,9 +15,18 @@ export const PARSED_FIELDS: readonly AtsParsedField[] = [
   "roles",
   "education",
   "skills",
+  "certifications",
+  "spokenLanguages",
 ];
 
-const MAX_REPORTED = { roles: 20, education: 10, skills: 60, links: 10 };
+const MAX_REPORTED = {
+  roles: 20,
+  education: 10,
+  skills: 60,
+  links: 10,
+  certifications: 20,
+  spokenLanguages: 15,
+};
 
 /**
  * Caps the lists, derives tenure and highest degree, and stamps provenance.
@@ -43,6 +52,9 @@ export function finalizeParsed(
     roles: core.roles.slice(0, MAX_REPORTED.roles),
     education: core.education.slice(0, MAX_REPORTED.education),
     skills: [...new Set(core.skills)].slice(0, MAX_REPORTED.skills),
+    // A record stored before these were read (and handed back to the repair merge) has neither.
+    certifications: (core.certifications ?? []).slice(0, MAX_REPORTED.certifications),
+    spokenLanguages: (core.spokenLanguages ?? []).slice(0, MAX_REPORTED.spokenLanguages),
   };
 
   const provenance = {} as Record<AtsParsedField, AtsProvenance>;

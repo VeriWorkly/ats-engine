@@ -1,0 +1,61 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.sections.required",
+        "message": "sections.required is not a valid regular expression in Unicode mode: Invalid regular expression: /(/u: Unterminated group"
+      },
+      {
+        "path": "keywordMatch.sections.preferred",
+        "message": "Invalid input: expected string, received undefined"
+      },
+      {
+        "path": "keywordMatch.sections.responsibilities",
+        "message": "Invalid input: expected string, received undefined"
+      },
+      {
+        "path": "keywordMatch.sections.excluded",
+        "message": "Invalid input: expected string, received undefined"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "sections",
+        "required"
+      ]
+    },
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "keywordMatch",
+        "sections",
+        "preferred"
+      ]
+    },
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "keywordMatch",
+        "sections",
+        "responsibilities"
+      ]
+    },
+    {
+      "expected": "string",
+      "code": "invalid_type",
+      "path": [
+        "keywordMatch",
+        "sections",
+        "excluded"
+      ]
+    }
+  ]
+}

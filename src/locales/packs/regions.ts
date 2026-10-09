@@ -10,7 +10,10 @@ import type { AtsRegionPackInput } from "../schema.js";
  *
  * The rule adjustments name rules of the community policy. A date of birth or a photo is
  * expected in Germany and India and a liability in the US, where it invites age and appearance
- * bias; `weight: 0` turns the rule off for the region rather than passing it.
+ * bias; `weight: 0` turns the rule off for the region rather than passing it. For the same reason
+ * only the US pack turns on the age advice (`ageAdvice`): a German Lebenslauf and an Indian
+ * resume customarily give a date of birth, so advising to hide a graduation year there would
+ * contradict the convention.
  */
 const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 
@@ -21,6 +24,7 @@ const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\
 const LAW = String.raw`(?<!\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\p{L})`;
 const LLM = String.raw`llm(?=\s*[,()]|\s+in\s|\s+(?:19|20)\d{2}(?!\d)|\s*$)(?:(?=[^\n]{0,80}?${LAW})|(?<=${LAW}[^\n]{0,80}llm))`;
 
+/** The United States: month-first dates; a date of birth or a photo is a warning; age advice on. */
 export const US: AtsRegionPackInput = {
   id: "US",
   name: "United States",
@@ -32,8 +36,12 @@ export const US: AtsRegionPackInput = {
     "ats-v2.privacy.dateOfBirth": { weight: 6, severity: "warning" },
     "ats-v2.format.photo": { weight: 6, severity: "warning" },
   },
+  // US recruiters expect no age on a resume (the ADEA protects applicants 40 and over), and
+  // career advice there commonly drops graduation years and roles older than 15–20 years.
+  ageAdvice: { graduationYears: 20, experienceYears: 20 },
 };
 
+/** Germany: day-first dates, German credentials; a date of birth or a photo is not judged. */
 export const DE: AtsRegionPackInput = {
   id: "DE",
   name: "Deutschland",
@@ -69,6 +77,7 @@ export const DE: AtsRegionPackInput = {
   },
 };
 
+/** India: day-first dates, Indian credentials and state codes; date of birth and photo not judged. */
 export const IN: AtsRegionPackInput = {
   id: "IN",
   name: "India",

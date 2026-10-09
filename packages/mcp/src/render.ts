@@ -4,7 +4,14 @@
  */
 
 import type { AtsReport, AtsRequirement, AtsRubricEntry, AtsVerdict } from "@veriworkly/ats-engine";
-import { categoryLabel, formatRoleDates, formatTenure } from "@veriworkly/ats-engine/format";
+import {
+  adviceLabel,
+  categoryLabel,
+  formatCertification,
+  formatRoleDates,
+  formatSpokenLanguage,
+  formatTenure,
+} from "@veriworkly/ats-engine/format";
 
 /** Said in every scored answer, so the assistant does not present the score as its own opinion. */
 export function provenance(report: AtsReport): string {
@@ -27,8 +34,9 @@ export function renderJobMatch(report: AtsReport): string[] {
     lines.push(`Requirements met: ${met} of ${report.requirements.length}`);
     lines.push(...report.requirements.map(requirementLine));
   }
-  if (report.missingKeywords.length)
-    lines.push(`Missing keywords: ${report.missingKeywords.join(", ")}`);
+  const { hard, soft } = report.missingKeywordGroups;
+  if (hard.length) lines.push(`Missing keywords: ${hard.join(", ")}`);
+  if (soft.length) lines.push(`Missing soft skills (weigh less): ${soft.join(", ")}`);
   return lines;
 }
 
@@ -74,6 +82,21 @@ export function renderCheck(report: AtsReport, verdict: AtsVerdict, withJob: boo
   if (parsed.monthsOfExperience)
     lines.push(`- Experience: ${formatTenure(parsed.monthsOfExperience)}`);
   if (parsed.skills.length) lines.push(`- Skills: ${parsed.skills.join(", ")}`);
+  for (const row of parsed.certifications)
+    lines.push(`- Certification: ${formatCertification(row)}`);
+  if (parsed.spokenLanguages.length)
+    lines.push(`- Speaks: ${parsed.spokenLanguages.map(formatSpokenLanguage).join(", ")}`);
+
+  // Apart from the score, and said to be: none of it changes a number above.
+  if (report.advice.length) {
+    lines.push("", "Advice (not scored):");
+    for (const item of report.advice) {
+      lines.push(`- [${adviceLabel(item.kind)}] ${item.message}`);
+      if (item.evidence) lines.push(`  ${item.evidence}`);
+      if (item.fix) lines.push(`  Fix: ${item.fix}`);
+      if (item.source) lines.push(`  Source: ${item.source}`);
+    }
+  }
   return lines.join("\n");
 }
 

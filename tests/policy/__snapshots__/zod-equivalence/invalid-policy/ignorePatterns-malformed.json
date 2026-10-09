@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.ignorePatterns.0",
+        "message": "ignorePatterns is not a valid regular expression in Unicode mode: Invalid regular expression: /a{2,1}/u: numbers out of order in {} quantifier"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "ignorePatterns",
+        0
+      ]
+    }
+  ]
+}

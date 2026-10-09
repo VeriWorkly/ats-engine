@@ -1,0 +1,53 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.months.jan",
+        "message": "Too small: expected number to be >=1"
+      },
+      {
+        "path": "resumeParse.months.dec",
+        "message": "Too big: expected number to be <=12"
+      },
+      {
+        "path": "resumeParse.months.feb",
+        "message": "Invalid input: expected number, received string"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "number",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "resumeParse",
+        "months",
+        "jan"
+      ]
+    },
+    {
+      "origin": "number",
+      "code": "too_big",
+      "maximum": 12,
+      "inclusive": true,
+      "path": [
+        "resumeParse",
+        "months",
+        "dec"
+      ]
+    },
+    {
+      "expected": "number",
+      "code": "invalid_type",
+      "path": [
+        "resumeParse",
+        "months",
+        "feb"
+      ]
+    }
+  ]
+}

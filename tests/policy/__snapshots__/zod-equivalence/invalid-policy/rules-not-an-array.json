@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules",
+        "message": "Invalid input: expected array, received object"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "array",
+      "code": "invalid_type",
+      "path": [
+        "rules"
+      ]
+    }
+  ]
+}

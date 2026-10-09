@@ -55,6 +55,14 @@ describe("ats-engine check", () => {
     expect(printed).toMatch(/Role {5}Senior Engineer, Acme Corporation \(Jan 2020 – Present\)/);
   });
 
+  it("prints the certifications and languages an ATS reads", async () => {
+    const resume = `${RESUME}\n\nCertifications\nPMP (PMI), expires 2027\n\nLanguages\nEnglish (native), German (B2)`;
+    expect(await main(["check", file("credentials.txt", resume)])).toBe(0);
+    const printed = out.join("\n");
+    expect(printed).toContain("Cert     PMP, PMI, expires 2027");
+    expect(printed).toContain("Speaks   English (native), German (B2)");
+  });
+
   it("prints the text as read with --text, and the region it was read in", async () => {
     expect(await main(["check", file("text.txt", RESUME), "--text", "--region", "US"])).toBe(0);
     const printed = out.join("\n");
@@ -85,6 +93,18 @@ describe("ats-engine check", () => {
     expect(report.missingKeywords).toContain("kubernetes");
   });
 
+  it("prints a posting's missing soft skills apart from its missing keywords", async () => {
+    const job = file(
+      "soft.txt",
+      "Requirements\n- Kubernetes and Terraform\n- Excellent communication skills\n- Teamwork",
+    );
+    expect(await main(["check", file("r3.txt", RESUME), "--job", job])).toBe(0);
+
+    const printed = out.join("\n");
+    expect(printed).toMatch(/Missing keywords: kubernetes, terraform\n/);
+    expect(printed).toContain("Missing soft skills (weigh less): communication, teamwork");
+  });
+
   it("reads PDF and DOCX files, measuring a PDF's layout", async () => {
     const ops = LEFT_COLUMN.flatMap((line: string, index: number) => [
       text(45, 720 - index * 26, line),
@@ -101,6 +121,19 @@ describe("ats-engine check", () => {
     ).toBe(0);
     expect(JSON.parse(out.join("\n")).parsed.name).toBe("Jane Doe");
   }, 60_000);
+
+  it("prints a failed writing check under the Writing label, with its fix", async () => {
+    const weak = RESUME.replace(
+      "- Built payment systems in TypeScript, cutting failures 40%.",
+      "- Responsible for the payment systems in TypeScript\n- Own the checkout flow",
+    );
+    expect(await main(["check", file("weak.txt", weak)])).toBe(0);
+    const printed = out.join("\n");
+    expect(printed).toContain(
+      'Writing: 1 bullet opens with a duty rather than an action, such as "Responsible for the payment systems in TypeScript".',
+    );
+    expect(printed).toContain('Fix: Replace "Responsible for", "Worked on"');
+  });
 
   it("gates on --min-score with exit code 2", async () => {
     const resume = file("r3.txt", RESUME);

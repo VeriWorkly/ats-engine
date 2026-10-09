@@ -1,0 +1,28 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.section",
+        "message": "Invalid option: expected one of \"experience\"|\"education\"|\"skills\"|\"projects\""
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_value",
+      "values": [
+        "experience",
+        "education",
+        "skills",
+        "projects"
+      ],
+      "path": [
+        "rules",
+        0,
+        "section"
+      ]
+    }
+  ]
+}

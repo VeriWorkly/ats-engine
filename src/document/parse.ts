@@ -1,9 +1,18 @@
+import { parseCertifications } from "../parser/certifications.js";
 import { educationLevel } from "../parser/education.js";
+import { canonicalLanguage, cefrLevel, parseSpokenLanguages } from "../parser/languages.js";
 import { findPhone } from "../parser/phone.js";
 import { parseDocumentDate } from "../parser/dates.js";
 import { finalizeParsed } from "../parser/record.js";
+import { sectionKind } from "../parser/sections.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
-import type { AtsParsedEducation, AtsParsedResume, AtsParsedRole } from "../types.js";
+import type {
+  AtsParsedCertification,
+  AtsParsedEducation,
+  AtsParsedLanguage,
+  AtsParsedResume,
+  AtsParsedRole,
+} from "../types.js";
 import type { AtsResumeDocument } from "./types.js";
 
 const dateValue = (date: { year: number; month: number | null } | null, fallbackMonth: number) =>
@@ -17,7 +26,9 @@ const dateValue = (date: { year: number; month: number | null } | null, fallback
  * credential ("MSc Data Science") rather than a level.
  *
  * Every experience-kind section contributes roles. Sections an ATS files separately —
- * volunteering, certifications — belong in `other` and never count toward tenure.
+ * volunteering, certifications — never count toward tenure. Certifications and languages are
+ * read from their own sections' fields, or from an `other` section titled as one; only a
+ * language's CEFR level is classified, from its level text.
  */
 export function parseResumeDocument(
   doc: AtsResumeDocument,
@@ -28,6 +39,8 @@ export function parseResumeDocument(
   const roles: AtsParsedRole[] = [];
   const education: AtsParsedEducation[] = [];
   const skills: string[] = [];
+  const certifications: AtsParsedCertification[] = [];
+  const spokenLanguages: AtsParsedLanguage[] = [];
 
   for (const section of doc.sections) {
     if (section.kind === "experience") {
@@ -65,6 +78,44 @@ export function parseResumeDocument(
         if (keywords.length) skills.push(...keywords);
         else if (group.name?.trim()) skills.push(group.name.trim());
       }
+    } else if (section.kind === "certifications") {
+      for (const item of section.items) {
+        const name = item.name.trim();
+        if (!name || certifications.some((row) => row.name.toLowerCase() === name.toLowerCase()))
+          continue;
+        certifications.push({
+          name,
+          issuer: item.issuer?.trim() ?? "",
+          date: parseDocumentDate(item.date, rp, now),
+          expires: parseDocumentDate(item.expires, rp, now),
+        });
+      }
+    } else if (section.kind === "languages") {
+      // A language field names a language whatever it is called; only its level is read.
+      for (const item of section.items) {
+        const language = item.language.trim();
+        const key = canonicalLanguage(language, policy);
+        if (
+          !language ||
+          spokenLanguages.some((row) => canonicalLanguage(row.language, policy) === key)
+        )
+          continue;
+        const level = item.level?.trim() ?? "";
+        spokenLanguages.push({ language, level, cefr: level ? cefrLevel(level, policy) : null });
+      }
+    } else if (section.kind === "other") {
+      // An `other` section titled as one ("Licenses & Certifications", "Languages") is read as
+      // the text parser reads that section: each entry's heading, or its lines when it has none.
+      const kind = sectionKind(section.title, policy);
+      if (kind !== "certifications" && kind !== "languages") continue;
+      const lines = section.items.flatMap((entry) =>
+        entry.heading?.trim() ? [entry.heading] : (entry.lines ?? []),
+      );
+      if (kind === "languages") parseSpokenLanguages(lines, policy, spokenLanguages);
+      else
+        for (const row of parseCertifications(lines, policy, now))
+          if (!certifications.some((kept) => kept.name.toLowerCase() === row.name.toLowerCase()))
+            certifications.push(row);
     }
   }
 
@@ -89,6 +140,8 @@ export function parseResumeDocument(
       roles,
       education,
       skills: skills.filter((skill) => skill.length <= 60),
+      certifications,
+      spokenLanguages,
     },
     () => "structured",
     now,

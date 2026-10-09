@@ -321,3 +321,44 @@ describe("the engine holds no state", () => {
     expect(() => AtsScoringService.check(nested, DEFAULT_POLICY)).not.toThrow();
   });
 });
+
+describe("the writing vocabulary and a rule's languages", () => {
+  const writingRule = {
+    id: "test.writing",
+    category: "writing",
+    severity: "info",
+    kind: "bands",
+    metric: "firstPersonLines",
+    bands: [
+      { upTo: 0, weight: 0 },
+      { upTo: null, weight: 2 },
+    ],
+    passEvidence: "ok",
+    failEvidence: "no",
+    fix: "fix it",
+  };
+
+  it("gives a policy written before them English and the community word lists", () => {
+    const policy = parseAtsPolicy(MINIMAL);
+    expect(policy.text.language).toBe("en");
+    expect(policy.writing).toEqual(DEFAULT_POLICY.writing);
+    expect(policy.writing.bulletsPerRole).toEqual({ min: 2, max: 8 });
+    expect(policy.writing.maxBulletWords).toBe(40);
+  });
+
+  it("accepts ISO 639 codes on a rule and refuses anything else", () => {
+    const parsed = parseAtsPolicy(withRule({ ...writingRule, languages: ["en", "fil"] }));
+    expect(parsed.rules[0]).toMatchObject({ languages: ["en", "fil"] });
+    for (const languages of [[], ["EN"], ["english"]])
+      expect(() => parseAtsPolicy(withRule({ ...writingRule, languages }))).toThrow(AtsPolicyError);
+  });
+
+  it("refuses a bullet range upside down and a word list that does not compile", () => {
+    expect(() =>
+      parseAtsPolicy({ ...MINIMAL, writing: { bulletsPerRole: { min: 9, max: 3 } } }),
+    ).toThrow(AtsPolicyError);
+    expect(() => parseAtsPolicy({ ...MINIMAL, writing: { weakOpeners: ["(unclosed"] } })).toThrow(
+      AtsPolicyError,
+    );
+  });
+});

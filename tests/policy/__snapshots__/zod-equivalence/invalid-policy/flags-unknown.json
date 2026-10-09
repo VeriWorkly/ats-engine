@@ -1,0 +1,34 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.flags",
+        "message": "flags \"q\" are not valid regular-expression flags: Invalid flags supplied to RegExp constructor 'q'"
+      },
+      {
+        "path": "rules.0.pattern",
+        "message": "pattern is not a valid regular expression with flags \"q\": Invalid flags supplied to RegExp constructor 'qu'"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "flags"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "pattern"
+      ]
+    }
+  ]
+}

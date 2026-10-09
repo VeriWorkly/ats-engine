@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.flags",
+        "message": "flags \"y\": the sticky flag \"y\" is not supported"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "flags"
+      ]
+    }
+  ]
+}

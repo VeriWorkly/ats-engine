@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import {
   groundingWords,
@@ -20,10 +20,12 @@ export const insightsSchema = z.object({
   priorityOrder: textList(500, 12),
 });
 
+/** What `analyze` returns: the model's reading of the report, as lists of short texts. */
 export type AtsAiInsights = z.output<typeof insightsSchema>;
 
 const jsonSchema = toStrictJsonSchema(insightsSchema);
 
+/** The resume, its report, and the posting if there was one. */
 export type AnalyzeInput = {
   /** The flattened resume the report was computed from. */
   resumeText: string;
@@ -34,6 +36,7 @@ export type AnalyzeInput = {
 /** Job text beyond this adds cost, not signal. */
 const MAX_JOB_CHARS = 20_000;
 
+/** The system prompt `analyze` uses unless `prompts.analyze` or a call replaces it. */
 export const DEFAULT_ANALYZE_PROMPT = [
   "You help a candidate improve their own resume.",
   "The user message is JSON. Besides a short instruction it has three members. deterministicReport is what an ATS engine computed from the resume: readinessScore, per-category scores, failedChecks (each with its evidence and a fix), prioritizedFixes and the parsed fields, plus jobMatchScore, missingKeywords and requirements (each judged met, partial, missing or unverifiable) when a posting was given. resume is the text the report was computed from. jobDescription is a job posting, or null.",

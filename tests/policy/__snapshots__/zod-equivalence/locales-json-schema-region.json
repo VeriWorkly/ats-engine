@@ -1,0 +1,510 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sections": {
+      "type": "object",
+      "properties": {
+        "experience": {
+          "type": "string",
+          "minLength": 1
+        },
+        "education": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skills": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projects": {
+          "type": "string",
+          "minLength": 1
+        },
+        "certifications": {
+          "type": "string",
+          "minLength": 1
+        },
+        "languages": {
+          "type": "string",
+          "minLength": 1
+        },
+        "other": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "languageLevels": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "A1",
+          "A2",
+          "B1",
+          "B2",
+          "C1",
+          "C2"
+        ]
+      }
+    },
+    "credentialWords": {
+      "type": "object",
+      "properties": {
+        "issued": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "expires": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "issuer": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "id": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "months": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 12
+      }
+    },
+    "seasons": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          }
+        ],
+        "items": false,
+        "minItems": 2,
+        "maxItems": 2
+      }
+    },
+    "durationUnits": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "nameLabels": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "postNominals": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "regionCodes": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "workplaceWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "openEnded": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "rangeWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "sinceWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "employerWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "titleWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "schoolWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "documentTitles": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "nameParticles": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "dateOfBirthLabels": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "headingConnectors": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "degrees": {
+      "type": "object",
+      "properties": {
+        "2": {
+          "type": "string",
+          "minLength": 1
+        },
+        "3": {
+          "type": "string",
+          "minLength": 1
+        },
+        "4": {
+          "type": "string",
+          "minLength": 1
+        },
+        "5": {
+          "type": "string",
+          "minLength": 1
+        },
+        "6": {
+          "type": "string",
+          "minLength": 1
+        },
+        "7": {
+          "type": "string",
+          "minLength": 1
+        },
+        "8": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "contentLineVerbs": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "actionVerbs": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "actionVerbAnywhere": {
+      "type": "boolean"
+    },
+    "injectionPhrases": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "yearsPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "equivalence": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "authorization": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "clearance": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "languagePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "languageNames": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "jobSections": {
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preferred": {
+          "type": "string",
+          "minLength": 1
+        },
+        "responsibilities": {
+          "type": "string",
+          "minLength": 1
+        },
+        "excluded": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "alternationWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "stopwords": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "softSkills": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "buzzwords": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "pluralSuffixes": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "nounsCapitalized": {
+      "type": "boolean"
+    },
+    "proseNames": {
+      "type": "boolean"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "community"
+      ]
+    },
+    "maintainers": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "phoneCountry": {
+      "type": "string"
+    },
+    "dateOrder": {
+      "type": "string",
+      "enum": [
+        "MDY",
+        "DMY",
+        "YMD"
+      ]
+    },
+    "rules": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "weight": {
+            "type": "number",
+            "minimum": 0
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          }
+        }
+      }
+    },
+    "ageAdvice": {
+      "type": "object",
+      "properties": {
+        "graduationYears": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "experienceYears": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      }
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "status",
+    "phoneCountry",
+    "dateOrder"
+  ]
+}

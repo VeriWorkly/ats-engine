@@ -1,0 +1,24 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.min",
+        "message": "Invalid input: expected number, received Infinity"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "number",
+      "code": "invalid_type",
+      "received": "Infinity",
+      "path": [
+        "rules",
+        0,
+        "min"
+      ]
+    }
+  ]
+}

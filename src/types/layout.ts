@@ -37,4 +37,15 @@ export type AtsLayoutSignals = {
    * does not index them — but read for instructions aimed at an AI, which hide there.
    */
   metadataText?: string;
+  /**
+   * A PDF that opened without a password but is encrypted: an owner password restricts copying,
+   * printing or editing. Absent when it is not. Advice, never scored.
+   */
+  encrypted?: boolean;
+  /**
+   * A Word document's tracked changes (insertions, deletions, moves, formatting changes) and
+   * comments still in the file. Measured for DOCX only; advice, never scored.
+   */
+  trackedChanges?: number;
+  comments?: number;
 };

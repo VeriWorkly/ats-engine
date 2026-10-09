@@ -7,6 +7,17 @@ import {
 } from "../checks/integrity/text.js";
 import { unsupportedSkills } from "../checks/skills.js";
 import { timelineIssues } from "../checks/timeline.js";
+import {
+  bulletsPerRole,
+  dateFormats,
+  firstPersonLines,
+  longBullets,
+  passiveVoice,
+  repeatedOpeners,
+  roleBlocks,
+  tenseMismatches,
+  weakOpeners,
+} from "../checks/writing.js";
 import { parseResumeDocument } from "../document/parse.js";
 import type { PreparedResume } from "../input.js";
 import { BULLET, wordListRegex, words } from "../text/text.js";
@@ -43,13 +54,17 @@ const contentLineTest = memo((text: AtsEnginePolicy["text"]) => {
   return (line: string) => verbs.test(line) || line.split(/\s+/).length >= 4;
 });
 
-function contentLinesOf(lines: string[], policy: AtsEnginePolicy) {
+/**
+ * The bullets: the lines with a list marker or, where the markers were lost in extraction, the
+ * sentences under each dated role, as the bullets were. Empty when there are neither.
+ */
+function bulletsOf(lines: string[], policy: AtsEnginePolicy) {
   const bullets = lines.filter((line) => BULLET.test(line));
-  if (bullets.length >= MIN_BULLETS) return bullets;
-  // Markers lost in extraction: the sentences under each dated role, as the bullets were.
-  const body = roleBodyLines(lines, policy);
-  return body.length ? body : lines.filter(contentLineTest(policy.text));
+  return bullets.length >= MIN_BULLETS ? bullets : roleBodyLines(lines, policy);
 }
+
+const contentLinesOf = (lines: string[], bullets: string[], policy: AtsEnginePolicy) =>
+  bullets.length ? bullets : lines.filter(contentLineTest(policy.text));
 
 export type ReadResume = {
   ctx: RuleContext;
@@ -73,7 +88,14 @@ export function readResume(
     jobDescription,
     layout,
     now,
-  }: { jobDescription?: string; layout?: AtsLayoutSignals; now: Date },
+    languages = [],
+  }: {
+    jobDescription?: string;
+    layout?: AtsLayoutSignals;
+    now: Date;
+    /** The attached language packs the resume itself is written in; see `RuleContext.languages`. */
+    languages?: readonly string[];
+  },
 ): ReadResume {
   const { lines, spaced } = readResumeLines(prepared.text.split(/\n+/), policy);
   const sections = segmentResume(lines, policy);
@@ -81,6 +103,9 @@ export function readResume(
   const parsed = prepared.document
     ? parseResumeDocument(prepared.document, policy, now)
     : parseReadLines(lines, policy, now, sections);
+  // The writing rules read bullets only: a summary paragraph is not one, nor a contact row.
+  const bullets = bulletsOf(lines, policy);
+  const roles = roleBlocks(sections, policy);
 
   const ctx: RuleContext = {
     text,
@@ -89,7 +114,8 @@ export function readResume(
     headingLines: lines.filter(isHeadingLine),
     contact: { email: parsed.email, phone: parsed.phone },
     sections: headedKinds(sections),
-    contentLines: contentLinesOf(lines, policy),
+    contentLines: contentLinesOf(lines, bullets, policy),
+    languages: languages.length ? languages : [policy.text.language],
     letterSpacedLines: spaced,
     layout,
     quality: {
@@ -118,6 +144,14 @@ export function readResume(
       stuffedTerms: stuffedTerms(text, lines, policy, now),
       timelineIssues: timelineIssues(parsed.roles, parsed.monthsOfExperience, now),
       unsupportedSkills: unsupportedSkills(sections, parsed.skills),
+      firstPersonLines: firstPersonLines(bullets, policy),
+      passiveVoiceRatio: passiveVoice(bullets, policy),
+      weakOpeners: weakOpeners(bullets, policy),
+      longBullets: longBullets(bullets, policy),
+      tenseMismatches: tenseMismatches(roles, policy),
+      bulletsPerRole: bulletsPerRole(roles, policy),
+      repeatedOpeners: repeatedOpeners(roles, policy),
+      dateFormats: dateFormats(roles, policy),
     },
     policy,
   };

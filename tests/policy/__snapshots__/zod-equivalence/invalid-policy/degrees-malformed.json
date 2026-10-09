@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.degrees.6",
+        "message": "degrees.6 is not a valid regular expression in Unicode mode: Invalid regular expression: /(/u: Unterminated group"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "resumeParse",
+        "degrees",
+        "6"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.metric",
+        "message": "Invalid option: expected one of \"rolesDetected\"|\"roleCompleteness\"|\"datedRoleRatio\"|\"contactCompleteness\"|\"educationDetected\"|\"dateOfBirthStated\""
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_value",
+      "values": [
+        "rolesDetected",
+        "roleCompleteness",
+        "datedRoleRatio",
+        "contactCompleteness",
+        "educationDetected",
+        "dateOfBirthStated"
+      ],
+      "path": [
+        "rules",
+        0,
+        "metric"
+      ]
+    }
+  ]
+}

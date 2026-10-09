@@ -1,0 +1,23 @@
+{
+  "error": {
+    "name": "AtsInputError",
+    "message": "Resume document is invalid.",
+    "issues": [
+      {
+        "path": "sections",
+        "message": "Too big: expected array to have <=40 items"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "array",
+      "code": "too_big",
+      "maximum": 40,
+      "inclusive": true,
+      "path": [
+        "sections"
+      ]
+    }
+  ]
+}

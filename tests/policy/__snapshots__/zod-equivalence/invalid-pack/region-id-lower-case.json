@@ -1,0 +1,25 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.regions.0.id",
+        "message": "an ISO 3166 country code"
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "origin": "string",
+        "code": "invalid_format",
+        "format": "regex",
+        "pattern": "/^[A-Z]{2}$/",
+        "path": [
+          "id"
+        ]
+      }
+    ]
+  ]
+}

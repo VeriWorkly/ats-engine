@@ -1,5 +1,6 @@
 import type { AtsReport } from "../types.js";
 
+/** The one-word reading of a report: `computeVerdict`. */
 export type AtsVerdict = "strong" | "needs-work" | "weak";
 
 /**

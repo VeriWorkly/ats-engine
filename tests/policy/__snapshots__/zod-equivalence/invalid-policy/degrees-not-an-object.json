@@ -1,0 +1,37 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.degrees",
+        "message": "Invalid input"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_union",
+      "errors": [
+        [
+          {
+            "expected": "object",
+            "code": "invalid_type",
+            "path": []
+          }
+        ],
+        [
+          {
+            "expected": "object",
+            "code": "invalid_type",
+            "path": []
+          }
+        ]
+      ],
+      "path": [
+        "resumeParse",
+        "degrees"
+      ]
+    }
+  ]
+}

@@ -30,6 +30,7 @@ import {
 } from "./tasks/convertResume.js";
 import { repairParseSpec, type RepairParseInput } from "./tasks/repairParse.js";
 
+/** The provider, and per task the default route, system prompt and redaction. */
 export type AtsAiOptions = {
   provider: LlmProvider;
   /** Default model and settings per task. Each call can override any of them. */
@@ -47,6 +48,7 @@ export type AtsAiOptions = {
   hooks?: { onRetry?(event: AtsAiRetryEvent): void };
 };
 
+/** The three tasks, bound to one provider. Each call can override its task's route. */
 export type AtsAi = {
   /** Plain-language explanation and recommendations for a deterministic report. */
   analyze(input: AnalyzeInput, options?: AtsAiCallOptions): Promise<AtsAiResult<AtsAiInsights>>;
@@ -62,6 +64,10 @@ export type AtsAi = {
   ): Promise<AtsAiResult<AtsConvertedResume>>;
 };
 
+/**
+ * The AI tasks over one provider, with a route (model, budget, retries) per task. Nothing is
+ * sent until a task is called.
+ */
 export function createAtsAi(options: AtsAiOptions): AtsAi {
   const context = {
     provider: options.provider,

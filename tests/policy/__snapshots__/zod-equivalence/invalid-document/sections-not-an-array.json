@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsInputError",
+    "message": "Resume document is invalid.",
+    "issues": [
+      {
+        "path": "sections",
+        "message": "Invalid input: expected array, received object"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "array",
+      "code": "invalid_type",
+      "path": [
+        "sections"
+      ]
+    }
+  ]
+}

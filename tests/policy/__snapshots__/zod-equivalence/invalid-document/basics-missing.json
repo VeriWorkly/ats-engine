@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsInputError",
+    "message": "Resume document is invalid.",
+    "issues": [
+      {
+        "path": "basics",
+        "message": "Invalid input: expected object, received undefined"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "object",
+      "code": "invalid_type",
+      "path": [
+        "basics"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "writing.bulletsPerRole",
+        "message": "min must not exceed max"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "writing",
+        "bulletsPerRole"
+      ]
+    }
+  ]
+}

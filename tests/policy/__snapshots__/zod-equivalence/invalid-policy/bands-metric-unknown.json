@@ -1,0 +1,44 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.metric",
+        "message": "Invalid option: expected one of \"wordCount\"|\"metricsRatio\"|\"actionVerbRatio\"|\"buzzwordCount\"|\"letterSpacedLines\"|\"injectionPhrases\"|\"invisibleCharacters\"|\"homoglyphWords\"|\"copiedPostingRatio\"|\"stuffedTerms\"|\"timelineIssues\"|\"unsupportedSkills\"|\"firstPersonLines\"|\"passiveVoiceRatio\"|\"weakOpeners\"|\"tenseMismatches\"|\"longBullets\"|\"bulletsPerRole\"|\"repeatedOpeners\"|\"dateFormats\""
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_value",
+      "values": [
+        "wordCount",
+        "metricsRatio",
+        "actionVerbRatio",
+        "buzzwordCount",
+        "letterSpacedLines",
+        "injectionPhrases",
+        "invisibleCharacters",
+        "homoglyphWords",
+        "copiedPostingRatio",
+        "stuffedTerms",
+        "timelineIssues",
+        "unsupportedSkills",
+        "firstPersonLines",
+        "passiveVoiceRatio",
+        "weakOpeners",
+        "tenseMismatches",
+        "longBullets",
+        "bulletsPerRole",
+        "repeatedOpeners",
+        "dateFormats"
+      ],
+      "path": [
+        "rules",
+        0,
+        "metric"
+      ]
+    }
+  ]
+}

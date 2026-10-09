@@ -96,6 +96,8 @@ describe("structured document input", () => {
       roles: "structured",
       education: "structured",
       skills: "structured",
+      certifications: "none",
+      spokenLanguages: "none",
     });
   });
 

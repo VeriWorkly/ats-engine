@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 /**
  * Minimal single-page PDF writer for layout-detection fixtures.
  *
@@ -46,6 +48,57 @@ function assemble(objects: string[], trailer: string): Buffer {
   pdf += `trailer\n<</Size ${objects.length + 1}/Root 1 0 R${trailer}>>\nstartxref\n${xrefAt}\n%%EOF\n`;
 
   return Buffer.from(pdf, "latin1");
+}
+
+/** RC4, which the PDF standard security handler's password check is built on. */
+function rc4(key: Uint8Array, data: Uint8Array): Uint8Array {
+  const state = Array.from({ length: 256 }, (_, index) => index);
+  for (let i = 0, j = 0; i < 256; i += 1) {
+    j = (j + state[i]! + key[i % key.length]!) & 255;
+    [state[i], state[j]] = [state[j]!, state[i]!];
+  }
+  const out = new Uint8Array(data.length);
+  for (let k = 0, i = 0, j = 0; k < data.length; k += 1) {
+    i = (i + 1) & 255;
+    j = (j + state[i]!) & 255;
+    [state[i], state[j]] = [state[j]!, state[i]!];
+    out[k] = data[k]! ^ state[(state[i]! + state[j]!) & 255]!;
+  }
+  return out;
+}
+
+/**
+ * Trailer entries (for `buildPdf`'s `trailer`) that encrypt a PDF with an empty user password and
+ * an owner password restricting copying and printing: it opens without a password, as many
+ * "secured" exports do. Standard security handler revision 4, with the Identity crypt filter for
+ * strings and streams, so the content stays as written and only the password check is real.
+ */
+export function ownerPasswordTrailer(): string {
+  const PAD = Buffer.from(
+    "28BF4E5E4E758A4164004E56FFFA01082E2E00B6D0683E802F0CA9FE6453697A",
+    "hex",
+  );
+  const owner = Buffer.alloc(32, 0x4f);
+  const id = Buffer.from("00112233445566778899aabbccddeeff", "hex");
+  const permissions = Buffer.alloc(4);
+  permissions.writeInt32LE(-3904);
+  const md5 = (data: Uint8Array) => createHash("md5").update(data).digest();
+  let key = md5(Buffer.concat([PAD, owner, permissions, id]));
+  for (let round = 0; round < 50; round += 1) key = md5(key.subarray(0, 16));
+  key = key.subarray(0, 16);
+  let check: Uint8Array = rc4(key, md5(Buffer.concat([PAD, id])));
+  for (let round = 1; round <= 19; round += 1)
+    check = rc4(
+      key.map((byte) => byte ^ round),
+      check,
+    );
+  const user = Buffer.concat([Buffer.from(check), Buffer.alloc(16)]);
+  return (
+    `/Encrypt<</Filter/Standard/V 4/R 4/Length 128/P -3904` +
+    `/CF<</StdCF<</CFM/AESV2/AuthEvent/DocOpen/Length 16>>>>/StmF/Identity/StrF/Identity` +
+    `/O<${owner.toString("hex")}>/U<${user.toString("hex")}>>>` +
+    `/ID[<${id.toString("hex")}><${id.toString("hex")}>]`
+  );
 }
 
 /** A PDF of several pages, one content stream each, all in Helvetica as `F1`. */

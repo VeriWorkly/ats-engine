@@ -1,0 +1,158 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.languages.0.sections.experience",
+        "message": "sections.experience is not a valid regular expression in Unicode mode: Invalid regular expression: /(/u: Unterminated group"
+      },
+      {
+        "path": "locales.languages.0.languageLevels.fluide",
+        "message": "Invalid option: expected one of \"A1\"|\"A2\"|\"B1\"|\"B2\"|\"C1\"|\"C2\""
+      },
+      {
+        "path": "locales.languages.0.credentialWords.issued",
+        "message": "Too small: expected array to have >=1 items"
+      },
+      {
+        "path": "locales.languages.0.months.janvier",
+        "message": "Too big: expected number to be <=12"
+      },
+      {
+        "path": "locales.languages.0.seasons.été",
+        "message": "Too small: expected array to have >=2 items"
+      },
+      {
+        "path": "locales.languages.0.titleWords",
+        "message": "Too small: expected array to have >=1 items"
+      },
+      {
+        "path": "locales.languages.0.degrees.6",
+        "message": "degrees.6 is not a valid regular expression in Unicode mode: Invalid regular expression: /(/u: Unterminated group"
+      },
+      {
+        "path": "locales.languages.0.actionVerbAnywhere",
+        "message": "Invalid input: expected boolean, received string"
+      },
+      {
+        "path": "locales.languages.0.requirements.clearance",
+        "message": "requirements.clearance does not assemble into a valid regular expression: Invalid regular expression: /(?<![\\p{L}\\p{M}\\p{N}_])(?:()(?![\\p{L}\\p{M}\\p{N}_])/iu: Unterminated group"
+      },
+      {
+        "path": "locales.languages.0.jobSections.required",
+        "message": "Too small: expected string to have >=1 characters"
+      },
+      {
+        "path": "locales.languages.0.stopwords.0",
+        "message": "Too small: expected string to have >=1 characters"
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "code": "custom",
+        "path": [
+          "sections",
+          "experience"
+        ]
+      },
+      {
+        "code": "invalid_value",
+        "values": [
+          "A1",
+          "A2",
+          "B1",
+          "B2",
+          "C1",
+          "C2"
+        ],
+        "path": [
+          "languageLevels",
+          "fluide"
+        ]
+      },
+      {
+        "origin": "array",
+        "code": "too_small",
+        "minimum": 1,
+        "inclusive": true,
+        "path": [
+          "credentialWords",
+          "issued"
+        ]
+      },
+      {
+        "origin": "number",
+        "code": "too_big",
+        "maximum": 12,
+        "inclusive": true,
+        "path": [
+          "months",
+          "janvier"
+        ]
+      },
+      {
+        "code": "too_small",
+        "minimum": 2,
+        "inclusive": true,
+        "origin": "array",
+        "path": [
+          "seasons",
+          "été"
+        ]
+      },
+      {
+        "origin": "array",
+        "code": "too_small",
+        "minimum": 1,
+        "inclusive": true,
+        "path": [
+          "titleWords"
+        ]
+      },
+      {
+        "code": "custom",
+        "path": [
+          "degrees",
+          "6"
+        ]
+      },
+      {
+        "expected": "boolean",
+        "code": "invalid_type",
+        "path": [
+          "actionVerbAnywhere"
+        ]
+      },
+      {
+        "code": "custom",
+        "path": [
+          "requirements",
+          "clearance"
+        ]
+      },
+      {
+        "origin": "string",
+        "code": "too_small",
+        "minimum": 1,
+        "inclusive": true,
+        "path": [
+          "jobSections",
+          "required"
+        ]
+      },
+      {
+        "origin": "string",
+        "code": "too_small",
+        "minimum": 1,
+        "inclusive": true,
+        "path": [
+          "stopwords",
+          0
+        ]
+      }
+    ]
+  ]
+}

@@ -10,6 +10,9 @@ import { EN_FIXTURES } from "./en-resumes.js";
 
 export type ExpectedRole = { title: string; employer: string; start: string; current: boolean };
 export type ExpectedEducation = { school: string; isced: number | null };
+/** `date` as "YYYY-MM", "YYYY", or "" when the row has none. */
+export type ExpectedCertification = { name: string; issuer: string; date: string };
+export type ExpectedLanguage = { language: string; cefr: string | null };
 
 export type LocaleFixture = {
   id: string;
@@ -21,6 +24,9 @@ export type LocaleFixture = {
   roles: ExpectedRole[];
   education: ExpectedEducation[];
   skills: string[];
+  /** None when left out: a resume without the section must not grow rows. */
+  certifications?: ExpectedCertification[];
+  spokenLanguages?: ExpectedLanguage[];
 };
 
 export const LOCALE_FIXTURES: Record<"en" | "de" | "hi" | "en-IN", LocaleFixture[]> = {
@@ -132,6 +138,60 @@ Terraform, AWS, Linux`,
       education: [{ school: "", isced: 3 }],
       skills: ["Terraform", "AWS", "Linux"],
     },
+    {
+      id: "de-zertifikate",
+      text: `Katrin Wagner
+katrin.wagner@example.de | +49 40 1234567 | Hamburg
+Kurzprofil
+Cloud-Architektin mit Schwerpunkt auf sicheren Plattformen für den Mittelstand.
+Berufserfahrung
+Cloud-Architektin bei Beispiel Systems GmbH 06.2021 – heute
+• Aufbau einer Plattform auf AWS für 25 Entwicklungsteams
+Systemadministratorin, Muster IT AG 09/2016 – 05/2021
+• Einführung von Terraform und Automatisierung der Bereitstellung
+Ausbildung
+Bachelor of Science Informatik, Universität Hamburg 2012 – 2016
+Zertifikate
+AWS Certified Solutions Architect – Professional, Amazon Web Services, 03/2023
+Professional Scrum Master (PSM I), Scrum.org, gültig bis 12/2027
+Kenntnisse
+AWS, Terraform, Kubernetes, Python
+Sprachen
+Deutsch (Muttersprache), Englisch (verhandlungssicher, C1), Französisch (Grundkenntnisse)`,
+      locale: { languages: ["de"], region: "DE" },
+      name: "Katrin Wagner",
+      email: "katrin.wagner@example.de",
+      phone: "+49 40 1234567",
+      roles: [
+        {
+          title: "Cloud-Architektin",
+          employer: "Beispiel Systems GmbH",
+          start: "2021-06",
+          current: true,
+        },
+        {
+          title: "Systemadministratorin",
+          employer: "Muster IT AG",
+          start: "2016-09",
+          current: false,
+        },
+      ],
+      education: [{ school: "Universität Hamburg", isced: 6 }],
+      skills: ["AWS", "Terraform", "Kubernetes", "Python"],
+      certifications: [
+        {
+          name: "AWS Certified Solutions Architect – Professional",
+          issuer: "Amazon Web Services",
+          date: "2023-03",
+        },
+        { name: "Professional Scrum Master (PSM I)", issuer: "Scrum.org", date: "" },
+      ],
+      spokenLanguages: [
+        { language: "Deutsch", cefr: "C2" },
+        { language: "Englisch", cefr: "C1" },
+        { language: "Französisch", cefr: "A2" },
+      ],
+    },
   ],
   hi: [
     {
@@ -195,6 +255,55 @@ SQL, Excel, Power BI`,
         { school: "लखनऊ विश्वविद्यालय", isced: 6 },
       ],
       skills: ["SQL", "Excel", "Power BI"],
+    },
+    {
+      id: "hi-certified",
+      text: `अमित कुमार
+amit.kumar@example.in | +91 99887 76655
+सारांश
+क्लाउड इंजीनियर, बैंकिंग प्रणालियों में चार वर्षों का अनुभव।
+कार्य अनुभव
+क्लाउड इंजीनियर, उदाहरण बैंक लिमिटेड जुलाई 2022 - वर्तमान
+• 30 सेवाओं को एडब्ल्यूएस पर स्थानांतरित किया
+सिस्टम इंजीनियर, नमूना टेक २०१९ - २०२२
+• सर्वर अपडेट को स्वचालित किया
+शिक्षा
+बी.टेक, सूचना प्रौद्योगिकी, पुणे विश्वविद्यालय 2015 - 2019
+प्रमाणपत्र
+AWS Certified Developer – Associate, Amazon Web Services, 2023
+पीएमपी (पीएमआई), समाप्ति 2027
+कौशल
+AWS, Linux, Python
+भाषाएँ
+हिंदी (मातृभाषा), अंग्रेज़ी (धाराप्रवाह), मराठी (बुनियादी ज्ञान)`,
+      locale: { languages: ["hi"], region: "IN" },
+      name: "अमित कुमार",
+      email: "amit.kumar@example.in",
+      phone: "+91 99887 76655",
+      roles: [
+        {
+          title: "क्लाउड इंजीनियर",
+          employer: "उदाहरण बैंक लिमिटेड",
+          start: "2022-07",
+          current: true,
+        },
+        { title: "सिस्टम इंजीनियर", employer: "नमूना टेक", start: "2019", current: false },
+      ],
+      education: [{ school: "पुणे विश्वविद्यालय", isced: 6 }],
+      skills: ["AWS", "Linux", "Python"],
+      certifications: [
+        {
+          name: "AWS Certified Developer – Associate",
+          issuer: "Amazon Web Services",
+          date: "2023",
+        },
+        { name: "पीएमपी", issuer: "पीएमआई", date: "" },
+      ],
+      spokenLanguages: [
+        { language: "हिंदी", cefr: "C2" },
+        { language: "अंग्रेज़ी", cefr: "C1" },
+        { language: "मराठी", cefr: "A2" },
+      ],
     },
   ],
   "en-IN": [

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adviceLabel,
   categoryLabel,
+  formatCertification,
   formatParsedDate,
+  formatSpokenLanguage,
   formatRoleDates,
   formatTenure,
   roleSpanMonths,
@@ -39,6 +42,19 @@ describe("format helpers", () => {
     expect(categoryLabel("content")).toBe("Evidence");
   });
 
+  it("labels writing and places it after every category about whether the ATS reads the resume", () => {
+    expect(categoryLabel("writing")).toBe("Writing");
+    const sorted = sortByCategoryOrder(
+      ["writing", "format", "content", "integrity"].map((category) => ({ category })),
+    );
+    expect(sorted.map((item) => item.category)).toEqual([
+      "integrity",
+      "content",
+      "format",
+      "writing",
+    ]);
+  });
+
   it("formats dates, spans and tenure", () => {
     expect(formatParsedDate({ year: 2021, month: 3 })).toBe("Mar 2021");
     expect(formatParsedDate({ year: 2021, month: null })).toBe("2021");
@@ -70,5 +86,28 @@ describe("format helpers", () => {
       9,
     );
     expect(roleSpanMonths({ start: null, end: null, current: true }, now)).toBe(0);
+  });
+
+  it("formats a certification row and a spoken-language row", () => {
+    expect(
+      formatCertification({
+        name: "PMP",
+        issuer: "PMI",
+        date: { year: 2021, month: 3 },
+        expires: { year: 2027, month: null },
+      }),
+    ).toBe("PMP, PMI, Mar 2021, expires 2027");
+    expect(formatCertification({ name: "CKA", issuer: "", date: null, expires: null })).toBe("CKA");
+    expect(formatSpokenLanguage({ language: "German", level: "B2", cefr: "B2" })).toBe(
+      "German (B2)",
+    );
+    expect(formatSpokenLanguage({ language: "German", level: "fluent", cefr: "C1" })).toBe(
+      "German (fluent)",
+    );
+    expect(formatSpokenLanguage({ language: "Hindi", level: "", cefr: null })).toBe("Hindi");
+  });
+
+  it("labels each kind of advice", () => {
+    expect((["file", "age", "ats"] as const).map(adviceLabel)).toEqual(["File", "Age", "ATS"]);
   });
 });

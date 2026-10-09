@@ -1,0 +1,27 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.scope",
+        "message": "Invalid option: expected one of \"document\"|\"line\"|\"heading\""
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "invalid_value",
+      "values": [
+        "document",
+        "line",
+        "heading"
+      ],
+      "path": [
+        "rules",
+        0,
+        "scope"
+      ]
+    }
+  ]
+}

@@ -7,11 +7,13 @@
 export type AtsIscedLevel = 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 /**
- * The five labels the engine reported before ISCED. Derived from `isced` (2–4 → diploma) and kept
- * for one minor version; read `isced` instead.
+ * The five labels the engine reported before ISCED. Derived from `isced` (2–4 → diploma).
+ *
+ * @deprecated Read `isced` (`AtsIscedLevel`) instead; removed in 1.0.
  */
 export type AtsDegreeLevel = "diploma" | "associate" | "bachelor" | "master" | "doctorate";
 
+/** A date as a resume states it: the month (1–12) is null when only the year is written. */
 export type AtsParsedDate = { year: number; month: number | null };
 
 /** One row of work history, in the shape an applicant tracking system stores it. */
@@ -23,6 +25,7 @@ export type AtsParsedRole = {
   current: boolean;
 };
 
+/** One row of education: the school, the credential as written, and its ISCED level. */
 export type AtsParsedEducation = {
   school: string;
   credential: string;
@@ -32,8 +35,42 @@ export type AtsParsedEducation = {
   end: AtsParsedDate | null;
 };
 
+/** A level on the Common European Framework of Reference for Languages, A1 lowest. */
+export type AtsCefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+
+/**
+ * One certification or licence, as an ATS files it: "AWS Certified Solutions Architect –
+ * Associate, Amazon Web Services, 2023". `date` is when it was earned, `expires` when it lapses;
+ * either is null when the resume does not say.
+ */
+export type AtsParsedCertification = {
+  name: string;
+  issuer: string;
+  date: AtsParsedDate | null;
+  expires: AtsParsedDate | null;
+};
+
+/**
+ * One language the candidate speaks. `language` as written ("Deutsch", "English"), `level` the
+ * words that state the level as written ("native", "verhandlungssicher, C1"; empty when none),
+ * and `cefr` that level on the CEFR scale, or null when no level word the policy knows was given.
+ */
+export type AtsParsedLanguage = {
+  language: string;
+  level: string;
+  cefr: AtsCefrLevel | null;
+};
+
 /** The groups of recovered fields that carry a provenance. */
-export type AtsParsedField = "name" | "email" | "phone" | "roles" | "education" | "skills";
+export type AtsParsedField =
+  | "name"
+  | "email"
+  | "phone"
+  | "roles"
+  | "education"
+  | "skills"
+  | "certifications"
+  | "spokenLanguages";
 
 /**
  * Where a recovered field came from.
@@ -63,6 +100,13 @@ export type AtsParsedResume = {
   roles: AtsParsedRole[];
   education: AtsParsedEducation[];
   skills: string[];
+  /** Certifications and licences, from their own section or a "Certifications:" line. */
+  certifications: AtsParsedCertification[];
+  /**
+   * Languages spoken, from their own section or a "Languages:" line among the skills. Each
+   * language once. Programming languages stay in `skills`.
+   */
+  spokenLanguages: AtsParsedLanguage[];
   /** Calendar months covered by at least one role, so overlapping jobs are not double counted. */
   monthsOfExperience: number | null;
   highestIsced: AtsIscedLevel | null;

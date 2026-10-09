@@ -1,0 +1,21 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch",
+        "message": "Invalid input: expected object, received undefined"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "object",
+      "code": "invalid_type",
+      "path": [
+        "keywordMatch"
+      ]
+    }
+  ]
+}

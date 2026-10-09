@@ -1,4 +1,4 @@
-import { z } from "zod";
+import * as z from "zod/mini";
 
 import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { mergeGrounded, type AtsRepairCandidate } from "../../repair/merge.js";
@@ -7,18 +7,21 @@ import type { TaskSpec } from "../run.js";
 import { toStrictJsonSchema } from "../schema.js";
 import { flag, list, trimmedText } from "./fields.js";
 
-const repairedDate = z
-  .object({
-    year: z.number().int().min(1900).max(2100).nullable().optional(),
-    month: z.number().int().min(1).max(12).nullable().optional(),
-  })
-  .nullable()
-  .optional()
-  .transform((value) =>
+const repairedDate = z.pipe(
+  z.optional(
+    z.nullable(
+      z.object({
+        year: z.optional(z.nullable(z.number().check(z.int(), z.gte(1900), z.lte(2100)))),
+        month: z.optional(z.nullable(z.number().check(z.int(), z.gte(1), z.lte(12)))),
+      }),
+    ),
+  ),
+  z.transform((value) =>
     value && typeof value.year === "number"
       ? { year: value.year, month: typeof value.month === "number" ? value.month : null }
       : null,
-  );
+  ),
+);
 
 export const repairedResumeSchema = z.object({
   name: trimmedText(200),
@@ -39,10 +42,11 @@ export const repairedResumeSchema = z.object({
     20,
   ),
   skills: list(trimmedText(100), 60),
-}) satisfies z.ZodType<AtsRepairCandidate, unknown>;
+}) satisfies z.ZodMiniType<AtsRepairCandidate, unknown>;
 
 const jsonSchema = toStrictJsonSchema(repairedResumeSchema);
 
+/** The resume and the parse to repair. */
 export type RepairParseInput = {
   /** The flattened resume the report was computed from. Every repaired value must occur in it. */
   resumeText: string;
@@ -54,6 +58,7 @@ export type RepairParseInput = {
 /** The model reads at most this much; grounding still checks against the whole document. */
 const MAX_REPAIR_CHARS = 40_000;
 
+/** The system prompt `repairParse` uses unless `prompts.repairParse` or a call replaces it. */
 export const DEFAULT_REPAIR_PROMPT = [
   "You re-read a resume whose automated parse failed and recover the candidate's name, email, phone number, roles, education and skills. The user message is JSON; its resume member is the document's text.",
   "Copy every text value EXACTLY as it appears in the document, character for character.",

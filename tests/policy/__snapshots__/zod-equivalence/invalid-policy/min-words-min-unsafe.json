@@ -1,0 +1,26 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.min",
+        "message": "Too big: expected int to be <=9007199254740991"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "too_big",
+      "maximum": 9007199254740991,
+      "note": "Integers must be within the safe integer range.",
+      "origin": "int",
+      "inclusive": true,
+      "path": [
+        "rules",
+        0,
+        "min"
+      ]
+    }
+  ]
+}

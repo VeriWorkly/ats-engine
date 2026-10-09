@@ -17,7 +17,8 @@ Node 20.19 or later. `npm run bench` prints field accuracy over the labelled cor
    regression. Every behaviour change says, in the test, what it protects. Tests live in the
    folder that mirrors the module they cover (`src/parser/` → `tests/parser/`), in a file named
    for the behaviour, never for a review or a date; what crosses modules goes in
-   `tests/integration/`.
+   `tests/integration/`. The GitHub Action's tests are in `tests/action/`, the MCP server's in
+   `packages/mcp/tests/`; both run against the build, so run `npm run build` first.
 2. **Language lives in data.** No month name, heading, title word or stopword in source: they
    belong in the policy (`src/policy/default/`) or a locale pack (`src/locales/packs/`). Policy
    patterns compile in Unicode mode; word lists go through `wordListPattern` (JS `\b` is
@@ -37,7 +38,34 @@ Node 20.19 or later. `npm run bench` prints field accuracy over the labelled cor
 
 Run `npm run changeset`. A change to the report's shape, the policy schema, or the score or
 recovered fields for the same input is **breaking** (see `.changeset/README.md`). If the community
-policy changes, `npm run rubric` regenerates RUBRIC.md and its fingerprint.
+policy changes, `npm run rubric` regenerates RUBRIC.md and its fingerprint. A change to the
+MCP server gets a changeset for `@veriworkly/ats-engine-mcp`. The GitHub Action in `action/` is
+in neither package: a change there needs no changeset unless the engine changes with it.
+
+## Releasing
+
+Releases go out from `main` through changesets and `.github/workflows/release.yml`:
+
+1. Each pull request with a user-visible change adds its changeset (`.changeset/*.md`).
+2. On a push to `main` with changesets pending, the Release workflow opens or updates a
+   "Version Packages" pull request. It runs `npm run version-packages`: `changeset version` (new
+   versions and CHANGELOG.md entries, consuming the changesets), `scripts/sync-version.mjs`
+   (`ENGINE_VERSION`, the GitHub Action's default `version`, and `packages/mcp/server.json`),
+   the lockfile, and `npm run rubric`.
+3. Merging that pull request leaves no changesets pending, so the workflow runs
+   `npm run release` (`npm run check`, then `changeset publish`): each new version is published
+   to npm with provenance and tagged `<name>@<version>`, and a new engine version is published to
+   GitHub Packages too (`.github/workflows/github-packages.yml`). Nothing publishes without that
+   pull request.
+
+If the organisation does not let GitHub Actions create pull requests, the workflow fails at
+step 2. Open the pull request by hand instead: on a branch from `main`, run
+`npm run version-packages` with npm 11 (`npm install -g npm@11` first if `npm --version` says
+10: npm 10 drops the `libc` fields from `package-lock.json`), commit, push, and open it against
+`main`. Merging it publishes as above.
+
+Dependencies are updated by hand. Dependabot alerts stay on, so a vulnerable dependency shows in
+the repository's Security tab, but Dependabot opens no pull requests.
 
 ## Locale packs
 
@@ -46,20 +74,29 @@ fixtures in `tests/fixtures/locale-resumes.ts` — invented people only.
 
 ## Where to change what
 
-| To change…                                    | Start in                                                                                        | Notes                                                                                                                                                                                          |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| How a job title, employer or date is read     | `src/parser/experience.ts`, `src/parser/dates.ts`; words in `src/policy/default/resumeParse.ts` | First check the text the parser received: `ats-engine check file --text` or `includeLines: true`.                                                                                              |
-| Which headings start a section                | `src/policy/default/resumeParse.ts` (`sections`)                                                | Data, not code.                                                                                                                                                                                |
-| A scoring rule's weight, threshold or wording | `src/policy/default/rules.ts`                                                                   | Then `npm run rubric` to regenerate RUBRIC.md.                                                                                                                                                 |
-| A new kind of rule (a new metric)             | `src/policy/schema/rules.ts`, `src/scoring/rules.ts`, `src/scoring/context.ts`, `src/checks/`   | Ask in an issue first: a new metric changes the policy schema.                                                                                                                                 |
-| Job matching and requirement judgements       | `src/matching/`; vocabulary in `src/policy/default/keywordMatch.ts`                             |                                                                                                                                                                                                |
-| A language or a country                       | `src/locales/packs/`                                                                            | See [LOCALES.md](LOCALES.md).                                                                                                                                                                  |
-| An AI prompt                                  | The `DEFAULT_*_PROMPT` constants in `src/ai/tasks/`                                             | Changes every result's `promptVersion`. `tests/ai/prompts.test.ts` checks each prompt names its schema's keys; `npm run eval:live` measures quality against a real model and needs a paid key. |
-| What is kept from a model's answer            | `src/repair/grounding.ts`, `src/repair/merge.ts`                                                |                                                                                                                                                                                                |
-| PDF reading order, columns, hidden text       | `src/node/pdf.ts`, `src/node/lines.ts`, `src/node/layout.ts`, `src/node/hidden.ts`              | Build test PDFs in code with `tests/fixtures/buildPdf.ts`; never check in a real resume.                                                                                                       |
-| DOCX reading                                  | `src/node/docx.ts`, `src/node/extract.ts`                                                       | `tests/fixtures/buildDocx.ts` builds test files.                                                                                                                                               |
-| Text taken from a job page                    | `src/job/`                                                                                      |                                                                                                                                                                                                |
-| The command line                              | `src/cli/`                                                                                      |                                                                                                                                                                                                |
+| To change…                                    | Start in                                                                                          | Notes                                                                                                                                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| How a job title, employer or date is read     | `src/parser/experience.ts`, `src/parser/dates.ts`; words in `src/policy/default/resumeParse.ts`   | First check the text the parser received: `ats-engine check file --text` or `includeLines: true`.                                                                                              |
+| Which headings start a section                | `src/policy/default/resumeParse.ts` (`sections`)                                                  | Data, not code.                                                                                                                                                                                |
+| A scoring rule's weight, threshold or wording | `src/policy/default/rules.ts`                                                                     | Then `npm run rubric` to regenerate RUBRIC.md.                                                                                                                                                 |
+| Writing-style words and limits                | `src/policy/schema/writing.ts`; the `writing` rules in `src/policy/default/rules.ts`              | English only: the rules carry `languages: ["en"]` and drop out for a resume read in another language. Their checks are in `src/checks/writing.ts`.                                             |
+| A new kind of rule (a new metric)             | `src/policy/schema/rules.ts`, `src/scoring/rules.ts`, `src/scoring/context.ts`, `src/checks/`     | Ask in an issue first: a new metric changes the policy schema.                                                                                                                                 |
+| Job matching and requirement judgements       | `src/matching/`; vocabulary in `src/policy/default/keywordMatch.ts`                               |                                                                                                                                                                                                |
+| Which words are soft skills                   | `softSkills` and `softSkillWeight` in `src/policy/default/keywordMatch.ts`; a pack's `softSkills` | A multi-word soft skill is matched as a phrase. Fold its other spellings in `synonyms` ("problem-solving"). A skill a resume shows with an outcome (mentoring, negotiation) stays hard.        |
+| How words fold together (plurals, "-ing")     | `stemming` in `src/policy/schema/keywordMatch.ts`                                                 | One rule set for every language; packs cannot change it. A new rule must not part a word from its plural elsewhere ("response", "responses").                                                  |
+| Certification and language rows               | `src/parser/certifications.ts`, `src/parser/languages.ts`                                         | Headings (`sections.certifications`, `sections.languages`) and CEFR level words (`languageLevels`) in `src/policy/schema/resumeParse.ts`; `credentialWords` in `src/policy/primitives.ts`.     |
+| Advice (file, age, target ATS)                | `src/advice/`; words, limits, messages and vendor notes in `src/policy/schema/advice.ts`          | Never scored, and no rule may read it. A target-ATS note needs a `source`: the vendor's own public page that says it.                                                                          |
+| Where the age advice applies                  | `ageAdvice` of a region pack in `src/locales/packs/regions.ts`                                    | Only where an age on a resume invites bias and is not customary (US). See [LOCALES.md](LOCALES.md).                                                                                            |
+| A language or a country                       | `src/locales/packs/`                                                                              | See [LOCALES.md](LOCALES.md).                                                                                                                                                                  |
+| An AI prompt                                  | The `DEFAULT_*_PROMPT` constants in `src/ai/tasks/`                                               | Changes every result's `promptVersion`. `tests/ai/prompts.test.ts` checks each prompt names its schema's keys; `npm run eval:live` measures quality against a real model and needs a paid key. |
+| What is kept from a model's answer            | `src/repair/grounding.ts`, `src/repair/merge.ts`                                                  |                                                                                                                                                                                                |
+| PDF reading order, columns, hidden text       | `src/node/pdf.ts`, `src/node/lines.ts`, `src/node/layout.ts`, `src/node/hidden.ts`                | Build test PDFs in code with `tests/fixtures/buildPdf.ts`; never check in a real resume.                                                                                                       |
+| DOCX reading                                  | `src/node/docx.ts`, `src/node/extract.ts`                                                         | `tests/fixtures/buildDocx.ts` builds test files.                                                                                                                                               |
+| Text taken from a job page                    | `src/job/`                                                                                        |                                                                                                                                                                                                |
+| Reading a file from a path                    | `src/node/files.ts`                                                                               | Shared by the CLI and the MCP server: the limits, the messages, and the `file` info for the advice.                                                                                            |
+| The command line                              | `src/cli/`                                                                                        | Keep `--help` (`USAGE` in `src/cli/main.ts`) and the option table in README.md in step.                                                                                                        |
+| The MCP server                                | `packages/mcp/src/`                                                                               | Tests in `packages/mcp/tests/`; its README lists the tools and their inputs.                                                                                                                   |
+| The GitHub Action                             | `action/action.yml`, `action/run.mjs`                                                             | Tests in `tests/action/`. Keep the inputs table in README.md in step.                                                                                                                          |
 
 ## Layout
 

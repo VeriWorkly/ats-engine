@@ -16,6 +16,7 @@ import {
   type LlmResponse,
 } from "./provider.js";
 
+/** The key, the endpoint, and the request details some endpoints need. */
 export type OpenAiCompatibleOptions = HttpOptions & {
   apiKey: string;
   /** Defaults to `https://api.openai.com/v1`. */
@@ -113,6 +114,11 @@ export function chatCompletionBody(
   };
 }
 
+/**
+ * A provider for any service that serves `POST {baseUrl}/chat/completions`: OpenAI by default,
+ * or OpenRouter, Gemini, Groq, Together, Ollama, vLLM and others by `baseUrl`. One HTTP call per
+ * `complete()`, never retried here. Throws `LlmProviderError` without an API key.
+ */
 export function openAiCompatible(options: OpenAiCompatibleOptions): LlmProvider {
   if (!options.apiKey) throw new LlmProviderError("An API key is required.", { retryable: false });
   const base = (options.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");

@@ -1,0 +1,25 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.id",
+        "message": "Too small: expected string to have >=1 characters"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "string",
+      "code": "too_small",
+      "minimum": 1,
+      "inclusive": true,
+      "path": [
+        "rules",
+        0,
+        "id"
+      ]
+    }
+  ]
+}

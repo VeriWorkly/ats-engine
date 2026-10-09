@@ -1,0 +1,34 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "rules.0.pattern",
+        "message": "pattern is not a valid regular expression in Unicode mode: Invalid regular expression: /(unclosed/u: Unterminated group"
+      },
+      {
+        "path": "rules.0.pattern",
+        "message": "pattern is not a valid regular expression with flags \"i\": Invalid regular expression: /(unclosed/iu: Unterminated group"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "pattern"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "rules",
+        0,
+        "pattern"
+      ]
+    }
+  ]
+}

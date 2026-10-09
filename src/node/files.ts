@@ -1,8 +1,9 @@
 import { readFile, stat } from "node:fs/promises";
-import { extname } from "node:path";
+import { basename, extname } from "node:path";
 
 import { isJsonResume, isResumeDocument } from "../document/index.js";
 import type { AtsResumeInput } from "../input.js";
+import type { AtsFileInfo } from "../types.js";
 import { extractJobPosting, jobTextFromHtml, normalizeJobText } from "../job/index.js";
 import { detectResumeFormat, extractResume, type AtsExtraction } from "./extract.js";
 
@@ -22,6 +23,7 @@ export class AtsFileError extends Error {
  */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
+/** Options of `readResumeFile` and `readJobFile`. */
 export type AtsReadFileOptions = {
   /** Refuse a larger file. Default `MAX_FILE_BYTES`. */
   maxBytes?: number;
@@ -66,26 +68,28 @@ export function parseJsonFile(data: Buffer, path: string): unknown {
 /**
  * A resume file as the scorer takes it: the extracted text and, where measurable, its layout; or
  * the document itself for a `.json` JSON Resume or ats-resume document. PDF and DOCX need the
- * optional peers `extractResume` needs.
+ * optional peers `extractResume` needs. `file` (its name, size and format) is `check`'s `file`
+ * option, for the advice on the file itself.
  */
 export async function readResumeFile(
   path: string,
   options?: AtsReadFileOptions,
-): Promise<{ input: AtsResumeInput } & Partial<AtsExtraction>> {
+): Promise<{ input: AtsResumeInput; file: AtsFileInfo } & Partial<AtsExtraction>> {
   const format = detectResumeFormat(path);
   if (!format)
     throw new AtsFileError(
       `Unsupported resume file type "${extname(path) || path}". Use .pdf, .docx, .html, .txt, .md or .json.`,
     );
   const data = await readFileBytes(path, options);
+  const file: AtsFileInfo = { name: basename(path), bytes: data.length, format };
   if (extname(path).toLowerCase() === ".json") {
     const input = parseJsonFile(data, path);
     if (!isResumeDocument(input) && !isJsonResume(input))
       throw new AtsFileError(`${path} is neither a JSON Resume nor an ats-resume document.`);
-    return { input: input as AtsResumeInput };
+    return { input: input as AtsResumeInput, file };
   }
   const { text, layout } = await extractResume(data, format);
-  return { input: readableText(text, format), layout };
+  return { input: readableText(text, format), layout, file };
 }
 
 /**

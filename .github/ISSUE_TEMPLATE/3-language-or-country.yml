@@ -37,7 +37,9 @@ body:
         - Phone number format:
         - Common section headings (Experience, Education, Skills):
         - Degree names, and the level each one is:
-        - Is a photo, date of birth or marital status expected, optional, or a bad idea?
+        - Headings for certifications and languages, and how the level of a language is written (fluent, Muttersprache):
+        - Soft skills postings ask for (teamwork, communication):
+        - Is a photo, date of birth, graduation year or marital status expected, optional, or a bad idea?
     validations:
       required: true
 

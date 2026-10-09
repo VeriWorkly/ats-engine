@@ -1,0 +1,43 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"event sourcing\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      },
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"domain driven design\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      },
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"container orchestration\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
+      ]
+    }
+  ]
+}

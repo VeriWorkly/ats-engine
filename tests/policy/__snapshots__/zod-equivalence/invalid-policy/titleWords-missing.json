@@ -1,0 +1,22 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "resumeParse.titleWords",
+        "message": "Invalid input: expected array, received undefined"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "expected": "array",
+      "code": "invalid_type",
+      "path": [
+        "resumeParse",
+        "titleWords"
+      ]
+    }
+  ]
+}

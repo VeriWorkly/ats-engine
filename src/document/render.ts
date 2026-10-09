@@ -91,6 +91,24 @@ function renderSection(section: AtsDocumentSection): string[] {
         if (line) lines.push(line);
       }
       break;
+    case "certifications":
+      // Earned and expiry as a range, as a role's dates are: the ISO form reads in any language.
+      for (const item of section.items) {
+        const line = join([item.name, item.issuer, span(item.date, item.expires, false)]);
+        if (line) lines.push(line);
+      }
+      break;
+    case "languages": {
+      const line = join(
+        section.items.map((item) =>
+          clean(item.language) && clean(item.level)
+            ? `${clean(item.language)} (${clean(item.level)})`
+            : item.language,
+        ),
+      );
+      if (line) lines.push(line);
+      break;
+    }
     case "other":
       for (const entry of section.items) {
         const heading = clean(entry.heading);
@@ -103,6 +121,10 @@ function renderSection(section: AtsDocumentSection): string[] {
   return lines;
 }
 
+/**
+ * The canonical plain text of a structured resume: one line per visual line, a heading line per
+ * section, bullets prefixed with "- ", dates as stored. What the content rules score.
+ */
 export function renderResumeDocument(doc: AtsResumeDocument): string {
   const { basics } = doc;
   const lines: string[] = [];

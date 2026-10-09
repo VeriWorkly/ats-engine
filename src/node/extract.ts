@@ -190,6 +190,9 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
       ...hiddenSignals([measured.hiddenText, ...chunked]),
       // Counted whole: the document's hidden text above is cut to its first 5,000 characters.
       hiddenTextChars: measured.hiddenChars + hiddenSignals(chunked).hiddenTextChars,
+      // Left in by an editor: advice on the file, never scored.
+      trackedChanges: measured.trackedChanges,
+      comments: measured.comments,
     },
   };
 }
@@ -219,7 +222,12 @@ function readHtmlResume(html: string): AtsExtraction {
   };
 }
 
-/** Extracts and normalises a resume's text, with page geometry for PDFs. */
+/**
+ * Extracts and normalises a resume's text, with the layout signals the format can show: page
+ * geometry, pictures, hidden text, metadata and encryption for a PDF; tables, pictures, hidden
+ * text, tracked changes and comments for a DOCX; tables and hidden elements for an HTML page.
+ * None for plain text.
+ */
 export async function extractResume(
   data: Uint8Array,
   format: AtsResumeFormat,

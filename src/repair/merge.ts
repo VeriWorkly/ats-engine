@@ -57,6 +57,7 @@ export function needsRepair(report: Pick<AtsReport, "parsed" | "wordCount">): bo
   return quality.contactCompleteness < 1 / 3;
 }
 
+/** What `mergeGrounded` needs besides the two records and the source. */
 export type MergeOptions = {
   /** Classifies repaired credentials into degree levels. */
   policy: AtsEnginePolicy;
@@ -64,6 +65,7 @@ export type MergeOptions = {
   now?: Date;
 };
 
+/** The merged record, and the model's values that were dropped for not occurring in the source. */
 export type MergeResult = {
   merged: AtsParsedResume;
   /** Values the model returned that do not occur in the source, with where each was found. */

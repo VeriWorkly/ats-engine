@@ -8,17 +8,17 @@ const { exports } = JSON.parse(readFileSync("package.json", "utf8"));
 
 /** Gzipped KB. */
 const BUDGETS = {
-  // 165: the October audit's vocabulary (headings, degrees, title and place words) filled 160;
-  // Markdown reading, role headers with a location and names left out of a posting's keywords
-  // (proseNames) took it to 160.2 (0.2). Most of the bundle is policy data, not code.
-  ".": 165,
+  // 95: zod/mini in place of zod (same schemas and messages) took it from 171.9 to 91.7.
+  ".": 95,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
   // optional end tags, a tag scan that skips scripts and comments, and hidden-element rules (0.2).
   "./job": 3.8,
-  "./locales": 145,
-  "./ai": 140,
+  // 70: zod/mini in place of zod took it from 141.1 to 67.5.
+  "./locales": 70,
+  // 70: zod/mini in place of zod took it from 141.0 to 67.5.
+  "./ai": 70,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,

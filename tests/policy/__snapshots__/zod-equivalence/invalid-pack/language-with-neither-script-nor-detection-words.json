@@ -1,0 +1,20 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "locales.languages.0",
+        "message": "a language pack needs a script or at least ten detection words"
+      }
+    ]
+  },
+  "raw": [
+    [
+      {
+        "code": "custom",
+        "path": []
+      }
+    ]
+  ]
+}

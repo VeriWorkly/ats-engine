@@ -1,0 +1,24 @@
+{
+  "error": {
+    "name": "AtsPolicyError",
+    "message": "ATS engine policy is invalid.",
+    "issues": [
+      {
+        "path": "writing.repeatedOpenerRun",
+        "message": "Too small: expected number to be >=2"
+      }
+    ]
+  },
+  "raw": [
+    {
+      "origin": "number",
+      "code": "too_small",
+      "minimum": 2,
+      "inclusive": true,
+      "path": [
+        "writing",
+        "repeatedOpenerRun"
+      ]
+    }
+  ]
+}

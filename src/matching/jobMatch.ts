@@ -1,6 +1,7 @@
 import { degreeLevels } from "../parser/education.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { VOCABULARY_TOKEN } from "../text/text.js";
+import type { AtsKeywordGroups } from "../types.js";
 import { alternationGroups } from "./alternation.js";
 import { isOfferLine, segmentJob, withoutIgnored, type JobSectionKind } from "./jobSections.js";
 import { proseNames } from "./proseNames.js";
@@ -15,9 +16,45 @@ import {
 
 export type JobMatch = {
   score: number | null;
+  /** The groups joined, hard first, at most 12. */
   matched: string[];
   missing: string[];
+  /** Each at most 12. */
+  matchedGroups: AtsKeywordGroups;
+  missingGroups: AtsKeywordGroups;
 };
+
+/** At most this many terms in each list the report shows. */
+const LISTED = 12;
+
+// A function, not a constant: the report hands these arrays to the caller, who may change them.
+const noMatch = (): JobMatch => ({
+  score: null,
+  matched: [],
+  missing: [],
+  matchedGroups: { hard: [], soft: [] },
+  missingGroups: { hard: [], soft: [] },
+});
+
+type Listed = { label: string; weight: number; skill: boolean; soft: boolean };
+
+/**
+ * Hard terms lead, then soft skills; within each, recognised skills lead regardless of section
+ * weight: a missing skill is always more actionable advice than a missing ordinary word, and
+ * these lists are what the user is shown and what the AI layer is handed as evidence.
+ */
+function listed(terms: Listed[]) {
+  terms.sort(
+    (a, b) =>
+      Number(a.soft) - Number(b.soft) || Number(b.skill) - Number(a.skill) || b.weight - a.weight,
+  );
+  const hard = terms.filter((term) => !term.soft).map((term) => term.label);
+  const soft = terms.filter((term) => term.soft).map((term) => term.label);
+  return {
+    all: [...hard, ...soft].slice(0, LISTED),
+    groups: { hard: hard.slice(0, LISTED), soft: soft.slice(0, LISTED) },
+  };
+}
 
 /**
  * A posting line as the keyword match reads it: without the text that is never a keyword (a
@@ -60,7 +97,7 @@ export function computeJobMatch(
 ): JobMatch {
   const km = policy.keywordMatch;
   const jobText = typeof jobDescription === "string" ? jobDescription.trim() : "";
-  if (!jobText) return { score: null, matched: [], missing: [] };
+  if (!jobText) return noMatch();
 
   const vocab = buildVocabulary(km);
   const sections = segmentJob(jobText, policy);
@@ -103,7 +140,7 @@ export function computeJobMatch(
 
   // A term can appear in more than one block. Keep the strongest claim: a skill listed under
   // Requirements is required even if it is mentioned again in the responsibilities prose.
-  const terms = new Map<string, { label: string; weight: number; skill: boolean }>();
+  const terms = new Map<string, Listed>();
   const scoredLines: string[] = [];
   /** The degree levels the posting asks for: the label it used and the strongest weight. */
   const degrees = new Map<number, { label: string; weight: number }>();
@@ -130,20 +167,27 @@ export function computeJobMatch(
     const text = read.map((line) => line.text).join("\n");
     for (const [token, term] of extractVocabulary(text, km, vocab)) {
       if (employer.has(token) || names.has(token)) continue;
-      const skill = term.skill || proper.has(term.label) || proper.has(token);
+      // A soft skill is an ordinary word discounted further, whatever its capitals: "Strong
+      // Communication skills" asks for no product called Communication.
+      const soft = vocab.softTokens.has(token);
+      const skill = !soft && (term.skill || proper.has(term.label) || proper.has(token));
       // One- and two-letter words carry meaning only as a named skill or acronym ("Go", "AI",
       // "JS"). Otherwise they are function words — "in", "to", "or", "a" — and scoring them told
       // candidates to add "or" to their resume, and credited them for having written "a".
       if (!skill && term.label.length <= 2) continue;
-      const specificity = skill ? 1 : km.generalTermWeight;
+      const specificity = skill
+        ? 1
+        : soft
+          ? km.generalTermWeight * km.softSkillWeight
+          : km.generalTermWeight;
       const scored = weight * specificity;
       const existing = terms.get(token);
       if (!existing || scored > existing.weight)
-        terms.set(token, { label: term.label, weight: scored, skill });
+        terms.set(token, { label: term.label, weight: scored, skill, soft });
     }
   }
 
-  if (terms.size === 0 && degrees.size === 0) return { score: null, matched: [], missing: [] };
+  if (terms.size === 0 && degrees.size === 0) return noMatch();
 
   const held = resumeCapabilities(extractVocabulary(resumeText, km, vocab), vocab);
   const { find, separatorOf } = alternationGroups(scoredLines, km, vocab);
@@ -151,7 +195,7 @@ export function computeJobMatch(
   // Alternatives collapse into one requirement worth one member's weight, satisfied by any of
   // them. "Go or Java" is a single ask, not two.
   type Group = {
-    members: Array<{ label: string; skill: boolean }>;
+    members: Array<{ label: string; skill: boolean; soft: boolean }>;
     weight: number;
     matched: string | null;
     /** The word the posting offered the alternatives with: "or", "oder". */
@@ -167,7 +211,7 @@ export function computeJobMatch(
       matched: null,
       separator: separatorOf(token) ?? km.alternationWords[0],
     };
-    group.members.push({ label: term.label, skill: term.skill });
+    group.members.push({ label: term.label, skill: term.skill, soft: term.soft });
     group.weight = Math.max(group.weight, term.weight);
     if (group.matched === null && held.has(token)) group.matched = term.label;
     groups.set(root, group);
@@ -175,24 +219,26 @@ export function computeJobMatch(
 
   let totalWeight = 0;
   let matchedWeight = 0;
-  const matched: Array<{ label: string; weight: number; skill: boolean }> = [];
-  const missing: Array<{ label: string; weight: number; skill: boolean }> = [];
+  const matched: Listed[] = [];
+  const missing: Listed[] = [];
 
   // A degree is met by level, as the requirements judge meets it: any Bachelor's for "BS".
   for (const [isced, { label, weight }] of degrees) {
     totalWeight += weight;
     if (highestIsced !== null && highestIsced >= isced) {
       matchedWeight += weight;
-      matched.push({ label, weight, skill: true });
-    } else missing.push({ label, weight, skill: true });
+      matched.push({ label, weight, skill: true, soft: false });
+    } else missing.push({ label, weight, skill: true, soft: false });
   }
 
   for (const group of groups.values()) {
     totalWeight += group.weight;
     const skill = group.members.some((member) => member.skill);
+    // A choice is soft only when every alternative is: "Python or teamwork" asks for Python.
+    const soft = group.members.every((member) => member.soft);
     if (group.matched !== null) {
       matchedWeight += group.weight;
-      matched.push({ label: group.matched, weight: group.weight, skill });
+      matched.push({ label: group.matched, weight: group.weight, skill, soft });
     } else {
       // Named as the choice the posting actually offered, so the advice reads "Go or Java"
       // rather than listing each alternative as a separate gap.
@@ -200,22 +246,18 @@ export function computeJobMatch(
         label: group.members.map((member) => member.label).join(` ${group.separator} `),
         weight: group.weight,
         skill,
+        soft,
       });
     }
   }
 
-  // Recognised skills lead both lists regardless of section weight: a missing skill is always
-  // more actionable advice than a missing ordinary word, and these lists are what the user is
-  // shown and what the AI layer is handed as evidence.
-  const rank = (a: { weight: number; skill: boolean }, b: { weight: number; skill: boolean }) =>
-    Number(b.skill) - Number(a.skill) || b.weight - a.weight;
-
-  matched.sort(rank);
-  missing.sort(rank);
-
+  const matchedList = listed(matched);
+  const missingList = listed(missing);
   return {
     score: totalWeight > 0 ? Math.round((matchedWeight / totalWeight) * 100) : null,
-    matched: matched.slice(0, 12).map((m) => m.label),
-    missing: missing.slice(0, 12).map((m) => m.label),
+    matched: matchedList.all,
+    missing: missingList.all,
+    matchedGroups: matchedList.groups,
+    missingGroups: missingList.groups,
   };
 }

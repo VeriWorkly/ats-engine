@@ -113,3 +113,32 @@ describe("the job summary", () => {
     expect(summary).not.toContain("${c}");
   });
 });
+
+describe("the job summary with 0.3 reports", () => {
+  it("shows missing hard and soft skills apart, and the advice", () => {
+    const posting = join(dir, "soft-job.txt");
+    writeFileSync(
+      posting,
+      "Backend Engineer\n\nRequirements\n- Terraform\n- Strong communication\n- Teamwork\n- Go\n",
+    );
+    const named = join(dir, "Resume_final_v3 (2).md");
+    writeFileSync(named, readFileSync(resume, "utf8"));
+    const { code, summary } = action({ ATS_RESUME: named, ATS_JOB: posting });
+    expect(code).toBe(0);
+    expect(summary).toContain("**Missing keywords:**");
+    expect(summary).toMatch(/Missing soft skills \(weigh less\):\*\* .*communication/);
+    expect(summary).toContain("### Advice (not scored)");
+  });
+});
+
+describe("the ats input", () => {
+  it("adds the named ATS's documented notes to the advice", () => {
+    const { code, summary } = action({ ATS_RESUME: resume, ATS_TARGET: "greenhouse" });
+    expect(code).toBe(0);
+    expect(summary).toContain("### Advice (not scored)");
+  });
+
+  it("fails on an ATS the engine does not know", () => {
+    expect(action({ ATS_RESUME: resume, ATS_TARGET: "nonesuch" }).code).toBe(1);
+  });
+});
