@@ -38,7 +38,7 @@ Node 20.19 or later. `npm run bench` prints field accuracy over the labelled cor
 
 Run `npm run changeset`. A change to the report's shape, the policy schema, or the score or
 recovered fields for the same input is **breaking** (see `.changeset/README.md`). If the community
-policy changes, `npm run rubric` regenerates RUBRIC.md and its fingerprint. A change to the
+policy changes, `npm run rubric` regenerates RUBRIC.md and its fingerprint, and the policy snapshots in `tests/policy/__snapshots__/` (check their diff is only your change). A change to the
 MCP server gets a changeset for `@veriworkly/ats-engine-mcp`. The GitHub Action in `action/` is
 in neither package: a change there needs no changeset unless the engine changes with it.
 
