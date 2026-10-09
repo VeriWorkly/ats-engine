@@ -36,7 +36,7 @@ check(resume, policy, options)                                   check.ts, scori
      parseReadLines | parseResumeDocument                          parser/, document/parse.ts
      checks               integrity, timeline, skills             checks/
  4 scoreRules             applicable rules → results, score       scoring/score.ts, rules.ts
- 5 computeJobMatch        posting terms, alternatives, weights    matching/jobMatch.ts
+ 5 computeJobMatch        posting terms, names left out, weights  matching/jobMatch.ts
  6 judgeRequirements      per-requirement status and evidence     matching/requirements.ts
  7 assemble               fixes, strengths, categories, stamp     scoring/engine.ts
 ```
@@ -59,7 +59,7 @@ Splitting those is welcome where a seam is clear.
 | `parser/`                | `lines`, `sections`, `dates`, `experience` (roles), `education` (ISCED), `contact` (name, email, date of birth), `phone`, `record` (derived fields, provenance), `tenure`, `index`                                                                                                                                                | `.` (`parseResume`)    |
 | `checks/`                | `integrity/text` (injection, homoglyphs, copied posting, stuffing), `timeline`, `skills`, `bullets` (role body lines when list markers were lost), `finding`                                                                                                                                                                      | internal               |
 | `scoring/`               | `engine` (pipeline), `context` (what rules read), `score` (arithmetic), `rules` (per-kind evaluation and applicability), `categories`, `rubric`, `verdict`                                                                                                                                                                        | `.`                    |
-| `matching/`              | `vocabulary` (terms, synonyms, phrases), `alternation` ("Go or Java"), `jobSections`, `jobMatch`, `requirements`                                                                                                                                                                                                                  | internal               |
+| `matching/`              | `vocabulary` (terms, synonyms, phrases), `alternation` ("Go or Java"), `jobSections`, `proseNames`, `jobMatch`, `requirements`                                                                                                                                                                                                    | internal               |
 | `locales/`               | `schema`, `languages` (language detection and vocabulary, no phone metadata), `resolve` (attach, region, date order), `packs/` (`de`, `hi`, `regions`)                                                                                                                                                                            | `/locales`             |
 | `document/`              | structured input: `types`, `render`, `jsonResume` (public); `schema`, `parse` (internal)                                                                                                                                                                                                                                          | `/document`            |
 | `report/`, `repair/`     | `shape` (full / restricted); `grounding`, `merge` (AI repair acceptance)                                                                                                                                                                                                                                                          | `.`                    |
@@ -91,7 +91,7 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 | Entry                                                   | Modules | Externals                                                |
 | ------------------------------------------------------- | ------: | -------------------------------------------------------- |
-| `.`                                                     |      62 | zod, libphonenumber-js                                   |
+| `.`                                                     |      64 | zod, libphonenumber-js                                   |
 | `/document`                                             |       4 | none                                                     |
 | `/format`                                               |       2 | none                                                     |
 | `/job`                                                  |       3 | none                                                     |

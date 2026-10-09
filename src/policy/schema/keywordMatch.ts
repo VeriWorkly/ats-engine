@@ -84,6 +84,19 @@ export const keywordMatchSchema = z
      */
     nounsCapitalized: z.boolean().default(false),
     /**
+     * Leave out a word the posting writes only as a name: always capitalised, at least once
+     * mid-sentence, only in its prose, never in a list, and not in this policy's vocabulary ("At
+     * Freightways, we ship from our Harbor Point depot"). Applies to a posting with at least
+     * `minListLines` list lines (bullets, or lines under a required or preferred heading) to
+     * compare with; never where `nounsCapitalized` holds, and off in a language pack that says so.
+     */
+    proseNames: z
+      .object({
+        enabled: z.boolean().default(true),
+        minListLines: z.number().int().positive().default(3),
+      })
+      .prefault({}),
+    /**
      * How a posting states the requirements that filter before any reading: years, a degree,
      * the right to work, a clearance, a language. Each a pattern; years and language patterns
      * capture the number and the language in group 1. Language packs add their own.

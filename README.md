@@ -164,15 +164,16 @@ In a web server, pass the uploaded file's name and MIME type to `detectResumeFor
 Pass the posting's text as `jobDescription`. If you have a saved job page instead, `/job` pulls the posting out of the HTML (including JSON-LD job data).
 
 ```ts
-import { jobTextFromHtml } from "@veriworkly/ats-engine/job";
+import { extractJobPosting, jobTextFromHtml } from "@veriworkly/ats-engine/job";
 
 const report = check(resumeText, DEFAULT_POLICY, {
   jobDescription: jobTextFromHtml(postingHtml),
+  jobCompany: extractJobPosting(postingHtml)?.company, // optional: the employer, never a keyword
   now: new Date("2026-10-01"), // optional: fix the date so tenure is reproducible
 });
 
 report.jobMatchScore; // 0-100, or null without a posting
-report.missingKeywords; // terms in the posting the resume never mentions
+report.missingKeywords; // terms in the posting the resume never mentions, names left out
 report.requirements; // [{ text, status: "met" | "partial" | "missing" | "unverifiable", evidence }]
 ```
 

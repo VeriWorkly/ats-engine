@@ -3,7 +3,7 @@ import { extname } from "node:path";
 
 import { isJsonResume, isResumeDocument } from "../document/index.js";
 import type { AtsResumeInput } from "../input.js";
-import { jobTextFromHtml, normalizeJobText } from "../job/index.js";
+import { extractJobPosting, jobTextFromHtml, normalizeJobText } from "../job/index.js";
 import { detectResumeFormat, extractResume, type AtsExtraction } from "./extract.js";
 
 /**
@@ -102,17 +102,25 @@ function readableText(text: string, format: string): string {
   return text;
 }
 
+/** A job posting read from a file: its text, and the employer when the file names one. */
+export type AtsJobFile = { text: string; company?: string };
+
 /**
  * A job posting file's text, normalised as a fetched posting is: a saved `.html` page is read for
- * its posting, a PDF or a Word file the way a resume is, anything else as text.
+ * its posting, a PDF or a Word file the way a resume is, anything else as text. A saved page's
+ * JSON-LD names the employer, which `check`'s `jobCompany` leaves out of the keywords.
  */
-export async function readJobFile(path: string, options?: AtsReadFileOptions): Promise<string> {
+export async function readJobFile(path: string, options?: AtsReadFileOptions): Promise<AtsJobFile> {
   const data = await readFileBytes(path, options);
-  if (/\.html?$/i.test(path)) return jobTextFromHtml(data.toString("utf8"));
+  if (/\.html?$/i.test(path)) {
+    const html = data.toString("utf8");
+    const company = extractJobPosting(html)?.company;
+    return company ? { text: jobTextFromHtml(html), company } : { text: jobTextFromHtml(html) };
+  }
   const format = detectResumeFormat(path);
   const text =
     format === "pdf" || format === "docx"
       ? (await extractResume(data, format)).text
       : data.toString("utf8");
-  return normalizeJobText(text);
+  return { text: normalizeJobText(text) };
 }

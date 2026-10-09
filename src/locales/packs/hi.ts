@@ -139,6 +139,9 @@ export const hi: AtsLanguagePackInput = {
     },
   },
   alternationWords: ["या", "अथवा"],
+  // A Latin word in a Devanagari sentence keeps the capital of its source ("Snowflake पर"), so
+  // the capital marks the switch of script, not a name.
+  proseNames: false,
   stopwords: [
     "का",
     "की",

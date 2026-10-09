@@ -1,10 +1,13 @@
 import { degreeLevels } from "../parser/education.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
+import { VOCABULARY_TOKEN } from "../text/text.js";
 import { alternationGroups } from "./alternation.js";
 import { isOfferLine, segmentJob, withoutIgnored, type JobSectionKind } from "./jobSections.js";
+import { proseNames } from "./proseNames.js";
 import { requirementLines } from "./requirements.js";
 import {
   buildVocabulary,
+  canonicalize,
   extractVocabulary,
   properNounTokens,
   resumeCapabilities,
@@ -42,6 +45,9 @@ function readPostingLine(line: string, policy: AtsEnginePolicy) {
  * against recognised skills and proper nouns — and works on any posting, headings or not.
  * Without both, a strong candidate scored around 30 against a posting they matched completely,
  * because "dental", "stipend" and the employer's own name counted the same as "Kubernetes".
+ *
+ * Names are left out altogether: every word of `company`, the employer as the host knows it,
+ * and the words the posting writes only as names in its prose (`proseNames`).
  */
 export function computeJobMatch(
   resumeText: string,
@@ -49,6 +55,8 @@ export function computeJobMatch(
   policy: AtsEnginePolicy,
   /** The resume's highest ISCED level, which a degree the posting names is matched against. */
   highestIsced: number | null = null,
+  /** The employer that posted the job; every word of it is left out of the keywords. */
+  company?: string,
 ): JobMatch {
   const km = policy.keywordMatch;
   const jobText = typeof jobDescription === "string" ? jobDescription.trim() : "";
@@ -57,6 +65,13 @@ export function computeJobMatch(
   const vocab = buildVocabulary(km);
   const sections = segmentJob(jobText, policy);
   const proper = properNounTokens(jobText, km.nounsCapitalized);
+  const names = proseNames(sections, km, vocab);
+  // Untyped callers send anything; a company name is short.
+  if (typeof company === "string")
+    for (const word of company.slice(0, 200).toLowerCase().match(VOCABULARY_TOKEN) ?? []) {
+      const token = canonicalize(word, km, vocab);
+      if (token) names.add(token);
+    }
 
   const sectionWeight: Record<JobSectionKind, number> = {
     required: km.requiredWeight,
@@ -114,7 +129,7 @@ export function computeJobMatch(
 
     const text = read.map((line) => line.text).join("\n");
     for (const [token, term] of extractVocabulary(text, km, vocab)) {
-      if (employer.has(token)) continue;
+      if (employer.has(token) || names.has(token)) continue;
       const skill = term.skill || proper.has(term.label) || proper.has(token);
       // One- and two-letter words carry meaning only as a named skill or acronym ("Go", "AI",
       // "JS"). Otherwise they are function words — "in", "to", "or", "a" — and scoring them told

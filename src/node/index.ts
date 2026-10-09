@@ -21,6 +21,7 @@ export {
   MAX_FILE_BYTES,
   readJobFile,
   readResumeFile,
+  type AtsJobFile,
   type AtsReadFileOptions,
 } from "./files.js";
 export type { AtsExtractRequest, AtsExtractResponse } from "./protocol.js";

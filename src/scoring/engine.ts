@@ -48,6 +48,11 @@ function visibleLine(layout: AtsLayoutSignals | undefined) {
 export type AtsCheckOptions = {
   /** Enables job match scoring. Read up to its first 20 000 characters. */
   jobDescription?: string;
+  /**
+   * The employer that posted the job, when the host knows it (the `company` of `/job`'s
+   * `extractJobPosting`). Every word of it is left out of the job-match keywords.
+   */
+  jobCompany?: string;
   /** Page geometry from a file upload. Absent for text and documents; layout rules then drop out. */
   layout?: AtsLayoutSignals;
   /**
@@ -128,6 +133,7 @@ export class AtsScoringService {
       jobDescription,
       policy,
       parsed.highestIsced,
+      options.jobCompany,
     );
     const caught = failedChecks.some(
       (rule) => rule.category === "integrity" && rule.severity === "error",

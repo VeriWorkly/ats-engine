@@ -49,9 +49,9 @@ describe("readResumeFile and readJobFile", () => {
     await expect(readResumeFile("resume.rtf")).rejects.toThrow(/Unsupported resume file type/);
     await expect(readResumeFile(file("bad.json", "{"))).rejects.toThrow(/is not valid JSON/);
     await expect(readResumeFile(file("other.json", "{}"))).rejects.toThrow(/neither a JSON/);
-    expect(await readJobFile(file("job.txt", "Platform Engineer\n\n\nGo required"))).toContain(
-      "Go required",
-    );
+    expect(
+      (await readJobFile(file("job.txt", "Platform Engineer\n\n\nGo required"))).text,
+    ).toContain("Go required");
   });
 
   it("are public on /node", () => {

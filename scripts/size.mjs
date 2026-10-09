@@ -8,7 +8,10 @@ const { exports } = JSON.parse(readFileSync("package.json", "utf8"));
 
 /** Gzipped KB. */
 const BUDGETS = {
-  ".": 160,
+  // 165: the October audit's vocabulary (headings, degrees, title and place words) filled 160;
+  // Markdown reading, role headers with a location and names left out of a posting's keywords
+  // (proseNames) took it to 160.2 (0.2). Most of the bundle is policy data, not code.
+  ".": 165,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then

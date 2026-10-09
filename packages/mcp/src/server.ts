@@ -237,9 +237,11 @@ async function answer(run: () => Promise<Answer>): Promise<CallToolResult> {
 async function score(args: ResumeArgs & JobArgs & { region?: string }, includeLines = false) {
   checkRegion(args.region);
   const { input, layout } = await readResume(args);
-  const jobDescription = await readJob(args);
+  const job = await readJob(args);
+  const jobDescription = job?.text;
   const report = check(input, POLICY, {
     jobDescription,
+    jobCompany: job?.company,
     layout,
     region: args.region,
     includeLines,

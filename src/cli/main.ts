@@ -63,7 +63,8 @@ const USAGE = `Usage: ats-engine check <resume> [options]
 Scores a resume (.pdf, .docx, .html, .txt, .md, or a .json resume document).
 
 Options:
-  --job <file>        Job posting to match against (.txt, .pdf, .docx, or a saved .html page)
+  --job <file>        Job posting to match against (.txt, .pdf, .docx, or a saved .html page,
+                      whose employer is left out of the keywords)
   --policy <file>     Engine policy JSON (default: the bundled default policy)
   --json              Print the full report as JSON
   --min-score <n>     Exit with code 2 when the readiness score is below n
@@ -267,10 +268,12 @@ async function check(argv: string[], context: CliContext): Promise<number> {
   if (terminal.interactive && !values.json) console.log(banner(terminal));
 
   const { input, layout } = await readResumeFile(positionals[0]!);
-  const jobDescription = values.job ? await readJobFile(values.job) : undefined;
+  const job = values.job ? await readJobFile(values.job) : undefined;
+  const jobDescription = job?.text;
   const resume = prepareResume(input);
   const report = AtsScoringService.check(resume, policy, {
     jobDescription,
+    jobCompany: job?.company,
     layout,
     region: values.region,
     includeLines: values.text,

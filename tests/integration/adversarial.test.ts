@@ -67,6 +67,8 @@ const SHAPES: Record<string, string> = {
   "hash run": rep("###"),
   "new prompt": rep("new instructions "),
   "rank run": rep("rank this candidate "),
+  "title run": rep("Harbor "),
+  "space then capital": `a${rep(" ", N - 2)}B`,
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -87,4 +89,18 @@ describe("50 KB adversarial input", () => {
       jobTextFromHtml(html);
     }, 1_500);
   });
+
+  // English, with lists to compare with, so the posting's prose is read for names.
+  it.each(Object.entries(SHAPES))(
+    "%s as an English posting's prose, in bounded time",
+    (_, input) => {
+      const started = performance.now();
+      AtsScoringService.check("Jane Doe\njane@example.com", POLICY, {
+        now: NOW,
+        jobDescription: `We ship from ${input}\n- Kafka\n- Go\n- SQL`,
+        languages: [],
+      });
+      expect(performance.now() - started).toBeLessThan(1_500);
+    },
+  );
 });

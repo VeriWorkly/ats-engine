@@ -73,6 +73,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       buzzwords: union(km.buzzwords, v.buzzwords),
       pluralSuffixes: union(km.pluralSuffixes, v.pluralSuffixes),
       nounsCapitalized: km.nounsCapitalized || Boolean(v.nounsCapitalized),
+      proseNames: { ...km.proseNames, enabled: km.proseNames.enabled && v.proseNames !== false },
       requirements: {
         yearsPatterns: union(km.requirements.yearsPatterns, v.requirements?.yearsPatterns),
         equivalence: union(km.requirements.equivalence, v.requirements?.equivalence),

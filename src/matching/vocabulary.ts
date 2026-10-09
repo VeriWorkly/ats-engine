@@ -188,16 +188,20 @@ export function properNounTokens(originalText: string, nounsCapitalized = false)
     const token = match[0];
     const acronym = /^[\p{Lu}\p{N}+#.]{2,6}$/u.test(token);
     const innerCapital = /\p{Ll}\p{Lu}/u.test(token);
-    let capitalised = false;
-    if (!nounsCapitalized && /^\p{Lu}/u.test(token)) {
-      // Back past spaces and list markers to the previous sentence boundary or line break, so
-      // an indented bullet ("      - Proficient") still opens a sentence.
-      const before = originalText.slice(Math.max(0, match.index - 40), match.index);
-      capitalised = !/(?:^|[.!?:\n])[^\p{L}\p{N}]*$/u.test(before);
-    }
+    const capitalised =
+      !nounsCapitalized && /^\p{Lu}/u.test(token) && !opensSentence(originalText, match.index);
 
     if (acronym || innerCapital || capitalised)
       proper.add(token.toLowerCase().replace(/(?<![./])[./]+$/, ""));
   }
   return proper;
+}
+
+/**
+ * Whether the word at `index` opens a sentence or a line. Backs past spaces and list markers to
+ * the previous sentence boundary or line break, so an indented bullet ("      - Proficient")
+ * still opens a sentence. Reads at most 40 characters back.
+ */
+export function opensSentence(text: string, index: number) {
+  return /(?:^|[.!?:\n])[^\p{L}\p{N}]*$/u.test(text.slice(Math.max(0, index - 40), index));
 }

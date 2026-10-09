@@ -65,17 +65,19 @@ export async function readResume(
 }
 
 /** The posting a call names, or undefined when it names none. */
-export async function readJob(args: JobArgs): Promise<string | undefined> {
+export async function readJob(
+  args: JobArgs,
+): Promise<{ text: string; company?: string } | undefined> {
   exactlyOne(args.job_path, args.job_text, "job posting", ["job_path", "job_text"]);
-  const text =
+  const job =
     args.job_path !== undefined
       ? await readJobFile(absolute(args.job_path))
       : args.job_text !== undefined
-        ? normalizeJobText(args.job_text)
+        ? { text: normalizeJobText(args.job_text) }
         : undefined;
-  if (text !== undefined && !text.trim())
+  if (job !== undefined && !job.text.trim())
     throw new ToolInputError("The job posting has no readable text.");
-  return text;
+  return job;
 }
 
 export function checkRegion(region: string | undefined): void {

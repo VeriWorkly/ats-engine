@@ -91,6 +91,11 @@ const vocabularyShape = {
   pluralSuffixes: optionalList("pluralSuffixes"),
   /** Set for a language that capitalises every noun; see `keywordMatch.nounsCapitalized`. */
   nounsCapitalized: z.boolean().optional(),
+  /**
+   * `false` for a language whose capitals say nothing about a name, such as one written in a
+   * script without case; see `keywordMatch.proseNames`.
+   */
+  proseNames: z.boolean().optional(),
 };
 
 /**
