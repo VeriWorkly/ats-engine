@@ -22,8 +22,10 @@ const SNAP = 2;
 /** Points between two cells' borders that still make them neighbours: CSS `border-spacing`. */
 const CELL_GAP = 4;
 /** Rules kept from a page, and cells with text grouped into tables; past these, the rest are
- * not. A resume's tables draw a few hundred edges at most. */
-const MAX_RULES = 2_000;
+ * not. A resume's tables draw a few hundred edges, but a dotted background or an underline per
+ * word can draw thousands of thin shapes before them: joining and lookup cost n log n, and the
+ * lookups are bounded by `MAX_CHECKS` besides. */
+const MAX_RULES = 50_000;
 const MAX_CELLS = 500;
 /** Lines looked at, across a page, while finding the cell around each piece of text. */
 const MAX_CHECKS = 1_000_000;
@@ -131,13 +133,13 @@ function joinLines(pieces: Line[]) {
 }
 
 /**
- * The index of the line nearest `at` on one side (`step` -1 below, 1 above) that runs past
- * `across`, or -1. Each line looked at spends one of `budget.left`.
+ * The index of the line nearest `at` on one side (`step` -1 below, 1 above) that runs from
+ * `from` to `to`, or -1. Each line looked at spends one of `budget.left`.
  */
 function nearest(
   lines: Line[],
   at: number,
-  across: number,
+  [from, to]: [number, number],
   step: 1 | -1,
   budget: { left: number },
 ) {
@@ -150,7 +152,7 @@ function nearest(
   for (let index = step < 0 ? low - 1 : low; index >= 0 && index < lines.length; index += step) {
     if ((budget.left -= 1) < 0) return -1;
     const line = lines[index]!;
-    if (line.from - SNAP <= across && across <= line.to + SNAP) return index;
+    if (line.from - SNAP <= from && to <= line.to + SNAP) return index;
   }
   return -1;
 }
@@ -192,11 +194,17 @@ export function countRuledTables(rules: readonly Box[], points: readonly Point[]
   for (const [x, y] of points) {
     if (cells.size >= MAX_CELLS || budget.left <= 0) break;
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    // The sides either way along the line of text, then the rules above and below it that run
+    // the whole way between them: a stray hairline across the cell is no side unless it does.
+    const leftAt = nearest(down, x, [y, y], -1, budget);
+    const rightAt = nearest(down, x, [y, y], 1, budget);
+    if (leftAt < 0 || rightAt < 0) continue;
+    const span: [number, number] = [down[leftAt]!.at, down[rightAt]!.at];
     const sides = [
-      nearest(down, x, y, -1, budget),
-      nearest(down, x, y, 1, budget),
-      nearest(across, y, x, -1, budget),
-      nearest(across, y, x, 1, budget),
+      leftAt,
+      rightAt,
+      nearest(across, y, span, -1, budget),
+      nearest(across, y, span, 1, budget),
     ];
     if (sides.some((side) => side < 0)) continue;
     const [left, right, bottom, top] = [

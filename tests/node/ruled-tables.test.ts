@@ -275,8 +275,10 @@ describe("cost on a crowded page", () => {
         fnArray.push(ops.setFont, ops.setTextMatrix, ops.showText);
         argsArray.push(["F1", 4], [[1, 0, 0, 1, x + 2, y + 4]], [[{ unicode: "x", width: 500 }]]);
       }
+    // Beside the table, not through it: hairlines drawn across every cell cut it into pieces
+    // that are no longer a grid, and no page draws a table that way.
     for (let i = 0; i < 10_000; i += 1) {
-      const [x, y] = [(i * 37) % 600, (i * 53) % 780];
+      const [x, y] = [(i * 37) % 600, 620 + ((i * 53) % 160)];
       if (i % 2) rect(x, y, 40, 0.5);
       else rect(x, y, 0.5, 40);
     }
@@ -302,4 +304,14 @@ describe("cost on a crowded page", () => {
     const points = Array.from({ length: 20_000 }, (_, i): [number, number] => [(i * 7) % 600, 302]);
     expectFast(() => countRuledTables(rules, points), 250);
   });
+
+  it("finds a table drawn after thousands of thin decorative shapes", async () => {
+    // 5,000 short hairlines (a dotted background, an underline per word) before the table: kept
+    // to the first 2,000 rules, the table's own borders were never looked at.
+    const noise = Array.from({ length: 5_000 }, (_, i) =>
+      chromeRect(40 + (i % 100) * 7, 40 + Math.floor(i / 100) * 4, 5, 0.5),
+    );
+    const page = chromePage(...noise, chromeTable(3, 2, { top: 500 }));
+    expect(await tables(buildPdf(page))).toBe(1);
+  }, 30_000);
 });
