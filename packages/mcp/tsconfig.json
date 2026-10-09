@@ -1,0 +1,12 @@
+{
+  // The engine's compiler options; the server runs on Node, so Node's types are in.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "types": ["node"],
+    "declaration": false
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "tests"]
+}

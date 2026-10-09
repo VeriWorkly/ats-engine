@@ -1,0 +1,5 @@
+{
+  // The engine's test settings; the MCP tests import the engine's source and fixtures.
+  "extends": "../../../tests/tsconfig.json",
+  "include": [".", "../src"]
+}

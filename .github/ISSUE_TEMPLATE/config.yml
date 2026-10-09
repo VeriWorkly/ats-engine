@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/VeriWorkly/ats-engine/security/policy
+    about: Please do not open a public issue. Email grievance@veriworkly.com as SECURITY.md describes.
+  - name: Ask a question
+    url: https://github.com/VeriWorkly/ats-engine/discussions
+    about: How to integrate the package, what a score means, or anything that is not a bug.
+  - name: Problem with veriworkly.com
+    url: https://github.com/VeriWorkly/veriworkly/issues
+    about: Issues with the VeriWorkly website or app, including its ATS checker page, go to the VeriWorkly repository.

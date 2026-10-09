@@ -47,13 +47,15 @@ export { ENGINE_VERSION } from "./version.js";
 
 // Input
 export { AtsInputError, prepareResume, type AtsResumeInput, type PreparedResume } from "./input.js";
+export type { HiddenCharacters } from "./text/characters.js";
 export * from "./document/index.js";
 
 // Scoring
 export { parseQuality, parseResume } from "./parser/index.js";
+export { check } from "./check.js";
 export { AtsScoringService, type AtsCheckOptions } from "./scoring/engine.js";
 export type { AtsLocale, AtsLocaleOptions } from "./locales/resolve.js";
-export { computeVerdict, type AtsVerdict } from "./scoring/verdict.js";
+export { computeVerdict, VERDICT_BANDS, type AtsVerdict } from "./scoring/verdict.js";
 export { policyRubric, type AtsRubricEntry } from "./scoring/rubric.js";
 
 // Presentation of a report at a chosen level of detail

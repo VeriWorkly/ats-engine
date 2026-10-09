@@ -1,0 +1,117 @@
+name: Resume read wrong
+description: A field was missed or misread, a check passed or failed when it should not have, or a score looks wrong.
+title: "[Parsing]: "
+labels: ["parsing", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Most parsing fixes start from a small, anonymised example.
+
+        > [!CAUTION]
+        > **Never post a real person's resume, including your own.** Replace the name, email, phone number, links, employers, schools and any other personal details with invented ones, then check that the problem still happens before you paste anything here.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: What was read wrong?
+      multiple: true
+      options:
+        - Name
+        - Email or phone number
+        - Links
+        - Job title
+        - Employer
+        - Dates or current role
+        - Education or degree level
+        - Skills
+        - Section headings
+        - Language or region detected
+        - A check passed or failed wrongly
+        - The readiness score
+        - Job match or a requirement's status
+        - Integrity check (false alarm)
+        - Integrity check (missed a problem)
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What the engine read
+      description: |
+        Paste the relevant part of the output. `ats-engine check resume.pdf --text` shows the text in the order the engine read it, which explains most layout problems. `--json` shows every field and rule.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should have read
+      placeholder: 'The second role should be "Data Analyst, Northwind Traders (Mar 2019 – Jun 2021)".'
+    validations:
+      required: true
+
+  - type: textarea
+    id: resume
+    attributes:
+      label: Anonymised resume text
+      description: The smallest part of the resume that still shows the problem, with every personal detail invented. For a PDF or DOCX, the `--text` output is usually enough.
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: format
+    attributes:
+      label: File type
+      options:
+        - PDF
+        - DOCX
+        - Plain text or Markdown
+        - JSON Resume or ats-resume document
+    validations:
+      required: true
+
+  - type: input
+    id: made-with
+    attributes:
+      label: How the file was made
+      description: The tool that produced the PDF or DOCX changes how it parses. Describe the layout too if it matters (two columns, tables, a header or footer, icons).
+      placeholder: Google Docs export, two columns, contact details in the page header
+
+  - type: dropdown
+    id: runner
+    attributes:
+      label: How you ran it
+      options:
+        - CLI (ats-engine check)
+        - Library on Node
+        - Library in a browser or edge runtime
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Engine version
+      description: Run `npx @veriworkly/ats-engine --version`, or read `report.engine.version`. If you use your own policy, add `report.engine.policy` too.
+      placeholder: "0.1.2"
+    validations:
+      required: true
+
+  - type: input
+    id: locale
+    attributes:
+      label: Language and country of the resume
+      description: Only if it is not English or not from the US.
+      placeholder: German, Germany
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: Every name, contact detail, employer and school in this issue is invented, and the problem still happens with them.
+          required: true

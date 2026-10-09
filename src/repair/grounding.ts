@@ -86,9 +86,37 @@ function addressGrounded(value: string, normalized: string) {
   );
 }
 
+/**
+ * A list separator between two words: a value never spans one it does not write itself, or
+ * "Clients: Acme, Globex" would ground an employer called "Acme Globex".
+ */
+const SEPARATOR = /[,;|•·]/;
+/** A word glued to the next by "&" or "-": the "R" of "R&D" and the "go" of "go-to-market". */
+const GLUE = /^[&-]$/;
+/** What may follow a comma inside one company name: "Acme, Inc." is still "Acme Inc". */
+const LEGAL_SUFFIX = new Set(
+  "inc llc ltd limited corp co plc gmbh ag kg sa sarl srl bv nv lp llp pty pvt ab as oy".split(" "),
+);
+
+type Gaps = { separated: Uint8Array; glued: Uint8Array };
+/** For each word, what stands between it and the word before. */
+const gapsOf = new WeakMap<readonly string[], Gaps>();
+
 /** The words of a normalised text, in order. Compute once per document and reuse. */
 export function groundingWords(normalized: string): string[] {
-  return normalized.match(WORD) ?? [];
+  const words: string[] = [];
+  const separated: number[] = [];
+  const glued: number[] = [];
+  let end = 0;
+  for (const match of normalized.matchAll(WORD)) {
+    const gap = words.length ? normalized.slice(end, match.index) : "";
+    separated.push(SEPARATOR.test(gap) ? 1 : 0);
+    glued.push(GLUE.test(gap) ? 1 : 0);
+    words.push(match[0]);
+    end = match.index + match[0].length;
+  }
+  gapsOf.set(words, { separated: Uint8Array.from(separated), glued: Uint8Array.from(glued) });
+  return words;
 }
 
 /**
@@ -112,30 +140,62 @@ export function isGrounded(
 ): boolean {
   const folded = normalizeForGrounding(value);
   if (ADDRESS.test(folded)) return addressGrounded(folded, normalized);
-  const target = groundingWords(folded).join("");
+  const valueWords = groundingWords(folded);
+  const target = valueWords.join("");
   if (!target) return true; // no letters or digits: asserts nothing, so there is nothing to ground
   // Chinese, Japanese or Thai run their words together, so a company inside a sentence is part
   // of one long "word"; there any occurrence counts, not only one on word boundaries.
-  const { joined, starts } = joinedWords(words);
+  const { joined, starts, wordAt } = joinedWords(words);
   const anywhere = UNSPACED.test(target);
-  return occurs(
-    joined,
-    target,
-    (at) => anywhere || (starts[at] === 1 && starts[at + target.length] === 1),
-  );
+  const gaps = gapsOf.get(words);
+  // Offsets inside the value where it writes a separator itself.
+  const ownSeparators = new Set<number>();
+  const own = gapsOf.get(valueWords)!;
+  valueWords.reduce((offset, word, index) => {
+    if (own.separated[index]) ownSeparators.add(offset);
+    return offset + word.length;
+  }, 0);
+
+  const crossesSeparator = (at: number) => {
+    for (let offset = at + 1; offset < at + target.length; offset += 1) {
+      const index = wordAt[offset]!;
+      if (index < 0 || !gaps!.separated[index] || ownSeparators.has(offset - at)) continue;
+      if (!LEGAL_SUFFIX.has(words[index]!)) return true;
+    }
+    return false;
+  };
+  // "R" is a skill; the "R" of "R&D" is not. Short values only: a long one glued that way
+  // ("full-stack") is still the same words.
+  const glued = (at: number) => {
+    const first = wordAt[at]!;
+    const next = wordAt[at + target.length]!;
+    return Boolean(gaps!.glued[first] || (next >= 0 && gaps!.glued[next]));
+  };
+
+  return occurs(joined, target, (at) => {
+    if (anywhere) return true;
+    if (starts[at] !== 1 || starts[at + target.length] !== 1) return false;
+    if (!gaps) return true;
+    return !crossesSeparator(at) && !(target.length <= 2 && glued(at));
+  });
 }
 
-/** The words run together, and a mark at every offset where a word starts or the run ends. */
+/**
+ * The words run together, a mark at every offset where a word starts or the run ends, and the
+ * index of the word starting at each offset (-1 elsewhere, and at the end).
+ */
 const joinedWords = memo((words: readonly string[]) => {
   const joined = words.join("");
   const starts = new Uint8Array(joined.length + 1);
+  const wordAt = new Int32Array(joined.length + 1).fill(-1);
   let at = 0;
-  for (const word of words) {
+  words.forEach((word, index) => {
     starts[at] = 1;
+    wordAt[at] = index;
     at += word.length;
-  }
+  });
   starts[at] = 1;
-  return { joined, starts };
+  return { joined, starts, wordAt };
 });
 
 /**

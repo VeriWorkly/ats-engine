@@ -4,4 +4,10 @@ coverage/
 *.tgz
 # Audit working notes and throwaway probes; not part of the package or its repo.
 AUDIT.md
+PLAN.md
 *.probe.ts
+.agents/
+.claude/
+skills-lock.json
+# Local secrets, such as the live AI eval key.
+.env

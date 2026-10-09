@@ -18,8 +18,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: npm
@@ -27,7 +27,7 @@ jobs:
       - run: npm ci
       # v2 reads the output of @changesets/cli v3; v1 published but could not see it, so it
       # created no git tag and no GitHub release.
-      - uses: changesets/action@v2
+      - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2
         id: changesets
         with:
           version-script: npm run version-packages
@@ -36,8 +36,15 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-      # The same version on GitHub's registry, so it is listed under the repository's Packages.
+      # The same engine version on GitHub's registry, so it is listed under the repository's
+      # Packages. With two packages in the workspace, changesets tags each release as
+      # "<name>@<version>", and a release may publish the MCP server alone.
       - if: steps.changesets.outputs.published == 'true'
-        run: gh workflow run github-packages.yml -f tag=v${{ fromJSON(steps.changesets.outputs['published-packages'])[0].version }}
+        run: |
+          version=$(jq -r '.[] | select(.name == "@veriworkly/ats-engine") | .version' <<< "$PUBLISHED")
+          if [ -n "$version" ]; then
+            gh workflow run github-packages.yml -f tag="@veriworkly/ats-engine@$version"
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLISHED: ${{ steps.changesets.outputs['published-packages'] }}

@@ -31,6 +31,22 @@ const vocabularyShape = {
     .partial()
     .optional(),
   months: z.record(z.string().min(1), z.number().int().min(1).max(12)).optional(),
+  /** Seasons a term is dated by, as the first and last month each covers: "Sommer 2019". */
+  seasons: z
+    .record(
+      z.string().min(1),
+      z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]),
+    )
+    .optional(),
+  /** Units of a role's printed duration: "4 Jahre 9 Monate". */
+  durationUnits: optionalList("durationUnits"),
+  /** Labels a name is written under: "Name: …". */
+  nameLabels: optionalList("nameLabels"),
+  /** Letters after a name ("Dipl.-Ing.", "CA" for a chartered accountant), and codes that name a
+   * region rather than a credential ("MH", "KA"). */
+  postNominals: optionalList("postNominals"),
+  regionCodes: optionalList("regionCodes"),
+  workplaceWords: optionalList("workplaceWords"),
   openEnded: optionalList("openEnded"),
   rangeWords: optionalList("rangeWords"),
   sinceWords: optionalList("sinceWords"),
@@ -75,6 +91,11 @@ const vocabularyShape = {
   pluralSuffixes: optionalList("pluralSuffixes"),
   /** Set for a language that capitalises every noun; see `keywordMatch.nounsCapitalized`. */
   nounsCapitalized: z.boolean().optional(),
+  /**
+   * `false` for a language whose capitals say nothing about a name, such as one written in a
+   * script without case; see `keywordMatch.proseNames`.
+   */
+  proseNames: z.boolean().optional(),
 };
 
 /**

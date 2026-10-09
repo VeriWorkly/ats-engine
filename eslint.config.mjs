@@ -2,12 +2,22 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "coverage/**", "node_modules/**"] },
+  // .claude/ and .agents/ hold local agent files and worktrees, gitignored like dist/.
+  {
+    ignores: [
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      "packages/*/dist/**",
+      ".claude/**",
+      ".agents/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
     // Build scripts run on Node.
-    files: ["scripts/**/*.mjs", "*.mjs"],
+    files: ["scripts/**/*.mjs", "action/**/*.mjs", "*.mjs"],
     languageOptions: {
       globals: Object.fromEntries(
         ["process", "console", "TextEncoder", "TextDecoder", "URL"].map((name) => [

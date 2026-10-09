@@ -18,9 +18,9 @@ file. These are the guarantees, each held by a test.
 **Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 50
 shapes (letter runs, digit runs, unclosed tags, comma lists, mixed scripts…), placed in the name
 line, a bullet and the posting at once, scores in tens of milliseconds under the community policy
-with every locale pack applied (`tests/adversarial.test.ts`, which fails past 1.5 s). Patterns in a _policy_ or a _pack_
+with every locale pack applied (`tests/integration/adversarial.test.ts`, which fails past 1.5 s). Patterns in a _policy_ or a _pack_
 are operator-supplied: `parseAtsPolicy` checks that they compile, not that they are linear, so
-review a policy's patterns as you would code — `tests/regressions.test.ts` re-runs the
+review a policy's patterns as you would code — `tests/integration/regressions.test.ts` re-runs the
 adversarial suite against a private policy when one is present.
 
 **Size.** Resume text is cut at 50 000 characters, postings at 20 000, a structured document is
@@ -46,6 +46,10 @@ What does not depend on the model:
   are not recognised). Parse repair and conversion must see contact details and do not redact.
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
   including text smuggled in Unicode tag characters or PDF metadata.
+
+**API keys in the CLI.** `ats-engine check --ai` reads the key from the environment only, never
+from a flag, so it does not land in shell history or the process list, and never prints it. The
+CLI says which provider and model the resume is about to be sent to before the request leaves.
 
 **State.** The core holds no global state, does no I/O and makes no network calls; only `/ai`
 calls the provider you configure, and only `/node` reads files you pass it.

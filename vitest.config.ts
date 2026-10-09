@@ -2,7 +2,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["tests/**/*.test.ts"],
+    // The workspace packages' tests run here too (packages/mcp spawns its built server).
+    include: ["tests/**/*.test.ts", "packages/*/tests/**/*.test.ts"],
     environment: "node",
     globals: true,
     clearMocks: true,

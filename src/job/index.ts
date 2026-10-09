@@ -41,21 +41,27 @@ export function normalizeJobText(text: string, maxChars = MAX_JOB_TEXT_CHARS): s
  *
  * Block elements become line breaks, so a posting's headings and bullets survive as lines — the
  * shape the job matcher's section detection reads — instead of collapsing into one paragraph.
- * Script, style and similar elements are dropped with their content; an element left unclosed
+ * Script, style and similar elements are dropped with their content, and so is the page's
+ * furniture: navigation, cookie banners, forms, "similar jobs", hidden elements — the posting is
+ * read from the page's `<main>` or `<article>` when it has one. An element left unclosed
  * drops everything after it, which on a well-formed page never happens and on a hostile one is
  * the safe direction. A `<` that cannot open a tag ("<5k") is text, as it is to a browser.
  */
 export function jobHtmlToText(html: string, maxChars = MAX_JOB_TEXT_CHARS): string {
-  return normalizeJobText(htmlText(html), maxChars);
+  return normalizeJobText(htmlText(html, true), maxChars);
 }
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
 }
 
-function isJobPosting(node: Record<string, unknown>): boolean {
-  return asArray(node["@type"]).some((type) => type === "JobPosting");
-}
+/** `"JobPosting"`, or the type written as a URI or a prefixed name ("http://schema.org/JobPosting"). */
+const isType = (node: Record<string, unknown>, type: string) =>
+  asArray(node["@type"]).some(
+    (value) => typeof value === "string" && value.split(/[/:#]/).pop() === type,
+  );
+
+const isJobPosting = (node: Record<string, unknown>) => isType(node, "JobPosting");
 
 /**
  * Real JSON-LD nests a value two or three levels deep. A page author picks the depth, and an
@@ -78,7 +84,11 @@ function textOf(value: unknown, depth = 0): string {
       .join("\n");
   if (value && typeof value === "object") {
     const node = value as Record<string, unknown>;
-    return textOf(node.name ?? node.description ?? "", depth + 1);
+    // A requirement given as structured data: a credential, or experience in months.
+    const months = Number(node.monthsOfExperience);
+    if (node.name === undefined && node.description === undefined && months > 0)
+      return `${Math.round(months / 6) / 2} years of experience`;
+    return textOf(node.name ?? node.description ?? node.credentialCategory ?? "", depth + 1);
   }
   return "";
 }
@@ -98,11 +108,22 @@ function jsonLdNodes(html: string): Record<string, unknown>[] {
     index = close + 8;
     if (!html.slice(open, tagEnd).toLowerCase().includes("application/ld+json")) continue;
 
+    // Wrapped in CDATA for old XHTML parsers, or with raw line breaks inside its strings, which
+    // JSON does not allow and browsers' structured-data readers forgive.
+    const source = html
+      .slice(tagEnd + 1, close)
+      .trim()
+      .replace(/^(?:\/\/)?<!\[CDATA\[/, "")
+      .replace(/(?:\/\/)?\]\]>$/, "");
     let parsed: unknown;
     try {
-      parsed = JSON.parse(html.slice(tagEnd + 1, close));
+      parsed = JSON.parse(source);
     } catch {
-      continue; // a page's broken structured data is the page's problem, not a failed scan
+      try {
+        parsed = JSON.parse(source.replace(/[\n\r\t]/g, " "));
+      } catch {
+        continue; // a page's broken structured data is the page's problem, not a failed scan
+      }
     }
     // A cursor, not shift(), and a loop, not push(...spread): a page author picks the size of
     // `@graph`, and both of those fall over (quadratic time, stack overflow) on a big one.
@@ -126,8 +147,17 @@ function jsonLdNodes(html: string): Record<string, unknown>[] {
  * jobs" list that make up most of a page's visible text.
  */
 export function extractJobPosting(html: string): AtsJobPosting | null {
-  const node = jsonLdNodes(html).find(isJobPosting);
+  const nodes = jsonLdNodes(html);
+  const node = nodes.find(isJobPosting);
   if (!node) return null;
+  // The employer, given by reference ("@id") to an Organization elsewhere in the graph — or,
+  // when the reference matches nothing, the graph's first Organization.
+  let company = node.hiringOrganization;
+  const id = (company as { "@id"?: unknown } | undefined)?.["@id"];
+  if (id !== undefined && !textOf(company))
+    company =
+      nodes.find((other) => other["@id"] === id && textOf(other)) ??
+      nodes.find((other) => isType(other, "Organization"));
 
   const description = textOf(node.description);
   if (!description) return null;
@@ -144,7 +174,7 @@ export function extractJobPosting(html: string): AtsJobPosting | null {
 
   return {
     title: textOf(node.title),
-    company: textOf(node.hiringOrganization),
+    company: textOf(company),
     description,
     requirements,
   };

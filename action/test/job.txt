@@ -1,0 +1,13 @@
+Senior Backend Engineer
+
+We build payment infrastructure for small businesses.
+
+Requirements
+- 5+ years of backend development in TypeScript or Go
+- Experience running services on Kubernetes
+- Strong PostgreSQL skills
+- Bachelor's degree in Computer Science or equivalent
+
+Nice to have
+- Kafka
+- Terraform

@@ -52,11 +52,45 @@ export const resumeParseSchema = z.object({
     dec: 12,
     december: 12,
   }),
+  /**
+   * Seasons a resume dates a term by — "Spring 2020 - Fall 2021", "Summer 2018" — as the first
+   * and last month each covers. A range starts at its first season's first month and ends at its
+   * last season's last month; a season standing alone is a term of its own.
+   */
+  seasons: z
+    .record(
+      z.string().min(1),
+      z.tuple([z.number().int().min(1).max(12), z.number().int().min(1).max(12)]),
+    )
+    .default({
+      spring: [3, 5],
+      summer: [6, 8],
+      fall: [9, 11],
+      autumn: [9, 11],
+      winter: [1, 3],
+    }),
   /** The ways a resume says a role is still current. Language-bound, hence data. */
   openEnded: z
     .array(z.string().min(1))
     .min(1)
-    .default(["present", "current", "now", "ongoing", "to date", "till date"]),
+    .default(["present", "current", "now", "ongoing", "to date", "till date", "today"]),
+  /**
+   * Units of a length of time written beside a date range, which LinkedIn exports print:
+   * "Jan 2020 - Present · 4 yrs 9 mos", "(4 years 9 months)". A number before one of these is
+   * the role's duration, not its title or employer.
+   */
+  durationUnits: wordList("durationUnits").default([
+    "yr",
+    "yrs",
+    "year",
+    "years",
+    "mo",
+    "mos",
+    "month",
+    "months",
+  ]),
+  /** Labels a resume writes its owner's name under: "Name: Jane Doe". */
+  nameLabels: wordList("nameLabels").default(["name", "full name"]),
   /** Words between the two ends of a date range besides a dash: "2019 to 2022", "2019 bis 2022". */
   rangeWords: wordList("rangeWords").default(["to", "until", "through"]),
   /** Words before a lone start date that make it a current role: "since 2019", "seit 03/2019". */
@@ -100,6 +134,61 @@ export const resumeParseSchema = z.object({
     "ibn",
     "al",
     "el",
+  ]),
+  /**
+   * Credentials written after a name ("Priya Raman, MBA", "Jane Doe, MD"): a name cut from one of
+   * these is the name, wherever a company over a title sits below it. Matched whole, ignoring case.
+   */
+  postNominals: wordList("postNominals").default([
+    String.raw`ph\.?d\.?`,
+    String.raw`m\.?d\.?`,
+    String.raw`d\.?o\.?`,
+    String.raw`j\.?d\.?`,
+    String.raw`esq\.?`,
+    "mba",
+    "msc",
+    "bsc",
+    "cpa",
+    "cfa",
+    "cma",
+    "acca",
+    "pmp",
+    "cissp",
+    "csm",
+    String.raw`p\.?e\.?`,
+    String.raw`r\.?n\.?`,
+    "bsn",
+    "msn",
+    "np",
+    "rd",
+    "dds",
+    "dmd",
+    "dvm",
+    "pharmd",
+    "lcsw",
+    "frcs",
+    "mrcp",
+  ]),
+  /**
+   * Two-letter codes of states and provinces, written in capitals after a city ("New York, NY").
+   * A name cut from one of these is a place, unless the code is also a credential the
+   * `postNominals` list ("MD"). Matched whole and case-sensitively.
+   */
+  regionCodes: wordList("regionCodes").default(
+    (
+      "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ " +
+      "NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY " +
+      "AB BC MB NB NL NS NT NU ON PE QC SK YT"
+    ).split(" "),
+  ),
+  /** Words that say how or where a role is worked rather than for whom: "Remote", "Hybrid". */
+  workplaceWords: wordList("workplaceWords").default([
+    "remote",
+    "hybrid",
+    "on-?site",
+    "in-office",
+    "work from home",
+    "wfh",
   ]),
   /**
    * Lowercase words a capitalised heading may join its words with: "Skills and Tools". Any other

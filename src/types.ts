@@ -62,6 +62,10 @@ export type AtsReport = {
   jobMatchScore: number | null;
   matchedKeywords: string[];
   missingKeywords: string[];
+  /**
+   * Evidence of every failed check that stops an ATS reading the document: the parse checks, and
+   * the format checks on how the text extracts (columns, tables, letter spacing).
+   */
   parsingWarnings: string[];
   strengths: string[];
   failedChecks: AtsRuleResult[];

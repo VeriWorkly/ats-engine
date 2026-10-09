@@ -1,0 +1,62 @@
+name: ATS resume check
+description: Score a resume the way an applicant tracking system reads it, with a deterministic, published rubric.
+author: VeriWorkly
+branding:
+  icon: check-circle
+  color: blue
+
+inputs:
+  resume:
+    description: Path to the resume (.pdf, .docx, .html, .txt, .md, or a .json resume document).
+    required: true
+  job:
+    description: Optional path to a job posting (.txt, .pdf, .docx, or a saved .html page) to match against.
+    required: false
+    default: ""
+  min-score:
+    description: Fail the step when the readiness score is below this number (0-100). Empty means never fail on the score.
+    required: false
+    default: ""
+  region:
+    description: Read the resume as from this country (for example US, DE, IN). Empty means inferred.
+    required: false
+    default: ""
+  version:
+    description: Version of @veriworkly/ats-engine to run. Defaults to the engine release this action ships with, so a later release cannot change your score until you move to it.
+    required: false
+    default: "0.1.1"
+  summary:
+    description: Write the report to the job summary.
+    required: false
+    default: "true"
+
+outputs:
+  score:
+    description: Readiness score, 0-100.
+    value: ${{ steps.check.outputs.score }}
+  job-match:
+    description: Job match score, 0-100, or empty without a job.
+    value: ${{ steps.check.outputs.job-match }}
+  failed-checks:
+    description: Failed checks as a JSON array of { id, severity, evidence, fix }.
+    value: ${{ steps.check.outputs.failed-checks }}
+  report:
+    description: Path to the full JSON report.
+    value: ${{ steps.check.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      # Inputs reach the script as environment variables, never pasted into the command line,
+      # so a file name cannot inject shell code.
+      env:
+        ATS_RESUME: ${{ inputs.resume }}
+        ATS_JOB: ${{ inputs.job }}
+        ATS_MIN_SCORE: ${{ inputs.min-score }}
+        ATS_REGION: ${{ inputs.region }}
+        ATS_VERSION: ${{ inputs.version }}
+        ATS_SUMMARY: ${{ inputs.summary }}
+        NO_COLOR: "1"
+      run: node "$GITHUB_ACTION_PATH/run.mjs"

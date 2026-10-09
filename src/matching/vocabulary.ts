@@ -29,7 +29,8 @@ export function canonicalize(raw: string, km: AtsEnginePolicy["keywordMatch"], v
 /** The policy's term maps, folded once per policy (see `memo`). */
 export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocabulary => {
   const stopwords = new Set<string>();
-  for (const word of km.stopwords) {
+  // A number word ("five years") is part of a years ask, never a keyword of its own.
+  for (const word of [...km.stopwords, ...Object.keys(km.numberWords)]) {
     stopwords.add(word);
     stopwords.add(stem(word, km.stemming));
   }
@@ -122,10 +123,25 @@ export function extractVocabulary(
   const tokenRe = new RegExp(VOCABULARY_TOKEN.source, "gu");
   let match: RegExpExecArray | null;
 
+  // Offsets in `lower` are offsets in `text` only when lower-casing kept the length.
+  const sameOffsets = lower.length === text.length;
+
   while ((match = tokenRe.exec(lower))) {
     if (claimed[match.index]) continue;
     const raw = match[0].replace(/(?<![./])[./]+$/, "");
     if (!raw || vocab.stopwords.has(raw) || vocab.stopwords.has(stem(raw, km.stemming))) continue;
+
+    // A word of one or two letters is a skill only as one is written: with a capital ("R",
+    // "Go", "AI"), and a single letter not followed by a full stop, which makes it an initial
+    // ("Jane R. Doe"). Lower case it is ordinary prose: "I go to every meeting". Letters
+    // without case (most scripts besides Latin, Greek and Cyrillic) carry no such signal.
+    let shortSkill = false;
+    if (raw.length <= 2 && /^\p{L}+$/u.test(raw) && raw.toUpperCase() !== raw && sameOffsets) {
+      const written = text.slice(match.index, match.index + raw.length);
+      if (written === raw) continue;
+      if (raw.length === 1 && match[0].endsWith(".")) continue;
+      shortSkill = true;
+    }
 
     const mapped = own(km.synonyms, raw) ?? raw;
     if (mapped.includes(" ")) {
@@ -133,7 +149,8 @@ export function extractVocabulary(
       continue;
     }
     const token = stem(mapped, km.stemming);
-    if (!map.has(token)) map.set(token, { token, label: raw, skill: vocab.skillTokens.has(token) });
+    if (!map.has(token))
+      map.set(token, { token, label: raw, skill: shortSkill || vocab.skillTokens.has(token) });
   }
 
   return map;
@@ -171,16 +188,20 @@ export function properNounTokens(originalText: string, nounsCapitalized = false)
     const token = match[0];
     const acronym = /^[\p{Lu}\p{N}+#.]{2,6}$/u.test(token);
     const innerCapital = /\p{Ll}\p{Lu}/u.test(token);
-    let capitalised = false;
-    if (!nounsCapitalized && /^\p{Lu}/u.test(token)) {
-      // Back past spaces and list markers to the previous sentence boundary or line break, so
-      // an indented bullet ("      - Proficient") still opens a sentence.
-      const before = originalText.slice(Math.max(0, match.index - 40), match.index);
-      capitalised = !/(?:^|[.!?:\n])[^\p{L}\p{N}]*$/u.test(before);
-    }
+    const capitalised =
+      !nounsCapitalized && /^\p{Lu}/u.test(token) && !opensSentence(originalText, match.index);
 
     if (acronym || innerCapital || capitalised)
       proper.add(token.toLowerCase().replace(/(?<![./])[./]+$/, ""));
   }
   return proper;
+}
+
+/**
+ * Whether the word at `index` opens a sentence or a line. Backs past spaces and list markers to
+ * the previous sentence boundary or line break, so an indented bullet ("      - Proficient")
+ * still opens a sentence. Reads at most 40 characters back.
+ */
+export function opensSentence(text: string, index: number) {
+  return /(?:^|[.!?:\n])[^\p{L}\p{N}]*$/u.test(text.slice(Math.max(0, index - 40), index));
 }

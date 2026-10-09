@@ -103,23 +103,27 @@
     "SECURITY.md",
     "NOTICE"
   ],
+  "workspaces": [
+    ".",
+    "packages/*"
+  ],
   "scripts": {
-    "build": "npm run clean && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json",
+    "build": "npm run clean && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json && npm run build -w packages/mcp",
     "dev": "tsc -p tsconfig.node.json --watch",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "typecheck": "tsc --noEmit -p tests/tsconfig.json",
-    "lint": "eslint . && prettier --check src tests scripts bench",
-    "format": "prettier --write src tests scripts bench",
+    "typecheck": "tsc --noEmit -p tests/tsconfig.json && tsc --noEmit -p packages/mcp/tests/tsconfig.json",
+    "lint": "eslint . && prettier --check src tests scripts bench packages/mcp action",
+    "format": "prettier --write src tests scripts bench packages/mcp action",
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "size": "node scripts/size.mjs",
     "smoke": "node scripts/smoke.mjs",
     "bench": "node --import tsx bench/run.ts",
-    "check": "npm run build && npm run typecheck && npm run lint && npm test && npm run size && npm run smoke && npm pack --dry-run",
-    "eval:live": "vitest run tests/ai-eval.live.test.ts",
-    "rubric": "vitest run tests/rubric.test.ts -u",
+    "check": "npm run build && npm run typecheck && npm run lint && npm test && npm run size && npm run smoke && npm pack --dry-run && npm pack --dry-run -w packages/mcp",
+    "eval:live": "vitest run tests/ai/eval.live.test.ts",
+    "rubric": "vitest run tests/scoring/rubric.test.ts -u",
     "changeset": "changeset",
-    "version-packages": "changeset version && node scripts/sync-version.mjs && npm run rubric",
+    "version-packages": "changeset version && node scripts/sync-version.mjs && npm install --package-lock-only --ignore-scripts && npm run rubric",
     "release": "npm run check && changeset publish"
   },
   "dependencies": {

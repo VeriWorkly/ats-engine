@@ -1,0 +1,86 @@
+name: Bug report
+description: A crash, an error, or the CLI, the API or an AI provider behaving differently from the docs.
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If a resume was parsed or scored wrongly, use **Resume read wrong** instead. Do not paste API keys or anyone's real resume.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: Include the full error message and stack trace if there is one. `DEBUG=1` makes the CLI print the stack.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce it
+      description: The command you ran, or the smallest code that shows the problem.
+      render: ts
+      placeholder: |
+        import { AtsScoringService, DEFAULT_POLICY } from "@veriworkly/ats-engine";
+
+        AtsScoringService.check("...", DEFAULT_POLICY);
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Part of the package
+      options:
+        - Scoring or parsing (@veriworkly/ats-engine)
+        - PDF or DOCX extraction (/node)
+        - Job postings (/job)
+        - Languages and regions (/locales)
+        - AI tasks or a provider adapter (/ai)
+        - CLI
+        - Types, exports or packaging
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: provider
+    attributes:
+      label: AI provider and model
+      description: Only for AI problems.
+      placeholder: gemini, through openAiCompatible, model gemini-...
+
+  - type: input
+    id: version
+    attributes:
+      label: Engine version
+      description: Run `npx @veriworkly/ats-engine --version`, or read `ENGINE_VERSION`.
+      placeholder: "0.1.2"
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Node version and OS, or the browser or edge runtime.
+      placeholder: Node 22.16 on Windows 11
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before you submit
+      options:
+        - label: This issue contains no API keys and no real person's personal details.
+          required: true

@@ -52,12 +52,14 @@ type Cell = {
  * seconds — on a page whose size the file's author chooses. Each cell keeps the shapes that
  * cover it whole (answered by order alone) apart from those that only overlap it (checked
  * exactly), so a run meets only the shapes near it. The grid spans every run's centre as well as
- * the page, so a point is never clamped into a cell it is not in.
+ * the page, so a point is never clamped into a cell it is not in. `budget` is the exact point
+ * checks allowed before it throws; tests lower it to reach the limit in milliseconds.
  */
 export function indexDrawn(
   drawn: readonly Drawn[],
   points: ReadonlyArray<[number, number]>,
   pageBox: Box,
+  budget = MAX_POINT_CHECKS,
 ): (point: [number, number], order: number) => Surroundings {
   let [ax0, ay0, ax1, ay1] = pageBox;
   for (const [x, y] of points)
@@ -122,7 +124,7 @@ export function indexDrawn(
     let covered = cell.lastOpaqueFull > order;
 
     checks += cell.partial.length;
-    if (checks > MAX_POINT_CHECKS) throw new Error("Too much drawn in one place to measure.");
+    if (checks > budget) throw new Error("Too much drawn in one place to measure.");
     for (const item of cell.partial) {
       if (!contains(item.box, point)) continue;
       if (item.order < order) {

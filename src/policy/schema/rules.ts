@@ -6,6 +6,12 @@ import { checkPatternWithFlags, regexFlags, regexString } from "../primitives.js
 const bandSchema = z.object({
   upTo: z.number().nullable(),
   weight: z.number().nonnegative(),
+  /**
+   * What a result in this band says and how to fix it, in place of the rule's own. For a rule
+   * that fails on both sides — too short and too long — whose advice points opposite ways.
+   */
+  failEvidence: z.string().min(1).optional(),
+  fix: z.string().min(1).optional(),
 });
 
 const bandsSchema = z

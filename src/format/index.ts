@@ -12,8 +12,12 @@ import { own } from "../util/own.js";
 
 export type AtsScoreTone = "good" | "warn" | "bad";
 
-/** Lower bounds of the display bands. Presentation only — the verdict has its own thresholds. */
-export const SCORE_BANDS = { good: 80, warn: 55 } as const;
+/**
+ * Lower bounds of the display bands: the verdict's own (`VERDICT_BANDS` in the main entry), so a
+ * score labelled "good" here is one the verdict calls "strong". Copied rather than imported to keep
+ * `/format` free of dependencies; `tests/format.test.ts` holds the two equal.
+ */
+export const SCORE_BANDS = { good: 75, warn: 45 } as const;
 
 export function scoreTone(score: number): AtsScoreTone {
   if (score >= SCORE_BANDS.good) return "good";
@@ -62,7 +66,9 @@ const MONTH_LABELS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" "
 /** "Mar 2021", or "2021" when only the year is known, or `null` when there is no date. */
 export function formatParsedDate(date: AtsParsedDate | null): string | null {
   if (!date) return null;
-  return date.month ? `${MONTH_LABELS[date.month - 1]} ${date.year}` : String(date.year);
+  // A month outside 1–12 (from hand-built input) reads as the year alone, never "undefined 2021".
+  const month = date.month ? MONTH_LABELS[date.month - 1] : undefined;
+  return month ? `${month} ${date.year}` : String(date.year);
 }
 
 /** "Mar 2021 – Present", "2018 – 2020", or `null` when the role has no start. */
@@ -73,10 +79,11 @@ export function formatRoleDates(role: Pick<AtsParsedRole, "start" | "end" | "cur
   return `${from} – ${to}`;
 }
 
-/** "3 yr 2 mo", "3 yr", "7 mo". */
+/** "3 yr 2 mo", "3 yr", "7 mo". Whole months; anything not a positive number reads as "0 mo". */
 export function formatTenure(months: number): string {
-  const years = Math.floor(months / 12);
-  const rest = months % 12;
+  const whole = Number.isFinite(months) && months > 0 ? Math.round(months) : 0;
+  const years = Math.floor(whole / 12);
+  const rest = whole % 12;
   if (!years) return `${rest} mo`;
   return rest ? `${years} yr ${rest} mo` : `${years} yr`;
 }
@@ -121,3 +128,24 @@ export const ISCED_LABELS: Readonly<Record<AtsIscedLevel, string>> = {
   7: "Master's or equivalent",
   8: "Doctorate",
 };
+
+/**
+ * Control characters, which text from a resume, a posting or a model can carry: an escape
+ * sequence printed raw recolours the terminal, clears it, or sets its title. Line breaks and tabs
+ * stay.
+ */
+const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g; // eslint-disable-line no-control-regex
+
+/**
+ * Every string in `value`, at any depth, made safe to print in a terminal: control characters
+ * removed. JSON escapes C0 controls but not C1 (U+0080–U+009F), which a terminal still acts on.
+ */
+export function printable<T>(value: T): T {
+  if (typeof value === "string") return value.replace(CONTROLS, "") as T;
+  if (Array.isArray(value)) return value.map(printable) as T;
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([key, child]) => [key, printable(child)]),
+    ) as T;
+  return value;
+}

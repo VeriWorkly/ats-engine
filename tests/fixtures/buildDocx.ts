@@ -91,3 +91,54 @@ export function buildDocxBody(
 export function documentXml(body: string): string {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}</w:body></w:document>`;
 }
+
+/** A header (`hdr`) or footer (`ftr`) part around raw body XML, e.g. `word/header1.xml`. */
+export function marginXml(root: "hdr" | "ftr", body: string): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:${root} xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${body}</w:${root}>`;
+}
+
+/**
+ * A relationships part, e.g. `word/_rels/document.xml.rels`: `[id, type, target]`, the type
+ * short ("hyperlink", "aFChunk", "styles") under the officeDocument relationships namespace.
+ */
+export function relationshipsXml(entries: Array<[id: string, type: string, target: string]>) {
+  const items = entries
+    .map(
+      ([id, type, target]) =>
+        `<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/${type}" Target="${escapeXml(target)}"${type === "hyperlink" ? ' TargetMode="External"' : ""}/>`,
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${items}</Relationships>`;
+}
+
+const NAMESPACES = [
+  'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"',
+  'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',
+  'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"',
+  'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"',
+  'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"',
+  'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"',
+].join(" ");
+
+/**
+ * A document whose body may use relationships (`r:id`: links, embedded chunks) and drawings,
+ * with `extra` archive entries beside it — its relationships part, headers, styles.
+ */
+export function buildRichDocx(
+  body: string,
+  extra: Array<[name: string, content: string | Buffer]> = [],
+  deflate = true,
+): Buffer {
+  return zip(
+    [
+      ["[Content_Types].xml", CONTENT_TYPES],
+      ["_rels/.rels", RELS],
+      [
+        "word/document.xml",
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NAMESPACES}><w:body>${body}</w:body></w:document>`,
+      ],
+      ...extra,
+    ],
+    deflate,
+  );
+}

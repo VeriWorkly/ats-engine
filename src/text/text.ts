@@ -80,9 +80,13 @@ export function normalizeText(text: string) {
   return stripHiddenCharacters(text.normalize("NFKC").replace(/\p{Nd}/gu, asciiDigit));
 }
 
-/** The words a length or density check counts: three or more characters, starting with a letter. */
+/**
+ * The words a length check counts, lower-cased: every run starting with a letter or a digit, as
+ * a word processor counts them. "a", "of", "9" and "NY" are words; a bullet glyph or a "|" is
+ * not. Counting only runs of three letters or more read a 270-word resume as 198.
+ */
 export function words(text: string) {
-  return text.toLowerCase().match(/\p{L}[\p{L}\p{M}\p{N}+#.-]{2,}/gu) ?? [];
+  return text.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}+#.'’-]*/gu) ?? [];
 }
 
 /**
@@ -113,8 +117,22 @@ export function stem(word: string, rules: readonly StemRule[]): string {
   return word;
 }
 
+/**
+ * Fills `{key}` with `values[key]`. `{key|one|other}` agrees with a number: "one" when the value
+ * is 1, "other" otherwise, so "{n} {n|role was|roles were} found" reads right for any count.
+ */
 export function formatTemplate(template: string, values: Record<string, string | number>) {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    key in values ? String(values[key]) : match,
+  return template.replace(
+    /\{(\w+)(?:\|([^{}|]*)\|([^{}|]*))?\}/g,
+    (match, key: string, one?: string, other?: string) => {
+      if (!(key in values)) return match;
+      if (one === undefined) return String(values[key]);
+      return Number(values[key]) === 1 ? one : (other ?? "");
+    },
   );
+}
+
+/** A template as published, every `{key|one|other}` read in its plural: "{n} roles were found". */
+export function pluralTemplate(template: string) {
+  return template.replace(/\{\w+\|[^{}|]*\|([^{}|]*)\}/g, "$1");
 }

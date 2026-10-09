@@ -441,6 +441,9 @@ const relationshipsOf = (path: string) => {
   return joinPath(dirname!, "_rels", `${basename}.rels`);
 };
 
+/** A page header or footer part, which `mammoth` does not read and `docxMargins` does. */
+const HEADER_OR_FOOTER = /^word\/(?:header|footer)\d*\.xml$/;
+
 /**
  * The parts `mammoth` 1.x's `docx-reader` reads, and how many times it reads each: its main
  * document — the package's `officeDocument` relationship, else `word/document.xml` — that
@@ -467,18 +470,26 @@ function mammothParts(files: Map<string, ZipEntry>) {
   const packageRelationships = relationships("_rels/.rels");
   if (!packageRelationships) return null;
   const main = find(packageRelationships, "officeDocument", "", "word/document.xml");
-  if (!exists(main)) return { main, reads };
+  if (!exists(main)) return { main, reads, styles: null, chunks: [] };
   const related = relationships(relationshipsOf(main));
   if (!related) return null;
   const [base] = splitPath(main);
   const part = (name: string) => find(related, name, base!, `word/${name}.xml`);
-  read(part("styles"));
+  const styles = part("styles");
+  read(styles);
   read(part("numbering"));
   for (const path of [...["footnotes", "endnotes", "comments"].map(part), main]) {
     read(relationshipsOf(path));
     read(path);
   }
-  return { main, reads };
+  // Content a web builder embeds whole (`w:altChunk`) — HTML, usually as MHT — which `mammoth`
+  // does not read: what this reads instead.
+  const chunks = (related.get(`${RELATIONSHIP_TYPE}aFChunk`) ?? [])
+    .map((target) => joinPath(base!, target).replace(/^\//, ""))
+    .filter(exists);
+  for (const chunk of chunks) read(chunk);
+  for (const key of files.keys()) if (HEADER_OR_FOOTER.test(key)) read(key);
+  return { main, reads, styles: exists(styles) ? styles : null, chunks };
 }
 
 /**
@@ -569,6 +580,8 @@ const PHOTO_MIN_POINTS = 50;
 export type DocxMeasure = {
   hiddenChars: number;
   hiddenSample: string;
+  /** All of the hidden text, in document order, to `MAX_HIDDEN_TEXT` characters. */
+  hiddenText: string;
   /** Tables in the body, nested ones included: Word layouts built from tables extract out of order. */
   tableCount: number;
   /** Pictures printed at least 50pt a side — a photo, as for a PDF. */
@@ -623,28 +636,87 @@ type OpenTable = {
 const underTable = (table: OpenTable | undefined): string | null | undefined =>
   table && (table.cell ?? table.fill ?? (table.styled ? null : table.outer));
 
-export function measureDocx(data: Uint8Array): DocxMeasure | null {
-  // The main document `mammoth` extracts, wherever the package's relationships put it.
-  const files = zipFiles(data);
-  const parts = files && mammothParts(files);
-  const entry = parts && files.get(parts.main);
-  const content = entry && !entry.dir ? inflate(entry, MAX_XML_BYTES) : null;
-  if (!content?.length) return null;
-  const xml = withoutMarkup(content.toString("utf8"));
+/** What `measureDocx` throws for a main document too large to measure. */
+export const UNMEASURABLE_DOCX = `The document's text expands to more than ${MAX_XML_BYTES / 1024 / 1024} MB; it is not a resume.`;
 
-  const tableCount = xml.match(/<w:tbl>|<w:tbl\s/g)?.length ?? 0;
-  const imageCount = [...xml.matchAll(EXTENT)].filter(([, attrs]) =>
-    [/\bcx=["'](\d+)["']/, /\bcy=["'](\d+)["']/].every(
-      (size) => Number(size.exec(attrs)?.[1] ?? 0) / EMU_PER_POINT >= PHOTO_MIN_POINTS,
-    ),
-  ).length;
+/** The most hidden text kept whole, in characters. */
+export const MAX_HIDDEN_TEXT = 5_000;
 
-  // The page colour, when the document sets one and shows it.
-  const page = /<w:background\b[^<>]*w:color=["']([0-9A-Fa-f]{6})["']/.exec(xml)?.[1] ?? "FFFFFF";
-  // A shape anchored behind the text — a Word template's dark sidebar or header band — lies
-  // under text this cannot place, so text on the bare page no longer has a known background.
-  const behindText = /<wp:anchor\b[^<>]*\bbehindDoc=["'](?:1|true|on)["']/.test(xml);
+/** XML text with its entity references decoded, as a parser gives it. */
+const xmlText = (text: string) =>
+  text.replace(/&#?\w+;/g, (reference) => entity(reference) ?? reference);
 
+/**
+ * The shading each paragraph style gives the paragraphs that name it: a hex colour, `null` for
+ * none, or "" where its pattern leaves it unknown. Followed through `w:basedOn` (ten steps at
+ * most). A style the part does not define is no style — Word gives its paragraph the defaults —
+ * so it adds no shading. `xml` null: the part could not be read, and every style is unknown.
+ */
+function styleShading(xml: string | null): (id: string | null) => string | null {
+  const styles = new Map<string, { shd: string | null | undefined; basedOn: string | null }>();
+  for (let at = xml?.indexOf("<w:style ") ?? -1; xml && at >= 0;) {
+    // A style written `<w:style …/>` is empty: what follows is the next style's.
+    const open = xml.indexOf(">", at);
+    const end = xml[open - 1] === "/" ? open + 1 : xml.indexOf("</w:style>", at);
+    if (open < 0 || end < 0) break;
+    const style = xml.slice(at, end);
+    const id = attr(/^<w:style\b([^<>]*)>/.exec(style)?.[1] ?? "", "styleId");
+    const shd = /<w:shd\b([^<>]*)>/.exec(style);
+    const basedOn = /<w:basedOn\b([^<>]*)>/.exec(style);
+    if (id)
+      styles.set(id, {
+        shd: shd ? shading(shd[1]!) : undefined,
+        basedOn: basedOn ? attr(basedOn[1]!, "val") : null,
+      });
+    at = xml.indexOf("<w:style ", end);
+  }
+  return (id) => {
+    if (xml === null) return "";
+    for (let step = 0; id !== null && step < 10; step += 1) {
+      const style = styles.get(id);
+      if (!style) return null;
+      if (style.shd !== undefined) return style.shd;
+      id = style.basedOn;
+    }
+    // A chain that loops (A based on B based on A) or runs on past ten steps names no shading
+    // Word would show: the page shows.
+    return null;
+  };
+}
+
+/**
+ * A part's content, or null where it is damaged — which `mammoth` refuses on its own. Throws
+ * `UNMEASURABLE_DOCX` where it expands past what this reads.
+ */
+function inflatePart(entry: ZipEntry): Buffer | null {
+  const content = inflate(entry, MAX_XML_BYTES);
+  if (content) return content;
+  let large = entry.body.length > MAX_XML_BYTES;
+  if (entry.method === 8)
+    try {
+      inflateRawSync(entry.body, { maxOutputLength: MAX_XML_BYTES });
+    } catch (error) {
+      large = (error as { code?: unknown }).code === "ERR_BUFFER_TOO_LARGE";
+    }
+  if (large) throw new Error(UNMEASURABLE_DOCX);
+  return null;
+}
+
+/** What a part's runs say: the text of its hidden ones, and its paragraphs' text without the
+ * runs marked hidden (`w:vanish`), a tab, break or carriage return each as a tab or line break. */
+type PartRuns = { hidden: string[]; lines: string[] };
+
+/**
+ * Reads the runs of one part — the main document, a header, a footer — for those a reader of
+ * the page cannot see. `page` is the page colour and `behindText` whether a shape lies behind
+ * the text, both from the main document.
+ */
+function scanRuns(
+  xml: string,
+  paragraphStyle: (id: string | null) => string | null,
+  page: string,
+  behindText: boolean,
+): PartRuns {
   // One entry per open table: whether it names a table style, whose shading this does not read,
   // the shading its own properties give every cell, and the shading of its current cell. Kept per
   // table, not once: a table nested in a cell closes back into that cell, and a cell of its own
@@ -653,6 +725,8 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
   // background in constant time however deep the nesting.
   const tables: OpenTable[] = [];
   let paragraphFill: string | null = null;
+  // The shading of the paragraph style the paragraph names: a heading band is often given one.
+  let styleFill: string | null = null;
   let inTextBox = 0;
   // The tracked formatting change (`w:rPrChange`, `w:pPrChange`, `w:tcPrChange`, …) being read:
   // the properties there are what the text looked like before the change, not what it looks
@@ -669,7 +743,9 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
   let inText = false;
   let textStart = 0;
   let runText = "";
+  let line = "";
   const hidden: string[] = [];
+  const lines: string[] = [];
 
   for (const match of xml.matchAll(TAG)) {
     const [, closing, tag, attrs, selfClosing] = match;
@@ -693,7 +769,12 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
       else tables.pop();
     } else if (tag === "w:tblStyle" && tables.length) tables[tables.length - 1].styled = true;
     else if (tag === "w:tc" && open && tables.length) tables[tables.length - 1].cell = null;
-    else if (tag === "w:p" && open && !selfClosing) paragraphFill = null;
+    else if (tag === "w:p" && open && !selfClosing) paragraphFill = styleFill = null;
+    else if (tag === "w:p" && closing) {
+      lines.push(line);
+      line = "";
+    } else if (tag === "w:pStyle" && where === "paragraph")
+      styleFill = paragraphStyle(attr(attrs, "val"));
     else if (tag === "w:tblPr") where = open && !selfClosing ? "table" : null;
     else if (tag === "w:tcPr") where = open && !selfClosing ? "cell" : null;
     else if (tag === "w:pPr") where = open && !selfClosing ? "paragraph" : null;
@@ -727,6 +808,7 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
       const background =
         run.fill ??
         paragraphFill ??
+        styleFill ??
         (underCell === undefined ? (behindText ? null : page) : underCell);
       const whiteOnWhite =
         !inTextBox &&
@@ -736,6 +818,7 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
         nearWhite(background);
       const tiny = run.size !== null && run.size < 4;
       if (runText.trim() && (run.vanish || tiny || whiteOnWhite)) hidden.push(runText);
+      if (!run.vanish) line += runText;
       run = null;
     } else if (run && where === "run") {
       if (tag === "w:vanish") run.vanish = !/^(?:0|false|off)$/.test(attr(attrs, "val") ?? "");
@@ -744,18 +827,136 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
     } else if (tag === "w:t" && open && !selfClosing) {
       inText = true;
       textStart = match.index + match[0].length;
-    }
+    } else if (run && open && (tag === "w:tab" || tag === "w:br" || tag === "w:cr"))
+      runText += tag === "w:tab" ? "\t" : "\n";
+  }
+  return { hidden, lines };
+}
+
+/** The parts holding a DOCX's page headers and footers, by name. */
+const marginParts = (files: Map<string, ZipEntry>) =>
+  [...files]
+    .filter(([key, entry]) => HEADER_OR_FOOTER.test(key) && !entry.dir)
+    .sort(([a], [b]) => (a < b ? -1 : 1));
+
+/**
+ * Hidden runs, tables and pictures in a DOCX's main document, or null when it has none to read.
+ * The runs of its page headers and footers are judged too: an ATS reads them as well. Throws
+ * `UNMEASURABLE_DOCX` when the document or its styles are there but expand past what this reads:
+ * its text would still reach an ATS — padded past the limit with an XML comment — while every
+ * rule that depends on these measures silently dropped out of the report.
+ */
+export function measureDocx(data: Uint8Array): DocxMeasure | null {
+  // The main document `mammoth` extracts, wherever the package's relationships put it.
+  const files = zipFiles(data);
+  const parts = files && mammothParts(files);
+  const entry = parts && files.get(parts.main);
+  if (!entry || entry.dir) return null;
+  const content = inflatePart(entry);
+  if (!content?.length) return null;
+  const xml = withoutMarkup(content.toString("utf8"));
+  const stylesEntry = parts.styles ? files.get(parts.styles) : undefined;
+  const styles = stylesEntry && inflatePart(stylesEntry);
+  const paragraphStyle = styleShading(
+    styles ? withoutMarkup(styles.toString("utf8")) : stylesEntry ? null : "",
+  );
+
+  const tableCount = xml.match(/<w:tbl>|<w:tbl\s/g)?.length ?? 0;
+  // Pictures, not every drawing: a text box or a shape has an extent too, and a skills text box
+  // was reported as a photo.
+  let imageCount = 0;
+  for (let at = xml.indexOf("<w:drawing"); at >= 0;) {
+    const end = xml.indexOf("</w:drawing>", at);
+    const drawing = xml.slice(at, end < 0 ? xml.length : end);
+    if (
+      /<(?:pic:pic|a:blip)\b/.test(drawing) &&
+      [...drawing.matchAll(EXTENT)].some(([, attrs]) =>
+        [/\bcx=["'](\d+)["']/, /\bcy=["'](\d+)["']/].every(
+          (size) => Number(size.exec(attrs!)?.[1] ?? 0) / EMU_PER_POINT >= PHOTO_MIN_POINTS,
+        ),
+      )
+    )
+      imageCount += 1;
+    at = end < 0 ? -1 : xml.indexOf("<w:drawing", end);
   }
 
-  const text = hidden.join(" ").replace(/\s+/g, " ").trim();
-  const decoded = text.replace(
-    /&(amp|lt|gt|quot|apos);/g,
-    (_, entity: string) => ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" })[entity]!,
-  );
+  // The page colour, when the document sets one and shows it.
+  const page = /<w:background\b[^<>]*w:color=["']([0-9A-Fa-f]{6})["']/.exec(xml)?.[1] ?? "FFFFFF";
+  // A shape anchored behind the text — a Word template's dark sidebar or header band — lies
+  // under text this cannot place, so text on the bare page no longer has a known background.
+  const behindText = /<wp:anchor\b[^<>]*\bbehindDoc=["'](?:1|true|on)["']/.test(xml);
+
+  const hidden = scanRuns(xml, paragraphStyle, page, behindText).hidden;
+  // A header's banner — a shape or picture behind its text, as Word's templates draw them — is
+  // a background this cannot read: white text on the bare page of a part that draws one is not
+  // judged.
+  for (const [, margin] of marginParts(files)) {
+    const part = inflate(margin, MAX_XML_BYTES);
+    if (!part) continue;
+    const content = withoutMarkup(part.toString("utf8"));
+    const drawn = behindText || /<w:(?:drawing|pict)\b/.test(content);
+    for (const run of scanRuns(content, paragraphStyle, page, drawn).hidden) hidden.push(run);
+  }
+
+  const decoded = xmlText(hidden.join(" ").replace(/\s+/g, " ").trim());
   return {
+    hiddenText: decoded.slice(0, MAX_HIDDEN_TEXT),
     hiddenChars: decoded.replace(/\s/g, "").length,
     hiddenSample: decoded.slice(0, 80),
     tableCount,
     imageCount,
   };
+}
+
+/**
+ * The text of a DOCX's page headers and footers, one line per paragraph or line break, each line
+ * once: what `mammoth` leaves out. Contact details often sit in the header, and an ATS that reads
+ * headers finds them there. Page numbers, and runs marked hidden, are left out.
+ */
+export function docxMargins(data: Uint8Array): { header: string; footer: string } {
+  const lines = { header: new Set<string>(), footer: new Set<string>() };
+  for (const [key, entry] of marginParts(zipFiles(data) ?? new Map())) {
+    const content = inflate(entry, MAX_XML_BYTES);
+    if (!content) continue;
+    const { lines: paragraphs } = scanRuns(
+      withoutMarkup(content.toString("utf8")),
+      () => null,
+      "FFFFFF",
+      false,
+    );
+    for (const paragraph of paragraphs)
+      for (let line of xmlText(paragraph).split("\n")) {
+        line = line.trim();
+        if (line && !/^\d+$/.test(line))
+          lines[key.includes("header") ? "header" : "footer"].add(line);
+      }
+  }
+  return { header: [...lines.header].join("\n"), footer: [...lines.footer].join("\n") };
+}
+
+/**
+ * The HTML a DOCX embeds whole (`w:altChunk`), as html-docx-js and many web resume builders
+ * write it: the document then holds no paragraphs of its own, and `mammoth` read it as empty.
+ * An MHT chunk — the form html-docx-js writes — is read from its `<html` to its `</html>`,
+ * quoted-printable decoded when it says so; RTF and other chunks are left out.
+ */
+export function docxChunks(data: Uint8Array): string[] {
+  const files = zipFiles(data);
+  const parts = files && mammothParts(files);
+  return (parts?.chunks ?? []).flatMap((chunk) => {
+    let content = inflate(files!.get(chunk)!, MAX_XML_BYTES)?.toString("latin1") ?? "";
+    if (/^MIME-Version:[^]*quoted-printable/i.test(content.slice(0, 2_000)))
+      content = content
+        .replace(/=\r?\n/g, "")
+        .replace(/=([0-9A-F]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+    const start = content.search(/<html\b/i);
+    const end = content.lastIndexOf("</html>");
+    return start < 0
+      ? []
+      : [
+          Buffer.from(content.slice(start, end < 0 ? undefined : end + 7), "latin1").toString(
+            "utf8",
+          ),
+        ];
+  });
 }

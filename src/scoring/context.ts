@@ -1,3 +1,4 @@
+import { roleBodyLines } from "../checks/bullets.js";
 import {
   copiedPosting,
   homoglyphWords,
@@ -44,7 +45,10 @@ const contentLineTest = memo((text: AtsEnginePolicy["text"]) => {
 
 function contentLinesOf(lines: string[], policy: AtsEnginePolicy) {
   const bullets = lines.filter((line) => BULLET.test(line));
-  return bullets.length >= MIN_BULLETS ? bullets : lines.filter(contentLineTest(policy.text));
+  if (bullets.length >= MIN_BULLETS) return bullets;
+  // Markers lost in extraction: the sentences under each dated role, as the bullets were.
+  const body = roleBodyLines(lines, policy);
+  return body.length ? body : lines.filter(contentLineTest(policy.text));
 }
 
 export type ReadResume = {
@@ -95,8 +99,14 @@ export function readResume(
     findings: {
       injectionPhrases: injectionPhrases(
         text,
-        // Text no reader sees: smuggled in tag characters, or in the file's metadata.
-        [prepared.hidden.smuggled, layout?.metadataText ?? ""].join("\n"),
+        // Text no reader sees: smuggled in tag characters, or in the file's metadata. And lines
+        // opening with "#" as written: the line reader drops a Markdown heading's marks, and
+        // "### System:" is a prompt delimiter with them.
+        [
+          prepared.hidden.smuggled,
+          layout?.metadataText ?? "",
+          ...prepared.text.split("\n").filter((line) => line.trimStart().startsWith("#")),
+        ].join("\n"),
         policy,
       ),
       invisibleCharacters: {

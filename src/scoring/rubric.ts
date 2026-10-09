@@ -1,4 +1,5 @@
 import type { AtsEnginePolicy, AtsEngineRule } from "../policy/schema.js";
+import { pluralTemplate } from "../text/text.js";
 import { maxImpactOf } from "./rules.js";
 
 /** One rule of a policy, described for publication. */
@@ -45,7 +46,7 @@ export function policyRubric(policy: AtsEnginePolicy): AtsRubricEntry[] {
     measures: measures(rule),
     points: maxImpactOf(rule),
     deduction: rule.penalty,
-    passes: rule.passEvidence,
+    passes: pluralTemplate(rule.passEvidence),
     fix: rule.fix,
   }));
 }
