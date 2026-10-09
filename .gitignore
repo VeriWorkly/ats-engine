@@ -9,3 +9,5 @@ PLAN.md
 .agents/
 .claude/
 skills-lock.json
+# Local secrets, such as the live AI eval key.
+.env

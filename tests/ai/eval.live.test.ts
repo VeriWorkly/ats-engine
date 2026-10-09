@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -20,12 +21,17 @@ import { evalCases } from "../fixtures/ai-eval-cases.js";
  *                        package defaults, so the eval measures what production actually sends
  *   ATS_EVAL_RUNS        optional, default 3
  *
- *   npm run eval:live -w @veriworkly/ats-engine
+ *   npm run eval:live
+ *
+ * The variables can live in a `.env` file at the repository root (gitignored), which is read
+ * when present; variables already set in the shell win.
  *
  * Prints the report — including every value grounding dropped, which is how to tell a caught
  * fabrication from a suggestion the keyword filter should have kept — and fails on the floors:
  * schema-valid output nearly always, and no injected value ever leaking into a result.
  */
+const dotenv = fileURLToPath(new URL("../../.env", import.meta.url));
+if (existsSync(dotenv)) process.loadEnvFile(dotenv);
 const env = process.env;
 const live = Boolean(env.ATS_EVAL_API_KEY && env.ATS_EVAL_MODEL);
 
