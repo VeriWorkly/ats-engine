@@ -130,7 +130,25 @@ Requirements
     );
     // In a list (Kafka), lowercase elsewhere (snowflake), a policy skill (Terraform implies IaC).
     for (const skill of ["kafka", "snowflake", "terraform"]) expect(keywords).toContain(skill);
-    expect(keywords).not.toContain("talend");
+    // A tool the policy knows by name (proseNames.skills) is no name, prose or not.
+    expect(keywords).toContain("talend");
+  });
+
+  it("keeps a skill spelled like an ordinary capitalised word, named only in prose", () => {
+    const keywords = missing(
+      RESUME,
+      `Backend Engineer
+
+Our backend is written in Rust, and we deploy from the Harbor Point office. The mobile team uses Swift, Kotlin and Flutter; analytics runs on Spark, Django and Rails.
+
+Requirements
+- Backend development
+- Code review
+- On-call rotation`,
+    );
+    for (const skill of ["rust", "swift", "kotlin", "flutter", "spark", "django", "rails"])
+      expect(keywords).toContain(skill);
+    expect(keywords).not.toContain("harbor");
   });
 
   it("drops nothing from a posting that lists nothing: there is no list to compare with", () => {
@@ -153,7 +171,11 @@ Requirements
     expect(missing(RESUME, SOFTWARE, { policy: withLocales(off, BUILT_IN_LOCALES) })).toContain(
       "harbor",
     );
-    expect(DEFAULT_POLICY.keywordMatch.proseNames).toEqual({ enabled: true, minListLines: 3 });
+    expect(DEFAULT_POLICY.keywordMatch.proseNames).toMatchObject({
+      enabled: true,
+      minListLines: 3,
+    });
+    expect(DEFAULT_POLICY.keywordMatch.proseNames.skills).toContain("rust");
   });
 
   it("keeps German nouns, which are capitalised wherever they stand", () => {

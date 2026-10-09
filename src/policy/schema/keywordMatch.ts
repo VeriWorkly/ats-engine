@@ -84,16 +84,48 @@ export const keywordMatchSchema = z
      */
     nounsCapitalized: z.boolean().default(false),
     /**
-     * Leave out a word the posting writes only as a name: always capitalised, at least once
-     * mid-sentence, only in its prose, never in a list, and not in this policy's vocabulary ("At
-     * Freightways, we ship from our Harbor Point depot"). Applies to a posting with at least
-     * `minListLines` list lines (bullets, or lines under a required or preferred heading) to
-     * compare with; never where `nounsCapitalized` holds, and off in a language pack that says so.
+     * Leave out a word the posting writes only as a name: always capitalised, mid-sentence, only
+     * in its prose, never in a list, not in this policy's vocabulary, and written the way a name
+     * is — in a run of capitalised words ("Harbor Point", "Cedar Valley Health") or after one of
+     * `cues` ("At Freightways", "the Sunbelt", "our depot"). "Written in Rust" has no such sign
+     * and keeps its word. `skills` are tools and languages spelled like ordinary words, never
+     * left out even beside a cue ("Apache Spark", "the Rust compiler").
+     *
+     * Applies to a posting with at least `minListLines` list lines (bullets, or lines under a
+     * required or preferred heading) to compare with; never where `nounsCapitalized` holds, and
+     * off in a language pack that says so.
      */
     proseNames: z
       .object({
         enabled: z.boolean().default(true),
         minListLines: z.number().int().positive().default(3),
+        cues: z.array(term).default(["the", "our", "at", "join", "across", "near"]),
+        skills: z.array(term).default(
+          [
+            // Languages
+            "rust swift ruby scala kotlin julia dart elixir haskell erlang clojure groovy " +
+              "perl fortran cobol pascal lua crystal ocaml prolog python java javascript " +
+              "typescript solidity verilog",
+            // Frameworks, libraries and runtimes
+            "spark flutter rails django flask laravel symfony spring angular react vue " +
+              "svelte ember express gatsby remix astro nuxt node deno pandas numpy pytorch " +
+              "tensorflow keras jupyter selenium cypress playwright jest mocha gradle maven " +
+              "webpack vite babel unity unreal",
+            // Data, infrastructure and cloud
+            "hadoop hive kafka airflow flink cassandra redis mongo postgres oracle " +
+              "snowflake databricks elasticsearch kibana grafana prometheus datadog splunk " +
+              "nginx apache tomcat docker kubernetes terraform ansible puppet chef jenkins " +
+              "git linux azure heroku vercel netlify firebase supabase fivetran informatica " +
+              "talend alteryx",
+            // Business, design and clinical tools
+            "excel salesforce hubspot marketo zendesk jira confluence figma sketch " +
+              "photoshop illustrator indesign premiere lightroom canva tableau looker shopify " +
+              "magento wordpress drupal workday netsuite quickbooks xero stripe twilio epic " +
+              "cerner meditech blender maya houdini solidworks autocad revit catia ansys " +
+              "stata minitab matlab simulink labview visio outlook powerpoint airtable notion " +
+              "asana trello slack",
+          ].flatMap((group) => group.split(" ")),
+        ),
       })
       .prefault({}),
     /**
