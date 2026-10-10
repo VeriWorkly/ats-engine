@@ -68,26 +68,33 @@ export const placeWords = (policy: AtsEnginePolicy) => placesOf(policy.resumePar
  * 78701", "Remote", "Boston, MA (Hybrid)", "Berlin, Germany", "Bengaluru, Karnataka, India",
  * "Toronto, ON, Canada", "Remote, India". The policy names countries, states and provinces
  * (`placeNames`) but no cities, so "Acme, Berlin" is not one, and "Acme, Germany" is told from
- * "Berlin, Germany" only by a legal form ("Acme GmbH, Germany") or a job title ("Software
- * Engineer, Germany") in its first part.
+ * "Berlin, Germany" only by a legal form ("Acme GmbH, Germany"), an institution's kind
+ * ("University of Georgia, Georgia") or a job title ("Software Engineer, Germany") in its first
+ * part.
+ *
+ * `named: false` reads only codes and workplace words, never a name: for a line of its own,
+ * which may as well be an employer with its country ("Infosys, India") or an employer named
+ * for a place ("Jordan") as where the role is worked.
  */
-export function isPlace(line: string, policy: AtsEnginePolicy) {
+export function isPlace(line: string, policy: AtsEnginePolicy, named = true) {
   const { code, workplace, name, company } = placesOf(policy.resumeParse);
   const parts = line
     .replace(BULLET_PREFIX, "")
     .split(/[,|·•()\t]|\s{2,}/u)
     .map((part) => part.trim().replace(/\s\d{5}(?:-\d{4})?$/u, ""))
     .filter(Boolean);
-  const where = (part: string) => code.test(part) || name.test(part) || workplace.test(part);
+  const isName = (part: string) => named && name.test(part);
+  const where = (part: string) => code.test(part) || isName(part) || workplace.test(part);
   if (parts.length === 0) return false;
   if (parts.every(where)) return true;
   // "City, ST", "City, State" or "City, Country", then perhaps more of where. A first part
-  // ending in a legal form is an employer ("Acme Corp, TX"), and one holding a job title before
-  // a name is a header ("Software Engineer, India").
+  // ending in a legal form is an employer ("Acme Corp, TX"), and one naming an organisation or
+  // holding a job title before a name is not a city ("Software Engineer, India").
+  const { titleWords, organisation } = matchersOf(policy);
   return (
     parts.length >= 2 &&
     (code.test(parts[1]) ||
-      (name.test(parts[1]) && !matchersOf(policy).titleWords.test(parts[0]))) &&
+      (isName(parts[1]) && !titleWords.test(parts[0]) && !organisation.test(parts[0]))) &&
     parts.slice(2).every(where) &&
     parts[0].split(/\s+/).length <= 3 &&
     !company.test(parts[0])
@@ -339,7 +346,10 @@ export function parseRoles(
     const found = BULLET.test(line) ? null : findDateRange(line, rp, now);
     if (!found) return [];
     const remainder = line.replace(found.matched, " ").replace(duration, " ").trim();
-    const own = lettersIn(remainder) >= 3 && !isPlace(remainder, policy) ? remainder : "";
+    // A country or a state names where only after the dates ("Jan 2020 - Present | Austin,
+    // Texas"); before them, "Infosys, India" is the employer.
+    const after = lettersIn(line.slice(0, line.indexOf(found.matched))) === 0;
+    const own = lettersIn(remainder) >= 3 && !isPlace(remainder, policy, after) ? remainder : "";
     return [{ index, found, own }];
   });
   const ownAt = new Map(anchors.map((anchor) => [anchor.index, anchor.own]));
@@ -358,7 +368,8 @@ export function parseRoles(
   // of the next role, whose dated line, two down, carries none of its own. A place ("Austin,
   // TX") is where the role is worked, not who it is for.
   const halfAt = (at: number, from: number) => {
-    if (!free(at) || opensWithVerb.test(lines[at]) || isPlace(lines[at], policy)) return null;
+    if (!free(at) || opensWithVerb.test(lines[at]) || isPlace(lines[at], policy, false))
+      return null;
     if (at > from && ownAt.get(at + 1) === "") return null;
     return headerParts(lines[at], policy)[0] ?? null;
   };
@@ -421,9 +432,14 @@ export function parseRoles(
     let top = index;
     if (!header && datesFirst && free(index + 1)) header = take(index + 1);
     // Where the role is worked, on a line of its own between its header and the dates
-    // ("Amazon" / "Seattle, WA" / "Jan 2020 - Present"), is dropped: the header is above it.
+    // ("Amazon" / "Seattle, WA" / "Jan 2020 - Present"), is dropped: the header is above it. A
+    // country or a state names where only when the lines above name the employer ("Engineer" /
+    // "Acme" / "Berlin, Germany"); under a title alone, "Infosys, India" is the employer.
+    const where = (at: number) =>
+      isPlace(lines[at]!, policy, false) ||
+      (isPlace(lines[at]!, policy) && (!isSingle(lines[at - 1]!) || stacked(at - 1)));
     let dates = index;
-    if (!header && free(index - 1) && free(index - 2) && isPlace(lines[index - 1], policy)) {
+    if (!header && free(index - 1) && free(index - 2) && where(index - 1)) {
       take(index - 1);
       dates = index - 1;
     }
@@ -461,7 +477,7 @@ export function parseRoles(
         !titled(above) &&
         employerLine(lines[above]) &&
         (above === 0 || BULLET.test(lines[above - 1])) &&
-        !isPlace(lines[above], policy)
+        !isPlace(lines[above], policy, false)
       ) {
         employer = headerParts(take(above), policy)[0] ?? "";
         group = employer;

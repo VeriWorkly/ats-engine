@@ -55,6 +55,19 @@ describe("German pack vocabulary for dates, durations and names", () => {
     expect(report.locale.languages).toContain("de");
     expect(report.parsed.roles[0]?.employer).toBe(employer);
   });
+
+  it.each([
+    ["Siemens, Bayern", "Siemens"],
+    ["Bosch, Baden-Württemberg", "Bosch"],
+    ["Siemens, Deutschland", "Siemens"],
+  ])("keeps the employer of %j on a line of its own", (line, employer) => {
+    const report = AtsScoringService.check(
+      resume(["Softwareentwicklerin", line, "01/2020 – heute"]),
+      policy,
+      { now: NOW },
+    );
+    expect(report.parsed.roles[0]?.employer).toBe(employer);
+  });
 });
 
 describe("region codes from a region pack", () => {

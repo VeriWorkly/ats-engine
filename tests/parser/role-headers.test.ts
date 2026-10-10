@@ -150,6 +150,49 @@ describe("a city with its state or country named in full", () => {
       "Software Engineer",
     );
   });
+
+  // An employer with its country or state on a line of its own has the shape of a city with
+  // its country: with no employer named elsewhere, it is the employer.
+  it.each([
+    [["Software Engineer", "Infosys, India", "Jan 2020 - Present"], "Infosys"],
+    [["Software Engineer", "Google, India", "Jan 2020 - Present"], "Google"],
+    [["Software Engineer", "Microsoft, Washington", "Jan 2020 - Present"], "Microsoft"],
+    [["Software Engineer", "Dell, Texas", "Jan 2020 - Present"], "Dell"],
+    [["Software Engineer", "Deloitte, USA", "Jan 2020 - Present"], "Deloitte"],
+    [["Software Engineer", "Accenture, UK", "Jan 2020 - Present"], "Accenture"],
+    [["Software Engineer", "Bank of America, Texas", "Jan 2020 - Present"], "Bank of America"],
+    [["Infosys, India", "Software Engineer", "Jan 2020 - Present"], "Infosys"],
+    [["Software Engineer | Jan 2020 - Present", "Infosys, India"], "Infosys"],
+    [["Software Engineer\tJan 2020 - Present", "Infosys, India"], "Infosys"],
+    // A country or state's name alone, as an employer's.
+    [["Software Engineer", "Jordan", "Jan 2020 - Present"], "Jordan"],
+    [["Software Engineer", "Victoria", "Jan 2020 - Present"], "Victoria"],
+    [["Software Engineer", "Washington", "Jan 2020 - Present"], "Washington"],
+  ])("keeps the employer of %j", (block, employer) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer }]);
+  });
+
+  it("keeps a school with its state", () => {
+    expect(
+      rolesIn("Teaching Assistant", "University of Georgia, Georgia", "Jan 2020 - Present"),
+    ).toEqual([{ title: "Teaching Assistant", employer: "University of Georgia" }]);
+  });
+
+  it("keeps an employer with its country over the roles under it", () => {
+    expect(
+      rolesIn(
+        "Infosys, India",
+        "Software Engineer",
+        "Mar 2021 - Present",
+        "- Built a billing service handling 2M requests a day",
+        "Associate Engineer",
+        "Jan 2018 - Feb 2021",
+      ),
+    ).toEqual([
+      { title: "Software Engineer", employer: "Infosys" },
+      { title: "Associate Engineer", employer: "Infosys" },
+    ]);
+  });
 });
 
 describe("an employer whose name holds an employer word", () => {
