@@ -786,10 +786,10 @@
       "work ethic"
     ],
     "sections": {
-      "required": "^(?:(?:minimum|basic|required|essential|key|core)\\s+)?(?:requirements|qualifications)|^(?:what\\s+you.{0,3}ll\\s+need|what\\s+you\\s+(?:bring|need|have)|must[\\s-]+haves?|about\\s+you|your\\s+profile|who\\s+you\\s+are|you\\s+have|you\\s+bring)",
-      "preferred": "^(?:nice\\s+to\\s+have|preferred|bonus|desirable|plus)",
+      "required": "^(?:(?:minimum|basic|required|essential|key|core)\\s+)?(?:requirements|qualifications|skills)|^(?:what\\s+you.{0,3}ll\\s+need|what\\s+you\\s+(?:bring|need|have)|what\\s+we(?:.{0,3}re|\\s+are)\\s+looking\\s+for|must[\\s-]+haves?|about\\s+you|your\\s+profile|who\\s+you\\s+are|you\\s+have|you\\s+bring)",
+      "preferred": "^(?:nice[\\s-]+to[\\s-]+haves?|preferred|bonus|desirable|desired|plus)",
       "responsibilities": "^(?:responsibilities|what\\s+you.{0,3}ll\\s+do|the\\s+role|about\\s+the\\s+role)",
-      "excluded": "^(?:about\\s+us|benefits|perks|equal\\s+opportunity|our\\s+values|why\\s+join|about\\s+(?!(?:you|your|the|this)(?![\\p{L}]))[\\p{L}\\p{N}&.'-]{1,40}(?:\\s+[\\p{L}\\p{N}&.'-]{1,40}){0,3})"
+      "excluded": "^(?:about\\s+us|benefits|perks|(?:what\\s+)?we\\s+offer|equal\\s+opportunity|our\\s+values|why\\s+join|about\\s+(?!(?:you|your|the|this)(?![\\p{L}]))[\\p{L}\\p{N}&.'-]{1,40}(?:\\s+[\\p{L}\\p{N}&.'-]{1,40}){0,3})"
     },
     "alternationWords": [
       "or"
