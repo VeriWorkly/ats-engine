@@ -13,13 +13,16 @@ export const DEFAULT_KEYWORD_MATCH = {
   softSkillWeight: 0.4,
   sections: {
     // "Minimum qualifications", "Basic Qualifications", "Must-haves", "What you bring", "About
-    // you": a posting whose required heading went unread lost every required item.
-    required: String.raw`^(?:(?:minimum|basic|required|essential|key|core)\s+)?(?:requirements|qualifications)|^(?:what\s+you.{0,3}ll\s+need|what\s+you\s+(?:bring|need|have)|must[\s-]+haves?|about\s+you|your\s+profile|who\s+you\s+are|you\s+have|you\s+bring)`,
-    preferred: String.raw`^(?:nice\s+to\s+have|preferred|bonus|desirable|plus)`,
+    // you", "Skills and Qualifications", "What we're looking for": a posting whose required
+    // heading went unread lost every required item, and its heading words became keywords.
+    // "Skills" only as the whole heading: "Skills you'll gain" are not asked.
+    required: String.raw`^(?:(?:minimum|basic|required|essential|key|core)\s+)?(?:requirements|qualifications)|^(?:(?:required|key|core)\s+)?skills(?:\s+(?:and|&)\s+(?:qualifications|requirements|experience))?\s*$|^(?:what\s+you.{0,3}ll\s+need|what\s+you\s+(?:bring|need|have)|what\s+we(?:.{0,3}re|\s+are)\s+looking\s+for|must[\s-]+haves?|about\s+you|your\s+profile|who\s+you\s+are|you\s+have|you\s+bring)`,
+    preferred: String.raw`^(?:nice[\s-]+to[\s-]+haves?|preferred|bonus|desirable|desired|plus)`,
     responsibilities: String.raw`^(?:responsibilities|what\s+you.{0,3}ll\s+do|the\s+role|about\s+the\s+role)`,
     // "About Acme Robotics" is the employer's own section; its name is never a keyword. "About
-    // you" (required) and "About the role" (responsibilities) are matched before this.
-    excluded: String.raw`^(?:about\s+us|benefits|perks|equal\s+opportunity|our\s+values|why\s+join|about\s+(?!(?:you|your|the|this)(?![\p{L}]))[\p{L}\p{N}&.'-]{1,40}(?:\s+[\p{L}\p{N}&.'-]{1,40}){0,3})`,
+    // you" (required) and "About the role" (responsibilities) are matched before this. What the
+    // job will teach ("Skills you'll gain", "What you'll learn") is not asked of anyone.
+    excluded: String.raw`^(?:about\s+(?:us|the\s+(?:team|company))|benefits|perks|(?:what\s+)?we\s+offer|skills\s+you(?:.{0,3}ll|\s+will)\s+(?:gain|learn|develop|build)|what\s+you(?:.{0,3}ll|\s+will)\s+learn|equal\s+opportunity|our\s+values|why\s+join|about\s+(?!(?:you|your|the|this)(?![\p{L}]))[\p{L}\p{N}&.'-]{1,40}(?:\s+[\p{L}\p{N}&.'-]{1,40}){0,3})`,
   },
   stopwords: [
     "the",
@@ -190,6 +193,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     // How well a language is spoken; the language is the requirement.
     "fluent",
     "fluency",
+    // How a soft skill is used: "written and verbal communication" asks for communication.
+    "written",
+    "verbal",
   ],
   synonyms: {
     js: "javascript",
@@ -206,6 +212,14 @@ export const DEFAULT_KEYWORD_MATCH = {
     node: "node.js",
     reactjs: "react",
     "react.js": "react",
+    // A ".js" name whose plain name is the framework; "Next.js" and "Express.js" stay whole, as
+    // "next" and "express" are ordinary words.
+    "vue.js": "vue",
+    "nuxt.js": "nuxt",
+    // AngularJS, not Angular, its successor.
+    "angular.js": "angularjs",
+    "full-stack": "full stack",
+    fullstack: "full stack",
     // A soft skill's other spellings, so "communicating" in a posting meets "communication" on a
     // resume. Each is a soft skill, never a hard one (see `softSkills`).
     communicate: "communication",
@@ -225,7 +239,11 @@ export const DEFAULT_KEYWORD_MATCH = {
     "multi-tasking": "multitasking",
     "problem-solving": "problem solving",
     "decision-making": "decision making",
-    "detail-oriented": "attention to detail",
+    "detail-oriented": "detail oriented",
+    "self-motivated": "self motivated",
+    "critical-thinking": "critical thinking",
+    "team-player": "team player",
+    "growth-mindset": "growth mindset",
   },
   // What a posting asks of the person rather than of their work. They weigh `softSkillWeight` of
   // an ordinary word and the report lists them apart. Placed by one test: does a resume evidence
@@ -256,6 +274,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     "critical thinking",
     "decision making",
     "attention to detail",
+    "detail oriented",
+    "self motivated",
+    "growth mindset",
     "time management",
     "multitasking",
     "organizational",
@@ -305,6 +326,7 @@ export const DEFAULT_KEYWORD_MATCH = {
     "i/o",
     "ts/sci",
     "software engineer",
+    "full stack",
     // Kept whole: "business" is a stopword, and "development" alone is a software engineer's.
     "business development",
     "documentation",

@@ -222,6 +222,49 @@ Improved the onboarding experience for every new engineer on the team`;
     expect(metrics?.passed).toBe(false);
   });
 
+  const cloud = (...bullets: string[]) =>
+    `Theo Lindqvist\ntheo@example.com\nExperience\nCloud Engineer, Ashgrove\nJan 2020 - Present\n${bullets.map((b) => `- ${b}`).join("\n")}`;
+  const metricsOf = (resume: string) =>
+    check(resume).rules.find((rule) => rule.id === "ats-v2.content.metrics");
+
+  it("does not count a product's name or version as a quantified outcome", () => {
+    const metrics = metricsOf(
+      cloud(
+        "Migrated workloads to EC2 and S3",
+        "Rewrote deploy scripts in Python 3.11",
+        "Hardened hosts to ISO 27001 controls",
+        "Maintained the desktop images on Windows 10",
+        "Provided Tier 2 support for the help desk",
+      ),
+    );
+    expect(metrics).toMatchObject({
+      passed: false,
+      evidence: "Only 0% of content lines carry a number.",
+    });
+  });
+
+  it("still counts the outcomes beside them", () => {
+    expect(
+      metricsOf(
+        cloud(
+          "Migrated 40 workloads to EC2 and S3",
+          "Cut Python 3 build times by 35%",
+          "Led 3 engineers through an ISO 27001 audit",
+          "Reduced p99 latency to 120ms across 2M requests",
+          // A count after a product's name is a count: only a bare version is not.
+          "Taught Python 300 students",
+          "Scaled PostgreSQL 10TB cluster",
+          "Maintained SQL Server 20 instances",
+          "Launched Android 1M downloads",
+          "Migrated Oracle 50 schemas",
+          "Rolled Windows 400 laptops",
+          "Improved throughput x10",
+          "Cut deploy time x3",
+        ),
+      )?.evidence,
+    ).toBe("100% of content lines carry a number.");
+  });
+
   it("does not credit a word that merely starts with an action verb", () => {
     const resume =
       "Experience\nEngineer, Acme\n2020 - 2024\nLedger reconciliation for the finance team\nLedger audits every quarter for the board";

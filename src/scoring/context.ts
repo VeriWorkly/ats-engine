@@ -1,4 +1,4 @@
-import { roleBodyLines } from "../checks/bullets.js";
+import { citationLines, roleBodyLines } from "../checks/bullets.js";
 import {
   copiedPosting,
   homoglyphWords,
@@ -53,13 +53,21 @@ const contentLineTest = memo((text: AtsEnginePolicy["text"]) => {
  * The bullets: the lines with a list marker or, where the markers were lost in extraction, the
  * sentences under each dated role, as the bullets were. Empty when there are neither.
  */
-function bulletsOf(lines: string[], policy: AtsEnginePolicy) {
-  const bullets = lines.filter((line) => BULLET.test(line));
+function bulletsOf(lines: string[], policy: AtsEnginePolicy, cited: Set<string>) {
+  const bullets = lines.filter((line) => BULLET.test(line) && !cited.has(line));
   return bullets.length >= MIN_BULLETS ? bullets : roleBodyLines(lines, policy);
 }
 
-const contentLinesOf = (lines: string[], bullets: string[], policy: AtsEnginePolicy) =>
-  bullets.length ? bullets : lines.filter(contentLineTest(policy.text));
+/** Never a list of works' lines (`citationLines`): a citation opens with its authors. */
+const contentLinesOf = (
+  lines: string[],
+  bullets: string[],
+  policy: AtsEnginePolicy,
+  cited: Set<string>,
+) =>
+  bullets.length
+    ? bullets
+    : lines.filter((line) => contentLineTest(policy.text)(line) && !cited.has(line));
 
 export type ReadResume = {
   ctx: RuleContext;
@@ -98,8 +106,10 @@ export function readResume(
   const parsed = prepared.document
     ? parseResumeDocument(prepared.document, policy, now)
     : parseReadLines(lines, policy, now, sections);
-  // The writing rules read bullets only: a summary paragraph is not one, nor a contact row.
-  const bullets = bulletsOf(lines, policy);
+  // The writing rules read bullets only: a summary paragraph is not one, nor a contact row, nor
+  // a citation.
+  const cited = citationLines(lines, policy);
+  const bullets = bulletsOf(lines, policy, cited);
   const roles = roleBlocks(sections, policy);
 
   const ctx: RuleContext = {
@@ -109,7 +119,7 @@ export function readResume(
     headingLines: lines.filter(isHeadingLine),
     contact: { email: parsed.email, phone: parsed.phone },
     sections: headedKinds(sections),
-    contentLines: contentLinesOf(lines, bullets, policy),
+    contentLines: contentLinesOf(lines, bullets, policy, cited),
     languages: languages.length ? languages : [policy.text.language],
     letterSpacedLines: spaced,
     layout,
@@ -119,12 +129,15 @@ export function readResume(
     },
     findings: {
       injectionPhrases: injectionPhrases(
-        text,
-        // Text no reader sees: smuggled in tag characters, or in the file's metadata. And lines
-        // opening with "#" as written: the line reader drops a Markdown heading's marks, and
-        // "### System:" is a prompt delimiter with them.
+        // By line: a quote is excused by the word on its own line that says it was caught.
+        lines.join("\n"),
+        // Text no reader sees: smuggled in tag characters, hidden by the layout, or in the file's
+        // metadata, where no quote excuses it. And lines opening with "#" as written: the line
+        // reader drops a Markdown heading's marks, and "### System:" is a prompt delimiter with
+        // them.
         [
           prepared.hidden.smuggled,
+          layout?.hiddenText ?? "",
           layout?.metadataText ?? "",
           ...prepared.text.split("\n").filter((line) => line.trimStart().startsWith("#")),
         ].join("\n"),
@@ -136,7 +149,7 @@ export function readResume(
       },
       homoglyphWords: homoglyphWords(text),
       copiedPostingRatio: jobDescription?.trim() ? copiedPosting(text, jobDescription) : null,
-      stuffedTerms: stuffedTerms(text, lines, policy, now),
+      stuffedTerms: stuffedTerms(text, lines, policy, now, parsed.name ?? "", cited),
       timelineIssues: timelineIssues(parsed.roles, parsed.monthsOfExperience, now),
       unsupportedSkills: unsupportedSkills(sections, parsed.skills),
       firstPersonLines: firstPersonLines(bullets, policy),

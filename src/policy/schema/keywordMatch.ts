@@ -63,67 +63,105 @@ export const keywordMatchSchema = z
           unless: z.optional(z.string().check(z.minLength(1))),
         }),
       ),
-      [
-        // One family whose noun and agent forms fold with the verb: "development", "developer"
-        // and "developed" are all "develop". A general "-ment" or "-er" rule would fold
-        // "statement" into "state" and "user" into "us".
-        { suffix: "elopments", minLength: 8, replacement: "elop" },
-        { suffix: "elopment", minLength: 7, replacement: "elop" },
-        { suffix: "elopers", minLength: 6, replacement: "elop" },
-        { suffix: "eloper", minLength: 5, replacement: "elop" },
-        // "-using" and "-used" fold as "-use" does below: "housing", "housed" and "house" to
-        // "hou", "focused" and "focus" to "focu".
-        { suffix: "using", minLength: 5, replacement: "u" },
-        { suffix: "used", minLength: 4, replacement: "u" },
-        // A rule that gives a word back unchanged keeps the rules after it off that word: a
-        // field is not named for its object, "accounting" is not "account" nor "marketing"
-        // "market".
-        { suffix: "accounting", minLength: 0, replacement: "accounting" },
-        { suffix: "marketing", minLength: 0, replacement: "marketing" },
-        { suffix: "ing", minLength: 6, replacement: "" },
-        { suffix: "ies", minLength: 5, replacement: "y" },
-        { suffix: "ed", minLength: 5, replacement: "" },
-        // "-es" is a plural ending only after s, x, ch and sh ("processes", "indexes",
-        // "searches"); elsewhere the "e" is the word's own ("databases", "pipelines"), and
-        // stripping it left "databas" beside "database".
-        { suffix: "sses", minLength: 5, replacement: "ss" },
-        { suffix: "xes", minLength: 4, replacement: "x" },
-        { suffix: "ches", minLength: 5, replacement: "ch" },
-        { suffix: "shes", minLength: 5, replacement: "sh" },
-        // A singular in "-che" folds as its plural does: "cache" and "caches" to "cach".
-        { suffix: "che", minLength: 4, replacement: "ch" },
-        // "-ses" is ambiguous: "buses" is "bus" + "es", "cases" is "case" + "s". Singular and
-        // plural fold to one shorter form, so either reading meets: "bus", "buses" and "status",
-        // "statuses" lose the "s" as "cpus" does ("bu", "statu"); "cause" and "causes" fold to
-        // "cau"; "case", "cases", "gas" and "gases" to "cas" and "gas". "uses" (four letters)
-        // stays the stopword "use".
-        { suffix: "uses", minLength: 4, replacement: "u" },
-        { suffix: "use", minLength: 3, replacement: "u" },
-        { suffix: "us", minLength: 2, replacement: "u" },
-        { suffix: "ases", minLength: 4, replacement: "as" },
-        { suffix: "ase", minLength: 3, replacement: "as" },
-        // Greek plurals in "-es" for "-is": "analysis" and "analyses" both to "analys". Only
-        // the endings that are always such a pair: a general "-ses" rule would part "response"
-        // from "responses", and "-oses" would part "close" from "closes".
-        { suffix: "ysis", minLength: 5, replacement: "ys" },
-        { suffix: "yses", minLength: 5, replacement: "ys" },
-        { suffix: "thesis", minLength: 6, replacement: "thes" },
-        { suffix: "theses", minLength: 6, replacement: "thes" },
-        { suffix: "gnosis", minLength: 6, replacement: "gnos" },
-        { suffix: "gnoses", minLength: 6, replacement: "gnos" },
-        // A silent "e" goes, as "-ing" and "-ed" drop it: "nurse", "nurses", "nursing" and
-        // "nursed" all to "nurs", "price" and "pricing" to "pric", "machines" and "machine" to
-        // "machin". Only past four letters, so "note" does not become "not", nor "code" "cod".
-        // "theme" would become the stopword "them", and "these" the "thes" of "theses", so they
-        // and "-ese" ("chinese") are given back as they are.
-        { suffix: "themes", minLength: 0, replacement: "theme" },
-        { suffix: "es", minLength: 5, replacement: "" },
-        { suffix: "theme", minLength: 0, replacement: "theme" },
-        { suffix: "ese", minLength: 0, replacement: "ese" },
-        { suffix: "e", minLength: 4, replacement: "" },
-        // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
-        { suffix: "s", minLength: 3, replacement: "", unless: "ss" },
-      ],
+      (
+        [
+          // One family whose noun and agent forms fold with the verb: "development", "developer"
+          // and "developed" are all "develop". A general "-ment" or "-er" rule would fold
+          // "statement" into "state" and "user" into "us".
+          ["elopments", 8, "elop"],
+          ["elopment", 7, "elop"],
+          ["elopers", 6, "elop"],
+          ["eloper", 5, "elop"],
+          // "-using" and "-used" fold as "-use" does below: "housing", "housed" and "house" to
+          // "hou", "focused" and "focus" to "focu".
+          ["using", 5, "u"],
+          ["used", 4, "u"],
+          // A rule that gives a word back unchanged keeps the rules after it off that word: a
+          // field is not named for its object, "accounting" is not "account" nor "marketing"
+          // "market".
+          ["accounting", 0, "accounting"],
+          ["marketing", 0, "marketing"],
+          // A name with ".js" is kept whole; the "s" rule below left "vue.j". It is not folded onto
+          // its plain word: "Next.js" is no "next release", "Express.js" no "expressed concerns".
+          // `synonyms` name the ones whose plain name is the framework ("Vue").
+          [".js", 0, ".js"],
+          // British spellings fold with American ones, each as its whole family: "modelling" and
+          // "modeling", "optimisation" and "optimization", "analysed" and "analyzed", "behaviours"
+          // and "behaviors". Every "-ise" word folds so, its own forms with it ("enterprise",
+          // "enterprises"); "-lling" only after the letters no one-syllable "-ell" word ends in,
+          // so "selling" stays "sell", and not after "c", or "excelled" would be "Excel".
+          ["delling", 0, "del"],
+          ["delled", 0, "del"],
+          ["belling", 0, "bel"],
+          ["belled", 0, "bel"],
+          ["velling", 0, "vel"],
+          ["velled", 0, "vel"],
+          ["isations", 0, "ization"],
+          ["isation", 0, "ization"],
+          ["isers", 5, "izer"],
+          ["iser", 4, "izer"],
+          ["ising", 6, "iz"],
+          ["ised", 5, "iz"],
+          ["ises", 5, "iz"],
+          ["ise", 4, "iz"],
+          ["yser", 4, "yzer"],
+          ["ysing", 6, "yz"],
+          ["ysed", 5, "yz"],
+          ["yse", 4, "yz"],
+          // Past four letters: "hour" and "four" stay as they are.
+          ["oural", 5, "oral"],
+          ["ours", 5, "or"],
+          ["our", 4, "or"],
+          ["ing", 6, ""],
+          ["ies", 5, "y"],
+          ["ed", 5, ""],
+          // "-es" is a plural ending only after s, x, ch and sh ("processes", "indexes",
+          // "searches"); elsewhere the "e" is the word's own ("databases", "pipelines"), and
+          // stripping it left "databas" beside "database".
+          ["sses", 5, "ss"],
+          ["xes", 4, "x"],
+          ["ches", 5, "ch"],
+          ["shes", 5, "sh"],
+          // A singular in "-che" folds as its plural does: "cache" and "caches" to "cach".
+          ["che", 4, "ch"],
+          // "-ses" is ambiguous: "buses" is "bus" + "es", "cases" is "case" + "s". Singular and
+          // plural fold to one shorter form, so either reading meets: "bus", "buses" and "status",
+          // "statuses" lose the "s" as "cpus" does ("bu", "statu"); "cause" and "causes" fold to
+          // "cau"; "case", "cases", "gas" and "gases" to "cas" and "gas". "uses" (four letters)
+          // stays the stopword "use".
+          ["uses", 4, "u"],
+          ["use", 3, "u"],
+          ["us", 2, "u"],
+          ["ases", 4, "as"],
+          ["ase", 3, "as"],
+          // Greek plurals in "-es" for "-is": "analysis" and "analyses" both to "analyz", as
+          // "analyse" and "analyze" are. Only the endings that are always such a pair: a general
+          // "-ses" rule would part "response" from "responses", and "-oses" "close" from "closes".
+          ["ysis", 5, "yz"],
+          ["yses", 5, "yz"],
+          ["thesis", 6, "thes"],
+          ["theses", 6, "thes"],
+          ["gnosis", 6, "gnos"],
+          ["gnoses", 6, "gnos"],
+          // A silent "e" goes, as "-ing" and "-ed" drop it: "nurse", "nurses", "nursing" and
+          // "nursed" all to "nurs", "price" and "pricing" to "pric", "machines" and "machine" to
+          // "machin". Only past four letters, so "note" does not become "not", nor "code" "cod".
+          // "theme" would become the stopword "them", and "these" the "thes" of "theses", so they
+          // and "-ese" ("chinese") are given back as they are.
+          ["themes", 0, "theme"],
+          ["es", 5, ""],
+          ["theme", 0, "theme"],
+          ["ese", 0, "ese"],
+          ["e", 4, ""],
+          // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
+          ["s", 3, "", "ss"],
+        ] as Array<[string, number, string, string?]>
+      ).map(([suffix, minLength, replacement, unless]) => ({
+        suffix,
+        minLength,
+        replacement,
+        ...(unless && { unless }),
+      })),
     ),
     /** Endings a multi-word phrase may carry on its last word and still be the same phrase. */
     pluralSuffixes: z._default(wordList("pluralSuffixes"), ["s", "es"]),

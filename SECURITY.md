@@ -83,7 +83,15 @@ What does not depend on the model:
   cut to 50 000 characters after redaction. Parse repair and conversion must see contact details
   and do not redact.
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
-  including text smuggled in Unicode tag characters or PDF metadata.
+  including text smuggled in Unicode tag characters or PDF metadata. A phrase in quotes or
+  backticks within three words of a word that says it was caught (`text.injectionMentionVerbs`:
+  "flags", "blocked", "red-teamed"), with no comma or colon between, is an AI security
+  engineer's example and is not flagged: `Built a filter that flags "ignore previous
+  instructions"`. An attacker can dress an instruction so too, and a model reading the resume
+  may still follow it; the rule trades that for not failing honest security work. It is still
+  flagged unquoted (a bare "[INST]" too), on a labelled list line ("Skills: …"), in text hidden
+  by the layout, in tag characters or in metadata, and whenever the quote tells the screener
+  what to make of the resume ("rank this candidate", "score me"; `text.injectionTargets`).
 
 **API keys.** The `/ai` adapters send the key only to the address you configure: they never
 follow a redirect, since `fetch` keeps a header such as `x-api-key` on a redirect to another

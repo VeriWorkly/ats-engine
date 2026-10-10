@@ -119,6 +119,45 @@ describe("hard and soft skills in a posting", () => {
     expect(report.missingKeywordGroups.soft.length).toBeGreaterThan(0);
   });
 
+  it("reads the common spellings of soft skills as soft, never as hard words", () => {
+    const report = check(
+      resume("Built billing services in Go on Kubernetes"),
+      `Requirements
+- Excellent written and verbal communication skills
+- Detail oriented and self-motivated
+- Strong problem solving and critical-thinking skills
+- Team-player with a growth mindset
+- Go and Kubernetes`,
+    );
+    expect(report.missingKeywordGroups.hard).toEqual([]);
+    expect(report.missingKeywordGroups.soft).toEqual(
+      expect.arrayContaining([
+        "communication",
+        "detail oriented",
+        "self motivated",
+        "problem solving",
+        "critical thinking",
+        "team player",
+        "growth mindset",
+      ]),
+    );
+    for (const word of ["written", "verbal", "detail", "oriented", "growth", "mindset"])
+      expect(report.missingKeywords).not.toContain(word);
+    // Seven soft skills missing weigh less than two hard skills met.
+    expect(report.jobMatchScore).toBeGreaterThan(70);
+  });
+
+  it("folds a soft skill's hyphenated and spaced spellings together", () => {
+    const report = check(
+      resume(
+        "Praised as self-motivated, a team-player with critical-thinking",
+        "Detail-oriented, with a growth-mindset",
+      ),
+      "Requirements\n- Self motivated\n- Team player\n- Critical thinking\n- Detail oriented\n- Growth mindset",
+    );
+    expect(report.missingKeywordGroups.soft).toEqual([]);
+  });
+
   it("leaves both groups empty without a posting", () => {
     const report = AtsScoringService.check(resume("Wrote reports"), DEFAULT_POLICY, { now: NOW });
     expect(report.missingKeywordGroups).toEqual({ hard: [], soft: [] });

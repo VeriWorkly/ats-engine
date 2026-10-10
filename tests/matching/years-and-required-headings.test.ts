@@ -76,6 +76,82 @@ describe("required headings", () => {
       ["Terraform", "preferred"],
     ]);
   });
+
+  it.each(["What we're looking for", "What we’re looking for", "What we are looking for"])(
+    "reads the unbulleted lines under %s as required",
+    (heading) => {
+      const report = check(
+        body,
+        `Backend Engineer\n${heading}\n5+ years of experience with Python\nExperience with Rust\nWhat we offer\nHealth insurance and 401k`,
+      );
+      expect(report.requirements.map((r) => [r.text, r.importance])).toEqual([
+        ["5+ years of experience with Python", "required"],
+        ["Experience with Rust", "required"],
+      ]);
+      for (const word of ["what", "offer", "health", "insurance"])
+        expect(report.missingKeywords).not.toContain(word);
+    },
+  );
+
+  it.each([
+    ["Skills and Qualifications", "required"],
+    ["Skills & Qualifications", "required"],
+    ["Required Skills", "required"],
+    ["Desired Skills", "preferred"],
+    ["Desired Qualifications", "preferred"],
+    ["Preferred Qualifications", "preferred"],
+    ["Nice to have", "preferred"],
+    ["Nice-to-haves", "preferred"],
+    ["Bonus points", "preferred"],
+  ] as const)("reads the items under %s as %s", (heading, importance) => {
+    const report = check(body, `Responsibilities\n- Build services\n${heading}\n- Rust`);
+    expect(report.requirements.map((r) => [r.text, r.importance])).toEqual([["Rust", importance]]);
+    for (const word of heading.toLowerCase().split(/[\s&-]+/))
+      expect(report.missingKeywords).not.toContain(word);
+  });
+
+  it.each([
+    "Benefits",
+    "Perks",
+    "What we offer",
+    "We offer",
+    "About the role",
+    "About the team",
+    "What you'll do",
+  ])("reads nothing under %s as a requirement", (heading) => {
+    const report = check(
+      body,
+      `Requirements\n- Python\n${heading}\n- Health insurance and a wellness stipend`,
+    );
+    expect(report.requirements.map((r) => r.text)).toEqual(["Python"]);
+    expect(report.missingKeywords).not.toContain("offer");
+  });
+
+  it.each([
+    "Skills you'll gain",
+    "Skills you’ll learn",
+    "Skills you will develop",
+    "Skills you'll build",
+    "What you'll learn",
+    "What you’ll learn",
+    "What you will learn",
+  ])("reads nothing under %s as a requirement or a keyword", (heading) => {
+    const report = check(body, `Requirements\n- Python\n${heading}\n- Kubernetes\n- Terraform`);
+    expect(report.requirements.map((r) => r.text)).toEqual(["Python"]);
+    for (const word of ["kubernetes", "terraform", "gain", "learn", "develop", "build"])
+      expect(report.missingKeywords).not.toContain(word);
+  });
+
+  it.each(["Skills you'll gain", "Skills you will learn", "Skills we value"])(
+    "does not read %s as a required heading",
+    (heading) => {
+      const report = check(
+        body,
+        `Responsibilities\n- Build APIs in Python\n${heading}\n- Kubernetes\n- Terraform`,
+      );
+      expect(report.requirements).toEqual([]);
+    },
+  );
 });
 
 describe("years of a named skill", () => {
