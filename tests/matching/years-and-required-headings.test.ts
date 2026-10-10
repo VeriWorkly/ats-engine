@@ -110,15 +110,31 @@ describe("required headings", () => {
       expect(report.missingKeywords).not.toContain(word);
   });
 
-  it.each(["Benefits", "Perks", "What we offer", "We offer", "About the role", "What you'll do"])(
-    "reads nothing under %s as a requirement",
+  it.each([
+    "Benefits",
+    "Perks",
+    "What we offer",
+    "We offer",
+    "About the role",
+    "About the team",
+    "What you'll do",
+  ])("reads nothing under %s as a requirement", (heading) => {
+    const report = check(
+      body,
+      `Requirements\n- Python\n${heading}\n- Health insurance and a wellness stipend`,
+    );
+    expect(report.requirements.map((r) => r.text)).toEqual(["Python"]);
+    expect(report.missingKeywords).not.toContain("offer");
+  });
+
+  it.each(["Skills you'll gain", "Skills you will learn", "Skills we value"])(
+    "does not read %s as a required heading",
     (heading) => {
       const report = check(
         body,
-        `Requirements\n- Python\n${heading}\n- Health insurance and a wellness stipend`,
+        `Responsibilities\n- Build APIs in Python\n${heading}\n- Kubernetes\n- Terraform`,
       );
-      expect(report.requirements.map((r) => r.text)).toEqual(["Python"]);
-      expect(report.missingKeywords).not.toContain("offer");
+      expect(report.requirements).toEqual([]);
     },
   );
 });
