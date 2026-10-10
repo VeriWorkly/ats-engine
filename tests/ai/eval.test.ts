@@ -95,12 +95,23 @@ describe("fabricatedNumbers", () => {
     expect(fabricatedNumbers("Raised 1,200 to 2.5", "1,200 and 2.5")).toEqual([]);
   });
 
-  it("knows the month of an ISO date whose year the source states, and only that", () => {
+  it("knows the month of an ISO date when the source states that month of that year", () => {
     expect(
-      fabricatedNumbers({ startDate: "2019-03", endDate: "2021-12" }, "Mar 2019 - Dec 2021"),
+      fabricatedNumbers({ startDate: "2019-03", endDate: "2021-12" }, "Mar 2019 - December 2021"),
     ).toEqual([]);
+    expect(fabricatedNumbers(["2019-03", "2020-11"], "03/2019 and 2020.11")).toEqual([]);
     expect(fabricatedNumbers({ startDate: "2018-03" }, "Mar 2019")).toEqual(["2018", "03"]);
     expect(fabricatedNumbers("2019-13", "2019")).toEqual(["13"]);
     expect(fabricatedNumbers("03", "Mar 2019")).toEqual(["03"]);
+    // A year alone, or another month of it, says nothing of the month.
+    expect(fabricatedNumbers("Started 2019-07", "Joined in 2019")).toEqual(["07"]);
+    expect(fabricatedNumbers("Started 2019-07", "Mar 2019")).toEqual(["07"]);
+    expect(fabricatedNumbers("2000-10 people", "2000 users")).toEqual(["10"]);
+  });
+
+  it("holds analyze to the report as sent, without the advice", () => {
+    const [analyze] = evalCases();
+    expect(analyze!.source).not.toContain('"advice"');
+    expect(analyze!.source).toContain('"readinessScore"');
   });
 });
