@@ -293,6 +293,20 @@ export const resumeParseSchema = z.object({
     "ministry",
   ]),
   /**
+   * Words naming a department or a function, not an employer: what follows a title's comma in
+   * "Director, Product Management | Google". A part made only of these (and `headingConnectors`:
+   * "Research & Development") stays with the title before it, whatever the employer after it is
+   * named; "Software Engineer, Acme | Berlin" is still a title, an employer and where.
+   */
+  departmentWords: z._default(
+    wordList("departmentWords"),
+    (
+      "management engineering product marketing sales operations finance research development " +
+      "design platform infrastructure strategy technology data analytics security growth " +
+      "partnerships communications business team"
+    ).split(" "),
+  ),
+  /**
    * Lowercase words a capitalised heading may join its words with: "Skills and Tools". Any other
    * lowercase word after the heading word reads as prose ("History of Art BA").
    */

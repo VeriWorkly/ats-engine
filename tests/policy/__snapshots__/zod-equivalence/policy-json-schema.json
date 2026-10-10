@@ -2029,6 +2029,38 @@
               "minLength": 1
             }
           },
+          "departmentWords": {
+            "default": [
+              "management",
+              "engineering",
+              "product",
+              "marketing",
+              "sales",
+              "operations",
+              "finance",
+              "research",
+              "development",
+              "design",
+              "platform",
+              "infrastructure",
+              "strategy",
+              "technology",
+              "data",
+              "analytics",
+              "security",
+              "growth",
+              "partnerships",
+              "communications",
+              "business",
+              "team"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "headingConnectors": {
             "default": [
               "and"
@@ -6611,6 +6643,38 @@
               "minLength": 1
             }
           },
+          "departmentWords": {
+            "default": [
+              "management",
+              "engineering",
+              "product",
+              "marketing",
+              "sales",
+              "operations",
+              "finance",
+              "research",
+              "development",
+              "design",
+              "platform",
+              "infrastructure",
+              "strategy",
+              "technology",
+              "data",
+              "analytics",
+              "security",
+              "growth",
+              "partnerships",
+              "communications",
+              "business",
+              "team"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "headingConnectors": {
             "default": [
               "and"
@@ -6730,6 +6794,7 @@
           "regionCodes",
           "workplaceWords",
           "organisationWords",
+          "departmentWords",
           "headingConnectors",
           "dateOfBirthLabels",
           "dateOrder",

@@ -196,6 +196,19 @@ describe("a comma inside the title", () => {
       "Senior Engineer, Platform Team",
       "Northwind Inc",
     ],
+    ["Senior Engineer, Platform, Acme Corp", "Senior Engineer, Platform", "Acme Corp"],
+    // A department after the comma (`departmentWords`) is the title's, whatever the employer.
+    [
+      "Director, Product Management | Google | Jan 2020 - Present",
+      "Director, Product Management",
+      "Google",
+    ],
+    ["Director, Product Management — Google", "Director, Product Management", "Google"],
+    [
+      "Manager, Research & Development | Northwind | Austin, TX",
+      "Manager, Research & Development",
+      "Northwind",
+    ],
   ])("keeps the title of %j whole", (header, title, employer) => {
     expect(roleOf(header)).toMatchObject({ title, employer });
   });
@@ -214,6 +227,8 @@ describe("a comma inside the title", () => {
       "Waymo, an Alphabet company",
     ],
     ["Software Engineer, Acme, Bank Street, NY", "Software Engineer", "Acme"],
+    // No department after the comma: the employer, then where.
+    ["Software Engineer, Acme | Berlin", "Software Engineer", "Acme, Berlin"],
   ])("still reads the employer after the comma in %j", (header, title, employer) => {
     expect(roleOf(header)).toMatchObject({ title, employer });
   });

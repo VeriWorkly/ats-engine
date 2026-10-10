@@ -2,7 +2,7 @@ import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsParsedRole } from "../types.js";
 import { BULLET, BULLET_PREFIX, wordListPattern, wordListRegex } from "../text/text.js";
 import { findDateRange } from "./dates.js";
-import { isHeadingLine } from "./sections.js";
+import { headingConnector, isHeadingLine } from "./sections.js";
 import { memo } from "../util/memo.js";
 
 type HeaderMatchers = {
@@ -21,6 +21,8 @@ type HeaderMatchers = {
   organisations: RegExp;
   verbOpener: RegExp;
   duration: RegExp;
+  /** One word of a department's name: "Product", "Management". */
+  department: RegExp;
 };
 
 const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatchers => {
@@ -45,6 +47,7 @@ const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatc
     organisation: wordListRegex(organisations),
     organisations: wordListRegex(organisations, "gi"),
     verbOpener: new RegExp(`^${wordListPattern(text.contentLineVerbs)}`, "iu"),
+    department: new RegExp(`^(?:${rp.departmentWords.join("|")})$`, "iu"),
   };
 });
 
@@ -145,13 +148,18 @@ function headerParts(header: string, policy: AtsEnginePolicy) {
  * A comma also parts a title from its qualifier ("Director, Product Management", "VP,
  * Engineering"). The title keeps its comma when what follows it up to the employer is not the
  * employer: when a separator stronger than a comma (a bar, a dash, a tab, "at") parts it from
- * a part naming an organisation ("Director, Product Management | Acme Corp"), or, with commas
- * only, when a later part names one ("VP, Engineering, Acme Corp"). An organisation is named by
- * its legal form ("Inc", "GmbH") or its kind ("Hospital", "University"): without one, "Software
- * Engineer, Acme | Berlin" is a title, an employer and where.
+ * a part naming an organisation ("Director, Product Management | Acme Corp") or from any
+ * employer when what follows the comma is a department ("Director, Product Management | Google",
+ * `departmentWords`), or, with commas only, when a later part names an organisation ("VP,
+ * Engineering, Acme Corp"). An organisation is named by its legal form ("Inc", "GmbH") or its
+ * kind ("Hospital", "University"): without one, "Software Engineer, Acme | Berlin" is a title,
+ * an employer and where.
  */
 export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
-  const { titleWords, organisation, organisations, strong } = matchersOf(policy);
+  const { titleWords, organisation, organisations, strong, department } = matchersOf(policy);
+  const connector = headingConnector(policy.resumeParse);
+  const isDepartment = (part: string) =>
+    part.split(" ").every((word) => department.test(word) || connector.test(word));
   // The parts between strong separators, each cut at its commas.
   const segments = splitHeader(header.replace(BULLET_PREFIX, ""), policy, strong)
     .map((segment) => headerParts(segment, policy))
@@ -179,7 +187,13 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
     const other = segments.find(
       (segment) => segment !== own && !isPlace(segment.join(", "), policy),
     );
-    if (own.length > 1 && own[0] === parts[titleIndex] && other && named(other.join(" "))) end = at;
+    if (
+      own.length > 1 &&
+      own[0] === parts[titleIndex] &&
+      other &&
+      (named(other.join(" ")) || own.slice(1).every(isDepartment))
+    )
+      end = at;
   } else {
     // A name, capitalised, and not the start of a place: "an Alphabet company" describes the
     // employer before it, and "Bank Street, NY" is where.
