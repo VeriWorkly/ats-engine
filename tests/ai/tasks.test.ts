@@ -131,6 +131,21 @@ describe("analyze", () => {
     await ai.analyze({ resumeText: `${RESUME}\n${"x".repeat(60_000)}`, report: report() });
     expect(userMessage(provider).resume).toHaveLength(50_000);
   });
+
+  it.each([
+    ["phone", "(415) 555-0199", /\(?415|555-?0/],
+    ["email", "jane.doe@example.com", /jane|@exam/],
+  ])("cuts after redacting, so a %s across the cut is not half sent", async (_, detail, half) => {
+    // The detail starts six characters before the 50,000th, where a cut first leaves its head.
+    const before = `${RESUME}\n${"x".repeat(50_000 - RESUME.length - 1 - 7)} `;
+    const provider = scriptedProvider(insights());
+    const ai = createAtsAi({ provider, routes });
+    await ai.analyze({ resumeText: `${before}${detail} and more`, report: report() });
+    const sent = userMessage(provider).resume;
+    expect(sent.length).toBeLessThanOrEqual(50_000);
+    expect(sent).not.toMatch(half);
+    expect(sent).not.toMatch(/\[[A-Z_0-9]*$/); // nor half a placeholder
+  });
 });
 
 describe("redaction", () => {
