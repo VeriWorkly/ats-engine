@@ -161,13 +161,18 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
   if (parts.length === 0) return { title: "", employer: "" };
   if (parts.length === 1) return { title: parts[0], employer: "" };
 
-  const titleIndex = Math.max(
-    0,
-    parts.findIndex((part) => titleWords.test(part)),
-  );
+  const named = (text: string) => organisation.test(text);
+  // With no title word on either side, an organisation's name first ("Globex Corporation,
+  // Croupier") is the employer, unless what follows it is only where.
+  let titleIndex = parts.findIndex((part) => titleWords.test(part));
+  if (titleIndex === -1)
+    titleIndex = +(
+      named(parts[0]!) &&
+      !named(parts[1]!) &&
+      !isPlace(parts.slice(1).join(", "), policy)
+    );
   // Where the employer starts after a title of several parts, or -1.
   let end = -1;
-  const named = (text: string) => organisation.test(text);
   if (segments.length > 1) {
     let at = 0;
     const own = segments.find((segment) => (at += segment.length) > titleIndex)!;

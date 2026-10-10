@@ -207,3 +207,31 @@ describe("a comma inside the title", () => {
     expect(roleOf(header)).toMatchObject({ title, employer });
   });
 });
+
+describe("an employer written before the title", () => {
+  it.each([
+    ["Deloitte, Accountant", "Accountant", "Deloitte"],
+    ["Mercy Hospital, Registered Nurse", "Registered Nurse", "Mercy Hospital"],
+    ["Lincoln High School, Teacher", "Teacher", "Lincoln High School"],
+    ["Acme Corp, CTO", "CTO", "Acme Corp"],
+    ["Target - Cashier", "Cashier", "Target"],
+    ["Account Executive, Head & Shoulders Media", "Account Executive", "Head & Shoulders Media"],
+    ["Northwind Bank | Teller", "Teller", "Northwind Bank"],
+    // No title word on either side: the side naming an organisation is the employer.
+    ["Globex Corporation, Croupier", "Croupier", "Globex Corporation"],
+    ["Globex Corporation, Croupier, Austin, TX", "Croupier", "Globex Corporation"],
+  ])("reads %j as the title at the employer", (header, title, employer) => {
+    expect(roleOf(header)).toMatchObject({ title, employer });
+  });
+
+  it("still reads the first part as the title when neither side names an organisation", () => {
+    expect(roleOf("Croupier, Globex")).toMatchObject({ title: "Croupier", employer: "Globex" });
+  });
+
+  it("reads a title word before an organisation's name", () => {
+    expect(roleOf("Bank Manager, Globex")).toMatchObject({
+      title: "Bank Manager",
+      employer: "Globex",
+    });
+  });
+});
