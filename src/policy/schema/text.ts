@@ -412,6 +412,21 @@ export const engineTextSchema = z.prefault(
       String.raw`reject(?:s|ed|ing)?`,
       String.raw`saniti[sz](?:e|es|ed|ing)`,
     ]),
+    /**
+     * Headings of a list of works, read where a section heading opens one: its lines are
+     * citations ("Kovalenko O, Marsh T. Ligand field effects…"), not bullets. They have no
+     * action verb to open with and repeat the author's name, so the verb and metric rules do not
+     * read them, nor does keyword stuffing count a term across them; a line repeating a term
+     * there is still stuffing.
+     */
+    citationHeadings: z._default(wordList("text.citationHeadings"), [
+      String.raw`publications?`,
+      String.raw`presentations?`,
+      String.raw`(?:invited\s+)?talks`,
+      "conferences",
+      "patents",
+      "posters",
+    ]),
   }),
   // `prefault`, not `default`: zod 4's `default` returns the fallback as-is without parsing it,
   // which would hand the scorer `{}` and silently drop the verb list above.

@@ -222,6 +222,93 @@ Python, SQL, Airflow, dbt, Spark, Kafka, Snowflake, Tableau`;
       passed: true,
     });
   });
+
+  const ENGINEER = `Nadia Ferreira
+nadia.ferreira@example.com | 555-321-6543
+Summary
+Data engineer with 8 years building data platforms, data pipelines and data quality tooling.
+Experience
+Senior Data Engineer, Kestrel Freight	Jan 2022 - Present
+- Designed the data lakehouse on Databricks holding 4 PB of shipment data
+- Cut data pipeline costs 35% by moving batch jobs to incremental Spark
+- Built data quality checks in Great Expectations covering 600 tables
+- Led a data contracts rollout with 9 producer teams
+- Mentored 4 data engineers on dbt and Airflow
+- Defined data retention policy with legal for GDPR
+Data Engineer, Larkspur Health	Mar 2019 - Dec 2021
+- Migrated 120 data pipelines from cron to Airflow
+- Modeled claims data in dbt for 30 analysts
+- Built a CDC feed with Debezium and Kafka for patient data
+- Reduced data freshness lag from 24 hours to 15 minutes
+- Wrote a data catalog integration for 2,000 datasets
+Data Analyst, Pinegrove Retail	Jul 2017 - Feb 2019
+- Built sales data marts in SQL Server for 40 stores
+- Automated weekly data extracts, saving 10 hours a week
+- Cleaned point-of-sale data for the pricing team
+Education
+B.S. Statistics, Easton University, 2017
+Skills
+Python, SQL, Spark, Databricks, Airflow, dbt, Kafka, Debezium, Great Expectations
+Data modeling, data governance, data quality`;
+
+  it.each([
+    ["one of 200 words", ENGINEER],
+    [
+      "without its summary and last skills line",
+      ENGINEER.replace(/Summary\n.*\n/, "").replace(/\nData modeling.*$/, ""),
+    ],
+  ])("does not flag a compact data engineer's resume, %s, for saying data", (_, resume) => {
+    expect(stuffing(resume)).toMatchObject({ passed: true });
+  });
+
+  const topics = ["Ligand field effects in", "Pressure tuning of", "Spin crossover in"];
+  const objects = ["cobalt pincer complexes", "nickel catalysts", "iron porphyrins"];
+  const coauthors = ["Marsh T", "Iyer P", "Becker L", "Osei K", "Tanaka R"];
+  const ACADEMIC = `Olena Kovalenko
+olena.k@example.com | 555-200-3030
+Experience
+Associate Professor of Chemistry, Westbrook University	Aug 2015 - Present
+- Lead a 9-person group studying cobalt catalysts; $2.1M in NSF funding
+- Teach CHEM 301 and CHEM 520 to 180 students a year
+- Chair the department safety committee of 12 faculty
+Assistant Professor of Chemistry, Easton College	Aug 2009 - Jul 2015
+- Built an undergraduate research program with 24 students
+- Won 2 NSF grants totalling $900K
+Education
+Ph.D. Chemistry, Northgate University, 2009
+Skills
+X-ray crystallography, DFT, Python
+Publications
+${Array.from(
+  { length: 30 },
+  (_, i) =>
+    `- Kovalenko O, ${coauthors[i % 5]}, ${coauthors[(i + 2) % 5]}. ${topics[i % 3]} ${objects[(i + 1) % 3]}. Inorg. Chem. ${2008 + (i % 17)}, ${20 + i}, ${100 + i * 13}.`,
+).join("\n")}`;
+
+  it("does not flag an academic's own surname on each of her publications", () => {
+    expect(stuffing(ACADEMIC)).toMatchObject({ passed: true });
+  });
+
+  it("does not grade an academic's publications as bullets without verbs", () => {
+    expect(rule(check(ACADEMIC), "content.verbs")).toMatchObject({ passed: true });
+  });
+
+  it("still flags a term on line after line of its own", () => {
+    const found = stuffing(`${SALES}\n${"Kubernetes\n".repeat(15)}`);
+    expect(found).toMatchObject({ passed: false });
+    expect(found?.evidence).toContain("kubernetes ×15");
+  });
+
+  it("still flags a run of terms in lower case, line after line", () => {
+    const run = Array.from({ length: 20 }, (_, i) => `kubernetes terraform kafka docker ${i}`);
+    expect(stuffing(`${SALES}\n${run.join("\n")}`)).toMatchObject({ passed: false });
+  });
+
+  it("still flags a line repeating a term under a publications heading", () => {
+    expect(stuffing(`${ACADEMIC}\n- ${"Kubernetes ".repeat(30)}`)).toMatchObject({
+      passed: false,
+    });
+  });
 });
 
 describe("instructions aimed at an AI screener", () => {

@@ -1416,6 +1416,14 @@
       "spot(?:s|ted|ting)?",
       "reject(?:s|ed|ing)?",
       "saniti[sz](?:e|es|ed|ing)"
+    ],
+    "citationHeadings": [
+      "publications?",
+      "presentations?",
+      "(?:invited\\s+)?talks",
+      "conferences",
+      "patents",
+      "posters"
     ]
   },
   "writing": {

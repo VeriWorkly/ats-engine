@@ -2545,6 +2545,22 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "citationHeadings": {
+            "default": [
+              "publications?",
+              "presentations?",
+              "(?:invited\\s+)?talks",
+              "conferences",
+              "patents",
+              "posters"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       },
@@ -7056,6 +7072,22 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "citationHeadings": {
+            "default": [
+              "publications?",
+              "presentations?",
+              "(?:invited\\s+)?talks",
+              "conferences",
+              "patents",
+              "posters"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "required": [
@@ -7065,7 +7097,8 @@
           "actionVerbForms",
           "actionVerbAnywhere",
           "injectionPhrases",
-          "injectionMentionVerbs"
+          "injectionMentionVerbs",
+          "citationHeadings"
         ],
         "additionalProperties": false
       },

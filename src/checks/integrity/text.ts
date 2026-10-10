@@ -2,7 +2,7 @@ import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { NO_FINDING as NONE, quote, type Finding } from "../finding.js";
 import { wordListPattern } from "../../text/text.js";
 import { segmentResume } from "../../parser/sections.js";
-import { isDatedLine } from "../bullets.js";
+import { citationLines, isDatedLine, readsAsSentence } from "../bullets.js";
 import { memo } from "../../util/memo.js";
 
 /**
@@ -163,8 +163,12 @@ function listItems(line: string): string[] | null {
  * Density, not a bare count:
  *
  * - A term counts once per line it appears on (the lines of a paragraph-length run count each
- *   time), and is stuffed when that reaches 15 and 5% of the words that are not repeated so: a
- *   data engineer says "data" in most bullets, often twice in one, and that is the job.
+ *   time), and is stuffed when that reaches 15 and 5% of the words that are not repeated so.
+ *   Not on a sentence — words in lower case and a stopword among them — that names other things
+ *   more: a data engineer says "data" in most bullets, often twice in one, and on a 200-word
+ *   resume that is still the job. A bare run of terms ("Kubernetes Terraform Kafka …") is no
+ *   sentence. Nor on the lines of a list of works (`citationLines`); and the words of the
+ *   candidate's `name`, which an academic's publications repeat by right, are no terms.
  * - A line that is not a list and repeats one term five times or more, as 30% of its words.
  * - A list item named three times or more within one line, or across the undated, unlabelled
  *   lists of a skills section, as a skills block padded with the same skills is. Each role
@@ -182,9 +186,13 @@ export function stuffedTerms(
   lines: string[],
   policy: AtsEnginePolicy,
   now: Date,
+  name = "",
 ): Finding {
-  const stop = new Set(policy.keywordMatch.stopwords);
-  const isTerm = (word: string) => word.length > 2 && /\p{L}/u.test(word) && !stop.has(word);
+  const stopwords = new Set(policy.keywordMatch.stopwords);
+  const own = new Set(wordsOf(name));
+  const isTerm = (word: string) =>
+    word.length > 2 && /\p{L}/u.test(word) && !stopwords.has(word) && !own.has(word);
+  const cited = citationLines(lines, policy);
   const total = new Map<string, number>();
   const spread = new Map<string, number>();
   const stuffed = new Map<string, number>();
@@ -196,12 +204,20 @@ export function stuffedTerms(
     const words = wordsOf(line);
     counted += words.length;
     const here = new Map<string, number>();
-    for (const word of words) if (isTerm(word)) add(here, word);
+    let terms = 0;
+    for (const word of words) {
+      if (!isTerm(word)) continue;
+      add(here, word);
+      terms += 1;
+    }
     const paragraph = words.length > LINE_WORDS;
     const list = listItems(line) !== null;
+    const sentence =
+      !paragraph && !list && readsAsSentence(line) && words.some((word) => stopwords.has(word));
     for (const [word, count] of here) {
       add(total, word, count);
-      add(spread, word, paragraph ? count : 1);
+      if (!cited.has(line) && !(sentence && count * 2 < terms))
+        add(spread, word, paragraph ? count : 1);
       if (!list && count >= 5 && count >= words.length * 0.3) stuffed.set(word, 0);
     }
   }
