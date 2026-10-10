@@ -550,3 +550,8 @@ function joinWrappedDates(lines: readonly string[], rp: AtsEnginePolicy["resumeP
 export function titleWordsOf(policy: AtsEnginePolicy) {
   return matchersOf(policy).titleWords;
 }
+
+/** The policy's organisation and school words, compiled once. */
+export function organisationWordsOf(policy: AtsEnginePolicy) {
+  return matchersOf(policy).organisation;
+}

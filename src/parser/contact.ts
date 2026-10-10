@@ -1,6 +1,12 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { wordListPattern } from "../text/text.js";
-import { isPlace, placeWords, splitTitleAndEmployer, titleWordsOf } from "./experience.js";
+import {
+  isPlace,
+  organisationWordsOf,
+  placeWords,
+  splitTitleAndEmployer,
+  titleWordsOf,
+} from "./experience.js";
 import { isSectionHeading, sectionKind } from "./sections.js";
 import { memo } from "../util/memo.js";
 
@@ -221,17 +227,24 @@ export function findName(
   };
 
   // A LinkedIn export read sidebar first (its contact block with the profile's address, then
-  // "Top Skills"): the name is over the headline, and the headline over where the person is,
-  // whatever the headline says ("Helping fintechs ship faster | Payments").
+  // "Top Skills" and its rows): the name is over the headline, and the headline over where the
+  // person is, whatever the headline says ("Helping fintechs ship faster | Payments"). Only
+  // under the skills heading that follows the address, and before any other heading; never an
+  // organisation's or a school's name ("Rice University").
   const exported = () => {
     const profile = trimmed.slice(0, 40).findIndex((line) => LINKEDIN_PROFILE.test(line));
     if (profile === -1) return "";
+    const organisation = organisationWordsOf(policy);
+    let skills = false;
     for (let at = profile + 1; at < Math.min(trimmed.length, 40); at += 1) {
       const line = trimmed[at]!;
-      if (sectionKind(line, policy) === "experience") break;
+      const kind = sectionKind(line, policy);
+      if (kind === "skills") skills = true;
+      else if (kind !== null) break;
+      if (!skills || kind !== null) continue;
       const [headline, where] = [trimmed[at + 1], trimmed[at + 2]];
       if (!headline || !where || !isPlace(where, policy) || isPlace(headline, policy)) continue;
-      if (isSectionHeading(headline, policy)) continue;
+      if (isSectionHeading(headline, policy) || organisation.test(line)) continue;
       const found = nameIn(line, at + 1, false);
       if (found && !found.cut && !found.place) return found.name;
     }

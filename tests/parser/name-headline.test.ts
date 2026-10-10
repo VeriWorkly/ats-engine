@@ -101,6 +101,49 @@ describe("the name when a sidebar is read first", () => {
     expect(parsed.skills).toEqual(["Machine Learning", "Kubernetes"]);
   });
 
+  it.each([
+    // The name before the profile's address: no export's sidebar is between them.
+    [
+      [
+        "Skills",
+        "Python",
+        "Go",
+        "Jane Doe",
+        "linkedin.com/in/someone",
+        "Education",
+        "Rice University",
+        "BS Computer Science",
+        "Houston, Texas",
+      ],
+      "Jane Doe",
+    ],
+    // No name at all: a school over its degree and city is no name.
+    [
+      [
+        "jane@example.com",
+        "linkedin.com/in/someone",
+        "Skills",
+        "Python",
+        "Go",
+        "Education",
+        "Rice University",
+        "BS Computer Science",
+        "Houston, Texas",
+      ],
+      "",
+    ],
+  ])("reads no school as a LinkedIn export's name in %j", (top, expected) => {
+    const text = [...top, "Experience", "Software Engineer, Acme", "Mar 2021 – Present"];
+    expect(name(text.join("\n"))).toBe(expected);
+  });
+
+  it("never reads a school over a headline as a LinkedIn export's name", () => {
+    const text = linkedIn(["Machine Learning"])
+      .replace("Jordan Ellery", "Rice University")
+      .replace("Senior Software Engineer at Acme Corp", "Helping fintechs ship faster");
+    expect(name(text)).not.toBe("Rice University");
+  });
+
   it("keeps a skills list that opens the page when no name is found", () => {
     const text = [
       "Skills",
