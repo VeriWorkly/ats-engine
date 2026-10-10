@@ -77,6 +77,17 @@ describe("the name when a sidebar is read first", () => {
     expect(name(linkedIn(["Machine Learning"]))).toBe("Jordan Ellery");
   });
 
+  it.each([
+    "Senior Software Engineer at Acme Corp | Building payment systems for small businesses",
+    "Staff Engineer - Payments, Ledgers and Fraud Systems at Acme Corp",
+  ])("reads the name over a long headline whose title comes first: %j", (headline) => {
+    const text = linkedIn(["Machine Learning"]).replace(
+      "Senior Software Engineer at Acme Corp",
+      headline,
+    );
+    expect(name(text)).toBe("Jordan Ellery");
+  });
+
   it("keeps a skills list that opens the page when no name is found", () => {
     const text = [
       "Skills",
