@@ -240,13 +240,66 @@ function toIndex(date: AtsParsedDate, edge: "start" | "end") {
  * A season alone ("Summer 2018") is read only when the line holds no range, and only at an edge
  * of the line or in a column of its own: in "Led the Fall 2021 recruiting season" or "Fall 2019
  * cohort, Acme Lab  Jan 2019 - Dec 2020" it is not the role's term.
+ *
+ * Read once per line in one reading of a resume (see `readingDatesAt`): the experience, education,
+ * section and phone readers and the checks each ask of the same lines, and 25,000 lines of "1"
+ * cost 25,000 searches each time.
  */
 export function findDateRange(
   line: string,
   rp: AtsEnginePolicy["resumeParse"],
   now: Date = new Date(),
   { aheadYears = 0 }: { aheadYears?: number } = {},
-): { range: DateRange; matched: string } | null {
+): DateRangeFound | null {
+  const read = readings.get(now)?.(rp);
+  if (!read) return searchDateRange(line, rp, now, aheadYears);
+  const key = `${aheadYears} ${line}`;
+  if (read.has(key)) return read.get(key)!;
+  const found = searchDateRange(line, rp, now, aheadYears);
+  read.set(key, found);
+  return found;
+}
+
+type DateRangeFound = { range: DateRange; matched: string };
+
+/**
+ * The lines read for dates in each reading of a resume, by the reading's own `now`, then by the
+ * policy. A WeakMap on a Date made for that reading holds nothing once the reading is done, and a
+ * `now` a caller keeps (or "any year") is never one: its lines are searched every time.
+ */
+const readings = new WeakMap<
+  Date,
+  (rp: AtsEnginePolicy["resumeParse"]) => Map<string, DateRangeFound | null>
+>();
+
+/**
+ * A `now` for one reading of a resume, with the same time as `now`: `findDateRange` reads each
+ * line once for as long as it is passed this Date. Made fresh by each `check` and `parseResume`,
+ * never kept, so what it remembers lasts one reading.
+ */
+export function readingDatesAt(now: Date): Date {
+  const reading = new Date(now.getTime());
+  readings.set(
+    reading,
+    memo(() => new Map()),
+  );
+  return reading;
+}
+
+/**
+ * Every date the patterns read holds two digits in a row: a four-digit year, or a two-digit one
+ * after an apostrophe. A line without them holds no date, and is not searched: the patterns'
+ * lookbehinds cost every position of the line, and a resume can be 25,000 one-letter lines.
+ */
+const TWO_DIGITS = /\d\d/;
+
+function searchDateRange(
+  line: string,
+  rp: AtsEnginePolicy["resumeParse"],
+  now: Date,
+  aheadYears: number,
+): DateRangeFound | null {
+  if (!TWO_DIGITS.test(line)) return null;
   const matchers = buildMatchers(rp);
   let term: { range: DateRange; matched: string } | null = null;
 
@@ -302,6 +355,7 @@ export function findDates(
   now: Date,
 ): Array<{ date: AtsParsedDate; index: number; end: number }> {
   const found: Array<{ date: AtsParsedDate; index: number; end: number }> = [];
+  if (!TWO_DIGITS.test(line)) return found;
   for (const match of line.matchAll(buildMatchers(rp).single)) {
     const raw = match[0];
     const parsed = parseDate(raw, rp);

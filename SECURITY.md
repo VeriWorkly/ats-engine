@@ -15,10 +15,14 @@ Only the latest minor release receives security fixes while the package is 0.x.
 The engine is built to take input from anyone: a resume, a posting, a web page, an uploaded
 file. These are the guarantees, each held by a test.
 
-**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 50
-shapes (letter runs, digit runs, unclosed tags, comma lists, mixed scripts…), placed in the name
-line, a bullet and the posting at once, scores in tens of milliseconds under the community policy
-with every locale pack applied (`tests/integration/adversarial.test.ts`, which fails past 1.5 s). Patterns in a _policy_ or a _pack_
+**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 81
+shapes, 76 written on one line (letter runs, digit runs, unclosed tags, comma lists, mixed
+scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each), placed in the name
+line, a bullet and the posting at once, and again under the certification and language headings,
+scores under the community policy with every locale pack applied in tens of milliseconds for most
+one-line shapes and a few hundred at most, short lines included, on a developer machine
+(`tests/integration/adversarial.test.ts`, which fails any shape past 1.5 s). The analysis's
+redaction (`/ai`) takes milliseconds on 150 000 characters. Patterns in a _policy_ or a _pack_
 are operator-supplied: `parseAtsPolicy` checks that they compile, not that they are linear, so
 review a policy's patterns as you would code — `tests/integration/regressions.test.ts` re-runs the
 adversarial suite against a private policy when one is present.
