@@ -105,10 +105,12 @@ type Run = {
 /**
  * `images`: where each image was drawn, in page points. `marks`: small filled shapes — list
  * markers Chrome draws as paths rather than glyphs — in page points too. `tables`: ruled tables
- * drawn on the page (`countRuledTables`).
+ * drawn on the page (`countRuledTables`). `invisibleChars`: of `textChars`, those drawn in an
+ * invisible render mode, as a scan's OCR layer is.
  */
 export type PageVisibility = {
   textChars: number;
+  invisibleChars: number;
   hidden: string[];
   images: Box[];
   marks: Box[];
@@ -529,11 +531,15 @@ export function measureVisibility(
   const hidden: string[] = [];
   let previous: Run | undefined;
   let textChars = 0;
+  let invisibleChars = 0;
   for (const run of runs) {
-    textChars += run.text.trim().length;
+    const chars = run.text.trim().length;
+    textChars += chars;
     const { top, overImage, covered } = around(run.center, run.order);
 
-    const invisible = (run.mode === 3 || run.mode === 7) && !overImage;
+    const unseen = run.mode === 3 || run.mode === 7;
+    if (unseen) invisibleChars += chars;
+    const invisible = unseen && !overImage;
     const paints = paintsOf(run);
     // Fully transparent, unless the same text is drawn where it lies — as glyphs, or as the mask
     // a gradient is painted through: Chrome lays such a copy over text with a shadow, an outline
@@ -574,6 +580,7 @@ export function measureVisibility(
 
   return {
     textChars,
+    invisibleChars,
     hidden,
     images: drawn.filter((d) => d.kind === "image").map((d) => d.box),
     marks,

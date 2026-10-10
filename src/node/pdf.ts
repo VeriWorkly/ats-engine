@@ -18,6 +18,8 @@ const MAX_PAGES_MEASURED = 6;
 const MAX_VISIBILITY_PAGES = 60;
 /** Fewer text characters than this on a page with an image, and the page is a picture. */
 const MIN_PAGE_TEXT = 20;
+/** Fewer than this over an image across most of the page, and the page is a picture. */
+const STAMP_TEXT = 200;
 /** Points a side (about 0.7in) an image must reach to count as a photo. */
 const PHOTO_MIN = 50;
 
@@ -115,16 +117,21 @@ async function readPdf(
             for (const run of seen.hidden) hidden.push(run);
             if (number <= MAX_PAGES_MEASURED) {
               tables += seen.tables;
-              // An image and next to no text: a scan with no OCR layer, or a page saved as a
-              // picture.
-              if (seen.images.length && seen.textChars < MIN_PAGE_TEXT) imageOnlyPages += 1;
               // A photo: an image printed at least PHOTO_MIN points a side (icons and logo marks
               // are smaller) but not across most of the page, which is a scan or a background.
               const [, , pageWidth, pageHeight] = page.view as Box;
-              imageCount += seen.images.filter(([x0, y0, x1, y1]) => {
-                const [w, h] = [x1 - x0, y1 - y0];
-                return w >= PHOTO_MIN && h >= PHOTO_MIN && w * h < pageWidth * pageHeight * 0.5;
-              }).length;
+              const wide = ([x0, y0, x1, y1]: Box) =>
+                (x1 - x0) * (y1 - y0) >= pageWidth * pageHeight * 0.5;
+              imageCount += seen.images.filter(
+                (box) => box[2] - box[0] >= PHOTO_MIN && box[3] - box[1] >= PHOTO_MIN && !wide(box),
+              ).length;
+              // An image and next to no text: a scan with no OCR layer, or a page saved as a
+              // picture. Over an image across most of the page with no OCR layer (text drawn
+              // invisibly), a line or two is a scanner's stamp ("Scanned with CamScanner"), not
+              // the resume's text.
+              const stamped = seen.images.some(wide) && seen.invisibleChars < MIN_PAGE_TEXT;
+              if (seen.images.length && seen.textChars < (stamped ? STAMP_TEXT : MIN_PAGE_TEXT))
+                imageOnlyPages += 1;
             }
             marks = seen.marks.map(([x0, y0, x1, y1]) => {
               const [[a, b], [c, d]] = [toViewport(x0, y0), toViewport(x1, y1)];

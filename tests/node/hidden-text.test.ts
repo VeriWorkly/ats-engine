@@ -118,3 +118,25 @@ describe("image-only pages", () => {
     expect((await hidden(IMAGE(450, 650, 100, 120))).imageOnlyPages).toBe(0);
   });
 });
+
+describe("a scan with a small text stamp", () => {
+  // A phone scanner's app prints its name in a corner of every page it saves: 23 characters of
+  // text over a picture of the whole page, which is still a picture.
+  const scan = (text: string) =>
+    extractResume(buildPdf(`${IMAGE(0, 0, 612, 792)}\n${line(20, text, 8)}`), "pdf");
+
+  it("is still a picture", async () => {
+    expect((await scan("Scanned with CamScanner")).layout?.imageOnlyPages).toBe(1);
+  });
+
+  it("is not a picture when the text over it is a resume's", async () => {
+    const body = "Jane Doe, Senior Engineer at Acme Corporation, Kubernetes Terraform Kafka ";
+    const { layout } = await extractResume(
+      buildPdf(
+        [IMAGE(0, 0, 612, 792), ...[0, 1, 2, 3].map((at) => line(700 - 20 * at, body))].join("\n"),
+      ),
+      "pdf",
+    );
+    expect(layout?.imageOnlyPages).toBe(0);
+  });
+});

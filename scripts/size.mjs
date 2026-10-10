@@ -39,7 +39,9 @@ const BUDGETS = {
   // 20.2. The rest is little room: the next addition trims or argues for more.
   // 20.6: reading a PDF's running header and footer once and its page numbers not at all (between
   // two pages they parted a role's title from its dates) took it from 20.20 to 20.57.
-  "./node": 20.6,
+  // 20.7: a sidebar taller than the main column read as a column (20.60), and a scan with a
+  // scanner's text stamp still counted as a picture (20.66).
+  "./node": 20.7,
 };
 
 let failed = false;
