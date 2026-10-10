@@ -18,6 +18,18 @@
       {
         "path": "keywordMatch.phrases",
         "message": "multi-word term \"attention to detail\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      },
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"self motivated\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      },
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"critical thinking\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
+      },
+      {
+        "path": "keywordMatch.phrases",
+        "message": "multi-word term \"team player\" is referenced by implies/synonyms but missing from phrases and softSkills, so it can never match"
       }
     ]
   },
@@ -31,6 +43,27 @@
         "keywordMatch",
         "softSkills",
         0
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
+      ]
+    },
+    {
+      "code": "custom",
+      "path": [
+        "keywordMatch",
+        "phrases"
       ]
     },
     {

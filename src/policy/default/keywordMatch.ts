@@ -190,6 +190,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     // How well a language is spoken; the language is the requirement.
     "fluent",
     "fluency",
+    // How a soft skill is used: "written and verbal communication" asks for communication.
+    "written",
+    "verbal",
   ],
   synonyms: {
     js: "javascript",
@@ -226,6 +229,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     "problem-solving": "problem solving",
     "decision-making": "decision making",
     "detail-oriented": "attention to detail",
+    "self-motivated": "self motivated",
+    "critical-thinking": "critical thinking",
+    "team-player": "team player",
   },
   // What a posting asks of the person rather than of their work. They weigh `softSkillWeight` of
   // an ordinary word and the report lists them apart. Placed by one test: does a resume evidence
@@ -256,6 +262,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     "critical thinking",
     "decision making",
     "attention to detail",
+    "detail oriented",
+    "self motivated",
+    "growth mindset",
     "time management",
     "multitasking",
     "organizational",

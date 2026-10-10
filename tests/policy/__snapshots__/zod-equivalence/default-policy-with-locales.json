@@ -766,6 +766,9 @@
       "critical thinking",
       "decision making",
       "attention to detail",
+      "detail oriented",
+      "self motivated",
+      "growth mindset",
       "time management",
       "multitasking",
       "organizational",
@@ -1533,7 +1536,9 @@
       "successful",
       "responsible",
       "fluent",
-      "fluency"
+      "fluency",
+      "written",
+      "verbal"
     ],
     "synonyms": {
       "js": "javascript",
@@ -1566,7 +1571,10 @@
       "multi-tasking": "multitasking",
       "problem-solving": "problem solving",
       "decision-making": "decision making",
-      "detail-oriented": "attention to detail"
+      "detail-oriented": "attention to detail",
+      "self-motivated": "self motivated",
+      "critical-thinking": "critical thinking",
+      "team-player": "team player"
     },
     "implies": {
       "terraform": [
