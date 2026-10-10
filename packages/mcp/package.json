@@ -1,6 +1,6 @@
 {
   "name": "@veriworkly/ats-engine-mcp",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "ATS resume checker MCP server: lets Claude, Cursor or VS Code read your resume the way an applicant tracking system does and score it with a published, deterministic rubric. Runs locally.",
   "keywords": [
     "mcp",
@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "@veriworkly/ats-engine": "^0.4.1",
+    "@veriworkly/ats-engine": "^0.5.0",
     "mammoth": "^1.12.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "5.4.296",
