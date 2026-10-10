@@ -124,7 +124,7 @@ export const DEFAULT_RULES = [
     // product's name ("Python 3.11", "on Windows 10.", but "Windows 400 laptops" is a count) or
     // a standard's number ("ISO 27001", "SOC 2", "Tier 2"): a cloud engineer listing tools
     // scored 100% with no outcome measured.
-    pattern: String.raw`[$€£₹%]|(?<!\d)(?<!\d[.,])(?:(?<!\p{L})|(?<=(?<!\p{L})x))(?<!(?:iso|iec|soc|pci\s+dss|nist|tier|level)\s{1,2})(?!(?<=(?:python|java|jdk|php|perl|ruby|swift|kotlin|scala|angular|vue|react|node|django|rails|spring|\.net|windows|macos|ios|android|ubuntu|rhel|centos|debian|office|excel|sql\s+server|oracle|mysql|postgresql|postgres|html|css|ecmascript|http|tls|ssl|oauth|saml|ipv)\s{1,2})\d{1,2}(?:\.\d+)*(?![\d\p{L}])(?!\s{1,3}\p{L}))(?<!(?:19|20)\d{2}\s*[/.-]\s*)(?!(?:19|20)\d{2}(?!\d))(?!\d{1,2}\s*[/.-]\s*(?:19|20)\d{2}(?!\d))\d+`,
+    pattern: String.raw`[$€£₹%]|(?<!\d)(?<!\d[.,])(?:(?<!\p{L})|(?<=(?<!\p{L})x))(?<!(?:iso|iec|soc|pci\s+dss|nist|tier|level)\s{1,2})(?!(?<=(?:python|java|php|ruby|swift|kotlin|angular|vue|react|node|django|rails|\.net|windows|macos|ios|android|ubuntu|rhel|office|excel|sql\s+server|oracle|mysql|postgres(?:ql)?|html|css|http|tls|oauth|ipv)\s{1,2})\d{1,2}(?:\.\d+)*(?![\d\p{L}])(?!\s{1,3}\p{L}))(?<!(?:19|20)\d{2}\s*[/.-]\s*)(?!(?:19|20)\d{2}(?!\d))(?!\d{1,2}\s*[/.-]\s*(?:19|20)\d{2}(?!\d))\d+`,
     flags: "i",
     bands: [
       { upTo: 0.15, weight: 10 },

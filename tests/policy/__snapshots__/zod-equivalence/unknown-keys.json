@@ -1369,20 +1369,9 @@
       "<\\|?(?:im_start|system|endoftext)\\|?>|\\[/?(?:inst|system)\\]|###\\s*(?:instructions?|system\\s*:)"
     ],
     "injectionMentionVerbs": [
-      "flag(?:s|ged|ging)?",
-      "detect(?:s|ed|ing|ion|ions)?",
-      "block(?:s|ed|ing)?",
-      "filter(?:s|ed|ing)?",
-      "catch(?:es|ing)?",
-      "caught",
-      "prevent(?:s|ed|ing)?",
-      "mitigat(?:e|es|ed|ing)",
-      "red[\\s-]?team(?:s|ed|ing)?",
-      "test(?:s|ed|ing)?",
-      "scan(?:s|ned|ning)?",
-      "spot(?:s|ted|ting)?",
-      "reject(?:s|ed|ing)?",
-      "saniti[sz](?:e|es|ed|ing)"
+      "(?:flag|detect|block|filter|prevent|red[\\s-]?team|test|scan|spot|reject)(?:s|g?ed|g?ing|ned|ning|ted|ting)?",
+      "catch(?:es|ing)?|caught|detections?",
+      "(?:mitigat|saniti[sz])(?:e|es|ed|ing)"
     ],
     "injectionTargets": [
       "this\\s+(?:candidate|applicant|resume|cv|profile|application)",

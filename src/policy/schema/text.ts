@@ -398,20 +398,10 @@ export const engineTextSchema = z.prefault(
      * quote naming one of `injectionTargets`.
      */
     injectionMentionVerbs: z._default(wordList("text.injectionMentionVerbs"), [
-      String.raw`flag(?:s|ged|ging)?`,
-      String.raw`detect(?:s|ed|ing|ion|ions)?`,
-      String.raw`block(?:s|ed|ing)?`,
-      String.raw`filter(?:s|ed|ing)?`,
-      String.raw`catch(?:es|ing)?`,
-      "caught",
-      String.raw`prevent(?:s|ed|ing)?`,
-      String.raw`mitigat(?:e|es|ed|ing)`,
-      String.raw`red[\s-]?team(?:s|ed|ing)?`,
-      String.raw`test(?:s|ed|ing)?`,
-      String.raw`scan(?:s|ned|ning)?`,
-      String.raw`spot(?:s|ted|ting)?`,
-      String.raw`reject(?:s|ed|ing)?`,
-      String.raw`saniti[sz](?:e|es|ed|ing)`,
+      // Each with its "-s", "-ed" and "-ing": "flags", "flagged", "scanning", "red-teamed".
+      String.raw`(?:flag|detect|block|filter|prevent|red[\s-]?team|test|scan|spot|reject)(?:s|g?ed|g?ing|ned|ning|ted|ting)?`,
+      String.raw`catch(?:es|ing)?|caught|detections?`,
+      String.raw`(?:mitigat|saniti[sz])(?:e|es|ed|ing)`,
     ]),
     /** What a quote that tells the screener what to make of this resume names: never an example. */
     injectionTargets: z._default(wordList("text.injectionTargets"), [
