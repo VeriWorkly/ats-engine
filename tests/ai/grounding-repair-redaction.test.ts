@@ -175,6 +175,20 @@ describe("redaction variants", () => {
     expect(redaction.apply(`Call ${written} today`)).toBe("Call [PHONE] today");
   });
 
+  it("catches a phone with an extension glued on, and an email at a domain in any script", () => {
+    const redaction = createRedaction(parsed("Jane Doe", "(415) 555-0132"), "jane@exämple.de");
+    expect(redaction.apply("Call 415-555-0132x123")).toBe("Call [PHONE]x123");
+    expect(redaction.apply("Mail jane@exämple.de or jane@例え.jp")).toBe(
+      "Mail [EMAIL_2] or jane@例え.jp", // only an address the resume holds is a placeholder's
+    );
+  });
+
+  it("reads a country code from where it is written, so part of the number is not a number", () => {
+    const redaction = createRedaction(parsed("Jane Doe", "+1 415 555 0132"), "");
+    expect(redaction.apply("Order 55550132 and 155550132")).toBe("Order 55550132 and 155550132");
+    expect(redaction.apply("Call 415 555 0132")).toBe("Call [PHONE]");
+  });
+
   it("leaves a longer hyphenated name and date ranges alone", () => {
     const redaction = createRedaction(parsed("Jane Doe"), "");
     expect(redaction.apply("Jane Doe-Smith")).toBe("Jane Doe-Smith");
