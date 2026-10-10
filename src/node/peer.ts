@@ -6,6 +6,9 @@ export async function optional<T>(load: () => Promise<T>, packages: string): Pro
   try {
     return await load();
   } catch (error) {
-    throw new Error(`Reading this format needs ${packages} installed.`, { cause: error });
+    throw new Error(
+      `Reading this format needs ${packages} installed beside the engine: npm install pdf-parse@2 pdfjs-dist@5.4.296 mammoth (with -g beside a global install; with npx, -p each of them).`,
+      { cause: error },
+    );
   }
 }

@@ -9,7 +9,16 @@ npm ci
 npm run check   # build, types, lint, tests, bundle sizes, browser/edge smoke, pack
 ```
 
-Node 22.12 or later. `npm run bench` prints field accuracy over the labelled corpus.
+Node 22.12 or later. `npm run bench` prints field accuracy over two labelled corpora (the
+hand-written resumes, and a seeded generated set rendered as text, PDF, two-column PDF and DOCX) and
+fails on any miss `bench/baseline.json` does not list (a resume, a field and its row), so a field
+read better elsewhere cannot hide one read worse. The baseline is not a goal and is not tuned to
+pass: it records what the engine misses today, and the run says when a listed miss is read right.
+Update it with `npm run bench -- --update` only in the change that earns the difference (a parser
+fix removes misses; a deliberate trade-off adds them, and the commit says why), and review the diff
+of `bench/baseline.json` like any other change. A new field or label that misses also needs an
+update. `npm run bench -- --verbose` lists each generated miss with what was read against what was
+labelled.
 
 ## The rules
 
@@ -55,8 +64,10 @@ Releases go out from `main` through changesets and `.github/workflows/release.ym
 3. Merging that pull request leaves no changesets pending, so the workflow runs
    `npm run release` (`npm run check`, then `changeset publish`): each new version is published
    to npm with provenance and tagged `<name>@<version>`, and a new engine version is published to
-   GitHub Packages too (`.github/workflows/github-packages.yml`). Nothing publishes without that
-   pull request.
+   GitHub Packages too (`.github/workflows/github-packages.yml`). A new MCP server version is
+   then listed in the official MCP Registry with `mcp-publisher` over GitHub OIDC, under
+   `io.github.VeriWorkly/ats-engine` (the registry compares the casing). Nothing publishes
+   without that pull request.
 
 If the organisation does not let GitHub Actions create pull requests, the workflow fails at
 step 2. Open the pull request by hand instead: on a branch from `main`, run

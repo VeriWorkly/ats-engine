@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -140,5 +140,78 @@ describe("the ats input", () => {
 
   it("fails on an ATS the engine does not know", () => {
     expect(action({ ATS_RESUME: resume, ATS_TARGET: "nonesuch" }).code).toBe(1);
+  });
+});
+
+describe("the Action's npx run", () => {
+  // `npx` installs no optional peers, so the Action asks it for the PDF and DOCX readers next to
+  // the engine; without them a PDF resume exits 1. The tests above run the local build and never
+  // reach npx, so a preload stands in for spawnSync and records what would be passed to it.
+  const preload = join(dir, "preload.mjs");
+  const record = join(dir, "argv.json");
+  writeFileSync(
+    preload,
+    `import cp from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
+import { writeFileSync } from "node:fs";
+cp.spawnSync = (command, args) => {
+  writeFileSync(${JSON.stringify(record)}, JSON.stringify(args));
+  return { status: 0, stdout: JSON.stringify({ readinessScore: 90, failedChecks: [] }), stderr: "" };
+};
+syncBuiltinESMExports();
+`,
+  );
+  const spawned = (env: Record<string, string>) => {
+    const run = spawnSync(
+      process.execPath,
+      ["--import", pathToFileURL(preload).href, join(root, "action/run.mjs")],
+      {
+        encoding: "utf8",
+        env: { ...process.env, ATS_RESUME: "resume.pdf", RUNNER_TEMP: dir, ...env },
+      },
+    );
+    expect(run.status).toBe(0);
+    return JSON.parse(readFileSync(record, "utf8")) as string[];
+  };
+  const { peerDependencies } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+    peerDependencies: Record<string, string>;
+  };
+
+  it("asks npx for the engine and each optional peer, then runs ats-engine check", () => {
+    const args = spawned({ ATS_ENGINE_CLI: "", ATS_VERSION: "0.4.0" });
+    const packages = args.filter((_, i) => args[i - 1] === "-p");
+    expect(packages[0]).toBe("@veriworkly/ats-engine@0.4.0");
+    expect(
+      packages
+        .slice(1)
+        .map((spec) => spec.replace(/@[^@]+$/, ""))
+        .sort(),
+    ).toEqual(Object.keys(peerDependencies).sort());
+    expect(args).toContain("--yes");
+    expect(args.slice(args.indexOf("ats-engine"), args.indexOf("ats-engine") + 2)).toEqual([
+      "ats-engine",
+      "check",
+    ]);
+  });
+
+  it("passes a local build only the CLI's own arguments", () => {
+    const args = spawned({ ATS_ENGINE_CLI: join(root, "dist/cli/index.js") });
+    expect(args[1]).toBe("check");
+    expect(args).not.toContain("-p");
+  });
+
+  it("pins peer versions the engine's peerDependencies accept", () => {
+    // The ranges are exact ("5.4.296") or caret on a 1.0 or later ("^1.12.0").
+    const accepts = (range: string, version: string) => {
+      if (!range.startsWith("^")) return version === range;
+      const [want, have] = [range.slice(1), version].map((v) => v.split(".").map(Number));
+      const [major, ...rest] = have!.map((part, i) => part - want![i]!);
+      return major === 0 && (rest.find((difference) => difference !== 0) ?? 0) >= 0;
+    };
+    const source = readFileSync(join(root, "action/run.mjs"), "utf8");
+    const pinned = [...source.matchAll(/"(pdf-parse|pdfjs-dist|mammoth)@(\d+\.\d+\.\d+)"/g)];
+    expect(pinned.map(([, name]) => name).sort()).toEqual(Object.keys(peerDependencies).sort());
+    for (const [, name, version] of pinned)
+      expect(accepts(peerDependencies[name!]!, version!), `${name}@${version}`).toBe(true);
   });
 });

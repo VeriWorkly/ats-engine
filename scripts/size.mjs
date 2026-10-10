@@ -30,7 +30,14 @@ const BUDGETS = {
   // 1.3), and reading a resume or a posting from a path (`readResumeFile`, `readJobFile`, shared
   // by the CLI and the MCP server, which validate a .json resume with `/document`'s guards, 1.6),
   // took it to 18.9 (0.2).
-  "./node": 19.5,
+  // 19.6: the missing-reader message naming the command that installs the readers, and how
+  // with -g or npx, took it from 19.44 to 19.52.
+  // 20.5: refusing, before mammoth parses it, a DOCX whose XML its parser would take seconds to
+  // minutes over (unclosed markup, malformed tags, a prefix bound to two namespaces, thousands of
+  // distinct warnings, over 2 MB) took it to 20.0, and reading only a regular local file, measured
+  // before it is opened and read through one bounded handle (no network path, pipe or device), to
+  // 20.2. The rest is little room: the next addition trims or argues for more.
+  "./node": 20.5,
 };
 
 let failed = false;

@@ -77,7 +77,7 @@ seam is clear.
 | `report/`, `repair/`                 | `shape` (full / restricted); `grounding`, `merge` (AI repair acceptance)                                                                                                                                                                                                                                                                                                                                                                                  | `.`                    |
 | `format/`, `job/`                    | display helpers; job text from HTML (`html.ts` scanner, whole-page mode skipping navigation and hidden elements; `index.ts` JSON-LD)                                                                                                                                                                                                                                                                                                                      | `/format`, `/job`      |
 | `ai/`                                | `run` (task runner, retries), `provider`, `http`, `schema`, `redact`, `tasks/`, adapters, `testing/`                                                                                                                                                                                                                                                                                                                                                      | `/ai`, `/ai/*`         |
-| `node/`                              | `extract` (formats, normalisation), `files` (`readResumeFile`, `readJobFile`: a path, its limits, the file info), `pdf` (text + geometry in one pass, encryption), `lines` (PDF lines in reading order: by baseline, column by column, links, bullets drawn as shapes), `hidden` + `surroundings` (replay, grid), `tables` (grids), `layout` (columns), `docx` (zip, hidden runs, tracked changes and comments, bomb budget), `peer`, `child`, `protocol` | `/node`, `/node/child` |
+| `node/`                              | `extract` (formats, normalisation), `files` (`readResumeFile`, `readJobFile`: a path, its limits, the file info), `pdf` (text + geometry in one pass, encryption), `lines` (PDF lines in reading order: by baseline, column by column, links, bullets drawn as shapes), `hidden` + `surroundings` (replay, grid), `tables` (grids), `layout` (columns), `docx` (zip, hidden runs, tracked changes and comments, bomb budget, what `mammoth` may parse), `peer`, `child`, `protocol` | `/node`, `/node/child` |
 | `cli/`                               | `index` (the bin), `main` (`ats-engine check`, arguments, the text report), `terminal` (colour, banner, control-character stripping), `ai` (`--ai` provider presets over the two adapters), `usage`                                                                                                                                                                                                                                                       | bin                    |
 | `util/`                              | `memo`, `own` (own-property lookup), `hash`, `issues` (zod's English messages, per parse)                                                                                                                                                                                                                                                                                                                                                                 | internal               |
 
@@ -86,14 +86,21 @@ Tests mirror `src/`: `tests/parser/`, `tests/matching/`, `tests/scoring/`, `test
 per module, each file named for what it covers. `tests/action/` runs the GitHub Action's
 `run.mjs` against the local build. `tests/integration/` holds what crosses modules: hostile input
 (`adversarial`), generated-input properties (`properties`), Unicode, and end-to-end regressions.
-`tests/fixtures/` builds PDFs, DOCX files and the labelled corpus; `timing.ts` has `expectFast`,
-which every time budget uses so a busy machine cannot fail a test. Work bounded by a count is
-tested by the count (`tests/node/visibility-budget.test.ts`), not the clock.
+`tests/fixtures/` builds PDFs, DOCX files and the labelled corpus. `generatedResumes.ts` writes a
+seeded set of invented resumes (varied separators, date forms, city placement, headings and section
+order) and renders each as text, a one-column PDF, a two-column PDF and a DOCX, labelled from its
+inputs and never from what the engine reads. `npm run bench` (`bench/run.ts`) scores both that set
+and the hand-written one per field and fails on any miss `bench/baseline.json` does not list; the
+≥0.95 per-locale gate in `tests/locales/` runs on the hand-written set. `timing.ts` has
+`expectFast`, which every time budget uses so a busy machine cannot fail a test. Work bounded by a
+count is tested by the count (`tests/node/visibility-budget.test.ts`), not the clock.
 
 `node/files` reads a resume or a posting from a path (`readResumeFile`, `readJobFile`) with the
-limits and messages the CLI and the MCP server share, and says what the file was (`file`: name,
+limits and messages the CLI and the MCP server share — a regular file on this computer only, no
+network path, pipe or device — and says what the file was (`file`: name,
 size, format) for the file advice; `node/docx` counts tracked changes and comments while it
-measures, and `node/pdf` notes an encrypted PDF that opened without a password. `printable` in
+measures and checks every part `mammoth` will parse before it parses any (`checkParsedXml`), and
+`node/pdf` notes an encrypted PDF that opened without a password. `printable` in
 `/format` strips control characters from what either prints. `packages/mcp/` is a separate npm workspace,
 `@veriworkly/ats-engine-mcp`: an MCP server over the public entry points, with tests in
 `packages/mcp/tests/` that spawn the built server. The root is a workspace too
@@ -122,8 +129,9 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 Counted with esbuild's metafile, every bare import left external. "zod/mini" includes its
 English locale (`zod/v4/locales/en.js`, see `util/issues.ts`). Bundle budgets per subpath are
-enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 91.7 KB for `.`, 67.5 KB
-each for `/locales` and `/ai`, 19.4 KB for `/node`, under 4 KB for every other);
+enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 95 KB for `.`, 70 KB
+each for `/locales` and `/ai`, 20.5 KB for `/node`, under 4 KB for every other; the script
+prints each entry's size against its budget, with the reason for each budget beside it);
 `npm run smoke` bundles every runtime-agnostic subpath for the browser and runs the core in a
 bare V8 context (edge).
 

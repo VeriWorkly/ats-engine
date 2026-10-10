@@ -33,7 +33,7 @@ npm install @veriworkly/ats-engine
 To read PDF and DOCX files on Node, also install the optional peer dependencies:
 
 ```sh
-npm install pdf-parse pdfjs-dist@5.4.296 mammoth
+npm install pdf-parse@2 pdfjs-dist@5.4.296 mammoth
 ```
 
 The core runs on Node 22.12 or later and in any modern browser or edge runtime.
@@ -42,11 +42,14 @@ The package is ESM only. From CommonJS on Node 22.12 or later, `require("@veriwo
 
 ## Quick start
 
-Score a file from the command line without writing any code:
+Score a file from the command line without writing any code. PDF and DOCX files need the optional readers, which `npx` does not install on its own, so install them once with the CLI:
 
 ```sh
-npx @veriworkly/ats-engine check resume.pdf --job posting.txt
+npm install -g @veriworkly/ats-engine pdf-parse@2 pdfjs-dist@5.4.296 mammoth
+ats-engine check resume.pdf --job posting.txt
 ```
+
+For a one-off run without installing, name the readers to `npx`: `npx -p @veriworkly/ats-engine -p pdf-parse@2 -p pdfjs-dist@5.4.296 -p mammoth ats-engine check resume.pdf`. A `.txt`, `.md`, `.html` or `.json` resume needs none of them: `npx @veriworkly/ats-engine check resume.md`.
 
 ```text
 Readiness  97/100 (good) — 32/35 checks passed
@@ -115,10 +118,10 @@ Add `--ai` to have a model explain the report and suggest what to fix first. The
 ```sh
 # macOS and Linux (PowerShell: $env:GEMINI_API_KEY = "...")
 export GEMINI_API_KEY=...
-npx @veriworkly/ats-engine check resume.pdf --ai --provider gemini --model <model-id>
+ats-engine check resume.pdf --ai --provider gemini --model <model-id>
 
 # Ollama on your own machine needs no key, and the resume never leaves it
-npx @veriworkly/ats-engine check resume.pdf --ai --provider ollama --model llama3.1
+ats-engine check resume.pdf --ai --provider ollama --model llama3.1
 ```
 
 | Option              | What it does                                                                                                               |
@@ -411,7 +414,7 @@ node dist/cli/index.js check path/to/resume.pdf --job path/to/posting.txt
 | `npm run dev`   | Rebuild on every change                                           |
 | `npm test`      | Run the test suite                                                |
 | `npm run lint`  | ESLint and Prettier checks                                        |
-| `npm run bench` | Field accuracy over the labelled corpus of synthetic resumes      |
+| `npm run bench` | Field accuracy over the labelled and generated synthetic resumes  |
 | `npm run check` | Everything CI runs: build, types, lint, tests, sizes, smoke, pack |
 
 ## Documentation
@@ -422,6 +425,7 @@ node dist/cli/index.js check path/to/resume.pdf --job path/to/posting.txt
 - [CONTRIBUTING.md](./CONTRIBUTING.md): the rules for a change, where to make it, and how a release goes out
 - [SECURITY.md](./SECURITY.md): limits, prompt-injection handling, and reporting a vulnerability
 - [CHANGELOG.md](./CHANGELOG.md): releases and breaking changes
+- [llms.txt](./llms.txt): a short summary of the package for AI tools, in the llmstxt.org format; also served from the npm package (`https://cdn.jsdelivr.net/npm/@veriworkly/ats-engine/llms.txt`)
 - [packages/mcp](https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme): the MCP server, `@veriworkly/ats-engine-mcp`
 
 The package is still 0.x. Any change to the report's shape, the policy schema, or the score for the same input is treated as breaking and called out in the changelog. `AtsParsedEducation.level`, `AtsParsedResume.highestDegree`, `AtsDegreeLevel` and `DEGREE_LABELS` are deprecated and will be removed in 1.0; use `isced`, `highestIsced` and `ISCED_LABELS` instead.

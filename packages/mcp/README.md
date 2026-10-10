@@ -97,7 +97,8 @@ The resource `rubric://default` is the whole rubric as JSON.
 - Give absolute paths. `~/` is read as your home folder; any other relative path is read from
   the folder the server was started in.
 - Pasted `text` and `job_text` may be up to 200 000 characters.
-- Files over 20 MB are refused, and so are folders. So is a PDF with no text layer: an ATS
+- Files over 20 MB are refused, and so are folders, pipes, devices and network paths
+  (`\\host\share\…`). So is a PDF with no text layer: an ATS
   cannot read a scan either.
 - `region` is `US`, `DE` or `IN`. Without it, the region is inferred from the resume.
 - `target_ats` is `greenhouse`, `lever` or `taleo`. It adds what that vendor documents publicly,

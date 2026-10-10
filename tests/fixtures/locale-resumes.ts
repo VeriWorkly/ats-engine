@@ -8,10 +8,23 @@
 
 import { EN_FIXTURES } from "./en-resumes.js";
 
-export type ExpectedRole = { title: string; employer: string; start: string; current: boolean };
-export type ExpectedEducation = { school: string; isced: number | null };
-/** `date` as "YYYY-MM", "YYYY", or "" when the row has none. */
-export type ExpectedCertification = { name: string; issuer: string; date: string };
+/** `start`, and `end` when labelled, as "YYYY-MM" or "YYYY"; `end` "" for a role with none. */
+export type ExpectedRole = {
+  title: string;
+  employer: string;
+  start: string;
+  current: boolean;
+  end?: string;
+};
+/** `credential`: the degree as written ("B.S.", "Master of Science"), not its field. */
+export type ExpectedEducation = { school: string; isced: number | null; credential?: string };
+/** `date` and `expires` as "YYYY-MM", "YYYY", or "" when the row has none. */
+export type ExpectedCertification = {
+  name: string;
+  issuer: string;
+  date: string;
+  expires?: string;
+};
 export type ExpectedLanguage = { language: string; cefr: string | null };
 
 export type LocaleFixture = {
@@ -24,6 +37,8 @@ export type LocaleFixture = {
   roles: ExpectedRole[];
   education: ExpectedEducation[];
   skills: string[];
+  /** As written, in any order; none when left out: a resume without links must not grow any. */
+  links?: string[];
   /** None when left out: a resume without the section must not grow rows. */
   certifications?: ExpectedCertification[];
   spokenLanguages?: ExpectedLanguage[];
@@ -60,12 +75,23 @@ Werkzeuge: Kubernetes, Docker, PostgreSQL`,
           employer: "Beispiel GmbH",
           start: "2020-03",
           current: true,
+          end: "",
         },
-        { title: "Softwareentwickler", employer: "Muster AG", start: "2017-01", current: false },
+        {
+          title: "Softwareentwickler",
+          employer: "Muster AG",
+          start: "2017-01",
+          current: false,
+          end: "2020-02",
+        },
       ],
       education: [
-        { school: "Hochschule für Technik und Wirtschaft Berlin", isced: 6 },
-        { school: "Gymnasium Steglitz", isced: 3 },
+        {
+          school: "Hochschule für Technik und Wirtschaft Berlin",
+          isced: 6,
+          credential: "Diplom-Informatiker (FH)",
+        },
+        { school: "Gymnasium Steglitz", isced: 3, credential: "Abitur" },
       ],
       skills: ["Go", "Java", "TypeScript", "Kubernetes", "Docker", "PostgreSQL"],
     },
@@ -98,17 +124,27 @@ SQL, Python, Tableau, SAP`,
           employer: "Beispiel Consulting GmbH",
           start: "2021-04",
           current: true,
+          end: "",
         },
         {
           title: "Projektleiterin",
           employer: "Muster Logistik AG",
           start: "2016-10",
           current: false,
+          end: "2021-03",
         },
       ],
       education: [
-        { school: "Universität Mannheim", isced: 7 },
-        { school: "Universität Mannheim", isced: 6 },
+        {
+          school: "Universität Mannheim",
+          isced: 7,
+          credential: "Master of Science",
+        },
+        {
+          school: "Universität Mannheim",
+          isced: 6,
+          credential: "Bachelor of Science",
+        },
       ],
       skills: ["SQL", "Python", "Tableau", "SAP"],
     },
@@ -133,9 +169,10 @@ Terraform, AWS, Linux`,
           employer: "Beispiel Cloud GmbH",
           start: "2019-03",
           current: true,
+          end: "",
         },
       ],
-      education: [{ school: "", isced: 3 }],
+      education: [{ school: "", isced: 3, credential: "Ausbildung zum Fachinformatiker" }],
       skills: ["Terraform", "AWS", "Linux"],
     },
     {
@@ -168,23 +205,31 @@ Deutsch (Muttersprache), Englisch (verhandlungssicher, C1), Französisch (Grundk
           employer: "Beispiel Systems GmbH",
           start: "2021-06",
           current: true,
+          end: "",
         },
         {
           title: "Systemadministratorin",
           employer: "Muster IT AG",
           start: "2016-09",
           current: false,
+          end: "2021-05",
         },
       ],
-      education: [{ school: "Universität Hamburg", isced: 6 }],
+      education: [{ school: "Universität Hamburg", isced: 6, credential: "Bachelor of Science" }],
       skills: ["AWS", "Terraform", "Kubernetes", "Python"],
       certifications: [
         {
           name: "AWS Certified Solutions Architect – Professional",
           issuer: "Amazon Web Services",
           date: "2023-03",
+          expires: "",
         },
-        { name: "Professional Scrum Master (PSM I)", issuer: "Scrum.org", date: "" },
+        {
+          name: "Professional Scrum Master (PSM I)",
+          issuer: "Scrum.org",
+          date: "",
+          expires: "2027-12",
+        },
       ],
       spokenLanguages: [
         { language: "Deutsch", cefr: "C2" },
@@ -220,8 +265,15 @@ Java, Go, Kubernetes, PostgreSQL`,
           employer: "उदाहरण टेक्नोलॉजीज़",
           start: "2021-01",
           current: true,
+          end: "",
         },
-        { title: "सॉफ्टवेयर इंजीनियर", employer: "नमूना सॉफ्टवेयर", start: "2018", current: false },
+        {
+          title: "सॉफ्टवेयर इंजीनियर",
+          employer: "नमूना सॉफ्टवेयर",
+          start: "2018",
+          current: false,
+          end: "2020",
+        },
       ],
       education: [{ school: "दिल्ली विश्वविद्यालय", isced: 6 }],
       skills: ["Java", "Go", "Kubernetes", "PostgreSQL"],
@@ -248,11 +300,12 @@ SQL, Excel, Power BI`,
           employer: "नमूना वित्त लिमिटेड",
           start: "2020-03",
           current: true,
+          end: "",
         },
       ],
       education: [
-        { school: "उदाहरण प्रबंधन संस्थान", isced: 7 },
-        { school: "लखनऊ विश्वविद्यालय", isced: 6 },
+        { school: "उदाहरण प्रबंधन संस्थान", isced: 7, credential: "एमबीए" },
+        { school: "लखनऊ विश्वविद्यालय", isced: 6, credential: "स्नातक" },
       ],
       skills: ["SQL", "Excel", "Power BI"],
     },
@@ -286,8 +339,15 @@ AWS, Linux, Python
           employer: "उदाहरण बैंक लिमिटेड",
           start: "2022-07",
           current: true,
+          end: "",
         },
-        { title: "सिस्टम इंजीनियर", employer: "नमूना टेक", start: "2019", current: false },
+        {
+          title: "सिस्टम इंजीनियर",
+          employer: "नमूना टेक",
+          start: "2019",
+          current: false,
+          end: "2022",
+        },
       ],
       education: [{ school: "पुणे विश्वविद्यालय", isced: 6 }],
       skills: ["AWS", "Linux", "Python"],
@@ -296,8 +356,9 @@ AWS, Linux, Python
           name: "AWS Certified Developer – Associate",
           issuer: "Amazon Web Services",
           date: "2023",
+          expires: "",
         },
-        { name: "पीएमपी", issuer: "पीएमआई", date: "" },
+        { name: "पीएमपी", issuer: "पीएमआई", date: "", expires: "2027" },
       ],
       spokenLanguages: [
         { language: "हिंदी", cefr: "C2" },
@@ -330,11 +391,12 @@ Java, Spring Boot, Kafka`,
           employer: "Example Technologies",
           start: "2019-06",
           current: true,
+          end: "",
         },
       ],
       education: [
-        { school: "Anna University", isced: 6 },
-        { school: "Kendriya Vidyalaya", isced: 3 },
+        { school: "Anna University", isced: 6, credential: "B.E." },
+        { school: "Kendriya Vidyalaya", isced: 3, credential: "Class XII" },
       ],
       skills: ["Java", "Spring Boot", "Kafka"],
     },
@@ -362,14 +424,22 @@ Excel, SQL, Tally`,
           employer: "Sample Finance Ltd",
           start: "2018-04",
           current: true,
+          end: "",
         },
-        { title: "Analyst", employer: "Example Bank", start: "2015-07", current: false },
+        {
+          title: "Analyst",
+          employer: "Example Bank",
+          start: "2015-07",
+          current: false,
+          end: "2018-03",
+        },
       ],
       education: [
-        { school: "Example Institute of Management", isced: 7 },
+        { school: "Example Institute of Management", isced: 7, credential: "MBA" },
         // B.Com is an Indian credential: without the IN region (no +91, nothing else saying
-        // India) only its school is read. A host that knows the country passes `region`.
-        { school: "Sample College", isced: null },
+        // India) its level is not read. A host that knows the country passes `region`. The
+        // credential is labelled as written, so the bench counts it until it is read.
+        { school: "Sample College", isced: null, credential: "B.Com" },
       ],
       skills: ["Excel", "SQL", "Tally"],
     },

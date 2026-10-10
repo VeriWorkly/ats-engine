@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +9,7 @@ import {
   normalizeExtractedText,
 } from "../../src/node/extract.js";
 import { measureColumns } from "../../src/node/layout.js";
+import { optional } from "../../src/node/peer.js";
 import { buildDocx } from "../fixtures/buildDocx.js";
 import { buildPdf, LEFT_COLUMN, RIGHT_COLUMN, ruledTable, text } from "../fixtures/buildPdf.js";
 
@@ -144,6 +147,45 @@ describe("resume extraction", () => {
 
   it("rejects a file that is not the format it claims", async () => {
     await expect(extractResume(Buffer.from("not a zip"), "docx")).rejects.toThrow();
+  });
+});
+
+describe("a missing PDF or DOCX reader", () => {
+  const root = new URL("../../", import.meta.url);
+  const { peerDependencies } = JSON.parse(readFileSync(new URL("package.json", root), "utf8")) as {
+    peerDependencies: Record<string, string>;
+  };
+  // What to install, at the versions the engine accepts: pdfjs-dist is pinned exactly, and a
+  // bare `pdf-parse` would take whatever major is latest.
+  const specs = [
+    `pdf-parse@${peerDependencies["pdf-parse"]!.replace(/^\^(\d+).*/, "$1")}`,
+    `pdfjs-dist@${peerDependencies["pdfjs-dist"]}`,
+    "mammoth",
+  ];
+  const missing = () =>
+    optional(() => Promise.reject(new Error("Cannot find package")), "pdf-parse and pdfjs-dist")
+      .then(() => new Error("loaded"))
+      .catch((error: Error) => error);
+
+  it("names the package and the command that installs it", async () => {
+    const error = await missing();
+    expect(error.message).toContain("needs pdf-parse and pdfjs-dist installed");
+    expect(error.message).toContain(`npm install ${specs.join(" ")}`);
+    expect(error.cause).toBeInstanceOf(Error);
+  });
+
+  it("tells a global or npx user how to add them too", async () => {
+    const { message } = await missing();
+    expect(message).toContain("-g");
+    expect(message).toMatch(/npx.*-p/);
+  });
+
+  it.each(["README.md", "llms.txt"])("is installed at the same versions %s gives", (name) => {
+    const doc = readFileSync(new URL(name, root), "utf8");
+    const commands = doc.match(/(?:npm install|npx) [^`\n]*/g) ?? [];
+    for (const word of commands.join(" ").split(" "))
+      if (/^(?:pdf-parse|pdfjs-dist)\b/.test(word)) expect(specs, name).toContain(word);
+    expect(doc).toContain(specs.join(" "));
   });
 });
 

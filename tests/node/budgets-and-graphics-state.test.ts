@@ -18,9 +18,9 @@ import {
 } from "../../src/node/docx.js";
 import { measureVisibility, seeThroughImages, type Box } from "../../src/node/hidden.js";
 import { extractResume } from "../../src/node/index.js";
-import { buildDocxBody, documentXml } from "../fixtures/buildDocx.js";
+import { buildDocxBody, documentXml, relationshipsXml } from "../fixtures/buildDocx.js";
 import { buildPdf, stream } from "../fixtures/buildPdf.js";
-import { expectFast } from "../fixtures/timing.js";
+import { expectFast, expectFastAsync } from "../fixtures/timing.js";
 
 /**
  * The `/node`, `/job` and CLI findings of the October review, each reproduced before its fix.
@@ -1161,6 +1161,170 @@ describe("the parts measured are the parts mammoth reads", () => {
     it("falls back to word/document.xml when the target is missing", () => {
       const data = docx(rels(["officeDocument", "word/absent.xml"]), [DOCUMENT, hidden]);
       expect(measureDocx(data)?.hiddenChars).toBe(KEYWORD_CHARS);
+    });
+  });
+});
+
+describe("the XML mammoth parses is checked before it parses any of it", () => {
+  // Its XML parser (`@xmldom/xmldom` 0.8) and its list of warnings take seconds to minutes over
+  // markup that never closes, `<` that starts no tag, thousands of distinct names it warns about,
+  // or more XML than a resume holds. A real Word document, comments and processing instructions
+  // included, still reads.
+  const RESUME = [
+    "Jane Doe",
+    "jane@example.com",
+    "Experience",
+    "Engineer at Acme 2019 - 2022",
+    "- Built a payments service used by 2,000 shops",
+  ]
+    .map((value) => `<w:p><w:r><w:t>${value}</w:t></w:r></w:p>`)
+    .join("");
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+  /** Refused within half a second, with the message every unreadable DOCX gets. */
+  const refusedFast = (data: Buffer, message = /could not be read as DOCX/) =>
+    expectFastAsync(
+      () =>
+        extractResume(data, "docx").then(
+          () => null,
+          (error: Error) => error.message,
+        ),
+      500,
+    ).then((refusal) => expect(refusal).toMatch(message));
+
+  describe("markup that never closes", () => {
+    it("refuses a 1 KB document of unclosed comments", async () => {
+      // 25,000 `<!--` deflate to about a kilobyte; mammoth's parser searched to the end of the
+      // part for each one's `-->`: 2.8 s here, 25 s at 50,000, two minutes at 100,000.
+      const data = buildDocxBody(RESUME + "<!--".repeat(25_000), true);
+      expect(data.length).toBeLessThan(1_200);
+      await refusedFast(data);
+    });
+
+    it("refuses unclosed processing instructions", async () => {
+      // Each `<?x ` copied the part up to it into a new node: 9 s at 10,000.
+      await refusedFast(buildDocxBody(RESUME + "<?x ".repeat(10_000), true));
+    });
+
+    it("refuses an unclosed CDATA section", async () => {
+      await refusedFast(
+        buildDocxBody(`${RESUME}<w:p><w:r><w:t><![CDATA[x</w:t></w:r></w:p>`, true),
+      );
+    });
+
+    it("refuses unclosed markup in a part the document names, not only in the document", async () => {
+      const styles = `<?xml version="1.0"?><w:styles xmlns:w="${W}">${"<!--".repeat(25_000)}</w:styles>`;
+      await refusedFast(buildDocxBody(RESUME, true, [["word/styles.xml", styles]]));
+    });
+  });
+
+  describe("tags the parser reports as errors, one at a time", () => {
+    it.each([
+      ["a run of <", "<".repeat(250_000)],
+      ["tag names cut short by <", "<a".repeat(250_000)],
+      ["end tags that never close", "</a".repeat(250_000)],
+      ["a document type declaration", '<!DOCTYPE w:document [<!ENTITY x "y">]>'],
+    ])("refuses %s", async (_, body) => {
+      await refusedFast(buildDocxBody(RESUME + body, true));
+    });
+  });
+
+  describe("warnings mammoth merges pairwise", () => {
+    // Each distinct warning is compared with every other: 10,000 cost 12 s.
+    const many = (unit: (index: number) => string) =>
+      Array.from({ length: 6_000 }, (_, index) => unit(index)).join("");
+
+    it.each([
+      ["element names", (index: number) => `<x${index}/>`],
+      ["namespaces", (index: number) => `<n${index}:p xmlns:n${index}="urn:example:${index}"/>`],
+      [
+        "paragraph styles",
+        (index: number) => `<w:p><w:pPr><w:pStyle w:val="S${index}"/></w:pPr></w:p>`,
+      ],
+      ["break types", (index: number) => `<w:r><w:br w:type="t${index}"/></w:r>`],
+      // The same tags in the default namespace, with no prefix to know them by: 17 s at 20,000.
+      [
+        "unprefixed break types",
+        (index: number) => `<w:r xmlns="${W}"><br w:type="t${index}"/></w:r>`,
+      ],
+      [
+        "unprefixed symbols",
+        (index: number) => `<w:r xmlns="${W}"><sym w:font="F" w:char="C${index}"/></w:r>`,
+      ],
+    ])("refuses thousands of distinct %s", async (_, unit) => {
+      await refusedFast(buildDocxBody(RESUME + many(unit), true));
+    });
+
+    it("refuses a prefix bound again, within a part, to another namespace", async () => {
+      // 120 names under 120 namespaces through one prefix: 14,400 distinct warnings from 240
+      // names and namespaces. 4 s here, 136 s at 240 of each. No writer rebinds a prefix.
+      let body = "";
+      for (let space = 0; space < 120; space += 1)
+        for (let name = 0; name < 120; name += 1)
+          body += `<n:a${name} xmlns:n="urn:example:${space}"/>`;
+      await refusedFast(buildDocxBody(RESUME + body, true));
+    });
+  });
+
+  describe("more XML than a resume holds", () => {
+    it("refuses a document past the parsed-XML limit, however it is padded", async () => {
+      const padding = `<w:p><w:r><w:t>${"lorem ipsum ".repeat(1_000)}</w:t></w:r></w:p>`;
+      await refusedFast(
+        buildDocxBody(RESUME + padding.repeat(200), true),
+        /^The document's XML expands to more than 2 MB, more than this reader takes\.$/,
+      );
+    });
+  });
+
+  it("ignores a style map embedded in the document", async () => {
+    // `mammoth` applied it: "p => !" dropped every paragraph, and 200,000 rules over 50,000
+    // paragraphs took over five minutes.
+    const data = buildDocxBody(RESUME, true, [["mammoth/style-map", "p => !"]]);
+    expect((await extractResume(data, "docx")).text).toContain("Engineer at Acme 2019 - 2022");
+  });
+
+  describe("a real Word document still reads", () => {
+    const DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    const part = (root: string, inner: string) =>
+      `${DECLARATION}<!-- Written by a test --><w:${root} xmlns:w="${W}">${inner}</w:${root}>`;
+    // Word declares a drawing's namespace again on each drawing, always to the same URI.
+    const A = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"';
+
+    it("with a declaration in every part, comments, a processing instruction and repeated namespaces", async () => {
+      const data = buildDocxBody(
+        `<?mso-application progid="Word.Document"?>${RESUME}<!-- a comment --><w:p><w:r><w:t>Go &amp; Rust</w:t></w:r><w:r ${A}/><w:r ${A}/></w:p>`,
+        true,
+        [
+          [
+            "word/_rels/document.xml.rels",
+            relationshipsXml([
+              ["rId1", "styles", "styles.xml"],
+              ["rId2", "numbering", "numbering.xml"],
+              ["rId3", "footnotes", "footnotes.xml"],
+              ["rId4", "header", "header1.xml"],
+            ]),
+          ],
+          [
+            "word/styles.xml",
+            part(
+              "styles",
+              '<w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/></w:style>',
+            ),
+          ],
+          ["word/numbering.xml", part("numbering", "")],
+          [
+            "word/footnotes.xml",
+            part(
+              "footnotes",
+              '<w:footnote w:id="0"><w:p><w:r><w:t>Note</w:t></w:r></w:p></w:footnote>',
+            ),
+          ],
+          ["word/header1.xml", part("hdr", "<w:p><w:r><w:t>Jane Doe</w:t></w:r></w:p>")],
+        ],
+      );
+      const { text } = await extractResume(data, "docx");
+      expect(text).toContain("Engineer at Acme 2019 - 2022");
+      expect(text).toContain("Go & Rust");
     });
   });
 });

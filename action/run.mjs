@@ -1,5 +1,6 @@
 // Runs the ats-engine CLI on the resume, writes the step outputs and the job summary, and fails
-// the step below min-score. No dependencies: Node and npx come with every GitHub runner.
+// the step below min-score. No dependencies of its own: Node and npx come with every GitHub
+// runner, and npx fetches the engine together with the PDF and DOCX readers (its optional peers).
 import { spawnSync } from "node:child_process";
 import { appendFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -24,11 +25,16 @@ const minScore = minScoreText ? Number(minScoreText) : null;
 if (minScore !== null && !(minScore >= 0 && minScore <= 100))
   fail(`min-score must be a number from 0 to 100, not "${minScoreText}".`);
 
+// The engine's optional peers: npx installs none on its own, and a PDF or DOCX resume needs them.
+// Each must satisfy the engine's peerDependencies (tests/action/run.test.ts checks).
+const peers = ["pdf-parse@2.4.5", "pdfjs-dist@5.4.296", "mammoth@1.12.0"];
 // Absolute, because npx runs outside the repository: see the spawn below.
-const args = ["--yes", `@veriworkly/ats-engine@${version}`, "check", resolve(resume), "--json"];
-if (job) args.push("--job", resolve(job));
-if (region) args.push("--region", region);
-if (target) args.push("--ats", target);
+const cliArgs = ["check", resolve(resume), "--json"];
+if (job) cliArgs.push("--job", resolve(job));
+if (region) cliArgs.push("--region", region);
+if (target) cliArgs.push("--ats", target);
+const packages = [`@veriworkly/ats-engine@${version}`, ...peers];
+const args = ["--yes", ...packages.flatMap((spec) => ["-p", spec]), "ats-engine", ...cliArgs];
 
 // On Windows `npx` is a .cmd file, which only a shell runs, and a shell would split a path with
 // spaces: npx's own script is run with this Node instead. ATS_ENGINE_CLI runs a local build of
@@ -41,7 +47,7 @@ const [command, prefix] = local
     : ["npx", []];
 // Run outside the repository: inside one whose package.json depends on the engine (or is the
 // engine), npx runs that local copy instead of the pinned version.
-const run = spawnSync(command, [...prefix, ...(local ? args.slice(2) : args)], {
+const run = spawnSync(command, [...prefix, ...(local ? cliArgs : args)], {
   cwd: env.RUNNER_TEMP || tmpdir(),
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
