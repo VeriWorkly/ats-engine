@@ -101,5 +101,9 @@ sends to its own model provider.
 **The GitHub Action.** Its inputs reach `run.mjs` as environment variables, never pasted into a
 shell command, so a file name cannot inject code. `version` must look like a version or a
 dist-tag. The CLI runs through `npx` outside the checkout, so a repository's own `package.json`
-cannot swap in another engine. Resume and posting text written to the job summary is escaped for
-Markdown and cut to 300 characters per cell.
+cannot swap in another engine. Resume and posting text written to the job summary is cut to 300
+characters per cell, never inside a character, then shown as text: `&`, `<` and `>` are written as
+HTML entities, so no tag survives, and the backslash and Markdown's own characters are escaped. A
+workflow command the Action prints has its `%`, carriage returns and line breaks encoded, so an
+input cannot start a second command, and the CLI's warnings, which can quote the resume, are passed
+on between `::stop-commands::` and its closing token, a random one per run.

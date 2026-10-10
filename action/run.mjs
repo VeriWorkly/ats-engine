@@ -2,6 +2,7 @@
 // the step below min-score. No dependencies of its own: Node and npx come with every GitHub
 // runner, and npx fetches the engine together with the PDF and DOCX readers (its optional peers).
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { appendFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -14,8 +15,15 @@ const region = env.ATS_REGION?.trim();
 const target = env.ATS_TARGET?.trim();
 const version = env.ATS_VERSION?.trim() || "latest";
 
+/**
+ * A workflow command's message, encoded as the runner decodes it: a line break in it (from an
+ * input or a file name) would otherwise end the command and start another one.
+ */
+const commandData = (text) =>
+  String(text).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
 function fail(message) {
-  console.log(`::error::${message}`);
+  console.log(`::error::${commandData(message)}`);
   process.exit(1);
 }
 
@@ -52,7 +60,15 @@ const run = spawnSync(command, [...prefix, ...(local ? cliArgs : args)], {
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
 });
-if (run.stderr) process.stderr.write(run.stderr);
+// The CLI's warnings can quote the resume, and the runner reads a line starting "::" on either
+// stream as a workflow command: they are passed on with commands stopped, under a token no
+// resume can guess.
+if (run.stderr) {
+  const token = randomBytes(16).toString("hex");
+  process.stderr.write(
+    `::stop-commands::${token}\n${run.stderr}${run.stderr.endsWith("\n") ? "" : "\n"}::${token}::\n`,
+  );
+}
 if (run.error) fail(`Could not run ats-engine: ${run.error.message}`);
 if (run.status !== 0) fail(`ats-engine exited with code ${run.status}.`);
 
@@ -83,12 +99,18 @@ output("job-match", report.jobMatchScore == null ? "" : String(report.jobMatchSc
 output("failed-checks", JSON.stringify(failed));
 output("report", reportPath);
 
-/** Text from a resume or a posting, safe inside a Markdown table cell. */
+/**
+ * Text from a resume or a posting, shown as text inside a Markdown table cell: one line, cut to
+ * 300 characters (whole characters, before anything is escaped), HTML's own characters encoded so
+ * no tag survives, and Markdown's escaped, the backslash first: "\<a" would otherwise leave "\\"
+ * and a live "<a".
+ */
 const cell = (text) =>
-  String(text ?? "")
-    .replace(/[\r\n]+/g, " ")
-    .replace(/[|<>`*_[\]]/g, (c) => "\\" + c)
-    .slice(0, 300);
+  Array.from(String(text ?? "").replace(/[\r\n]+/g, " "))
+    .slice(0, 300)
+    .join("")
+    .replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c])
+    .replace(/[\\|`*_~[\]]/g, (c) => "\\" + c);
 
 const below = minScore !== null && report.readinessScore < minScore;
 const lines = [
@@ -139,6 +161,8 @@ console.log(
 );
 
 if (below) {
-  console.log(`::error::Readiness score ${report.readinessScore} is below min-score ${minScore}.`);
+  console.log(
+    `::error::${commandData(`Readiness score ${report.readinessScore} is below min-score ${minScore}.`)}`,
+  );
   process.exit(2);
 }
