@@ -10,6 +10,8 @@
 // not in it, so one field read better cannot hide another read worse; `npm run bench -- --update`
 // rewrites it, in the change that earns the difference.
 import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { format, resolveConfig } from "prettier";
 
 import { AtsScoringService, DEFAULT_POLICY, type AtsLayoutSignals } from "../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../src/locales/index.js";
@@ -102,7 +104,10 @@ else console.log(`\n${misses.get("generated")?.size ?? 0} generated misses (--ve
 
 const current = Object.fromEntries([...misses].map(([corpus, keys]) => [corpus, [...keys.keys()]]));
 if (update) {
-  writeFileSync(BASELINE, `${JSON.stringify(current, null, 2)}\n`);
+  // Written as `npm run lint` checks it, so an update never fails the formatting check.
+  const file = fileURLToPath(BASELINE);
+  const options = { ...(await resolveConfig(file)), filepath: file };
+  writeFileSync(file, await format(JSON.stringify(current), options));
   console.log("\nbaseline updated: review the diff of bench/baseline.json");
 } else {
   const baseline = JSON.parse(readFileSync(BASELINE, "utf8")) as Record<string, string[]>;
