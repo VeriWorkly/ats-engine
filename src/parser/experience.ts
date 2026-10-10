@@ -204,7 +204,8 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
  * Francisco, CA" is Acme, "Acme, Remote" is Acme. Only "City, ST" and workplace words are places
  * (see `isPlace`); "Acme, Berlin" keeps its city. A workplace word alone ("Remote") or a city
  * of one or two words and its state ("Austin, TX") names no employer, so there is none; a
- * longer one may be an employer run into its city ("Oakmont Foods Portland, OR"), and is kept.
+ * longer one may be an employer run into its city ("Oakmont Foods Portland, OR"), and is kept. A
+ * place in brackets after the name ("Netflix (Remote)") goes too.
  */
 function withoutPlace(parts: string[], policy: AtsEnginePolicy): string {
   const { code, workplace } = placesOf(policy.resumeParse);
@@ -223,7 +224,11 @@ function withoutPlace(parts: string[], policy: AtsEnginePolicy): string {
     parts[end - 2]!.split(/\s+/).length <= 3
   )
     end -= 2;
-  return parts.slice(0, end).join(", ");
+  const employer = parts.slice(0, end).join(", ");
+  // Where, in brackets after the name: "Netflix (Remote)", "Acme (Austin, TX)". The parts'
+  // whitespace is collapsed, so one space at most comes before the bracket.
+  const where = / ?\(([^()]{1,60})\)$/u.exec(employer);
+  return where?.index && isPlace(where[1]!, policy) ? employer.slice(0, where.index) : employer;
 }
 
 /**

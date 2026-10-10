@@ -28,6 +28,9 @@ describe("a role header with its location", () => {
     "Senior Software Engineer, Northwind Payments, San Francisco, CA",
     "Senior Software Engineer, Northwind Payments, Remote",
     "Northwind Payments — Senior Software Engineer",
+    "Senior Software Engineer, Northwind Payments (Remote)",
+    "Senior Software Engineer | Northwind Payments (San Francisco, CA)",
+    "Senior Software Engineer at Northwind Payments (Hybrid)",
   ])("reads the title and the employer of %j", (header) => {
     expect(roleOf(header)).toMatchObject({
       title: "Senior Software Engineer",
@@ -38,6 +41,7 @@ describe("a role header with its location", () => {
 
   it("keeps a city that is not told from part of the employer", () => {
     expect(roleOf("Software Engineer, Acme, Berlin")?.employer).toBe("Acme, Berlin");
+    expect(roleOf("Software Engineer, Acme (Europe)")?.employer).toBe("Acme (Europe)");
   });
 
   it("does not take a description line for a header", () => {
