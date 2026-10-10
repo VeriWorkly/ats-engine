@@ -813,6 +813,26 @@
         "replacement": "elop"
       },
       {
+        "suffix": "using",
+        "minLength": 5,
+        "replacement": "u"
+      },
+      {
+        "suffix": "used",
+        "minLength": 4,
+        "replacement": "u"
+      },
+      {
+        "suffix": "accounting",
+        "minLength": 0,
+        "replacement": "accounting"
+      },
+      {
+        "suffix": "marketing",
+        "minLength": 0,
+        "replacement": "marketing"
+      },
+      {
         "suffix": "ing",
         "minLength": 6,
         "replacement": ""
@@ -906,6 +926,31 @@
         "suffix": "gnoses",
         "minLength": 6,
         "replacement": "gnos"
+      },
+      {
+        "suffix": "themes",
+        "minLength": 0,
+        "replacement": "theme"
+      },
+      {
+        "suffix": "es",
+        "minLength": 5,
+        "replacement": ""
+      },
+      {
+        "suffix": "theme",
+        "minLength": 0,
+        "replacement": "theme"
+      },
+      {
+        "suffix": "ese",
+        "minLength": 0,
+        "replacement": "ese"
+      },
+      {
+        "suffix": "e",
+        "minLength": 4,
+        "replacement": ""
       },
       {
         "suffix": "s",

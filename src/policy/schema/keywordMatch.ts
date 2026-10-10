@@ -71,6 +71,15 @@ export const keywordMatchSchema = z
         { suffix: "elopment", minLength: 7, replacement: "elop" },
         { suffix: "elopers", minLength: 6, replacement: "elop" },
         { suffix: "eloper", minLength: 5, replacement: "elop" },
+        // "-using" and "-used" fold as "-use" does below: "housing", "housed" and "house" to
+        // "hou", "focused" and "focus" to "focu".
+        { suffix: "using", minLength: 5, replacement: "u" },
+        { suffix: "used", minLength: 4, replacement: "u" },
+        // A rule that gives a word back unchanged keeps the rules after it off that word: a
+        // field is not named for its object, "accounting" is not "account" nor "marketing"
+        // "market".
+        { suffix: "accounting", minLength: 0, replacement: "accounting" },
+        { suffix: "marketing", minLength: 0, replacement: "marketing" },
         { suffix: "ing", minLength: 6, replacement: "" },
         { suffix: "ies", minLength: 5, replacement: "y" },
         { suffix: "ed", minLength: 5, replacement: "" },
@@ -102,6 +111,16 @@ export const keywordMatchSchema = z
         { suffix: "theses", minLength: 6, replacement: "thes" },
         { suffix: "gnosis", minLength: 6, replacement: "gnos" },
         { suffix: "gnoses", minLength: 6, replacement: "gnos" },
+        // A silent "e" goes, as "-ing" and "-ed" drop it: "nurse", "nurses", "nursing" and
+        // "nursed" all to "nurs", "price" and "pricing" to "pric", "machines" and "machine" to
+        // "machin". Only past four letters, so "note" does not become "not", nor "code" "cod".
+        // "theme" would become the stopword "them", and "these" the "thes" of "theses", so they
+        // and "-ese" ("chinese") are given back as they are.
+        { suffix: "themes", minLength: 0, replacement: "theme" },
+        { suffix: "es", minLength: 5, replacement: "" },
+        { suffix: "theme", minLength: 0, replacement: "theme" },
+        { suffix: "ese", minLength: 0, replacement: "ese" },
+        { suffix: "e", minLength: 4, replacement: "" },
         // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
         { suffix: "s", minLength: 3, replacement: "", unless: "ss" },
       ],

@@ -304,6 +304,30 @@ describe("years judgements", () => {
     expect(report.missingKeywords).not.toContain("min");
   });
 
+  it("counts a nurse's roles toward years of nursing", () => {
+    const nurse = [
+      "Experience",
+      "Registered Nurse, Bayview General Hospital, Houston, TX Mar 2021 - Present",
+      "- Administer medications and monitor cardiac rhythms",
+      "Staff Nurse, Lakeside Medical Center, Austin, TX Jun 2018 - Feb 2021",
+      "- Cared for post-operative patients on a medical-surgical floor",
+    ].join("\n");
+    expect(one(nurse, "3+ years of nursing experience")).toMatchObject({
+      kind: "experience",
+      status: "met",
+      detail: "8 years in roles naming nursing, 3 asked",
+    });
+  });
+
+  it("does not read an account executive's years as accounting", () => {
+    const sales = [
+      "Experience",
+      "Account Executive, Brightline Software Feb 2020 - Present",
+      "- Managed a book of 60 mid-market accounts in Salesforce",
+    ].join("\n");
+    expect(one(sales, "2+ years of accounting experience").status).toBe("missing");
+  });
+
   it("reads a minimum of years of a skill", () => {
     expect(one(SOFTWARE_ENGINEER, "Minimum 3 years of Python")).toMatchObject({
       status: "met",
