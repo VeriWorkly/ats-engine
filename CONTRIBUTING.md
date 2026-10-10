@@ -9,7 +9,7 @@ npm ci
 npm run check   # build, types, lint, tests, bundle sizes, browser/edge smoke, pack
 ```
 
-Node 20.19 or later. `npm run bench` prints field accuracy over the labelled corpus.
+Node 22.12 or later. `npm run bench` prints field accuracy over the labelled corpus.
 
 ## The rules
 

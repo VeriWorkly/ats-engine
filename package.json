@@ -1,17 +1,25 @@
 {
   "name": "@veriworkly/ats-engine",
   "version": "0.3.1",
-  "description": "Reads a resume the way an applicant tracking system does, shows what it would store, and scores it with a published rubric. Deterministic, locale-aware, browser- and edge-safe.",
+  "description": "ATS resume checker and parser: reads a resume (PDF, DOCX, text, JSON Resume) the way an applicant tracking system does, scores it with a published deterministic rubric, and matches it to a job description. Browser- and edge-safe.",
   "keywords": [
     "ats",
+    "ats-engine",
+    "ats-checker",
+    "ats-score",
+    "ats-friendly",
+    "applicant-tracking-system",
     "resume",
     "cv",
-    "applicant-tracking-system",
     "resume-parser",
     "resume-checker",
-    "ats-checker",
+    "resume-analyzer",
+    "resume-scoring",
+    "resume-scanner",
+    "job-description",
     "job-match",
-    "scoring",
+    "keyword-matching",
+    "jsonresume",
     "pdf",
     "docx"
   ],
@@ -26,7 +34,7 @@
     "url": "https://github.com/VeriWorkly/ats-engine/issues"
   },
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22.12"
   },
   "publishConfig": {
     "access": "public",

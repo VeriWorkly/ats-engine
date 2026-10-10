@@ -13,7 +13,7 @@ always gets the same score. The assistant explains the result and helps you fix 
 
 ## Install
 
-You need Node.js 20.19 or later. Every client below runs the server with
+You need Node.js 22.12 or later. Every client below runs the server with
 `npx -y @veriworkly/ats-engine-mcp`.
 
 ### Claude Code

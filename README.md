@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@veriworkly/ats-engine)](https://www.npmjs.com/package/@veriworkly/ats-engine)
 [![CI](https://github.com/VeriWorkly/ats-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/VeriWorkly/ats-engine/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-![Node 20.19+](https://img.shields.io/badge/node-%3E%3D20.19-brightgreen)
+![Node 22.12+](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen)
 
 Read a resume the way an applicant tracking system (ATS) does, see what it would store, and get a score with a reason behind every point.
 
@@ -36,9 +36,9 @@ To read PDF and DOCX files on Node, also install the optional peer dependencies:
 npm install pdf-parse pdfjs-dist@5.4.296 mammoth
 ```
 
-The core runs on Node 20.19 or later and in any modern browser or edge runtime.
+The core runs on Node 22.12 or later and in any modern browser or edge runtime.
 
-The package is ESM only. From CommonJS on Node 20.19 or later, `require("@veriworkly/ats-engine")` loads it anyway (Node's `require(esm)`); with TypeScript, use `"module": "nodenext"` or `"moduleResolution": "bundler"`.
+The package is ESM only. From CommonJS on Node 22.12 or later, `require("@veriworkly/ats-engine")` loads it anyway (Node's `require(esm)`); with TypeScript, use `"module": "nodenext"` or `"moduleResolution": "bundler"`.
 
 ## Quick start
 
@@ -391,7 +391,7 @@ A score measures how well a resume parses and reads. It says nothing about the p
 
 ## Run from source
 
-You need Node 20.19 or later.
+You need Node 22.12 or later.
 
 ```sh
 git clone https://github.com/VeriWorkly/ats-engine.git

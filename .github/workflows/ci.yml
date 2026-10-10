@@ -21,8 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # 20.19.0 is the floor package.json promises, not just "some Node 20".
-        node: ["20.19.0", 22, 24]
+        # 22.12.0 is the floor package.json promises, not just "some Node 22".
+        node: ["22.12.0", 24, 26]
         include:
           # Path and line-ending handling differ on Windows (see src/node/pdf.ts).
           - os: windows-latest
