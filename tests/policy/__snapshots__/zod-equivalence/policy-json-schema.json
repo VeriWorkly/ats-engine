@@ -729,6 +729,26 @@
           "stemming": {
             "default": [
               {
+                "suffix": "elopments",
+                "minLength": 8,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "elopment",
+                "minLength": 7,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "elopers",
+                "minLength": 6,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "eloper",
+                "minLength": 5,
+                "replacement": "elop"
+              },
+              {
                 "suffix": "ing",
                 "minLength": 6,
                 "replacement": ""
@@ -4788,6 +4808,26 @@
           },
           "stemming": {
             "default": [
+              {
+                "suffix": "elopments",
+                "minLength": 8,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "elopment",
+                "minLength": 7,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "elopers",
+                "minLength": 6,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "eloper",
+                "minLength": 5,
+                "replacement": "elop"
+              },
               {
                 "suffix": "ing",
                 "minLength": 6,

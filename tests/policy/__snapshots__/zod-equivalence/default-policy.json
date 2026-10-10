@@ -793,6 +793,26 @@
     ],
     "stemming": [
       {
+        "suffix": "elopments",
+        "minLength": 8,
+        "replacement": "elop"
+      },
+      {
+        "suffix": "elopment",
+        "minLength": 7,
+        "replacement": "elop"
+      },
+      {
+        "suffix": "elopers",
+        "minLength": 6,
+        "replacement": "elop"
+      },
+      {
+        "suffix": "eloper",
+        "minLength": 5,
+        "replacement": "elop"
+      },
+      {
         "suffix": "ing",
         "minLength": 6,
         "replacement": ""
@@ -1450,6 +1470,8 @@
       "equivalent",
       "another",
       "least",
+      "minimum",
+      "min",
       "age",
       "old",
       "older",
@@ -1524,6 +1546,11 @@
       ],
       "nurse": [
         "healthcare"
+      ],
+      "software engineer": [
+        "software",
+        "engineer",
+        "development"
       ]
     },
     "phrases": [
@@ -1537,6 +1564,8 @@
       "unit testing",
       "code review",
       "ci/cd",
+      "software engineer",
+      "business development",
       "documentation",
       "containers",
       "sql"

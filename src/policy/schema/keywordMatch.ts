@@ -64,6 +64,13 @@ export const keywordMatchSchema = z
         }),
       ),
       [
+        // One family whose noun and agent forms fold with the verb: "development", "developer"
+        // and "developed" are all "develop". A general "-ment" or "-er" rule would fold
+        // "statement" into "state" and "user" into "us".
+        { suffix: "elopments", minLength: 8, replacement: "elop" },
+        { suffix: "elopment", minLength: 7, replacement: "elop" },
+        { suffix: "elopers", minLength: 6, replacement: "elop" },
+        { suffix: "eloper", minLength: 5, replacement: "elop" },
         { suffix: "ing", minLength: 6, replacement: "" },
         { suffix: "ies", minLength: 5, replacement: "y" },
         { suffix: "ed", minLength: 5, replacement: "" },
