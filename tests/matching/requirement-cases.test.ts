@@ -17,6 +17,10 @@ describe("composite asks, language levels, skill tenure and degree fields", () =
       "Must be authorized to work in the United States",
     ],
     ["No active security clearance", "Active security clearance required"],
+    [
+      "Cannot work in the US without visa sponsorship",
+      "Must be authorized to work in the US without sponsorship",
+    ],
   ])("does not treat negative evidence as satisfying %s", (evidence, ask) => {
     expect(requirement(`${BASE}\n${evidence}`, ask)[0]?.status).not.toBe("met");
   });

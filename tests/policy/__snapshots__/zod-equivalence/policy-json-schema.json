@@ -729,6 +729,46 @@
           "stemming": {
             "default": [
               {
+                "suffix": "elopments",
+                "minLength": 8,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "elopment",
+                "minLength": 7,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "elopers",
+                "minLength": 6,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "eloper",
+                "minLength": 5,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "using",
+                "minLength": 5,
+                "replacement": "u"
+              },
+              {
+                "suffix": "used",
+                "minLength": 4,
+                "replacement": "u"
+              },
+              {
+                "suffix": "accounting",
+                "minLength": 0,
+                "replacement": "accounting"
+              },
+              {
+                "suffix": "marketing",
+                "minLength": 0,
+                "replacement": "marketing"
+              },
+              {
                 "suffix": "ing",
                 "minLength": 6,
                 "replacement": ""
@@ -822,6 +862,31 @@
                 "suffix": "gnoses",
                 "minLength": 6,
                 "replacement": "gnos"
+              },
+              {
+                "suffix": "themes",
+                "minLength": 0,
+                "replacement": "theme"
+              },
+              {
+                "suffix": "es",
+                "minLength": 5,
+                "replacement": ""
+              },
+              {
+                "suffix": "theme",
+                "minLength": 0,
+                "replacement": "theme"
+              },
+              {
+                "suffix": "ese",
+                "minLength": 0,
+                "replacement": "ese"
+              },
+              {
+                "suffix": "e",
+                "minLength": 4,
+                "replacement": ""
               },
               {
                 "suffix": "s",
@@ -951,16 +1016,151 @@
                   "minLength": 1
                 }
               },
-              "clearance": {
+              "needsSponsorship": {
                 "default": [
-                  "(?:security|secret|top\\s+secret|ts/sci|dv|sc|government|federal)\\s+clearance",
-                  "ts/sci"
+                  "(?:requires?|requiring|needs?|needing|will\\s+(?:require|need))\\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\\s+){0,3}sponsorship",
+                  "sponsorship\\s+(?:is\\s+)?(?:required|needed)"
                 ],
                 "minItems": 1,
                 "type": "array",
                 "items": {
                   "type": "string",
                   "minLength": 1
+                }
+              },
+              "noSponsorship": {
+                "default": [
+                  "(?:no|without)\\s+(?:(?:an?|any|further|future|h-?1b|visa|work|employment|immigration)\\s+){0,3}sponsorship",
+                  "(?:not|never|\\p{L}+n['’]t)\\s+(?:(?:currently|presently|now|ever|be|been|eligible|for|offer\\p{L}*|provid\\p{L}*|requir\\p{L}*|need\\p{L}*|an?|any|h-?1b|visa|work|employment|immigration|future)\\s+){0,4}sponsor(?:ship)?",
+                  "(?:cannot|unable\\s+to)\\s+(?:(?:offer|provide)\\s+)?(?:visa\\s+)?sponsor(?:ship)?",
+                  "sponsorship\\s+(?:is\\s+)?not\\s+(?:required|needed|available|offered|provided)"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "negation": {
+                "default": [
+                  "not",
+                  "no",
+                  "without",
+                  "lack(?:ing)?",
+                  "inactive",
+                  "expired",
+                  "cannot",
+                  "unable",
+                  "\\p{L}+n['’]t"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "notHeld": {
+                "default": [
+                  "eligible",
+                  "pending",
+                  "able\\s+to\\s+obtain",
+                  "former(?:ly)?"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "citizenship": {
+                "default": [
+                  "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",
+                  "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "residence": {
+                "default": [
+                  "green\\s+card",
+                  "(?:lawful\\s+)?permanent\\s+residen(?:t|cy|ce)"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "clearance": {
+                "default": [
+                  "(?:security|confidential|secret|top\\s+secret|ts/sci|ts|sci|dv|sc|government|federal)\\s+clearance",
+                  "ts(?:\\s*/\\s*|-)sci"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "clearanceLevels": {
+                "default": [
+                  {
+                    "name": "Confidential",
+                    "patterns": [
+                      "confidential"
+                    ]
+                  },
+                  {
+                    "name": "Secret",
+                    "patterns": [
+                      "secret"
+                    ]
+                  },
+                  {
+                    "name": "Top Secret",
+                    "patterns": [
+                      "top[\\s-]+secret",
+                      "ts\\s+clearance"
+                    ]
+                  },
+                  {
+                    "name": "TS/SCI",
+                    "patterns": [
+                      "ts(?:\\s*/\\s*|[\\s-]+)sci",
+                      "top[\\s-]+secret(?:\\s*/\\s*|[\\s-]+)sci"
+                    ]
+                  }
+                ],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "patterns": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "patterns"
+                  ]
                 }
               },
               "languagePatterns": {
@@ -4654,6 +4854,46 @@
           "stemming": {
             "default": [
               {
+                "suffix": "elopments",
+                "minLength": 8,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "elopment",
+                "minLength": 7,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "elopers",
+                "minLength": 6,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "eloper",
+                "minLength": 5,
+                "replacement": "elop"
+              },
+              {
+                "suffix": "using",
+                "minLength": 5,
+                "replacement": "u"
+              },
+              {
+                "suffix": "used",
+                "minLength": 4,
+                "replacement": "u"
+              },
+              {
+                "suffix": "accounting",
+                "minLength": 0,
+                "replacement": "accounting"
+              },
+              {
+                "suffix": "marketing",
+                "minLength": 0,
+                "replacement": "marketing"
+              },
+              {
                 "suffix": "ing",
                 "minLength": 6,
                 "replacement": ""
@@ -4747,6 +4987,31 @@
                 "suffix": "gnoses",
                 "minLength": 6,
                 "replacement": "gnos"
+              },
+              {
+                "suffix": "themes",
+                "minLength": 0,
+                "replacement": "theme"
+              },
+              {
+                "suffix": "es",
+                "minLength": 5,
+                "replacement": ""
+              },
+              {
+                "suffix": "theme",
+                "minLength": 0,
+                "replacement": "theme"
+              },
+              {
+                "suffix": "ese",
+                "minLength": 0,
+                "replacement": "ese"
+              },
+              {
+                "suffix": "e",
+                "minLength": 4,
+                "replacement": ""
               },
               {
                 "suffix": "s",
@@ -5041,16 +5306,152 @@
                   "minLength": 1
                 }
               },
-              "clearance": {
+              "needsSponsorship": {
                 "default": [
-                  "(?:security|secret|top\\s+secret|ts/sci|dv|sc|government|federal)\\s+clearance",
-                  "ts/sci"
+                  "(?:requires?|requiring|needs?|needing|will\\s+(?:require|need))\\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\\s+){0,3}sponsorship",
+                  "sponsorship\\s+(?:is\\s+)?(?:required|needed)"
                 ],
                 "minItems": 1,
                 "type": "array",
                 "items": {
                   "type": "string",
                   "minLength": 1
+                }
+              },
+              "noSponsorship": {
+                "default": [
+                  "(?:no|without)\\s+(?:(?:an?|any|further|future|h-?1b|visa|work|employment|immigration)\\s+){0,3}sponsorship",
+                  "(?:not|never|\\p{L}+n['’]t)\\s+(?:(?:currently|presently|now|ever|be|been|eligible|for|offer\\p{L}*|provid\\p{L}*|requir\\p{L}*|need\\p{L}*|an?|any|h-?1b|visa|work|employment|immigration|future)\\s+){0,4}sponsor(?:ship)?",
+                  "(?:cannot|unable\\s+to)\\s+(?:(?:offer|provide)\\s+)?(?:visa\\s+)?sponsor(?:ship)?",
+                  "sponsorship\\s+(?:is\\s+)?not\\s+(?:required|needed|available|offered|provided)"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "negation": {
+                "default": [
+                  "not",
+                  "no",
+                  "without",
+                  "lack(?:ing)?",
+                  "inactive",
+                  "expired",
+                  "cannot",
+                  "unable",
+                  "\\p{L}+n['’]t"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "notHeld": {
+                "default": [
+                  "eligible",
+                  "pending",
+                  "able\\s+to\\s+obtain",
+                  "former(?:ly)?"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "citizenship": {
+                "default": [
+                  "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",
+                  "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "residence": {
+                "default": [
+                  "green\\s+card",
+                  "(?:lawful\\s+)?permanent\\s+residen(?:t|cy|ce)"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "clearance": {
+                "default": [
+                  "(?:security|confidential|secret|top\\s+secret|ts/sci|ts|sci|dv|sc|government|federal)\\s+clearance",
+                  "ts(?:\\s*/\\s*|-)sci"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "clearanceLevels": {
+                "default": [
+                  {
+                    "name": "Confidential",
+                    "patterns": [
+                      "confidential"
+                    ]
+                  },
+                  {
+                    "name": "Secret",
+                    "patterns": [
+                      "secret"
+                    ]
+                  },
+                  {
+                    "name": "Top Secret",
+                    "patterns": [
+                      "top[\\s-]+secret",
+                      "ts\\s+clearance"
+                    ]
+                  },
+                  {
+                    "name": "TS/SCI",
+                    "patterns": [
+                      "ts(?:\\s*/\\s*|[\\s-]+)sci",
+                      "top[\\s-]+secret(?:\\s*/\\s*|[\\s-]+)sci"
+                    ]
+                  }
+                ],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "patterns": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "patterns"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "languagePatterns": {
@@ -5129,7 +5530,14 @@
               "yearsPatterns",
               "equivalence",
               "authorization",
+              "needsSponsorship",
+              "noSponsorship",
+              "negation",
+              "notHeld",
+              "citizenship",
+              "residence",
               "clearance",
+              "clearanceLevels",
               "languagePatterns",
               "languageNames"
             ],

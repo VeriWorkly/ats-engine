@@ -85,6 +85,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       nounsCapitalized: km.nounsCapitalized || Boolean(v.nounsCapitalized),
       proseNames: { ...km.proseNames, enabled: km.proseNames.enabled && v.proseNames !== false },
       requirements: {
+        ...km.requirements,
         yearsPatterns: union(km.requirements.yearsPatterns, v.requirements?.yearsPatterns),
         equivalence: union(km.requirements.equivalence, v.requirements?.equivalence),
         authorization: union(km.requirements.authorization, v.requirements?.authorization),

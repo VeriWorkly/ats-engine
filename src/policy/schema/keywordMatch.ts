@@ -64,6 +64,22 @@ export const keywordMatchSchema = z
         }),
       ),
       [
+        // One family whose noun and agent forms fold with the verb: "development", "developer"
+        // and "developed" are all "develop". A general "-ment" or "-er" rule would fold
+        // "statement" into "state" and "user" into "us".
+        { suffix: "elopments", minLength: 8, replacement: "elop" },
+        { suffix: "elopment", minLength: 7, replacement: "elop" },
+        { suffix: "elopers", minLength: 6, replacement: "elop" },
+        { suffix: "eloper", minLength: 5, replacement: "elop" },
+        // "-using" and "-used" fold as "-use" does below: "housing", "housed" and "house" to
+        // "hou", "focused" and "focus" to "focu".
+        { suffix: "using", minLength: 5, replacement: "u" },
+        { suffix: "used", minLength: 4, replacement: "u" },
+        // A rule that gives a word back unchanged keeps the rules after it off that word: a
+        // field is not named for its object, "accounting" is not "account" nor "marketing"
+        // "market".
+        { suffix: "accounting", minLength: 0, replacement: "accounting" },
+        { suffix: "marketing", minLength: 0, replacement: "marketing" },
         { suffix: "ing", minLength: 6, replacement: "" },
         { suffix: "ies", minLength: 5, replacement: "y" },
         { suffix: "ed", minLength: 5, replacement: "" },
@@ -95,6 +111,16 @@ export const keywordMatchSchema = z
         { suffix: "theses", minLength: 6, replacement: "thes" },
         { suffix: "gnosis", minLength: 6, replacement: "gnos" },
         { suffix: "gnoses", minLength: 6, replacement: "gnos" },
+        // A silent "e" goes, as "-ing" and "-ed" drop it: "nurse", "nurses", "nursing" and
+        // "nursed" all to "nurs", "price" and "pricing" to "pric", "machines" and "machine" to
+        // "machin". Only past four letters, so "note" does not become "not", nor "code" "cod".
+        // "theme" would become the stopword "them", and "these" the "thes" of "theses", so they
+        // and "-ese" ("chinese") are given back as they are.
+        { suffix: "themes", minLength: 0, replacement: "theme" },
+        { suffix: "es", minLength: 5, replacement: "" },
+        { suffix: "theme", minLength: 0, replacement: "theme" },
+        { suffix: "ese", minLength: 0, replacement: "ese" },
+        { suffix: "e", minLength: 4, replacement: "" },
         // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
         { suffix: "s", minLength: 3, replacement: "", unless: "ss" },
       ],
@@ -191,11 +217,96 @@ export const keywordMatchSchema = z
           String.raw`green\s+card`,
           String.raw`permanent\s+resident`,
         ]),
+        /**
+         * What a statement about the right to work says, beyond that it is one. A line that
+         * `noSponsorship` ("no sponsorship required", "does not require visa sponsorship") is
+         * read without those words first, so their "no" and "not" are not its negation. What is
+         * left `needsSponsorship` ("will require H-1B sponsorship") never shows the right to
+         * work, and shows its absence where the posting rules sponsorship out (a line of the
+         * posting either list matches); what is left with a `negation` shows nothing.
+         */
+        needsSponsorship: z._default(wordList("requirements.needsSponsorship"), [
+          String.raw`(?:requires?|requiring|needs?|needing|will\s+(?:require|need))\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\s+){0,3}sponsorship`,
+          String.raw`sponsorship\s+(?:is\s+)?(?:required|needed)`,
+        ]),
+        // Only words about sponsorship between the "not" and it: "not authorized to work without
+        // sponsorship" keeps its "not".
+        noSponsorship: z._default(wordList("requirements.noSponsorship"), [
+          String.raw`(?:no|without)\s+(?:(?:an?|any|further|future|h-?1b|visa|work|employment|immigration)\s+){0,3}sponsorship`,
+          String.raw`(?:not|never|\p{L}+n['’]t)\s+(?:(?:currently|presently|now|ever|be|been|eligible|for|offer\p{L}*|provid\p{L}*|requir\p{L}*|need\p{L}*|an?|any|h-?1b|visa|work|employment|immigration|future)\s+){0,4}sponsor(?:ship)?`,
+          String.raw`(?:cannot|unable\s+to)\s+(?:(?:offer|provide)\s+)?(?:visa\s+)?sponsor(?:ship)?`,
+          String.raw`sponsorship\s+(?:is\s+)?not\s+(?:required|needed|available|offered|provided)`,
+        ]),
+        /** Words that say a statement is not so: "Not authorized to work", "no active clearance". */
+        negation: z._default(wordList("requirements.negation"), [
+          "not",
+          "no",
+          "without",
+          String.raw`lack(?:ing)?`,
+          "inactive",
+          "expired",
+          "cannot",
+          "unable",
+          String.raw`\p{L}+n['’]t`,
+        ]),
+        /**
+         * Words that say a clearance or a citizenship is not held yet, or any more: "eligible
+         * for", "pending", "able to obtain", "former". Not for the right to work itself:
+         * "eligible to work in the US" states it.
+         */
+        notHeld: z._default(wordList("requirements.notHeld"), [
+          "eligible",
+          "pending",
+          String.raw`able\s+to\s+obtain`,
+          String.raw`former(?:ly)?`,
+        ]),
+        /**
+         * Citizenship, and the permanent residence that is not it: an ask for `citizenship`
+         * that does not also accept `residence` is met by citizenship alone, and a green card
+         * says the candidate does not hold it. Only U.S. citizenship by default.
+         */
+        citizenship: z._default(wordList("requirements.citizenship"), [
+          String.raw`(?:us|u\.s\.|united\s+states)\s+citizen(?:ship)?`,
+          String.raw`citizen\s+of\s+the\s+(?:us|u\.s\.|united\s+states)`,
+        ]),
+        residence: z._default(wordList("requirements.residence"), [
+          String.raw`green\s+card`,
+          String.raw`(?:lawful\s+)?permanent\s+residen(?:t|cy|ce)`,
+        ]),
         // Qualified, never bare: "customs clearance" is logistics, not a security vetting.
         clearance: z._default(wordList("requirements.clearance"), [
-          String.raw`(?:security|secret|top\s+secret|ts/sci|dv|sc|government|federal)\s+clearance`,
-          String.raw`ts/sci`,
+          String.raw`(?:security|confidential|secret|top\s+secret|ts/sci|ts|sci|dv|sc|government|federal)\s+clearance`,
+          String.raw`ts(?:\s*/\s*|-)sci`,
         ]),
+        /**
+         * Clearance levels, lowest first. A level asked is met by it or any above it; the lowest
+         * a posting names is its bar ("Secret or Top Secret"). The first pattern list that
+         * matches, from the highest down, names a line's level: "Top Secret" is not also
+         * "Secret". "TS" is Top Secret only beside "clearance".
+         */
+        clearanceLevels: z._default(
+          z.array(
+            z.object({
+              name: z.string().check(z.minLength(1)),
+              patterns: wordList("requirements.clearanceLevels"),
+            }),
+          ),
+          [
+            { name: "Confidential", patterns: ["confidential"] },
+            { name: "Secret", patterns: ["secret"] },
+            {
+              name: "Top Secret",
+              patterns: [String.raw`top[\s-]+secret`, String.raw`ts\s+clearance`],
+            },
+            {
+              name: "TS/SCI",
+              patterns: [
+                String.raw`ts(?:\s*/\s*|[\s-]+)sci`,
+                String.raw`top[\s-]+secret(?:\s*/\s*|[\s-]+)sci`,
+              ],
+            },
+          ],
+        ),
         languagePatterns: z._default(z.array(regexString("requirements.languagePatterns")), [
           String.raw`(?:fluent|fluency|proficien(?:t|cy)|native|business[\s-]level|working\s+proficiency|professional\s+proficiency)\s+(?:in\s+|with\s+)?(\p{L}+)`,
         ]),

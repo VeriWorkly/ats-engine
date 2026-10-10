@@ -124,8 +124,14 @@ function nameCandidate(line: string, label: RegExp) {
  * qualifies. A single word qualifies only as the very first line — that is where a mononym
  * ("Suharto") sits, and anywhere lower a lone capitalised word is far more likely a heading — and
  * never when it is a section heading or the document's own title ("Resume").
+ *
+ * `headlined` says the name was read over a headline further down, where a sidebar read before
+ * the main column leaves it.
  */
-export function findName(lines: string[], policy: AtsEnginePolicy) {
+export function findName(
+  lines: string[],
+  policy: AtsEnginePolicy,
+): { name: string; headlined: boolean } {
   const { particles, titles, label } = nameVocabulary(policy.resumeParse);
   const trimmed = lines.map((line) => line.trim()).filter(Boolean);
   const titleWords = titleWordsOf(policy);
@@ -212,17 +218,25 @@ export function findName(lines: string[], policy: AtsEnginePolicy) {
   // with its credentials cut ("Priya Raman, MBA") is still the name at the top, over any company
   // above a title further down; one whose cut tail is a state ("San Francisco, CA") is a place,
   // taken only when no other name is found.
+  // A name under a sidebar's list heading ("Top Skills" over "Machine Learning") is more likely
+  // one of its rows, so a name over a headline further down comes first.
   let onlyHeadingsAbove = true;
   let place = "";
+  let listed = false;
+  let row = "";
   for (const [index, line] of trimmed.slice(0, 6).entries()) {
     // The work history is never the header block, whatever is missing above it.
-    if (sectionKind(line, policy) === "experience") break;
+    const kind = sectionKind(line, policy);
+    if (kind === "experience") break;
+    listed ||= kind !== null && kind !== "other";
     const firstLine = onlyHeadingsAbove;
     onlyHeadingsAbove &&= titles.test(line) || isSectionHeading(line, policy);
     const found = nameIn(line, index, firstLine);
     if (!found) continue;
-    if (!found.place) return found.name;
-    place ||= found.name;
+    if (found.place) place ||= found.name;
+    else if (listed) row ||= found.name;
+    else return { name: found.name, headlined: false };
   }
-  return headlined() || place;
+  const over = headlined();
+  return over ? { name: over, headlined: true } : { name: row || place, headlined: false };
 }

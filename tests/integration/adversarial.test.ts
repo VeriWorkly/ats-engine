@@ -83,6 +83,20 @@ const SHAPES: Record<string, string> = {
   "soft phrase run": rep("problem solving "),
   "soft phrase prefix run": rep("attention to "),
   "devanagari soft phrase run": rep("समस्या समाधान "),
+  // The right to work and a clearance, read for what they say and the level they name.
+  "sponsorship run": rep("authorized to work not visa "),
+  "needs sponsorship run": rep("requires visa work "),
+  "no sponsorship run": `authorized to work ${rep("not currently eligible for ")}`,
+  "contraction run": `authorized to work ${rep("doesn't ")}`,
+  "clearance level run": rep("top secret clearance "),
+  "ts sci run": rep("TS - "),
+  "ts slash run": rep("TS / "),
+  "ts clearance run": rep("ts "),
+  // Slash compounds split into their words; never inside a link.
+  "slash compound run": rep("HTML/CSS/"),
+  "slash number run": rep("a/1/"),
+  "link run": rep("a://b/"),
+  "scheme run": rep("a+b.c-"),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

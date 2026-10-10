@@ -1,7 +1,7 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { memo } from "../util/memo.js";
 import { wordListPattern } from "../text/text.js";
-import { canonicalize, type Vocabulary } from "./vocabulary.js";
+import { canonicalize, slashParts, type Vocabulary } from "./vocabulary.js";
 
 const isTermChar = (char: string) => /[\p{L}\p{M}\p{N}+#./-]/u.test(char);
 
@@ -58,9 +58,9 @@ function leadingList(text: string) {
  * is a within-sentence relationship; a term appearing on its own elsewhere joins the same group
  * through the union-find, which is what makes chained lists collapse correctly.
  *
- * The policy's `alternationWords` ("or", "oder") are the only separators honoured. A slash would
- * be ambiguous against tokens that legally contain one — ci/cd, tcp/ip, a/b — and splitting
- * those would do more harm than the extra coverage is worth.
+ * The policy's `alternationWords` ("or", "oder") are the only separators honoured. A slash joins
+ * skills asked together ("HTML/CSS" asks for both), so it offers no choice; beside an "or", each
+ * of its parts is one of the alternatives ("Python/Django or Go").
  *
  * Returns the union-find root of a term, and the separator word that grouped it, so the
  * missing-keyword label can read "Go oder Java" for a German posting.
@@ -109,6 +109,7 @@ export function alternationGroups(
 
     for (let i = 2; i < parts.length; i += 2) {
       const members = [...trailingList(parts[i - 2]), ...leadingList(parts[i])]
+        .flatMap((word) => slashParts(word, vocab).map(([part]) => part))
         .map((word) => canonicalize(word, km, vocab))
         .filter((token): token is string => token !== null && !grouped.has(token));
 

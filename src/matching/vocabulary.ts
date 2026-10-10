@@ -16,14 +16,46 @@ export type Vocabulary = {
   softPhrases: string[];
   /** Canonical skill -> canonical capabilities it demonstrates. Resume side only. */
   implies: Map<string, string[]>;
+  /** The terms the policy writes with a slash ("ci/cd", "tcp/ip"): never split. */
+  slashTerms: Set<string>;
 };
+
+/** A "." or "/" a word picked up from the sentence around it: "JavaScript.", "and/". */
+const TRAILING = /(?<![./])[./]+$/;
+
+/** A link, from its scheme on: "https://careers.example.com/jobs/123". Never a skill. */
+const LINK = /(?<![\p{L}\p{N}+.-])\p{L}[\p{L}\p{N}+.-]{0,30}:\/\/\S*/gu;
+
+/**
+ * The words a token stands for, each with its offset in the token. A slash joins words a
+ * posting asks for together ("HTML/CSS", "Python/Django", "C#/.NET"), so each is a word of its
+ * own. A term the policy names with its slash ("CI/CD", "TCP/IP") or lists as a stopword
+ * ("n/a") stays whole, and so does a token with a part that is no word ("OS/2", "24/7").
+ */
+export function slashParts(token: string, vocab: Vocabulary): Array<[string, number]> {
+  const whole = token.toLowerCase().replace(TRAILING, "");
+  if (
+    !whole.includes("/") ||
+    vocab.slashTerms.has(whole) ||
+    vocab.stopwords.has(whole) ||
+    !whole.split("/").every((part) => /\p{L}/u.test(part))
+  )
+    return [[token, 0]];
+  const parts: Array<[string, number]> = [];
+  let at = 0;
+  for (const part of token.split("/")) {
+    if (part) parts.push([part, at]);
+    at += part.length + 1;
+  }
+  return parts;
+}
 
 /**
  * Folds a raw word to the same canonical key `extractVocabulary` would file it under, so
  * alternation detection and term lookup agree on what counts as "the same skill".
  */
 export function canonicalize(raw: string, km: AtsEnginePolicy["keywordMatch"], vocab: Vocabulary) {
-  const word = raw.toLowerCase().replace(/(?<![./])[./]+$/, "");
+  const word = raw.toLowerCase().replace(TRAILING, "");
   if (!word || vocab.stopwords.has(word) || vocab.stopwords.has(stem(word, km.stemming)))
     return null;
   const mapped = own(km.synonyms, word) ?? word;
@@ -47,6 +79,11 @@ export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocab
     softTokens,
     softPhrases: [],
     implies: new Map(),
+    slashTerms: new Set(
+      [...km.phrases, ...Object.keys(km.synonyms), ...Object.values(km.synonyms)].filter((term) =>
+        term.includes("/"),
+      ),
+    ),
   };
 
   // Soft skills fold as every term does: "communicating" (a synonym of "communication") and
@@ -132,6 +169,11 @@ export function extractVocabulary(
   const map = new Map<string, Term>();
   // Character mask marking spans already claimed by a multi-word phrase.
   const claimed = new Uint8Array(lower.length);
+  // And the links, where neither a phrase ("a/b" in "https://x.com/a/b") nor a word is read.
+  const linked = new Uint8Array(lower.length);
+  if (lower.includes("://"))
+    for (const link of lower.matchAll(LINK))
+      linked.fill(1, link.index, link.index + link[0].length);
 
   for (const phrase of [...km.phrases, ...vocab.softPhrases]) {
     // Most of a large phrase list is absent from any one text, and a substring test is far
@@ -140,6 +182,7 @@ export function extractVocabulary(
     const re = phrasePattern(phrase, km.pluralSuffixes);
     let match: RegExpExecArray | null;
     while ((match = re.exec(lower))) {
+      if (linked[match.index]) continue;
       map.set(phrase, { token: phrase, label: phrase, skill: !vocab.softTokens.has(phrase) });
       claimed.fill(1, match.index, match.index + match[0].length);
       if (match.index === re.lastIndex) re.lastIndex += 1;
@@ -154,9 +197,13 @@ export function extractVocabulary(
   const sameOffsets = lower.length === text.length;
 
   while ((match = tokenRe.exec(lower))) {
-    if (claimed[match.index]) continue;
-    const raw = match[0].replace(/(?<![./])[./]+$/, "");
-    if (!raw || vocab.stopwords.has(raw) || vocab.stopwords.has(stem(raw, km.stemming))) continue;
+    if (claimed[match.index] || linked[match.index]) continue;
+    for (const [word, offset] of slashParts(match[0], vocab)) addWord(word, match.index + offset);
+  }
+
+  function addWord(word: string, index: number) {
+    const raw = word.replace(TRAILING, "");
+    if (!raw || vocab.stopwords.has(raw) || vocab.stopwords.has(stem(raw, km.stemming))) return;
 
     // A word of one or two letters is a skill only as one is written: with a capital ("R",
     // "Go", "AI"), and a single letter not followed by a full stop, which makes it an initial
@@ -164,9 +211,9 @@ export function extractVocabulary(
     // without case (most scripts besides Latin, Greek and Cyrillic) carry no such signal.
     let shortSkill = false;
     if (raw.length <= 2 && /^\p{L}+$/u.test(raw) && raw.toUpperCase() !== raw && sameOffsets) {
-      const written = text.slice(match.index, match.index + raw.length);
-      if (written === raw) continue;
-      if (raw.length === 1 && match[0].endsWith(".")) continue;
+      const written = text.slice(index, index + raw.length);
+      if (written === raw) return;
+      if (raw.length === 1 && word.endsWith(".")) return;
       shortSkill = true;
     }
 
@@ -174,7 +221,7 @@ export function extractVocabulary(
     if (mapped.includes(" ")) {
       if (!map.has(mapped))
         map.set(mapped, { token: mapped, label: mapped, skill: !vocab.softTokens.has(mapped) });
-      continue;
+      return;
     }
     const token = stem(mapped, km.stemming);
     if (!map.has(token))
@@ -213,14 +260,21 @@ export function properNounTokens(originalText: string, nounsCapitalized = false)
   let match: RegExpExecArray | null;
 
   while ((match = re.exec(originalText))) {
-    const token = match[0];
-    const acronym = /^[\p{Lu}\p{N}+#.]{2,6}$/u.test(token);
-    const innerCapital = /\p{Ll}\p{Lu}/u.test(token);
-    const capitalised =
-      !nounsCapitalized && /^\p{Lu}/u.test(token) && !opensSentence(originalText, match.index);
+    // A compound and each of its parts ("HTML/CSS", "HTML", "CSS"), whichever the vocabulary
+    // reads it as. A part after a slash does not open a sentence, and one written with a
+    // capital says the first is a name too: "Java/Kotlin" opening a line names Java.
+    const parts = match[0].includes("/") ? [match[0], ...match[0].split("/")] : [match[0]];
+    const named =
+      !opensSentence(originalText, match.index) ||
+      parts.slice(2).some((part) => /^\p{Lu}/u.test(part));
+    parts.forEach((token, part) => {
+      const acronym = /^[\p{Lu}\p{N}+#.]{2,6}$/u.test(token);
+      const innerCapital = /\p{Ll}\p{Lu}/u.test(token);
+      const capitalised = !nounsCapitalized && /^\p{Lu}/u.test(token) && (part > 1 || named);
 
-    if (acronym || innerCapital || capitalised)
-      proper.add(token.toLowerCase().replace(/(?<![./])[./]+$/, ""));
+      if (acronym || innerCapital || capitalised)
+        proper.add(token.toLowerCase().replace(TRAILING, ""));
+    });
   }
   return proper;
 }
