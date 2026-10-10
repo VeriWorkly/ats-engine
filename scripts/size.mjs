@@ -9,7 +9,10 @@ const { exports } = JSON.parse(readFileSync("package.json", "utf8"));
 /** Gzipped KB. */
 const BUDGETS = {
   // 95: zod/mini in place of zod (same schemas and messages) took it from 171.9 to 91.7.
-  ".": 95,
+  // 97: 0.6.0's reading and keyword fixes took it from 93.6 to 96.2, mostly policy data: the
+  // headings, title and organisation words, en-GB stemming rows, injection-mention and
+  // citation words, and the section rules that read gutter headings and role sub-headings.
+  ".": 97,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
