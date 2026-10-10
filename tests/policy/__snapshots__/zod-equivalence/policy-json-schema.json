@@ -2561,6 +2561,19 @@
               "minLength": 1
             }
           },
+          "symbolSubscripts": {
+            "default": [
+              "max|min|lim|avg|rms|tot|opt|abs|rel|ref",
+              "obs|eff|app|sat|cat|syn",
+              "int|ext|sub|off|out|mix"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "citationHeadings": {
             "default": [
               "publications?",
@@ -7120,6 +7133,19 @@
               "minLength": 1
             }
           },
+          "symbolSubscripts": {
+            "default": [
+              "max|min|lim|avg|rms|tot|opt|abs|rel|ref",
+              "obs|eff|app|sat|cat|syn",
+              "int|ext|sub|off|out|mix"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "citationHeadings": {
             "default": [
               "publications?",
@@ -7146,6 +7172,7 @@
           "injectionPhrases",
           "injectionMentionVerbs",
           "injectionTargets",
+          "symbolSubscripts",
           "citationHeadings"
         ],
         "additionalProperties": false

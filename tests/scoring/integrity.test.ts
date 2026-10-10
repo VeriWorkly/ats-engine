@@ -204,6 +204,25 @@ describe("look-alike letters", () => {
   });
 
   it.each([
+    "- Μηχανικός λογισμικού με εμπειρία σε συστήματα πληρωμών",
+    "- Ρυθμός ανάπτυξης 40% στη Νέα Υόρκη",
+    "- Built Python και Java services for ρυθμός analytics",
+    "- Measured αsyn aggregation and κcat, χeff and ρeff across 12 samples",
+  ])(
+    "does not flag Greek words, or a symbol before a subscript in `symbolSubscripts`: %j",
+    (line) => {
+      expect(rule(check(`${RESUME}\n${line}`), "homoglyphs")?.passed).toBe(true);
+    },
+  );
+
+  it.each([
+    ["a rho before three letters", "- Top ρank in the regional contest"],
+    ["a nu before three letters", "- Delivered νery large migrations"],
+  ])("flags %s that are no subscript", (_, line) => {
+    expect(rule(check(`${RESUME}\n${line}`), "homoglyphs")?.passed).toBe(false);
+  });
+
+  it.each([
     ["an omicron opening a word", "- Built services on οracle databases"],
     ["a capital Greek letter opening one", "- Built services on Οracle databases"],
     ["a Greek letter inside one", "- Built services in Pythοn"],
