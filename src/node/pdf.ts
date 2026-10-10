@@ -154,7 +154,7 @@ async function readPdf(
 
       const lines = pageText(textItems, toViewport, viewport.width, marks);
       pages.push(lines);
-      chars += lines.text.length + 2;
+      chars += lines.lines.join(" ").length + 2;
       // The worst page wins: one two-column page is a two-column resume, and averaging it
       // against clean pages would hide exactly the problem worth reporting.
       if (lines.columns !== null) columnRatio = Math.max(columnRatio ?? 0, lines.columns);

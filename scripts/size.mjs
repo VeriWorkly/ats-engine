@@ -41,7 +41,10 @@ const BUDGETS = {
   // two pages they parted a role's title from its dates) took it from 20.20 to 20.57.
   // 20.7: a sidebar taller than the main column read as a column (20.60), and a scan with a
   // scanner's text stamp still counted as a picture (20.66).
-  "./node": 20.7,
+  // 20.9: a running header or footer told from body text by the margin it sits in, all of it
+  // repeated, and a page number by matching its page (dates opening each page, bullets differing
+  // in their figures and a skills line at the foot of two pages were dropped), took it to 20.89.
+  "./node": 20.9,
 };
 
 let failed = false;

@@ -273,13 +273,113 @@ describe("a PDF's running header and footer are read once, and its page numbers 
 
   it("stays linear over thousands of pages printing the same lines", () => {
     const pages = Array.from({ length: 20_000 }, (_, page) => ({
-      lines: ["Jordan Ellery", "x", "y", `Page ${page}`],
-      ys: [10, 10.5, 11, 11.5],
+      lines: ["Jordan Ellery - Resume", "x", "y", "z", `Page ${page + 1}`],
+      ys: [10, 40, 52, 64, 94],
     }));
     const started = performance.now();
-    // The first two lines of a page are its header, the last two its footer.
-    expect(joinPages(pages)).toBe("Jordan Ellery\nx\n\ny\n\n");
+    const joined = joinPages(pages);
+    expect(joined.startsWith("Jordan Ellery - Resume\n\nx\ny\nz\n\n")).toBe(true);
+    expect(joined).not.toContain("Page");
     expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
+  // Pages of a role each: "Senior Engineer, Hooli" ends a page and its dates open the next.
+  const filler = (top: number, tag: string) =>
+    [0, 1, 2].map((row) => at(60, top - 14 * row, `- ${tag} improved the service number ${row}`));
+  const head = [
+    at(45, 740, "Jordan Ellery", 20),
+    at(45, 722, "jordan.ellery@example.com | (415) 555-0132"),
+    at(45, 690, "EXPERIENCE", 12),
+  ];
+  const rolesOf = async (pages: string[][]) => {
+    const { text } = await extractResume(
+      buildPdfPages(pages.map((page) => page.join("\n"))),
+      "pdf",
+    );
+    const report = check(text, DEFAULT_POLICY, { now: new Date("2026-10-01T00:00:00Z") });
+    return { text, roles: report.parsed.roles.map((role) => [role.title, role.employer]) };
+  };
+
+  it.each([
+    ["2021 - 2024", "2017 - 2021", "2012 - 2016"],
+    ["03/2021 - 04/2024", "01/2017 - 02/2021", "05/2012 - 12/2016"],
+  ])("keeps dates that open a page and differ only in their numbers: %j", async (...dates) => {
+    const { roles } = await rolesOf([
+      [
+        ...head,
+        at(45, 670, "Staff Engineer, Initech"),
+        at(45, 656, dates[0]!),
+        ...filler(642, "a"),
+        at(45, 60, "Senior Engineer, Hooli"),
+      ],
+      [at(45, 740, dates[1]!), ...filler(726, "b"), at(45, 60, "Engineer, Globex")],
+      [
+        at(45, 740, dates[2]!),
+        ...filler(726, "c"),
+        at(45, 690, "EDUCATION", 12),
+        at(45, 674, "B.S. Mathematics, Ohio State University, 2012"),
+      ],
+    ]);
+    expect(roles).toEqual([
+      ["Staff Engineer", "Initech"],
+      ["Senior Engineer", "Hooli"],
+      ["Engineer", "Globex"],
+    ]);
+  });
+
+  it("keeps the body's last lines, alike or differing in their numbers, where they are", async () => {
+    const page = (role: string, dates: string, tag: string, last: string[], top = 740) => [
+      at(45, top, role),
+      at(470, top, dates),
+      ...filler(top - 14, tag),
+      ...last.map((line, index) => at(45, 54 - 14 * index, line)),
+    ];
+    const { text } = await rolesOf([
+      [
+        ...head,
+        ...page(
+          "Staff Engineer, Initech",
+          "Mar 2021 - Present",
+          "a",
+          ["- Grew revenue 20% a year", "- Cut costs by 15%"],
+          670,
+        ),
+      ],
+      page("Senior Engineer, Hooli", "Jan 2017 - Feb 2021", "b", [
+        "- Grew revenue 35% a year",
+        "- Cut costs by 22%",
+      ]),
+      page("Engineer, Globex", "Jun 2012 - Dec 2016", "c", ["SKILLS", "Python, Go, Kubernetes"]),
+      page("Intern, Initech", "Jun 2011 - Aug 2011", "d", ["PROJECTS", "Python, Go, Kubernetes"]),
+    ]);
+    const lines = text.split("\n").filter(Boolean);
+    expect(lines).toEqual(
+      expect.arrayContaining(["- Grew revenue 20% a year", "- Cut costs by 22%"]),
+    );
+    expect(lines.indexOf("Python, Go, Kubernetes")).toBe(lines.indexOf("SKILLS") + 1);
+    expect(lines.at(-1)).toBe("Python, Go, Kubernetes");
+  });
+
+  it("keeps a later page's first line that only starts like the first page's, at its height", async () => {
+    const { roles } = await rolesOf([
+      [
+        at(45, 740, "Senior Engineer", 20),
+        at(45, 722, "Jordan Ellery | jordan.ellery@example.com"),
+        at(45, 690, "EXPERIENCE", 12),
+        at(45, 670, "Staff Engineer, Initech"),
+        at(470, 670, "Mar 2021 - Present"),
+        ...filler(654, "a"),
+      ],
+      [
+        at(45, 740, "Senior Engineer, Hooli"),
+        at(470, 740, "Jan 2017 - Feb 2021"),
+        ...filler(726, "b"),
+      ],
+    ]);
+    expect(roles).toEqual([
+      ["Staff Engineer", "Initech"],
+      ["Senior Engineer", "Hooli"],
+    ]);
   });
 });
 
@@ -867,9 +967,8 @@ describe("a sidebar taller than the main column is a column", () => {
       run("TypeScript, Go, PostgreSQL, Kubernetes, Terraform", 45, y - 61, 250),
       right("Page 1 of 1", 40, 40, 8),
     );
-    const { text: extracted, columns } = pageText(items, (x, yy) => [x, 792 - yy], 612);
+    const { lines, columns } = pageText(items, (x, yy) => [x, 792 - yy], 612);
     expect(columns).toBe(0);
-    const lines = extracted.split("\n");
     expect(lines.findIndex((line) => line.includes("Austin, TX"))).toBeLessThan(
       lines.indexOf("EXPERIENCE"),
     );
@@ -906,8 +1005,8 @@ describe("a centred heading over a short block is not a second column", () => {
   const read = () => pageText(lastPage, (x, y) => [x, 841.5 - y], 595.5);
 
   it("reads the heading before the lines under it, and reports no second column", () => {
-    const { text: extracted, columns } = read();
-    expect(extracted.split("\n")).toEqual([
+    const { lines, columns } = read();
+    expect(lines).toEqual([
       "SKILLS",
       "Languages: TypeScript, JavaScript, SQL",
       "Frontend: React, Next.js, Tailwind CSS",
@@ -918,7 +1017,9 @@ describe("a centred heading over a short block is not a second column", () => {
   });
 
   it("finds the skills under it", () => {
-    const resume = ["Jane Doe", "jane.doe@example.com | +1 415 555 0142", read().text].join("\n");
+    const resume = ["Jane Doe", "jane.doe@example.com | +1 415 555 0142", ...read().lines].join(
+      "\n",
+    );
     const report = check(resume, DEFAULT_POLICY, { now: new Date("2026-10-01T00:00:00Z") });
     expect(report.parsed.skills).toEqual(
       expect.arrayContaining(["TypeScript", "React", "PostgreSQL", "System Design"]),
@@ -927,8 +1028,8 @@ describe("a centred heading over a short block is not a second column", () => {
 
   it("is not a column with a centred footer under the block either", () => {
     const withFooter = [...lastPage, item("Page 2 of 2", 9, 276, 40, 45)];
-    const { text: extracted, columns } = pageText(withFooter, (x, y) => [x, 841.5 - y], 595.5);
-    expect(extracted.split("\n")[0]).toBe("SKILLS");
+    const { lines, columns } = pageText(withFooter, (x, y) => [x, 841.5 - y], 595.5);
+    expect(lines[0]).toBe("SKILLS");
     expect(columns).toBe(0);
   });
 });
