@@ -48,3 +48,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PUBLISHED: ${{ steps.changesets.outputs['published-packages'] }}
+      # A new MCP server version is listed in the official MCP Registry once npm has it: the
+      # registry checks the npm package's mcpName. GitHub OIDC (id-token above) grants
+      # io.github.VeriWorkly/*, so no secret is needed. The publisher is pinned by version and hash.
+      # npm can take minutes to serve a version it has just published, so the listing is tried
+      # again, after a longer wait each time, before the step fails.
+      - if: steps.changesets.outputs.published == 'true'
+        working-directory: packages/mcp
+        run: |
+          version=$(jq -r '.[] | select(.name == "@veriworkly/ats-engine-mcp") | .version' <<< "$PUBLISHED")
+          if [ -z "$version" ]; then exit 0; fi
+          curl -fsSL -o mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz"
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+          for wait in 30 60 120 240 0; do
+            ./mcp-publisher login github-oidc && ./mcp-publisher publish && exit 0
+            [ "$wait" -eq 0 ] || sleep "$wait"
+          done
+          exit 1
+        env:
+          PUBLISHED: ${{ steps.changesets.outputs['published-packages'] }}

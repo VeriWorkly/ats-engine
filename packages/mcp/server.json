@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.veriworkly/ats-engine",
+  "name": "io.github.VeriWorkly/ats-engine",
   "title": "ATS Engine",
   "description": "Read your own resume the way an ATS does and score it with a published, deterministic rubric.",
   "repository": {

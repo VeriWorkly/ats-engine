@@ -315,7 +315,10 @@ describe("registry metadata", () => {
     const pkg = JSON.parse(readFileSync(PACKAGE, "utf8"));
     const server = JSON.parse(readFileSync(SERVER_JSON, "utf8"));
     expect(server.name).toBe(pkg.mcpName);
-    expect(server.name).toBe("io.github.veriworkly/ats-engine");
+    // The registry grants `io.github.<owner>/*` in the owner's exact casing and compares
+    // names case-sensitively (modelcontextprotocol/registry#689), so a lowercase
+    // namespace is refused for the VeriWorkly organisation.
+    expect(server.name).toBe("io.github.VeriWorkly/ats-engine");
     expect(server.version).toBe(pkg.version);
     expect(server.packages).toEqual([
       expect.objectContaining({

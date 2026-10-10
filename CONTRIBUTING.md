@@ -64,8 +64,10 @@ Releases go out from `main` through changesets and `.github/workflows/release.ym
 3. Merging that pull request leaves no changesets pending, so the workflow runs
    `npm run release` (`npm run check`, then `changeset publish`): each new version is published
    to npm with provenance and tagged `<name>@<version>`, and a new engine version is published to
-   GitHub Packages too (`.github/workflows/github-packages.yml`). Nothing publishes without that
-   pull request.
+   GitHub Packages too (`.github/workflows/github-packages.yml`). A new MCP server version is
+   then listed in the official MCP Registry with `mcp-publisher` over GitHub OIDC, under
+   `io.github.VeriWorkly/ats-engine` (the registry compares the casing). Nothing publishes
+   without that pull request.
 
 If the organisation does not let GitHub Actions create pull requests, the workflow fails at
 step 2. Open the pull request by hand instead: on a branch from `main`, run

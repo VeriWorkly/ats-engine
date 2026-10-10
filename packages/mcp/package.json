@@ -29,7 +29,7 @@
   "bugs": {
     "url": "https://github.com/VeriWorkly/ats-engine/issues"
   },
-  "mcpName": "io.github.veriworkly/ats-engine",
+  "mcpName": "io.github.VeriWorkly/ats-engine",
   "engines": {
     "node": ">=22.12"
   },
