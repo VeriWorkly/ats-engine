@@ -124,6 +124,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     "us",
     "via",
     "per",
+    "off",
+    // Kept whole, a slash and all: "N/A" is no skill "N".
+    "n/a",
     "deep",
     "hands",
     "hands-on",
@@ -145,6 +148,11 @@ export const DEFAULT_KEYWORD_MATCH = {
     "me",
     "my",
     "he",
+    // "his/her" splits into its words.
+    "his",
+    "her",
+    "him",
+    "she",
     // Posting filler: where and how the job is, and words around a requirement rather than in it.
     "hiring",
     "hire",
@@ -167,6 +175,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     "equivalent",
     "another",
     "least",
+    // How many years, not of what: "Minimum of 5 years", "Min. 5 years".
+    "minimum",
+    "min",
     "age",
     "old",
     "older",
@@ -272,6 +283,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     // A role is experience in its field: a teacher's years are years in education.
     teacher: ["education"],
     nurse: ["healthcare"],
+    // A software engineer's work is software development, though the role never says
+    // "developed"; an engineer of another kind (sales, civil) is not.
+    "software engineer": ["software", "engineer", "development"],
   },
   phrases: [
     "infrastructure as code",
@@ -284,6 +298,15 @@ export const DEFAULT_KEYWORD_MATCH = {
     "unit testing",
     "code review",
     "ci/cd",
+    // A slash joins two skills ("HTML/CSS" asks for both) except in a name written with one.
+    "tcp/ip",
+    "pl/sql",
+    "a/b",
+    "i/o",
+    "ts/sci",
+    "software engineer",
+    // Kept whole: "business" is a stopword, and "development" alone is a software engineer's.
+    "business development",
     "documentation",
     "containers",
     "sql",

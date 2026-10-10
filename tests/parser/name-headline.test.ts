@@ -45,6 +45,55 @@ describe("the name when a sidebar is read first", () => {
     ].join("\n");
     expect(name(text)).toBe("");
   });
+
+  /** A LinkedIn "Save to PDF" profile: Contact and Top Skills read before the name. */
+  const linkedIn = (skills: string[]) =>
+    [
+      "Contact",
+      "jordan.ellery@example.com",
+      "www.linkedin.com/in/jordanellery",
+      "Top Skills",
+      ...skills,
+      "Jordan Ellery",
+      "Senior Software Engineer at Acme Corp",
+      "Austin, Texas, United States",
+      "Summary",
+      "Backend engineer with nine years building payment systems.",
+      "Experience",
+      "Senior Software Engineer, Acme Corp",
+      "January 2022 - Present",
+    ].join("\n");
+
+  it("reads a LinkedIn export's name, and its top skills without it", () => {
+    const { parsed } = AtsScoringService.check(
+      linkedIn(["Kubernetes", "TypeScript", "PostgreSQL"]),
+      DEFAULT_POLICY,
+    );
+    expect(parsed.name).toBe("Jordan Ellery");
+    expect(parsed.skills).toEqual(["Kubernetes", "TypeScript", "PostgreSQL"]);
+  });
+
+  it("does not take a two-word skill in the sidebar for the name", () => {
+    expect(name(linkedIn(["Machine Learning"]))).toBe("Jordan Ellery");
+  });
+
+  it("keeps a skills list that opens the page when no name is found", () => {
+    const text = [
+      "Skills",
+      "Machine Learning",
+      "Data Science",
+      "Python",
+      "Experience",
+      "Data Scientist, Acme Corp",
+      "Jan 2020 - Present",
+      "- Built churn models",
+    ].join("\n");
+    expect(AtsScoringService.check(text, DEFAULT_POLICY).parsed.skills).toEqual([
+      "Machine Learning",
+      "Data Science",
+      "Python",
+    ]);
+  });
 });
 
 describe("a role row whose title and dates both wrap", () => {

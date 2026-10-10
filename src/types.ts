@@ -60,7 +60,10 @@ export type AtsRequirement = {
   terms: Array<{ term: string; found: boolean }>;
   /** Resume lines that show it, quoted. Work history first; a skills list last. */
   evidence: string[];
-  /** For years and degrees: what was compared, "6 years in the work history, 5 asked". */
+  /**
+   * For years, degrees, language levels and clearance levels: what was compared, "6 years in the
+   * work history, 5 asked", "Secret read, Top Secret asked".
+   */
   detail?: string;
 };
 

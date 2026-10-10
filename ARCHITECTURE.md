@@ -33,7 +33,7 @@ check(resume, policy, options)                                   check.ts, scori
  2 localizePolicy         languages, region, date order           locales/resolve.ts
  3 readResume             lines, sections (once), parse, context  scoring/context.ts
      readResumeLines      rejoin wrapped lines, read spaced ones  parser/lines.ts
-     segmentResume        headings → sections                     parser/sections.ts
+     readSections         headings → sections, cut at a late name parser/sections.ts, index.ts
      parseReadLines | parseResumeDocument                          parser/, document/parse.ts
        readCredentialRows certification and language rows         parser/certifications.ts, languages.ts
      checks               integrity, timeline, skills, writing    checks/

@@ -56,7 +56,7 @@ export function isPlace(line: string, policy: AtsEnginePolicy) {
   const { code, workplace } = placesOf(policy.resumeParse);
   const parts = line
     .replace(BULLET_PREFIX, "")
-    .split(/[,|·•()]/u)
+    .split(/[,|·•()\t]|\s{2,}/u)
     .map((part) => part.trim().replace(/\s\d{5}(?:-\d{4})?$/u, ""))
     .filter(Boolean);
   const where = (part: string) => code.test(part) || workplace.test(part);
@@ -149,10 +149,19 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
 /**
  * The employer's parts, joined, without where the role is worked after them: "Acme, San
  * Francisco, CA" is Acme, "Acme, Remote" is Acme. Only "City, ST" and workplace words are places
- * (see `isPlace`); "Acme, Berlin" keeps its city, and an employer is never left empty.
+ * (see `isPlace`); "Acme, Berlin" keeps its city. A workplace word alone ("Remote") or a city
+ * of one or two words and its state ("Austin, TX") names no employer, so there is none; a
+ * longer one may be an employer run into its city ("Oakmont Foods Portland, OR"), and is kept.
  */
 function withoutPlace(parts: string[], policy: AtsEnginePolicy): string {
   const { code, workplace } = placesOf(policy.resumeParse);
+  if (
+    (parts.length === 1 && workplace.test(parts[0]!)) ||
+    (parts.length === 2 &&
+      code.test(parts[1]!.replace(/\s\d{5}(?:-\d{4})?$/u, "")) &&
+      parts[0]!.split(/\s+/).length <= 2)
+  )
+    return "";
   let end = parts.length;
   while (end > 1 && workplace.test(parts[end - 1]!)) end -= 1;
   if (
@@ -208,10 +217,15 @@ export function parseRoles(
       !opensWithVerb.test(line)
     );
   };
+  // How long a role or a stay at an employer ran, on a line of its own ("4 years 9 months" under
+  // LinkedIn's employer): neither a title nor an employer.
+  const durationOnly = (line: string | undefined) =>
+    line !== undefined && !/[\p{L}\p{N}]/u.test(line.replace(duration, ""));
   const isHeader = (line: string | undefined): line is string =>
     line !== undefined &&
     !BULLET.test(line) &&
     (isHeadingLine(line.replace(/\.$/, "")) || isPartedHeader(line.replace(/\.$/, ""))) &&
+    !durationOnly(line) &&
     !findDateRange(line, rp, now);
   const isLongHeader = (line: string | undefined): line is string =>
     line !== undefined &&
@@ -223,12 +237,14 @@ export function parseRoles(
   const isSingle = (line: string) => splitTitleAndEmployer(line, policy).employer === "";
   const lettersIn = (text: string) => text.match(/\p{L}/gu)?.length ?? 0;
 
-  // Every dated line, with the header text it carries itself.
+  // Every dated line, with the header text it carries itself. Where the role is worked, beside
+  // its dates ("Jan 2020 - Present | Austin, TX"), is none: the header is elsewhere.
   const anchors = lines.flatMap((line, index) => {
     const found = BULLET.test(line) ? null : findDateRange(line, rp, now);
     if (!found) return [];
     const remainder = line.replace(found.matched, " ").replace(duration, " ").trim();
-    return [{ index, found, own: lettersIn(remainder) >= 3 ? remainder : "" }];
+    const own = lettersIn(remainder) >= 3 && !isPlace(remainder, policy) ? remainder : "";
+    return [{ index, found, own }];
   });
   const ownAt = new Map(anchors.map((anchor) => [anchor.index, anchor.own]));
 
@@ -243,9 +259,10 @@ export function parseRoles(
   // The half of a header a dated line lacks, read from the line at `at`. A short description
   // line without a bullet ("Led the platform team") is header-shaped too; opening with an
   // action verb is what gives it away. The line below a role is not free when it is the header
-  // of the next role, whose dated line, two down, carries none of its own.
+  // of the next role, whose dated line, two down, carries none of its own. A place ("Austin,
+  // TX") is where the role is worked, not who it is for.
   const halfAt = (at: number, from: number) => {
-    if (!free(at) || opensWithVerb.test(lines[at])) return null;
+    if (!free(at) || opensWithVerb.test(lines[at]) || isPlace(lines[at], policy)) return null;
     if (at > from && ownAt.get(at + 1) === "") return null;
     return headerParts(lines[at], policy)[0] ?? null;
   };
@@ -279,9 +296,10 @@ export function parseRoles(
       // the header, and what the dated line carries besides its dates is where, not who.
       const full = titled(index) ? undefined : sides.find((offset) => whole(index + offset, index));
       const side = full ?? sides.find((offset) => halfAt(index + offset, index));
+      // Its title is all it carries that is not where: "Acme Corp | Austin, TX" is Acme Corp.
       if (full !== undefined) header = take(index + full);
       else if (side !== undefined)
-        header = `${own} | ${headerParts(take(index + side), policy)[0]}`;
+        header = `${splitTitleAndEmployer(own, policy).title} | ${headerParts(take(index + side), policy)[0]}`;
     }
     // Stacked above a bare date line: "Engineer" over "Acme", or a title over "Acme, Munich" —
     // the line two up is the title when it holds one and the line above does not. Only the first
@@ -306,20 +324,27 @@ export function parseRoles(
       !opensWithVerb.test(lines[above]);
     let top = index;
     if (!header && datesFirst && free(index + 1)) header = take(index + 1);
-    if (!header && free(index - 1)) {
-      if (wrapped(index - 1)) {
-        const short = take(index - 1).trim();
-        const long = take(index - 2).trim();
+    // Where the role is worked, on a line of its own between its header and the dates
+    // ("Amazon" / "Seattle, WA" / "Jan 2020 - Present"), is dropped: the header is above it.
+    let dates = index;
+    if (!header && free(index - 1) && free(index - 2) && isPlace(lines[index - 1], policy)) {
+      take(index - 1);
+      dates = index - 1;
+    }
+    if (!header && free(dates - 1)) {
+      if (wrapped(dates - 1)) {
+        const short = take(dates - 1).trim();
+        const long = take(dates - 2).trim();
         header = isPlace(short, policy)
           ? long
           : `${long}${long.length >= WRAP_WIDTH ? " " : ", "}${short}`;
-        top = index - 2;
-      } else if (stacked(index - 1)) {
-        header = `${take(index - 2)} | ${headerParts(take(index - 1), policy)[0]}`;
-        top = index - 2;
+        top = dates - 2;
+      } else if (stacked(dates - 1)) {
+        header = `${take(dates - 2)} | ${headerParts(take(dates - 1), policy)[0]}`;
+        top = dates - 2;
       } else {
-        header = take(index - 1);
-        top = index - 1;
+        header = take(dates - 1);
+        top = dates - 1;
       }
     }
     if (!header && free(index + 1)) header = take(index + 1);
@@ -330,9 +355,10 @@ export function parseRoles(
     // over a title and its dates, then more titles and dates. The employer line names every role
     // under it, until a role names its own. It opens a group, so it starts the section or follows
     // the bullets of the role before; anywhere else, and as a place ("San Francisco, CA"), it is
-    // the end of the role before.
+    // the end of the role before. LinkedIn prints the time at the employer between it and the
+    // first title ("Acme Corp" / "4 years 9 months" / "Senior Engineer").
     if (split.title && !employer) {
-      const above = top - 1;
+      const above = durationOnly(lines[top - 1]) && !used.has(top - 1) ? top - 2 : top - 1;
       if (
         titled(top) &&
         free(above) &&

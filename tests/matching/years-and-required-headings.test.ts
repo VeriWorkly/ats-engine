@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AtsScoringService, DEFAULT_POLICY, type AtsRequirement } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { policyRegex } from "../../src/policy/regex.js";
+import { stem } from "../../src/text/text.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
@@ -249,6 +250,90 @@ describe("years judgements", () => {
       ),
     ).toMatchObject({ status: "missing", detail: expect.stringContaining("does not name") });
   });
+
+  const SOFTWARE_ENGINEER = [
+    "Experience",
+    "Senior Software Engineer, Northwind Labs Jan 2021 - Present",
+    "- Built payment services in Go on Kubernetes serving 3M users",
+    "Software Engineer, Tailspin Systems Jun 2017 - Dec 2020",
+    "- Wrote REST APIs in Python backed by PostgreSQL",
+  ].join("\n");
+
+  it.each([
+    "5+ years of hands-on software development experience",
+    "5+ years of experience as a software developer",
+  ])("counts a software engineer's years as software development: %s", (ask) => {
+    expect(one(SOFTWARE_ENGINEER, ask)).toMatchObject({
+      kind: "experience",
+      status: "met",
+      detail: expect.stringMatching(/^9 years in roles naming software, develop/),
+    });
+  });
+
+  it("folds develop, developed, developer and development", () => {
+    const forms = ["develop", "developed", "developer", "developers", "development"];
+    const rules = DEFAULT_POLICY.keywordMatch.stemming;
+    expect(new Set(forms.map((form) => stem(form, rules)))).toEqual(new Set(["develop"]));
+  });
+
+  it.each([
+    ["Mechanical Engineer, Copperline Pumps", "Designed pumps", "software development"],
+    ["Sales Engineer, Brightline Software", "Ran software demos", "software development"],
+    ["Software Engineer, Brightline Software", "Built billing software", "business development"],
+    ["Field Service Engineer, Copperline Pumps", "Serviced pumps", "business development"],
+    ["Civil Engineer, Greystone Land Partners", "Surveyed land for housing", "land development"],
+  ])("does not count an engineer's years as other development: %s", (role, bullet, field) => {
+    const body = `Experience\n${role} Jan 2015 - Present\n- ${bullet}`;
+    expect(one(body, `5+ years of ${field} experience`).status).not.toBe("met");
+  });
+
+  it.each([
+    "Minimum of 5 years of software engineering experience",
+    "Min. 5 years of software engineering experience",
+    "A minimum of 5 years of software engineering experience",
+  ])('reads "minimum" as the wording of the years, not their field: %s', (ask) => {
+    const report = check(SOFTWARE_ENGINEER, `Requirements\n- ${ask}`);
+    const requirement = report.requirements[0] as AtsRequirement;
+    expect(requirement).toMatchObject({
+      kind: "experience",
+      status: "met",
+      detail: "9 years in roles naming software, engineering, 5 asked",
+    });
+    expect(requirement.terms.map(({ term }) => term)).toEqual(["software", "engineering"]);
+    expect(report.missingKeywords).not.toContain("minimum");
+    expect(report.missingKeywords).not.toContain("min");
+  });
+
+  it("counts a nurse's roles toward years of nursing", () => {
+    const nurse = [
+      "Experience",
+      "Registered Nurse, Bayview General Hospital, Houston, TX Mar 2021 - Present",
+      "- Administer medications and monitor cardiac rhythms",
+      "Staff Nurse, Lakeside Medical Center, Austin, TX Jun 2018 - Feb 2021",
+      "- Cared for post-operative patients on a medical-surgical floor",
+    ].join("\n");
+    expect(one(nurse, "3+ years of nursing experience")).toMatchObject({
+      kind: "experience",
+      status: "met",
+      detail: "8 years in roles naming nursing, 3 asked",
+    });
+  });
+
+  it("does not read an account executive's years as accounting", () => {
+    const sales = [
+      "Experience",
+      "Account Executive, Brightline Software Feb 2020 - Present",
+      "- Managed a book of 60 mid-market accounts in Salesforce",
+    ].join("\n");
+    expect(one(sales, "2+ years of accounting experience").status).toBe("missing");
+  });
+
+  it("reads a minimum of years of a skill", () => {
+    expect(one(SOFTWARE_ENGINEER, "Minimum 3 years of Python")).toMatchObject({
+      status: "met",
+      detail: "3 years in roles naming python, 3 asked",
+    });
+  });
 });
 
 describe("missing keywords", () => {
@@ -281,6 +366,15 @@ describe("missing keywords", () => {
     ])
       expect(report.missingKeywords).not.toContain(noise);
     expect(report.missingKeywords).toContain("kafka");
+  });
+
+  it("leaves out function words joined by a slash", () => {
+    const report = check(
+      "Skills\nPython",
+      "Requirements\n- Python and/or Go\n- Bring his/her own laptop",
+    );
+    for (const word of ["and/or", "and", "or", "his/her", "his", "her"])
+      expect(report.missingKeywords).not.toContain(word);
   });
 
   it("credits a B.Tech against a Bachelor's degree in the match score", () => {
