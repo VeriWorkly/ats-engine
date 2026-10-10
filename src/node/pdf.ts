@@ -5,7 +5,7 @@ import type { AtsLayoutSignals } from "../types.js";
 import { MAX_HIDDEN_TEXT } from "./docx.js";
 import { measureVisibility, seeThroughImages } from "./hidden.js";
 import type { Box } from "./surroundings.js";
-import { pageText, withLinks, type PdfTextItem } from "./lines.js";
+import { joinPages, pageText, withLinks, type PdfTextItem } from "./lines.js";
 import { optional } from "./peer.js";
 
 /** Pages whose pictures and ruled tables are counted, here and by pdf-parse. */
@@ -18,6 +18,12 @@ const MAX_PAGES_MEASURED = 6;
 const MAX_VISIBILITY_PAGES = 60;
 /** Fewer text characters than this on a page with an image, and the page is a picture. */
 const MIN_PAGE_TEXT = 20;
+/**
+ * Fewer than this over an image across most of the page, and the page is a picture: a scanner's
+ * one-line stamp ("Scanned with CamScanner"), not two short sections on a designed template's
+ * background.
+ */
+const STAMP_TEXT = 40;
 /** Points a side (about 0.7in) an image must reach to count as a photo. */
 const PHOTO_MIN = 50;
 
@@ -68,7 +74,8 @@ async function readPdf(
     });
 
   try {
-    let text = "";
+    let chars = 0;
+    const pages: Array<{ lines: string[]; ys: number[] }> = [];
     let columnRatio: number | null = null;
     const hidden: string[] = [];
     const links: string[] = [];
@@ -78,7 +85,7 @@ async function readPdf(
     let visibilityRead = true;
     let measured = 0;
 
-    for (let number = 1; number <= document.numPages && text.length < maxChars; number += 1) {
+    for (let number = 1; number <= document.numPages && chars < maxChars; number += 1) {
       const page = await document.getPage(number);
       const viewport = page.getViewport({ scale: 1 });
       const toViewport = (x: number, y: number) => viewport.convertToViewportPoint(x, y);
@@ -114,16 +121,21 @@ async function readPdf(
             for (const run of seen.hidden) hidden.push(run);
             if (number <= MAX_PAGES_MEASURED) {
               tables += seen.tables;
-              // An image and next to no text: a scan with no OCR layer, or a page saved as a
-              // picture.
-              if (seen.images.length && seen.textChars < MIN_PAGE_TEXT) imageOnlyPages += 1;
               // A photo: an image printed at least PHOTO_MIN points a side (icons and logo marks
               // are smaller) but not across most of the page, which is a scan or a background.
               const [, , pageWidth, pageHeight] = page.view as Box;
-              imageCount += seen.images.filter(([x0, y0, x1, y1]) => {
-                const [w, h] = [x1 - x0, y1 - y0];
-                return w >= PHOTO_MIN && h >= PHOTO_MIN && w * h < pageWidth * pageHeight * 0.5;
-              }).length;
+              const wide = ([x0, y0, x1, y1]: Box) =>
+                (x1 - x0) * (y1 - y0) >= pageWidth * pageHeight * 0.5;
+              imageCount += seen.images.filter(
+                (box) => box[2] - box[0] >= PHOTO_MIN && box[3] - box[1] >= PHOTO_MIN && !wide(box),
+              ).length;
+              // An image and next to no text: a scan with no OCR layer, or a page saved as a
+              // picture. Over an image across most of the page with no OCR layer (text drawn
+              // invisibly), a line or two is a scanner's stamp ("Scanned with CamScanner"), not
+              // the resume's text.
+              const stamped = seen.images.some(wide) && seen.invisibleChars < MIN_PAGE_TEXT;
+              if (seen.images.length && seen.textChars < (stamped ? STAMP_TEXT : MIN_PAGE_TEXT))
+                imageOnlyPages += 1;
             }
             marks = seen.marks.map(([x0, y0, x1, y1]) => {
               const [[a, b], [c, d]] = [toViewport(x0, y0), toViewport(x1, y1)];
@@ -141,7 +153,8 @@ async function readPdf(
       }
 
       const lines = pageText(textItems, toViewport, viewport.width, marks);
-      text += `${lines.text}\n\n`;
+      pages.push(lines);
+      chars += lines.lines.join(" ").length + 2;
       // The worst page wins: one two-column page is a two-column resume, and averaging it
       // against clean pages would hide exactly the problem worth reporting.
       if (lines.columns !== null) columnRatio = Math.max(columnRatio ?? 0, lines.columns);
@@ -170,7 +183,7 @@ async function readPdf(
 
     return {
       tables,
-      text: withLinks(text, links),
+      text: withLinks(joinPages(pages), links),
       geometry: {
         ...(metadataText && { metadataText }),
         ...(encrypted && { encrypted }),

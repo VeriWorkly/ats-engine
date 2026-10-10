@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
 import { extractResume } from "../../src/node/index.js";
-import { buildPdf } from "../fixtures/buildPdf.js";
+import { buildPdf, buildPdfPages } from "../fixtures/buildPdf.js";
 import { expectFastAsync } from "../fixtures/timing.js";
 
 /**
@@ -116,5 +116,45 @@ describe("image-only pages", () => {
 
   it("does not count a page with text and a photo", async () => {
     expect((await hidden(IMAGE(450, 650, 100, 120))).imageOnlyPages).toBe(0);
+  });
+});
+
+describe("a scan with a small text stamp", () => {
+  // A phone scanner's app prints its name in a corner of every page it saves: 23 characters of
+  // text over a picture of the whole page, which is still a picture.
+  const scan = (text: string) =>
+    extractResume(buildPdf(`${IMAGE(0, 0, 612, 792)}\n${line(20, text, 8)}`), "pdf");
+
+  it("is still a picture", async () => {
+    expect((await scan("Scanned with CamScanner")).layout?.imageOnlyPages).toBe(1);
+  });
+
+  it("is not a picture when the text over it is a resume's", async () => {
+    const body = "Jane Doe, Senior Engineer at Acme Corporation, Kubernetes Terraform Kafka ";
+    const { layout } = await extractResume(
+      buildPdf(
+        [IMAGE(0, 0, 612, 792), ...[0, 1, 2, 3].map((at) => line(700 - 20 * at, body))].join("\n"),
+      ),
+      "pdf",
+    );
+    expect(layout?.imageOnlyPages).toBe(0);
+  });
+
+  it("is not a picture when a designed template's short last page sits on its background", async () => {
+    // A background picture across every page, and a second page of two short sections.
+    const background = IMAGE(0, 0, 612, 792);
+    const first = [background, ...Array.from({ length: 20 }, (_, at) => line(700 - 14 * at))];
+    const second = [
+      background,
+      line(740, "SKILLS", 12),
+      line(722, "TypeScript, Go, PostgreSQL, Kubernetes, Terraform, AWS, Docker"),
+      line(690, "EDUCATION", 12),
+      line(672, "B.S. Computer Science, Ohio State University, 2016"),
+    ];
+    const { layout } = await extractResume(
+      buildPdfPages([first.join("\n"), second.join("\n")]),
+      "pdf",
+    );
+    expect(layout?.imageOnlyPages).toBe(0);
   });
 });

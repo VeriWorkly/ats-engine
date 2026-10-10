@@ -78,7 +78,7 @@ export function pageText(
   toViewport: (x: number, y: number) => number[],
   pageWidth = 0,
   marks: readonly Box[] = [],
-): { text: string; columns: number | null } {
+): { columns: number | null } & PageLines {
   let placed: Placed[] = [];
   for (const item of items) {
     // An empty item only marks where pdf.js saw a line end; position says that here.
@@ -367,9 +367,106 @@ export function pageText(
     // page to say its mark is a timeline's.
     if ([-1, 0, 1].some(listed) || !decorative.has(Math.round(mark))) bulleted.add(at);
   });
-  const text = texts.map(({ out }, at) => (bulleted.has(at) ? `• ${out}` : out)).join("\n");
+  const read = texts.map(({ out }, at) => (bulleted.has(at) ? `• ${out}` : out));
 
-  return { text, columns: gutter?.ratio ?? null };
+  return {
+    columns: gutter?.ratio ?? null,
+    lines: read,
+    ys: lines.map((line) => line[0]?.y ?? 0),
+  };
+}
+
+/** A page's lines and the height of each, from `pageText`. */
+type PageLines = { lines: string[]; ys: number[] };
+
+/**
+ * The pages' text, without what a PDF prints on every page. A page's margins are its first line
+ * or two and its last line or two, when a gap wider than one and a half of its usual line gaps
+ * parts them from the body. A line in a margin printed at the same height (within 2pt) in a
+ * margin of another page runs on every page: with the same text it is a header or footer, read
+ * once, before the text or after it as a DOCX's are; with only its numbers changed, and each the
+ * number of its page ("Page 1 of 2", "2/3"), it is a page number, and is not read. A later page
+ * that opens its top margin, above where the first page's text starts, with the line the first
+ * page opens with ("Jordan Ellery - Resume" over the name) opens with its header, which is not
+ * read either. Left in, each fell between the last line of one page and the first of the next,
+ * and a role the page break parted took it for its title and employer.
+ */
+export function joinPages(pages: readonly PageLines[]): string {
+  type Line = [text: string, height: number];
+  const rows = pages.map(({ lines, ys }) => lines.map((text, at): Line => [text, ys[at]!]));
+  const sorted = rows.map((page) => [...page].sort((a, b) => a[1] - b[1]));
+  // Wider than one and a half of the document's usual line gaps: a short last page has few
+  // lines, far apart.
+  const gaps = sorted
+    .flatMap((page) => page.slice(1).map(([, y], at) => y - page[at]![1]))
+    .filter((gap) => gap > 0.5)
+    .sort((a, b) => a - b);
+  const wide = 1.5 * gaps[gaps.length >> 2]!;
+  // Lines in a margin, by their text with its numbers masked, with their page.
+  const groups = new Map<string, Array<[number, Line]>>();
+  // Each page's top and bottom margins.
+  const edges = sorted.map((page, number) => {
+    const gap = (at: number) => page[at + 1]![1] - page[at]![1] > wide;
+    const count = page.length;
+    const top = count > 1 && gap(0) ? 1 : count > 2 && gap(1) ? 2 : 0;
+    const bottom =
+      count > 1 && gap(count - 2) ? count - 1 : count > 2 && gap(count - 3) ? count - 2 : count;
+    const margins = [page.slice(0, top), page.slice(Math.max(top, bottom))];
+    for (const line of margins.flat()) {
+      const key = line[0].trim().replace(/\d+/g, "#");
+      (groups.get(key) ?? groups.set(key, []).get(key)!).push([number, line]);
+    }
+    return margins;
+  });
+  // The running lines: their text for a header or footer, "" for a page number.
+  const running = new Map<Line, string>();
+  for (const group of groups.values()) {
+    // By height, each line is matched with the next on another page within 2pt.
+    group.sort((a, b) => a[1][1] - b[1][1]);
+    const found = new Set<[number, Line]>();
+    group.forEach((line, at) => {
+      for (
+        let next = at + 1;
+        next < group.length && group[next]![1][1] - line[1][1] <= 2;
+        next += 1
+      )
+        if (group[next]![0] !== line[0]) {
+          found.add(line).add(group[next]!);
+          break;
+        }
+    });
+    const same = new Set([...found].map(([, [text]]) => text)).size === 1;
+    // Only its numbers changed, and each the number of its page: a page number.
+    if (same || [...found].every(([page, [text]]) => text.match(/\d+/g)?.includes(`${page + 1}`)))
+      for (const [, line] of found) running.set(line, same ? line[0] : "");
+  }
+  // A margin runs when all of it does: a heading and its line at the foot of a page, alike on
+  // another page, are body text.
+  const margins = [new Set<string>(), new Set<string>()];
+  const dropped = new Set<Line>();
+  for (const sides of edges)
+    sides.forEach((lines, side) => {
+      if (lines.every((line) => running.has(line)))
+        for (const line of lines) {
+          if (running.get(line)) margins[side]!.add(line[0]);
+          dropped.add(line);
+        }
+    });
+  // The line the first page opens with: a later page whose top margin opens with it, printed
+  // above it, opens with its header.
+  const [opening, height] = sorted[0]?.[0] ?? ["", 0];
+  if (opening.trim().includes(" "))
+    for (const [[line]] of edges.slice(1))
+      if (line && line[1] < height - 2 && line[0].trim().startsWith(opening.trim()))
+        dropped.add(line);
+  return [
+    margins[0]!,
+    ...rows.map((page) => page.filter((line) => !dropped.has(line)).map(([text]) => text)),
+    margins[1]!,
+  ]
+    .map((lines) => [...lines].join("\n"))
+    .map((part) => part && `${part}\n\n`)
+    .join("");
 }
 
 /** At most this many link targets are added to a document's text. */

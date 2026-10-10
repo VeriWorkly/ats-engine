@@ -28,6 +28,9 @@ describe("a role header with its location", () => {
     "Senior Software Engineer, Northwind Payments, San Francisco, CA",
     "Senior Software Engineer, Northwind Payments, Remote",
     "Northwind Payments — Senior Software Engineer",
+    "Senior Software Engineer, Northwind Payments (Remote)",
+    "Senior Software Engineer | Northwind Payments (San Francisco, CA)",
+    "Senior Software Engineer at Northwind Payments (Hybrid)",
   ])("reads the title and the employer of %j", (header) => {
     expect(roleOf(header)).toMatchObject({
       title: "Senior Software Engineer",
@@ -38,6 +41,7 @@ describe("a role header with its location", () => {
 
   it("keeps a city that is not told from part of the employer", () => {
     expect(roleOf("Software Engineer, Acme, Berlin")?.employer).toBe("Acme, Berlin");
+    expect(roleOf("Software Engineer, Acme (Europe)")?.employer).toBe("Acme (Europe)");
   });
 
   it("does not take a description line for a header", () => {
@@ -160,5 +164,85 @@ describe("the time at an employer on a line of its own", () => {
       { title: "Senior Software Engineer", employer: "Acme Corp" },
       { title: "Software Engineer", employer: "Acme Corp" },
     ]);
+  });
+});
+
+describe("a comma inside the title", () => {
+  it.each([
+    [
+      "Director, Product Management | Acme Corp | Jan 2020 - Present",
+      "Director, Product Management",
+      "Acme Corp",
+    ],
+    [
+      "Director, Product Management | Acme Corp | Austin, TX",
+      "Director, Product Management",
+      "Acme Corp",
+    ],
+    [
+      "Director, Product Management — Northwind Bank",
+      "Director, Product Management",
+      "Northwind Bank",
+    ],
+    [
+      "Teaching Assistant, Physics | Ohio State University",
+      "Teaching Assistant, Physics",
+      "Ohio State University",
+    ],
+    ["VP, Engineering, Acme, Inc.", "VP, Engineering", "Acme, Inc"],
+    ["VP, Engineering, Acme Corp", "VP, Engineering", "Acme Corp"],
+    [
+      "Senior Engineer, Platform Team, Northwind Inc., Austin, TX",
+      "Senior Engineer, Platform Team",
+      "Northwind Inc",
+    ],
+  ])("keeps the title of %j whole", (header, title, employer) => {
+    expect(roleOf(header)).toMatchObject({ title, employer });
+  });
+
+  it.each([
+    // A comma part beside a place, or a city and its country, is still the employer.
+    ["Senior Engineer, Acme — Austin, TX", "Senior Engineer", "Acme"],
+    ["Senior Engineer, Acme | Remote", "Senior Engineer", "Acme"],
+    ["Software Engineer, Acme | Berlin, Germany", "Software Engineer", "Acme, Berlin, Germany"],
+    // Without a company's legal form after it, a third part is where.
+    ["Software Engineer, Acme, Berlin", "Software Engineer", "Acme, Berlin"],
+    // A description of the employer is not an employer of its own, nor a street named for one.
+    [
+      "Software Engineer, Waymo, an Alphabet company",
+      "Software Engineer",
+      "Waymo, an Alphabet company",
+    ],
+    ["Software Engineer, Acme, Bank Street, NY", "Software Engineer", "Acme"],
+  ])("still reads the employer after the comma in %j", (header, title, employer) => {
+    expect(roleOf(header)).toMatchObject({ title, employer });
+  });
+});
+
+describe("an employer written before the title", () => {
+  it.each([
+    ["Deloitte, Accountant", "Accountant", "Deloitte"],
+    ["Mercy Hospital, Registered Nurse", "Registered Nurse", "Mercy Hospital"],
+    ["Lincoln High School, Teacher", "Teacher", "Lincoln High School"],
+    ["Acme Corp, CTO", "CTO", "Acme Corp"],
+    ["Target - Cashier", "Cashier", "Target"],
+    ["Account Executive, Head & Shoulders Media", "Account Executive", "Head & Shoulders Media"],
+    ["Northwind Bank | Teller", "Teller", "Northwind Bank"],
+    // No title word on either side: the side naming an organisation is the employer.
+    ["Globex Corporation, Croupier", "Croupier", "Globex Corporation"],
+    ["Globex Corporation, Croupier, Austin, TX", "Croupier", "Globex Corporation"],
+  ])("reads %j as the title at the employer", (header, title, employer) => {
+    expect(roleOf(header)).toMatchObject({ title, employer });
+  });
+
+  it("still reads the first part as the title when neither side names an organisation", () => {
+    expect(roleOf("Croupier, Globex")).toMatchObject({ title: "Croupier", employer: "Globex" });
+  });
+
+  it("reads a title word before an organisation's name", () => {
+    expect(roleOf("Bank Manager, Globex")).toMatchObject({
+      title: "Bank Manager",
+      employer: "Globex",
+    });
   });
 });

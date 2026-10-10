@@ -167,6 +167,14 @@
         "minLength": 1
       }
     },
+    "organisationWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "openEnded": {
       "minItems": 1,
       "type": "array",

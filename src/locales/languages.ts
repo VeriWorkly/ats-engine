@@ -50,6 +50,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       postNominals: union(rp.postNominals, v.postNominals),
       regionCodes: union(rp.regionCodes, v.regionCodes),
       workplaceWords: union(rp.workplaceWords, v.workplaceWords),
+      organisationWords: union(rp.organisationWords, v.organisationWords),
       openEnded: union(rp.openEnded, v.openEnded),
       rangeWords: union(rp.rangeWords, v.rangeWords),
       sinceWords: union(rp.sinceWords, v.sinceWords),

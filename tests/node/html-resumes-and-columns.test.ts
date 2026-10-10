@@ -429,7 +429,7 @@ describe("a date line is not taken for a justified one", () => {
       item(" ", 432, 180, 23),
       item("Jul 2022 – Present", 449.4, 180, 91.6),
     ];
-    expect(pageText(items, viewport, 612).text.split("\n").at(-1)).toBe(
+    expect(pageText(items, viewport, 612).lines.at(-1)).toBe(
       "Registered Nurse, Intensive Care Unit, Banner University\tJul 2022 – Present",
     );
   });
@@ -452,7 +452,7 @@ describe("a date line is not taken for a justified one", () => {
       });
     });
     // No page width: four short lines may leave a channel down the page, a gutter of no matter.
-    expect(pageText(items, viewport).text.split("\n")).toEqual(
+    expect(pageText(items, viewport).lines).toEqual(
       widths.map((row) => row.map(() => "word").join(" ")),
     );
   });
@@ -464,7 +464,7 @@ describe("runs pdf.js ended a line between are not run together", () => {
       item("Institute of Technology,", 71, 100, 120, true),
       item("2022 –", 191, 100, 30),
     ];
-    expect(pageText(items, viewport, 612).text).toBe("Institute of Technology, 2022 –");
+    expect(pageText(items, viewport, 612).lines.join("\n")).toBe("Institute of Technology, 2022 –");
   });
 });
 
