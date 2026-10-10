@@ -49,7 +49,6 @@ const MAX_TERMS = 6;
 const MAX_EVIDENCE_LINES = 1_000;
 /** Years of dated work that let "or equivalent experience" stand in for a degree. */
 const EQUIVALENT_MONTHS = 24;
-const NEGATED_EVIDENCE = /\b(?:not|no|without|lack(?:ing)?|inactive|expired)\b/iu;
 const WEAK_LANGUAGE = /\b(?:beginner|basic|elementary|limited|a1|a2)\b/iu;
 
 /** A resume section with the heading line that opened it, when one did: "Certifications". */
@@ -124,7 +123,17 @@ type Matchers = {
   /** The same, global: blanked out to see what else a clause says. */
   preferredAll: RegExp;
   authorization: RegExp;
+  needsSponsorship: RegExp;
+  noSponsorship: RegExp;
+  /** The same, global: blanked out to read what else a line says. */
+  noSponsorshipAll: RegExp;
+  negation: RegExp;
+  notHeld: RegExp;
+  citizenship: RegExp;
+  residence: RegExp;
   clearance: RegExp;
+  /** Clearance levels, highest first, each with its rank (0 the lowest) and a global pattern. */
+  clearanceLevels: Array<{ name: string; rank: number; pattern: RegExp }>;
   /** `qualifiers`, each folded to the tokens a line is read as. */
   qualifiers: Array<{ tokens: Set<string>; sameLine: boolean }>;
 };
@@ -152,7 +161,17 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     preferred: wordListRegex(km.preferredMarkers),
     preferredAll: wordListRegex(km.preferredMarkers, "gi"),
     authorization: wordListRegex(r.authorization),
+    needsSponsorship: wordListRegex(r.needsSponsorship),
+    noSponsorship: wordListRegex(r.noSponsorship),
+    noSponsorshipAll: wordListRegex(r.noSponsorship, "gi"),
+    negation: wordListRegex(r.negation),
+    notHeld: wordListRegex(r.notHeld),
+    citizenship: wordListRegex(r.citizenship),
+    residence: wordListRegex(r.residence),
     clearance: wordListRegex(r.clearance),
+    clearanceLevels: r.clearanceLevels
+      .map(({ name, patterns }, rank) => ({ name, rank, pattern: wordListRegex(patterns, "gi") }))
+      .reverse(),
     qualifiers: km.qualifiers.map(({ words, sameLine }) => ({
       tokens: new Set(
         words
@@ -173,6 +192,69 @@ function patternLanguages(text: string, matchers: Matchers) {
       (captured): captured is string =>
         captured !== undefined && matchers.languageNames.has(captured),
     );
+}
+
+/**
+ * The clearance levels a line names, by rank. Read from the highest down, each match blanked
+ * before the next level is looked for, so "Top Secret" is not also "Secret".
+ */
+function clearanceRanks(text: string, matchers: Matchers) {
+  const ranks: number[] = [];
+  let rest = text;
+  for (const { rank, pattern } of matchers.clearanceLevels) {
+    const blanked = rest.replace(pattern, (found) => " ".repeat(found.length));
+    if (blanked !== rest) ranks.push(rank);
+    rest = blanked;
+  }
+  return ranks;
+}
+
+/** A clearance the line says is held: not negated, not pending or past. */
+const holdsClearance = (line: string, matchers: Matchers) =>
+  matchers.clearance.test(line) && !matchers.negation.test(line) && !matchers.notHeld.test(line);
+
+/**
+ * The right to work: met by a statement of it, never by one that says the opposite. A line is
+ * read without what says no sponsorship is needed ("not requiring sponsorship"), so its "not"
+ * is not taken for a negation; what is left that needs sponsorship is no evidence of the right
+ * to work, and evidence against it where the posting rules sponsorship out, and what is left
+ * negated ("Cannot work in the US") is no evidence. An ask for citizenship alone is met only by
+ * citizenship held, and a line naming permanent residence instead says the candidate does not
+ * hold it. Otherwise the question is the application's.
+ */
+function judgeAuthorization(
+  ask: string,
+  lines: ReadonlyArray<{ line: string }>,
+  matchers: Matchers,
+): { status: Status | "unverifiable"; lines: Array<{ line: string }> } {
+  const stated = lines.flatMap((entry) => {
+    const { line } = entry;
+    if (
+      !matchers.authorization.test(line) &&
+      !matchers.citizenship.test(line) &&
+      !matchers.residence.test(line)
+    )
+      return [];
+    const rest = line.replace(matchers.noSponsorshipAll, " ");
+    if (matchers.needsSponsorship.test(rest)) return [{ entry, needs: true }];
+    return matchers.negation.test(rest) ? [] : [{ entry, needs: false }];
+  });
+  const shown = stated.filter(({ needs }) => !needs).map(({ entry }) => entry);
+  const needing = stated.filter(({ needs }) => needs).map(({ entry }) => entry);
+  if (matchers.citizenship.test(ask) && !matchers.residence.test(ask)) {
+    const citizen = shown.filter(
+      ({ line }) =>
+        matchers.citizenship.test(line) &&
+        !matchers.residence.test(line) &&
+        !matchers.notHeld.test(line),
+    );
+    if (citizen.length) return { status: "met", lines: citizen };
+    const against = [...shown.filter(({ line }) => matchers.residence.test(line)), ...needing];
+    return { status: against.length ? "missing" : "unverifiable", lines: against };
+  }
+  const excludes = matchers.noSponsorship.test(ask) || matchers.needsSponsorship.test(ask);
+  if (excludes && needing.length) return { status: "missing", lines: needing };
+  return { status: shown.length ? "met" : "unverifiable", lines: shown };
 }
 
 /** The word after a position, when only spaces stand before it. */
@@ -548,17 +630,39 @@ export function judgeRequirements(
     const base = { text, importance };
 
     // The right to work and a clearance: settled in the application, unless the resume says.
-    for (const kind of ["authorization", "clearance"] as const) {
-      if (!matchers[kind].test(text)) continue;
-      const evidence = evidenceFor(
-        (entry) => matchers[kind].test(entry.line) && !NEGATED_EVIDENCE.test(entry.line),
-      );
+    if (matchers.authorization.test(text)) {
+      const { status, lines: shown } = judgeAuthorization(ask, resumeLines, matchers);
+      const lines = new Set(shown);
       return {
         ...base,
-        kind,
-        status: evidence.length ? "met" : "unverifiable",
+        kind: "authorization",
+        status,
+        terms: [],
+        evidence: evidenceFor((entry) => lines.has(entry)),
+      } satisfies AtsRequirement;
+    }
+    if (matchers.clearance.test(text)) {
+      const holds = (entry: { line: string }) => holdsClearance(entry.line, matchers);
+      const evidence = evidenceFor(holds);
+      // A level asked is met by it or one above; the lowest the ask names is the bar.
+      const asked = Math.min(...clearanceRanks(ask, matchers));
+      const held = Math.max(
+        -1,
+        ...resumeLines.filter(holds).flatMap((entry) => clearanceRanks(entry.line, matchers)),
+      );
+      const levels = km.requirements.clearanceLevels;
+      const short = evidence.length > 0 && Number.isFinite(asked) && held < asked;
+      return {
+        ...base,
+        kind: "clearance",
+        status: !evidence.length ? "unverifiable" : short ? "partial" : "met",
         terms: [],
         evidence,
+        ...(short
+          ? {
+              detail: `${held < 0 ? "No level" : levels[held]!.name} read, ${levels[asked]!.name} asked`,
+            }
+          : {}),
       } satisfies AtsRequirement;
     }
 

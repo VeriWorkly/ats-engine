@@ -149,6 +149,143 @@ describe("knockouts", () => {
   });
 });
 
+/** The judgement of `ask` for a resume that ends with `statement`. */
+const stating = (statement: string, ask: string) => one(ask, `${RESUME}\n${statement}`);
+
+describe("the right to work, read for what the statement says", () => {
+  const authorized = stating;
+  const WITHOUT_SPONSORSHIP = "Must be authorized to work in the US without sponsorship";
+
+  it("is missing where the posting rules sponsorship out and the resume needs it", () => {
+    expect(authorized("Requires H-1B visa sponsorship", WITHOUT_SPONSORSHIP)).toMatchObject({
+      kind: "authorization",
+      status: "missing",
+      evidence: ["Requires H-1B visa sponsorship"],
+    });
+    expect(
+      authorized("Will require visa sponsorship", "This role is not eligible for work sponsorship")
+        .status,
+    ).toBe("missing");
+  });
+
+  it.each([
+    "Not currently requiring sponsorship, but will require sponsorship in the future",
+    "Doesn't require sponsorship now; will need H-1B sponsorship in 2027",
+  ])("reads a need for sponsorship later in the line: %s", (statement) => {
+    expect(authorized(statement, WITHOUT_SPONSORSHIP)).toMatchObject({
+      status: "missing",
+      evidence: [statement],
+    });
+  });
+
+  it.each([
+    "Cannot work in the US without visa sponsorship",
+    "Can't work in the US without sponsorship",
+    "Not authorized to work without sponsorship",
+    "Unable to work in the US without sponsorship",
+  ])("does not take a negated statement for one: %s", (statement) => {
+    expect(authorized(statement, WITHOUT_SPONSORSHIP).status).not.toBe("met");
+  });
+
+  it.each([
+    "Authorized to work in the US; no sponsorship required",
+    "U.S. citizen, does not require visa sponsorship",
+    "Authorized to work in the US without sponsorship",
+    "US Citizen; not requiring sponsorship",
+  ])("is met by a line that needs no sponsorship: %s", (statement) => {
+    expect(authorized(statement, WITHOUT_SPONSORSHIP)).toMatchObject({
+      status: "met",
+      evidence: [statement],
+    });
+  });
+
+  it("never meets a plain ask with a line that needs sponsorship", () => {
+    expect(
+      authorized(
+        "Requires H-1B visa sponsorship",
+        "Must be authorized to work in the United States",
+      ).status,
+    ).toBe("unverifiable");
+    expect(
+      authorized("Authorized to work in the US", "Must be authorized to work in the United States")
+        .status,
+    ).toBe("met");
+  });
+
+  it("meets a citizenship ask only with U.S. citizenship held", () => {
+    const CITIZEN = "Must be a U.S. citizen";
+    expect(authorized("Green card holder", CITIZEN)).toMatchObject({
+      status: "missing",
+      evidence: ["Green card holder"],
+    });
+    expect(authorized("Permanent resident of the US", CITIZEN).status).toBe("missing");
+    expect(authorized("U.S. citizen", CITIZEN).status).toBe("met");
+    // Authorized, but whether as a citizen the line does not say.
+    expect(authorized("Authorized to work in the US", CITIZEN).status).toBe("unverifiable");
+    for (const statement of [
+      "Lawful permanent resident; U.S. citizenship pending",
+      "Eligible for U.S. citizenship in 2027; green card holder",
+      "Former U.S. citizen",
+    ])
+      expect(authorized(statement, CITIZEN).status, statement).not.toBe("met");
+  });
+
+  it("meets a citizenship-or-residence ask with either", () => {
+    expect(
+      authorized("Green card holder", "Must be a U.S. citizen or green card holder").status,
+    ).toBe("met");
+    expect(
+      authorized("Permanent resident", "U.S. citizenship or permanent residency required").status,
+    ).toBe("met");
+  });
+});
+
+describe("a clearance, compared by its level", () => {
+  const cleared = stating;
+
+  it.each([
+    [
+      "Active Secret clearance",
+      "Active Top Secret clearance required",
+      "Secret read, Top Secret asked",
+    ],
+    ["Active Secret clearance", "Active TS/SCI clearance", "Secret read, TS/SCI asked"],
+    ["Active Top Secret clearance", "TS/SCI clearance required", "Top Secret read, TS/SCI asked"],
+    ["Confidential clearance (active)", "Secret clearance", "Confidential read, Secret asked"],
+    ["Active Secret clearance", "Active TS clearance required", "Secret read, Top Secret asked"],
+    ["Active security clearance", "Active Top Secret clearance", "No level read, Top Secret asked"],
+  ])("is partial with a lower level: %s for %s", (statement, ask, detail) => {
+    expect(cleared(statement, ask)).toMatchObject({
+      kind: "clearance",
+      status: "partial",
+      evidence: [statement],
+      detail,
+    });
+  });
+
+  it.each([
+    ["Active TS/SCI clearance", "Active Top Secret clearance required"],
+    ["Active Top Secret/SCI clearance", "Secret clearance required"],
+    ["Active TS-SCI clearance with polygraph", "Active TS/SCI clearance"],
+    ["Active Top Secret clearance", "Active Top Secret clearance required"],
+    ["Active TS clearance", "Top Secret clearance required"],
+    ["Active Secret clearance", "Active security clearance required"],
+    ["Active Secret clearance", "Secret or Top Secret clearance"],
+  ])("is met by the level asked or one above: %s for %s", (statement, ask) => {
+    expect(cleared(statement, ask).status).toBe("met");
+  });
+
+  it.each([
+    ["TS/SCI (inactive since 2022)", "Active TS/SCI clearance"],
+    ["Secret clearance, expired 2021", "Secret clearance"],
+    ["Eligible for Secret clearance", "Secret clearance"],
+    ["Top Secret clearance pending", "Secret clearance"],
+    ["Able to obtain a security clearance", "Active security clearance required"],
+  ])("takes no clearance from one not held: %s", (statement, ask) => {
+    expect(cleared(statement, ask).status).toBe("unverifiable");
+  });
+});
+
 describe("cost", () => {
   it("stays bounded on thousands of lines under a policy with hundreds of phrases", () => {
     const policy = {

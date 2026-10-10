@@ -332,9 +332,72 @@
         "green\\s+card",
         "permanent\\s+resident"
       ],
+      "needsSponsorship": [
+        "(?:requires?|requiring|needs?|needing|will\\s+(?:require|need))\\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\\s+){0,3}sponsorship",
+        "sponsorship\\s+(?:is\\s+)?(?:required|needed)"
+      ],
+      "noSponsorship": [
+        "(?:no|without)\\s+(?:(?:an?|any|further|future|h-?1b|visa|work|employment|immigration)\\s+){0,3}sponsorship",
+        "(?:not|never|\\p{L}+n['’]t)\\s+(?:(?:currently|presently|now|ever|be|been|eligible|for|offer\\p{L}*|provid\\p{L}*|requir\\p{L}*|need\\p{L}*|an?|any|h-?1b|visa|work|employment|immigration|future)\\s+){0,4}sponsor(?:ship)?",
+        "(?:cannot|unable\\s+to)\\s+(?:(?:offer|provide)\\s+)?(?:visa\\s+)?sponsor(?:ship)?",
+        "sponsorship\\s+(?:is\\s+)?not\\s+(?:required|needed|available|offered|provided)"
+      ],
+      "negation": [
+        "not",
+        "no",
+        "without",
+        "lack(?:ing)?",
+        "inactive",
+        "expired",
+        "cannot",
+        "unable",
+        "\\p{L}+n['’]t"
+      ],
+      "notHeld": [
+        "eligible",
+        "pending",
+        "able\\s+to\\s+obtain",
+        "former(?:ly)?"
+      ],
+      "citizenship": [
+        "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",
+        "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)"
+      ],
+      "residence": [
+        "green\\s+card",
+        "(?:lawful\\s+)?permanent\\s+residen(?:t|cy|ce)"
+      ],
       "clearance": [
-        "(?:security|secret|top\\s+secret|ts/sci|dv|sc|government|federal)\\s+clearance",
-        "ts/sci"
+        "(?:security|confidential|secret|top\\s+secret|ts/sci|ts|sci|dv|sc|government|federal)\\s+clearance",
+        "ts(?:\\s*/\\s*|-)sci"
+      ],
+      "clearanceLevels": [
+        {
+          "name": "Confidential",
+          "patterns": [
+            "confidential"
+          ]
+        },
+        {
+          "name": "Secret",
+          "patterns": [
+            "secret"
+          ]
+        },
+        {
+          "name": "Top Secret",
+          "patterns": [
+            "top[\\s-]+secret",
+            "ts\\s+clearance"
+          ]
+        },
+        {
+          "name": "TS/SCI",
+          "patterns": [
+            "ts(?:\\s*/\\s*|[\\s-]+)sci",
+            "top[\\s-]+secret(?:\\s*/\\s*|[\\s-]+)sci"
+          ]
+        }
       ],
       "languagePatterns": [
         "(?:fluent|fluency|proficien(?:t|cy)|native|business[\\s-]level|working\\s+proficiency|professional\\s+proficiency)\\s+(?:in\\s+|with\\s+)?(\\p{L}+)"
