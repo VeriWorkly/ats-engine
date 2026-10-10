@@ -1,0 +1,29 @@
+# @veriworkly/ats-engine
+
+> Open-source ATS resume checker and parser for TypeScript and JavaScript. It reads a resume (PDF, DOCX, HTML, text, JSON Resume) the way an applicant tracking system does, recovers the fields an ATS stores, scores it 0-100 with a published deterministic rubric, and compares it with a job posting requirement by requirement. No AI is involved in the score: the same input, policy and date always give the same report. The core makes no network calls, so it runs in a browser, at the edge or on a server. MIT licence.
+
+Install with `npm install @veriworkly/ats-engine`. Reading PDF or DOCX in Node also needs the optional peers: `npm install pdf-parse@2 pdfjs-dist@5.4.296 mammoth`. One-off from the command line: `npx -p @veriworkly/ats-engine -p pdf-parse@2 -p pdfjs-dist@5.4.296 -p mammoth ats-engine check resume.pdf --job posting.txt`.
+
+Score text: `import { check } from "@veriworkly/ats-engine"; const report = check(resumeText, undefined, { jobDescription });`. The report has `readinessScore`, `categories`, `failedChecks` (each with evidence and a fix), `parsed` (name, email, phone, links, roles, education, skills, certifications, spoken languages), `jobMatchScore`, `requirements` (met, partial, missing, unverifiable) and `missingKeywords`. Read a file in Node with `readResumeFile` from `@veriworkly/ats-engine/node`: `const { input, layout, file } = await readResumeFile(path); const report = check(input, undefined, { layout, file, jobDescription });`.
+
+The engine is for candidates checking their own resume, not for ranking or filtering applicants.
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/README.md): what it does, install, CLI, GitHub Action, MCP server, use in an app, AI features
+- [Scoring rubric](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/RUBRIC.md): every rule with its category, weight, what it reads, when it passes and the fix
+- [Architecture](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/ARCHITECTURE.md): the check() pipeline, modules, invariants and design decisions
+- [Locales](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/LOCALES.md): German and Hindi language packs, US/DE/IN regions, how to add a language
+- [Security](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/SECURITY.md): input limits, hostile input, prompt injection, what leaves the machine
+
+## Tools
+
+- [MCP server](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/packages/mcp/README.md): `@veriworkly/ats-engine-mcp`, tools `check_resume`, `match_job`, `explain_rule`, `extract_text`; runs locally over stdio (`npx -y @veriworkly/ats-engine-mcp`)
+- [GitHub Action](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/action/README.md): check a resume in CI, with a minimum score and a job summary
+- [Hosted checker](https://veriworkly.com/ats-checker): a web checker that runs on this engine, no install
+
+## Optional
+
+- [Changelog](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/CHANGELOG.md): what changed in each version, breaking changes marked
+- [Contributing](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/CONTRIBUTING.md): rules for changes and where to change what
+- [npm package](https://www.npmjs.com/package/@veriworkly/ats-engine)

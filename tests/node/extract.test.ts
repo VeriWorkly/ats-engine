@@ -180,11 +180,12 @@ describe("a missing PDF or DOCX reader", () => {
     expect(message).toMatch(/npx.*-p/);
   });
 
-  it("is installed at the same versions the README's commands give", () => {
-    const readme = readFileSync(new URL("README.md", root), "utf8");
-    for (const [, name, version] of readme.matchAll(/\b(pdf-parse|pdfjs-dist)@([\w.^]+)/g))
-      expect(specs, `${name}@${version} in README.md`).toContain(`${name}@${version}`);
-    expect(readme).toContain(specs.join(" "));
+  it.each(["README.md", "llms.txt"])("is installed at the same versions %s gives", (name) => {
+    const doc = readFileSync(new URL(name, root), "utf8");
+    const commands = doc.match(/(?:npm install|npx) [^`\n]*/g) ?? [];
+    for (const word of commands.join(" ").split(" "))
+      if (/^(?:pdf-parse|pdfjs-dist)\b/.test(word)) expect(specs, name).toContain(word);
+    expect(doc).toContain(specs.join(" "));
   });
 });
 

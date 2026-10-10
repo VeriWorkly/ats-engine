@@ -111,7 +111,8 @@
     "CHANGELOG.md",
     "ARCHITECTURE.md",
     "SECURITY.md",
-    "NOTICE"
+    "NOTICE",
+    "llms.txt"
   ],
   "workspaces": [
     ".",
