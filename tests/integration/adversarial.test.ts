@@ -92,6 +92,11 @@ const SHAPES: Record<string, string> = {
   "ts sci run": rep("TS - "),
   "ts slash run": rep("TS / "),
   "ts clearance run": rep("ts "),
+  // Slash compounds split into their words; never inside a link.
+  "slash compound run": rep("HTML/CSS/"),
+  "slash number run": rep("a/1/"),
+  "link run": rep("a://b/"),
+  "scheme run": rep("a+b.c-"),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

@@ -78,6 +78,75 @@ describe("skills", () => {
       evidence: [],
     });
   });
+
+  /** The report for a resume whose skills line is `skills`, against a posting asking `ask`. */
+  const listing = (skills: string, ask: string) =>
+    AtsScoringService.check(
+      RESUME.replace("Go, Python, Kubernetes, Terraform, PostgreSQL", skills),
+      DEFAULT_POLICY,
+      { jobDescription: `Requirements\n- ${ask}`, now: NOW },
+    );
+
+  it.each([
+    ["HTML, CSS, JavaScript", "HTML/CSS"],
+    ["HTML/CSS, JavaScript", "HTML, CSS"],
+    ["C#, .NET, SQL", "C#/.NET"],
+    ["C#/.NET, SQL", "C#, .NET"],
+    ["Python, Django", "Python/Django"],
+    ["Python, Django", "Experience with Python/Django"],
+  ])("reads each skill in a slash compound: %s for %s", (skills, ask) => {
+    const report = listing(skills, ask);
+    expect(report.requirements[0]?.status).toBe("met");
+    expect(report.jobMatchScore).toBe(100);
+  });
+
+  it("asks for every part of a slash compound: HTML alone partly meets HTML/CSS", () => {
+    const report = listing("HTML, JavaScript", "HTML/CSS");
+    expect(report.requirements[0]).toMatchObject({
+      status: "partial",
+      terms: [
+        { term: "html", found: true },
+        { term: "css", found: false },
+      ],
+    });
+    expect(report.missingKeywords).toEqual(["css"]);
+  });
+
+  it.each([
+    ["TCP/IP, DNS", "TCP/IP", "tcp/ip"],
+    ["CI/CD, Docker", "CI/CD", "ci/cd"],
+    ["PL/SQL, Oracle", "PL/SQL", "pl/sql"],
+    ["A/B testing", "A/B testing", "a/b"],
+  ])("keeps a compound the policy names whole: %s", (skills, ask, term) => {
+    const requirement = listing(skills, ask).requirements[0] as AtsRequirement;
+    expect(requirement.status).toBe("met");
+    expect(requirement.terms.map((found) => found.term)).toContain(term);
+    expect(listing("Python", ask).requirements[0]?.status).not.toBe("met");
+  });
+
+  it("weighs both parts of a compound that opens a line alike", () => {
+    expect(listing("Java", "Java/Kotlin").jobMatchScore).toBe(
+      listing("Kotlin", "Java/Kotlin").jobMatchScore,
+    );
+  });
+
+  it("reads no skill inside a link", () => {
+    const linked =
+      "Python\n- Apply at https://careers.example.com/jobs/123/apply or https://x.com/a/b";
+    const report = listing("Python", linked);
+    expect(report.missingKeywords).toEqual(
+      listing("Python", linked.replace(/https\S*/g, "")).missingKeywords,
+    );
+    expect(report.requirements.flatMap(({ terms }) => terms.map(({ term }) => term))).not.toContain(
+      "a/b",
+    );
+  });
+
+  it("reads no skill in a slash between letters, numbers or function words", () => {
+    const report = listing("Python", "Python; N/A for OS/2, on/off");
+    for (const junk of ["n", "a", "os", "2", "on", "off"])
+      expect(report.missingKeywords).not.toContain(junk);
+  });
 });
 
 describe("knockouts", () => {

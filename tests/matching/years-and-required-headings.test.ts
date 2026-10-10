@@ -368,6 +368,15 @@ describe("missing keywords", () => {
     expect(report.missingKeywords).toContain("kafka");
   });
 
+  it("leaves out function words joined by a slash", () => {
+    const report = check(
+      "Skills\nPython",
+      "Requirements\n- Python and/or Go\n- Bring his/her own laptop",
+    );
+    for (const word of ["and/or", "and", "or", "his/her", "his", "her"])
+      expect(report.missingKeywords).not.toContain(word);
+  });
+
   it("credits a B.Tech against a Bachelor's degree in the match score", () => {
     const report = check(
       "Education\nB.Tech Computer Science, Indian Institute of Technology 2015",
