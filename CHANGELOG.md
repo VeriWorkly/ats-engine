@@ -3,6 +3,17 @@
 Release notes are generated from `.changeset/` by `changeset version`. See
 [.changeset/README.md](.changeset/README.md) for what counts as breaking.
 
+## 0.4.1
+
+### Patch Changes
+
+- 212e39e: A DOCX whose XML would keep `mammoth`'s parser busy for seconds or minutes is now refused before `mammoth` parses any of it: a 1.4 KB file of unclosed comments (`<!--` repeated) held `extractResume`, the CLI and the MCP server for two minutes. Refused with "The document could not be read as DOCX.": a comment, processing instruction or CDATA section that never closes in any part `mammoth` parses (the document, styles, numbering, notes, comments, relationships, content types), more than 1,000 of them, a document type declaration, a `<` that starts no well-formed tag, a namespace prefix bound to a second namespace within a part, and more than 1,000 distinct elements and style, break, symbol or content-type tags, which `mammoth` would each warn about. A document holding more than 2 MB of that XML is refused with "The document's XML expands to more than 2 MB, more than this reader takes." Word's own templates hold under 600 KB and its resume templates under 120 KB. A style map embedded in the file (`mammoth/style-map`) is no longer applied: it could drop every paragraph (`p => !`), and 200,000 rules took over five minutes.
+
+  `readResumeFile` and `readJobFile` (so `ats-engine check`, its `--job` and `--policy`, and the MCP server's `path` and `job_path`) read only a regular file on this computer. A network path (`\\host\share\cv.pdf`, `//host/share/cv.pdf`, `\\?\UNC\host\share\cv.pdf`) was read over SMB, a network request from a tool that makes none; it is now refused with "… is a network share or a device, not a file on this computer.", and so is a device path (`\\.\pipe\…`). The local long form `\\?\C:\…` still reads. Only the path's form is checked: a mapped drive letter, a link to a share or a network mount is still read. A pipe or a device, which reports no size and can stream without end, is refused with "… is not a regular file." before it is opened; a named pipe that kept sending was read until the process held hundreds of megabytes. A file is read through one handle no further than one byte past the 20 MB limit, so one that grows after it was measured is refused too.
+
+- 41c09e3: The package ships `llms.txt`, a short summary for AI tools in the llmstxt.org format: what the engine does, how to install and call it, and links to the README, rubric, architecture, locales, security notes, MCP server and GitHub Action. It is served with the package, for example at `https://cdn.jsdelivr.net/npm/@veriworkly/ats-engine/llms.txt`. Nothing in the engine changes.
+- b97ef19: When the PDF or DOCX reader is missing, the error now says how to install it: "Reading this format needs pdf-parse and pdfjs-dist installed beside the engine: npm install pdf-parse@2 pdfjs-dist@5.4.296 mammoth (with -g beside a global install; with npx, -p each of them)." It used to stop at "needs pdf-parse and pdfjs-dist installed.", which left `npx @veriworkly/ats-engine check resume.pdf` failing with no way forward: `npx` installs no optional peers. The README's quick start now installs the readers with the CLI (`npm install -g @veriworkly/ats-engine pdf-parse@2 pdfjs-dist@5.4.296 mammoth`, then `ats-engine check resume.pdf`) and gives the one-off `npx -p` form; a `.txt`, `.md`, `.html` or `.json` resume still runs with plain `npx`.
+
 ## 0.4.0
 
 ### Minor Changes
