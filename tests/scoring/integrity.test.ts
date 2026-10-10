@@ -197,9 +197,8 @@ describe("look-alike letters", () => {
 
   it.each([
     "- Measured νmax shifts in 40 IR spectra",
-    "- Characterised αhelix content of 9 peptides",
     "- Modelled ρmax-limited reactors for 3 plants",
-    "- Ran χsquared tests for 2 trials",
+    "- Reported κobs for 12 reactions",
   ])("does not flag a Greek symbol opening a scientific term: %j", (line) => {
     expect(rule(check(`${RESUME}\n${line}`), "homoglyphs")?.passed).toBe(true);
   });
@@ -208,6 +207,10 @@ describe("look-alike letters", () => {
     ["an omicron opening a word", "- Built services on οracle databases"],
     ["a capital Greek letter opening one", "- Built services on Οracle databases"],
     ["a Greek letter inside one", "- Built services in Pythοn"],
+    // A symbol opens a short subscript ("max"), never a skill's name.
+    ["a rho opening Python", "- Built services in ρython"],
+    ["a kappa opening Kubernetes", "- Ran κubernetes clusters"],
+    ["an alpha opening admin", "- Linux αdmin for 4 years"],
   ])("still flags %s", (_, line) => {
     expect(rule(check(`${RESUME}\n${line}`), "homoglyphs")?.passed).toBe(false);
   });
