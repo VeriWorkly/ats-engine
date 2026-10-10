@@ -138,7 +138,7 @@
       "penalty": false,
       "kind": "bands",
       "metric": "metricsRatio",
-      "pattern": "[$€£₹%]|(?<![\\d\\p{L}])(?<!\\d[.,])(?<!(?:python|java|jdk|php|perl|ruby|swift|kotlin|scala|angular|vue|react|node|django|rails|spring|\\.net|windows|macos|ios|android|ubuntu|rhel|centos|debian|office|excel|sql\\s+server|oracle|mysql|postgresql|postgres|html|css|ecmascript|http|tls|ssl|oauth|saml|ipv|iso|iec|soc|pci\\s+dss|nist|tier|level)\\s{1,2})(?<!(?:19|20)\\d{2}\\s*[/.-]\\s*)(?!(?:19|20)\\d{2}(?!\\d))(?!\\d{1,2}\\s*[/.-]\\s*(?:19|20)\\d{2}(?!\\d))\\d+",
+      "pattern": "[$€£₹%]|(?<!\\d)(?<!\\d[.,])(?:(?<!\\p{L})|(?<=(?<!\\p{L})x))(?<!(?:iso|iec|soc|pci\\s+dss|nist|tier|level)\\s{1,2})(?!(?<=(?:python|java|jdk|php|perl|ruby|swift|kotlin|scala|angular|vue|react|node|django|rails|spring|\\.net|windows|macos|ios|android|ubuntu|rhel|centos|debian|office|excel|sql\\s+server|oracle|mysql|postgresql|postgres|html|css|ecmascript|http|tls|ssl|oauth|saml|ipv)\\s{1,2})\\d{1,2}(?:\\.\\d+)*(?![\\d\\p{L}])(?!\\s{1,3}\\p{L}))(?<!(?:19|20)\\d{2}\\s*[/.-]\\s*)(?!(?:19|20)\\d{2}(?!\\d))(?!\\d{1,2}\\s*[/.-]\\s*(?:19|20)\\d{2}(?!\\d))\\d+",
       "flags": "i",
       "bands": [
         {

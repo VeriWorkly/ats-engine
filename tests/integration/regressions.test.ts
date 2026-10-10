@@ -233,7 +233,7 @@ Improved the onboarding experience for every new engineer on the team`;
         "Migrated workloads to EC2 and S3",
         "Rewrote deploy scripts in Python 3.11",
         "Hardened hosts to ISO 27001 controls",
-        "Maintained Windows 10 images",
+        "Maintained the desktop images on Windows 10",
         "Provided Tier 2 support for the help desk",
       ),
     );
@@ -251,6 +251,15 @@ Improved the onboarding experience for every new engineer on the team`;
           "Cut Python 3 build times by 35%",
           "Led 3 engineers through an ISO 27001 audit",
           "Reduced p99 latency to 120ms across 2M requests",
+          // A count after a product's name is a count: only a bare version is not.
+          "Taught Python 300 students",
+          "Scaled PostgreSQL 10TB cluster",
+          "Maintained SQL Server 20 instances",
+          "Launched Android 1M downloads",
+          "Migrated Oracle 50 schemas",
+          "Rolled Windows 400 laptops",
+          "Improved throughput x10",
+          "Cut deploy time x3",
         ),
       )?.evidence,
     ).toBe("100% of content lines carry a number.");
