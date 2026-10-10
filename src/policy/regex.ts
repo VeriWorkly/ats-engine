@@ -8,7 +8,7 @@
  * passes validation cannot fail here. A `v` flag already implies Unicode mode and is left alone.
  *
  * A group name used twice is refused on every engine. Node 24 accepts one per alternative
- * (ES2025); Node 20 and 22, and older browsers, throw. A policy built on the newer engine would
+ * (ES2025); Node 22, and older browsers, throw. A policy built on the newer engine would
  * otherwise pass validation there and fail on the first resume read on an older one.
  */
 export function policyRegex(pattern: string, flags = "") {

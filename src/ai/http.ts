@@ -4,7 +4,7 @@
  * The package compiles without DOM or Node types so that nothing runtime-specific leaks into
  * the browser build, which means the platform's `fetch` and `AbortSignal` are described here
  * structurally rather than imported. Every runtime the package targets — Node
- * 20.19+, browsers, edge workers — provides them.
+ * 22.12+, browsers, edge workers — provides them.
  */
 
 import { isRetryableStatus, LlmProviderError, type AbortSignalLike } from "./provider.js";

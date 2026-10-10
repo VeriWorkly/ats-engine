@@ -1,15 +1,21 @@
 {
   "name": "@veriworkly/ats-engine-mcp",
   "version": "0.2.0",
-  "description": "MCP server for @veriworkly/ats-engine: an AI assistant reads your resume the way an ATS does and scores it with a published, deterministic rubric. Runs locally.",
+  "description": "ATS resume checker MCP server: lets Claude, Cursor or VS Code read your resume the way an applicant tracking system does and score it with a published, deterministic rubric. Runs locally.",
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
+    "claude",
+    "cursor",
     "ats",
+    "ats-checker",
+    "ats-score",
     "applicant-tracking-system",
     "resume",
     "cv",
     "resume-checker",
+    "resume-parser",
     "job-match"
   ],
   "license": "MIT",
@@ -25,7 +31,7 @@
   },
   "mcpName": "io.github.veriworkly/ats-engine",
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22.12"
   },
   "publishConfig": {
     "access": "public",
