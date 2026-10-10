@@ -90,8 +90,16 @@ function originOf(url: string): string {
 /** A header whose value is a credential. */
 const SECRET_HEADER = /auth|key|token|secret/i;
 
-/** A bearer token, or a key in a provider's usual form ("sk-…", "sk-ant-…", "AIza…"). */
-const SECRET = /\b[Bb]earer\s+[^\s"',;]+|\b(?:sk|pk|rk)-[\w-]{8,}|\bAIza[\w-]{20,}/g;
+/**
+ * A bearer token, or a key in a provider's usual form: OpenAI and Anthropic ("sk-…", "sk-ant-…"),
+ * Google ("AIza…"), Groq ("gsk_…"), Hugging Face ("hf_…"), xAI ("xai-…"), Replicate ("r8_…"),
+ * Together ("tgp_v1_…").
+ */
+const SECRET =
+  /\b[Bb]earer\s+[^\s"',;]+|\b(?:sk|pk|rk|xai)-[\w-]{8,}|\b(?:gsk|hf|r8|tgp_v1)_[\w-]{8,}|\bAIza[\w-]{20,}/g;
+
+/** A JSON member, its name and its string value: `"api_key": "…"`. */
+const JSON_MEMBER = /"([\w-]{1,64})"(\s*:\s*)"(?:[^"\\]|\\.)*"/g;
 
 /**
  * An error body with the credentials taken out. A proxy or gateway that echoes the request puts
@@ -100,12 +108,15 @@ const SECRET = /\b[Bb]earer\s+[^\s"',;]+|\b(?:sk|pk|rk)-[\w-]{8,}|\bAIza[\w-]{20
 function withoutSecrets(text: string, headers: Record<string, string>): string {
   let out = text;
   for (const [name, value] of Object.entries(headers))
-    if (SECRET_HEADER.test(name) && value.length >= 8)
+    if (SECRET_HEADER.test(name))
+      // At least eight characters each: a short test key would rewrite every word it is part of.
       for (const secret of [value, value.replace(/^Bearer\s+/i, "")])
-        out = out.split(secret).join("[redacted]");
-  return out.replace(SECRET, (match) =>
-    /^Bearer/i.test(match) ? "Bearer [redacted]" : "[redacted]",
-  );
+        if (secret.length >= 8) out = out.split(secret).join("[redacted]");
+  return out
+    .replace(JSON_MEMBER, (member, name: string, colon: string) =>
+      SECRET_HEADER.test(name) ? `"${name}"${colon}"[redacted]"` : member,
+    )
+    .replace(SECRET, (match) => (/^Bearer/i.test(match) ? "Bearer [redacted]" : "[redacted]"));
 }
 
 /**

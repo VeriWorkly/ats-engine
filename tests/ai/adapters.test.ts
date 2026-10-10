@@ -163,6 +163,27 @@ describe("openai-compatible transport", () => {
       expect(error.message).not.toContain(secret);
   });
 
+  it("keeps other providers' keys and JSON key fields out of an error body too", async () => {
+    // Keys of other services a gateway may echo: Groq, Hugging Face, xAI, Replicate, Together.
+    const echo = JSON.stringify({
+      seen: [
+        "gsk_Invented0123456789",
+        "hf_Invented0123456789",
+        "xai-Invented0123456789",
+        "r8_Invented0123456789",
+        "tgp_v1_Invented0123456789",
+      ],
+      api_key: "plainsecret1",
+      apiKey: "plainsecret2",
+      "x-api-key": "plainsecret3",
+      access_token: "plainsecret4",
+    });
+    const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(401, echo) });
+    const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
+    expect(error.message).toContain('"api_key":"[redacted]"');
+    expect(error.message).not.toMatch(/Invented|plainsecret/);
+  });
+
   it("treats an unreadable body and a network failure as retryable", async () => {
     const garbled = openAiCompatible({ apiKey: "k", fetch: fetchReturning(200, "<html>") });
     await expect(garbled.complete(request())).rejects.toMatchObject({ retryable: true });
