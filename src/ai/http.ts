@@ -26,6 +26,12 @@ export type FetchLike = (
     headers: Record<string, string>;
     body: string;
     signal?: AbortSignalLike;
+    /**
+     * Always `"error"`: a redirect is never followed. `fetch` keeps headers such as `x-api-key`
+     * on a redirect to another origin, and a 307 or 308 resends the body, so following one would
+     * hand the key and the resume to whoever answered. Pass it on to the `fetch` you wrap.
+     */
+    redirect?: "error";
   },
 ) => Promise<FetchResponseLike>;
 
@@ -56,6 +62,20 @@ export class AbortedError extends Error {
 }
 
 /**
+ * Whether a failed `fetch` refused a redirect. Node says so in the cause ("unexpected
+ * redirect"); a browser says only "Failed to fetch", which stays a network error. Read by
+ * shape: the platform's errors may come from another realm.
+ */
+function refusedRedirect(error: unknown): boolean {
+  let cause = error as { message?: unknown; cause?: unknown } | undefined;
+  for (let depth = 0; cause && typeof cause === "object" && depth < 5; depth++) {
+    if (typeof cause.message === "string" && /\bredirect\b/i.test(cause.message)) return true;
+    cause = cause.cause as typeof cause;
+  }
+  return false;
+}
+
+/**
  * POSTs `body` as JSON and returns the parsed JSON response.
  *
  * Every failure becomes an `LlmProviderError` with the shared retry rule applied, except an
@@ -83,10 +103,16 @@ export async function postJson(
       headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
       signal,
+      redirect: "error",
     });
     raw = await response.text();
   } catch (error) {
     if (options.signal?.aborted) throw new AbortedError(error);
+    if (refusedRedirect(error))
+      throw new LlmProviderError(
+        `The provider at ${url} answered with a redirect, which is never followed: it would take the API key and the request elsewhere. Set the base URL to the address the provider answers at.`,
+        { retryable: false, cause: error },
+      );
     throw new LlmProviderError(timeout.aborted ? "Provider request timed out." : "Network error.", {
       retryable: true,
       cause: error,

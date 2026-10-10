@@ -71,7 +71,11 @@ What does not depend on the model:
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
   including text smuggled in Unicode tag characters or PDF metadata.
 
-**API keys in the CLI.** `ats-engine check --ai` reads the key from the environment only, never
+**API keys.** The `/ai` adapters send the key only to the address you configure: they never
+follow a redirect (`fetch`'s `redirect: "error"`), since `fetch` keeps a header such as
+`x-api-key` on a redirect to another origin and a 307 resends the request body. A redirect fails
+the call with an error that says so; a `fetch` you pass in receives the option and should pass it
+on. `ats-engine check --ai` reads the key from the environment only, never
 from a flag, so it does not land in shell history or the process list, and never prints it. The
 CLI says which provider and model the resume is about to be sent to before the request leaves,
 and refuses to send a key over plain `http` to any host but this machine (`localhost`,

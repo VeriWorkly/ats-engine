@@ -1,3 +1,6 @@
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { anthropic, messagesBody } from "../../src/ai/anthropic.js";
@@ -253,5 +256,54 @@ describe("anthropic transport", () => {
   ])("maps stop_reason %s to %s", async (stopReason, finish) => {
     const fetch = fetchReturning(200, { content: [], stop_reason: stopReason });
     expect((await anthropic({ apiKey: "k", fetch }).complete(request())).finish).toBe(finish);
+  });
+});
+
+describe("redirects", () => {
+  // fetch drops `authorization` on a cross-origin redirect but keeps `x-api-key`, and a 307
+  // resends the body: following one hands the key and the resume to whoever answered.
+  async function listen(handler: http.RequestListener): Promise<[http.Server, string]> {
+    const server = http.createServer(handler);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    return [server, `http://127.0.0.1:${(server.address() as AddressInfo).port}`];
+  }
+
+  it("never follows one, so the key and the body stay with the configured address", async () => {
+    const seen: http.IncomingHttpHeaders[] = [];
+    const [other, otherUrl] = await listen((req, res) => {
+      seen.push(req.headers);
+      req.resume();
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ content: [{ type: "text", text: "{}" }] }));
+    });
+    const [configured, configuredUrl] = await listen((req, res) => {
+      req.resume();
+      res.statusCode = 307;
+      res.setHeader("location", `${otherUrl}/steal`);
+      res.end();
+    });
+    try {
+      for (const provider of [
+        anthropic({ apiKey: "sk-ant-invented", baseUrl: configuredUrl }),
+        openAiCompatible({ apiKey: "sk-invented", baseUrl: configuredUrl }),
+      ]) {
+        const error = await provider.complete(request()).catch((caught: unknown) => caught);
+        expect(error).toBeInstanceOf(LlmProviderError);
+        expect(error).toMatchObject({
+          retryable: false,
+          message: expect.stringMatching(/redirect/),
+        });
+      }
+      expect(seen).toEqual([]);
+    } finally {
+      configured.close();
+      other.close();
+    }
+  });
+
+  it("asks a caller's own fetch not to follow one", async () => {
+    const fetch = fetchReturning(200, { content: [] });
+    await anthropic({ apiKey: "k", fetch }).complete(request());
+    expect(fetch.mock.calls[0]![1]).toMatchObject({ redirect: "error" });
   });
 });
