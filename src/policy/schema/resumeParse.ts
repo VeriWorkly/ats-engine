@@ -361,13 +361,14 @@ export const resumeParseSchema = z.object({
    * Words naming a department or a function, not an employer: what follows a title's comma in
    * "Director, Product Management | Google". A part made only of these (and `headingConnectors`:
    * "Research & Development") stays with the title before it, whatever the employer after it is
-   * named; "Software Engineer, Acme | Berlin" is still a title, an employer and where.
+   * named; "Software Engineer, Acme | Berlin" is still a title, an employer and where. Not
+   * "security": "Manager, Security Finance | Spartanburg" is at a company named so.
    */
   departmentWords: z._default(
     wordList("departmentWords"),
     (
       "management engineering product marketing sales operations finance research development " +
-      "design platform infrastructure strategy technology data analytics security growth " +
+      "design platform infrastructure strategy technology data analytics growth " +
       "partnerships communications business team"
     ).split(" "),
   ),
