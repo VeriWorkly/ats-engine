@@ -103,14 +103,19 @@ output("report", reportPath);
  * Text from a resume or a posting, shown as text inside a Markdown table cell: one line, cut to
  * 300 characters (whole characters, before anything is escaped), HTML's own characters encoded so
  * no tag survives, and Markdown's escaped, the backslash first: "\<a" would otherwise leave "\\"
- * and a live "<a".
+ * and a live "<a". GitHub also links an address written on its own ("https://…", "www.…",
+ * "name@host"): every colon, the dot after "www" and every "@" are written as entities, which
+ * read the same but start no link.
  */
 const cell = (text) =>
   Array.from(String(text ?? "").replace(/[\r\n]+/g, " "))
     .slice(0, 300)
     .join("")
     .replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c])
-    .replace(/[\\|`*_~[\]]/g, (c) => "\\" + c);
+    .replace(/[\\|`*_~[\]]/g, (c) => "\\" + c)
+    .replace(/:/g, "&#58;")
+    .replace(/@/g, "&#64;")
+    .replace(/(www)\./gi, "$1&#46;");
 
 const below = minScore !== null && report.readinessScore < minScore;
 const lines = [

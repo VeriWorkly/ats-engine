@@ -116,7 +116,10 @@ process.stdout.write(JSON.stringify({
     { id: "a", severity: "error", evidence: ${JSON.stringify(hostile)}, fix: "Jane | Doe *x* & <b>y</b>" },
     { id: "b", severity: "warning", evidence: "x".repeat(299) + "😀😀", fix: "\\r\\n::error::in a cell" },
   ],
-  requirements: [{ status: "missing", text: "<img src=x onerror=alert(1)>" }],
+  requirements: [
+    { status: "missing", text: "<img src=x onerror=alert(1)>" },
+    { status: "missing", text: "Apply at https://evil.example/login, WWW.evil.com or hr@evil.example" },
+  ],
 }));
 `,
   );
@@ -145,11 +148,18 @@ process.stdout.write(JSON.stringify({
     expect(status).toBe(0);
     // No tag survives: a backslash before "<" no longer leaves the "<" live.
     expect(summary).not.toMatch(/<(?!sub>|\/sub>)/);
-    expect(summary).toContain("\\\\&lt;a href=https://evil.example/apply#\\\\&gt;apply here");
+    expect(summary).toContain("\\\\&lt;a href=https&#58;//evil.example/apply#\\\\&gt;apply here");
     expect(summary).toContain("&lt;img src=x onerror=alert(1)&gt;");
     expect(summary).toContain("Jane \\| Doe \\*x\\* &amp; &lt;b&gt;y&lt;/b&gt;");
+    // Nor a link GitHub would make of an address on its own: the colon of a scheme, the dot
+    // after "www" and the "@" are written as entities, which read the same.
+    expect(summary).toContain(
+      "Apply at https&#58;//evil.example/login, WWW&#46;evil.com or hr&#64;evil.example",
+    );
+    const rows = summary.split("\n").filter((line) => line.startsWith("|"));
+    expect(rows.join("\n")).not.toMatch(/:\/\/|www\.|@/i);
     // Each table row stays one line, and a cut never splits a character in two.
-    expect(summary).toContain("|  ::error::in a cell |");
+    expect(summary).toContain("|  &#58;&#58;error&#58;&#58;in a cell |");
     expect(summary).toContain(`${"x".repeat(299)}😀 |`);
     expect(summary).not.toMatch(
       /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,

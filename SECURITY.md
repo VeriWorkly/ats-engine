@@ -115,7 +115,9 @@ shell command, so a file name cannot inject code. `version` must look like a ver
 dist-tag. The CLI runs through `npx` outside the checkout, so a repository's own `package.json`
 cannot swap in another engine. Resume and posting text written to the job summary is cut to 300
 characters per cell, never inside a character, then shown as text: `&`, `<` and `>` are written as
-HTML entities, so no tag survives, and the backslash and Markdown's own characters are escaped. A
+HTML entities, so no tag survives, the backslash and Markdown's own characters are escaped, and
+every colon, every `@` and the dot after `www` are written as entities too, so an address written
+on its own (`https://…`, `www.…`, `name@host`) is not made a link. A
 workflow command the Action prints has its `%`, carriage returns and line breaks encoded, so an
 input cannot start a second command, and the CLI's warnings, which can quote the resume, are passed
 on between `::stop-commands::` and its closing token, a random one per run.
