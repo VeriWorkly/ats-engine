@@ -3,6 +3,7 @@ import { prepareResume, type AtsResumeInput, type PreparedResume } from "../inpu
 import { localizePolicy, type AtsLocaleOptions } from "../locales/resolve.js";
 import { computeJobMatch } from "../matching/jobMatch.js";
 import { judgeRequirements, withHeadings, type HeadedSection } from "../matching/requirements.js";
+import { readingDatesAt } from "../parser/dates.js";
 import { policyFingerprint } from "../policy/fingerprint.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { BULLET_PREFIX, normalizeText } from "../text/text.js";
@@ -106,7 +107,9 @@ export class AtsScoringService {
     basePolicy: AtsEnginePolicy,
     options: AtsCheckOptions = {},
   ): AtsReport {
-    const { layout, now = new Date() } = options;
+    const { layout } = options;
+    // This check's own: the lines it reads for dates are read once for as long as it lasts.
+    const now = readingDatesAt(options.now ?? new Date());
     // Untyped callers send anything; only a string is a posting.
     // Normalised as the resume is: a no-break space or a zero-width space pasted from a careers
     // page split "Machine learning" and "Kubernetes" into words no resume had.

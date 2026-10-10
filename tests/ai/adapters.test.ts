@@ -1,3 +1,6 @@
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { anthropic, messagesBody } from "../../src/ai/anthropic.js";
@@ -140,6 +143,47 @@ describe("openai-compatible transport", () => {
     expect(error).toMatchObject({ status, retryable });
   });
 
+  it("keeps keys out of an error body that echoes the request", async () => {
+    // A proxy that echoes what it was sent puts the key in the body, and so in the message.
+    const echo = [
+      "authorization: Bearer sk-invented-0123456789",
+      "x-api-key: sk-ant-api03-other-key_9876543210",
+      "x-goog-api-key: AIzaInvented0123456789abcdef",
+      "token=Bearer eyJhbGciOiJIUzI1NiJ9.invented",
+    ].join("\n");
+    const provider = openAiCompatible({
+      apiKey: "sk-invented-0123456789",
+      headers: { "x-goog-api-key": "AIzaInvented0123456789abcdef" },
+      fetch: fetchReturning(400, echo),
+    });
+    const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
+    expect(error.message).toContain("HTTP 400");
+    expect(error.message).toContain("authorization:");
+    for (const secret of ["0123456789", "9876543210", "AIzaInvented", "eyJhbGci"])
+      expect(error.message).not.toContain(secret);
+  });
+
+  it("keeps other providers' keys and JSON key fields out of an error body too", async () => {
+    // Keys of other services a gateway may echo: Groq, Hugging Face, xAI, Replicate, Together.
+    const echo = JSON.stringify({
+      seen: [
+        "gsk_Invented0123456789",
+        "hf_Invented0123456789",
+        "xai-Invented0123456789",
+        "r8_Invented0123456789",
+        "tgp_v1_Invented0123456789",
+      ],
+      api_key: "plainsecret1",
+      apiKey: "plainsecret2",
+      "x-api-key": "plainsecret3",
+      access_token: "plainsecret4",
+    });
+    const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(401, echo) });
+    const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
+    expect(error.message).toContain('"api_key":"[redacted]"');
+    expect(error.message).not.toMatch(/Invented|plainsecret/);
+  });
+
   it("treats an unreadable body and a network failure as retryable", async () => {
     const garbled = openAiCompatible({ apiKey: "k", fetch: fetchReturning(200, "<html>") });
     await expect(garbled.complete(request())).rejects.toMatchObject({ retryable: true });
@@ -253,5 +297,110 @@ describe("anthropic transport", () => {
   ])("maps stop_reason %s to %s", async (stopReason, finish) => {
     const fetch = fetchReturning(200, { content: [], stop_reason: stopReason });
     expect((await anthropic({ apiKey: "k", fetch }).complete(request())).finish).toBe(finish);
+  });
+});
+
+describe("redirects", () => {
+  // fetch drops `authorization` on a cross-origin redirect but keeps `x-api-key`, and a 307
+  // resends the body: following one hands the key and the resume to whoever answered.
+  async function listen(handler: http.RequestListener): Promise<[http.Server, string]> {
+    const server = http.createServer(handler);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    return [server, `http://127.0.0.1:${(server.address() as AddressInfo).port}`];
+  }
+
+  /** A provider address that redirects with `status` to a second server, which records calls. */
+  async function redirecting(status: number) {
+    const seen: http.IncomingHttpHeaders[] = [];
+    const [other, otherUrl] = await listen((req, res) => {
+      seen.push(req.headers);
+      req.resume();
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ content: [{ type: "text", text: "{}" }], choices: [] }));
+    });
+    const [configured, url] = await listen((req, res) => {
+      req.resume();
+      res.statusCode = status;
+      res.setHeader("location", `${otherUrl}/steal`);
+      res.end();
+    });
+    return { seen, url, close: () => (configured.close(), other.close()) };
+  }
+  const providers = (baseUrl: string, fetch?: FetchLike) => [
+    anthropic({ apiKey: "sk-ant-invented", baseUrl, ...(fetch && { fetch }) }),
+    openAiCompatible({ apiKey: "sk-invented", baseUrl, ...(fetch && { fetch }) }),
+  ];
+
+  it.each([301, 302, 303, 307, 308])(
+    "never follows a %i, so the key and the body stay with the configured address",
+    async (status) => {
+      const { seen, url, close } = await redirecting(status);
+      try {
+        for (const provider of providers(url)) {
+          const error = await provider.complete(request()).catch((caught: unknown) => caught);
+          expect(error).toBeInstanceOf(LlmProviderError);
+          expect(error).toMatchObject({ retryable: false });
+          // The origin only: a path can carry a deployment's own tokens.
+          expect((error as Error).message).toBe(
+            `The provider at ${new URL(url).origin} answered with a redirect (HTTP ${status}), which is never followed: it would take the API key and the request elsewhere. Set the base URL to the address the provider answers at.`,
+          );
+        }
+        expect(seen).toEqual([]);
+      } finally {
+        close();
+      }
+    },
+  );
+
+  it("refuses the answer of a caller's fetch that followed one anyway", async () => {
+    const { url, close } = await redirecting(307);
+    // A wrapper that drops `redirect`, so the platform's fetch follows: the key has gone, but the
+    // answer is not used and the caller hears why.
+    const following: FetchLike = (target, init) =>
+      fetch(target, {
+        method: init.method,
+        headers: init.headers,
+        body: init.body,
+        signal: init.signal as AbortSignal,
+      });
+    try {
+      for (const provider of providers(url, following))
+        await expect(provider.complete(request())).rejects.toMatchObject({
+          retryable: false,
+          message: expect.stringMatching(/answered with a redirect, which is never followed/),
+        });
+    } finally {
+      close();
+    }
+  });
+
+  it("asks a caller's own fetch to hand back a redirect rather than follow it", async () => {
+    const fetch = fetchReturning(200, { content: [] });
+    await anthropic({ apiKey: "k", fetch }).complete(request());
+    expect(fetch.mock.calls[0]![1]).toMatchObject({ redirect: "manual" });
+  });
+
+  it("reads a browser's opaque redirect as one, and a network error naming 'redirect' as none", async () => {
+    const opaque = vi.fn<FetchLike>(async () => ({
+      ok: false,
+      status: 0,
+      type: "opaqueredirect",
+      text: async () => "",
+    }));
+    await expect(
+      anthropic({ apiKey: "k", fetch: opaque }).complete(request()),
+    ).rejects.toMatchObject({
+      retryable: false,
+      message: expect.stringMatching(/answered with a redirect, which/),
+    });
+
+    const offline = vi.fn<FetchLike>(async () => {
+      throw new TypeError("fetch failed", {
+        cause: new Error("getaddrinfo ENOTFOUND redirect.example.com"),
+      });
+    });
+    await expect(
+      anthropic({ apiKey: "k", fetch: offline }).complete(request()),
+    ).rejects.toMatchObject({ retryable: true, message: "Network error." });
   });
 });

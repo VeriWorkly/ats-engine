@@ -54,6 +54,28 @@ describe("runAiEval", () => {
     expect(report.failures).toEqual([]);
   });
 
+  it("counts the numbers a task was given, and the months of dates it reformats, as known", async () => {
+    // The report's scores and word count, which analyze is given and quotes; "2019-03", which
+    // conversion writes for "Mar 2019". A live run flagged both as fabricated.
+    const provider = scriptedProvider((request) => {
+      const content = request.messages[0]!.content;
+      if (!content.includes('"deterministicReport"')) return obedientModel(content);
+      const { readinessScore, wordCount, jobMatchScore } = (
+        JSON.parse(content) as { deterministicReport: Record<string, number> }
+      ).deterministicReport;
+      return JSON.stringify({
+        ...JSON.parse(insights),
+        explanation: `A readiness score of ${readinessScore} and a job match of ${jobMatchScore} over ${wordCount} words.`,
+      });
+    });
+    const cases = evalCases().filter((testCase) =>
+      ["analyze/standard-with-job", "convert/standard"].includes(testCase.id),
+    );
+    const report = await runAiEval(createAtsAi({ provider, routes }), cases);
+    expect(report.schemaValidRate).toBe(1);
+    expect(report.fabricatedNumberRate).toBe(0);
+  });
+
   it("counts failures and leaves them out of the quality rates", async () => {
     const ai = createAtsAi({ provider: scriptedProvider("not json"), routes });
     const report = await runAiEval(ai, evalCases().slice(0, 2));
@@ -71,5 +93,25 @@ describe("fabricatedNumbers", () => {
   it("finds numbers the source never states", () => {
     expect(fabricatedNumbers({ a: ["Cut costs 35%", "for 12 teams"] }, "12 teams")).toEqual(["35"]);
     expect(fabricatedNumbers("Raised 1,200 to 2.5", "1,200 and 2.5")).toEqual([]);
+  });
+
+  it("knows the month of an ISO date when the source states that month of that year", () => {
+    expect(
+      fabricatedNumbers({ startDate: "2019-03", endDate: "2021-12" }, "Mar 2019 - December 2021"),
+    ).toEqual([]);
+    expect(fabricatedNumbers(["2019-03", "2020-11"], "03/2019 and 2020.11")).toEqual([]);
+    expect(fabricatedNumbers({ startDate: "2018-03" }, "Mar 2019")).toEqual(["2018", "03"]);
+    expect(fabricatedNumbers("2019-13", "2019")).toEqual(["13"]);
+    expect(fabricatedNumbers("03", "Mar 2019")).toEqual(["03"]);
+    // A year alone, or another month of it, says nothing of the month.
+    expect(fabricatedNumbers("Started 2019-07", "Joined in 2019")).toEqual(["07"]);
+    expect(fabricatedNumbers("Started 2019-07", "Mar 2019")).toEqual(["07"]);
+    expect(fabricatedNumbers("2000-10 people", "2000 users")).toEqual(["10"]);
+  });
+
+  it("holds analyze to the report as sent, without the advice", () => {
+    const [analyze] = evalCases();
+    expect(analyze!.source).not.toContain('"advice"');
+    expect(analyze!.source).toContain('"readinessScore"');
   });
 });

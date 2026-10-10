@@ -6,6 +6,7 @@ import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
 import { AtsScoringService } from "../../src/scoring/engine.js";
 import type { AtsReport } from "../../src/types.js";
+import { expectFast } from "../fixtures/timing.js";
 
 const route = { model: "m", maxTokens: 100 };
 const routes = { analyze: route, repairParse: route, convertResume: route };
@@ -64,6 +65,18 @@ describe("analyze", () => {
     ]);
   });
 
+  it("leaves the advice out, so the file name does not carry the name", async () => {
+    const withFile = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+      file: { name: "Jane_Doe_Resume_final_v3 (2).pdf", format: "pdf", bytes: 1_000 },
+    });
+    expect(JSON.stringify(withFile.advice)).toMatch(/Jane.Doe/); // the advice quotes it
+    const provider = scriptedProvider(insights());
+    await createAtsAi({ provider, routes }).analyze({ resumeText: RESUME, report: withFile });
+
+    expect(provider.calls[0]!.messages[0]!.content).not.toMatch(/jane/i);
+    expect(userMessage(provider).deterministicReport.advice).toBeUndefined();
+  });
+
   it("sends contact details when redaction is switched off", async () => {
     const provider = scriptedProvider(insights());
     const ai = createAtsAi({ provider, routes, redact: { analyze: false } });
@@ -111,6 +124,28 @@ describe("analyze", () => {
     await ai.analyze({ resumeText: RESUME, report: report(), jobDescription: "x".repeat(30_000) });
     expect(userMessage(provider).jobDescription).toHaveLength(20_000);
   });
+
+  it("cuts the resume it sends to the 50,000 characters the engine reads", async () => {
+    const provider = scriptedProvider(insights());
+    const ai = createAtsAi({ provider, routes, redact: { analyze: false } });
+    await ai.analyze({ resumeText: `${RESUME}\n${"x".repeat(60_000)}`, report: report() });
+    expect(userMessage(provider).resume).toHaveLength(50_000);
+  });
+
+  it.each([
+    ["phone", "(415) 555-0199", /\(?415|555-?0/],
+    ["email", "jane.doe@example.com", /jane|@exam/],
+  ])("cuts after redacting, so a %s across the cut is not half sent", async (_, detail, half) => {
+    // The detail starts six characters before the 50,000th, where a cut first leaves its head.
+    const before = `${RESUME}\n${"x".repeat(50_000 - RESUME.length - 1 - 7)} `;
+    const provider = scriptedProvider(insights());
+    const ai = createAtsAi({ provider, routes });
+    await ai.analyze({ resumeText: `${before}${detail} and more`, report: report() });
+    const sent = userMessage(provider).resume;
+    expect(sent.length).toBeLessThanOrEqual(50_000);
+    expect(sent).not.toMatch(half);
+    expect(sent).not.toMatch(/\[[A-Z_0-9]*$/); // nor half a placeholder
+  });
 });
 
 describe("redaction", () => {
@@ -142,6 +177,15 @@ describe("redaction", () => {
     const value = { a: ["Jane Doe", { b: "call 415 555 0199" }], n: 3 };
     expect(redaction.restore(redaction.apply(value))).toEqual(value);
   });
+
+  it.each(["a", "a.", "a-", "1.", "é.", "a.a-", "https://a."])(
+    "finds web addresses in linear time in 150,000 characters of %j",
+    (shape) => {
+      // Longer than the engine reads: a library caller can pass any text.
+      const hostile = shape.repeat(Math.ceil(150_000 / shape.length));
+      expectFast(() => createRedaction(parsed, hostile).apply(hostile), 1_000, shape);
+    },
+  );
 });
 
 describe("repairParse", () => {

@@ -15,10 +15,14 @@ Only the latest minor release receives security fixes while the package is 0.x.
 The engine is built to take input from anyone: a resume, a posting, a web page, an uploaded
 file. These are the guarantees, each held by a test.
 
-**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 50
-shapes (letter runs, digit runs, unclosed tags, comma lists, mixed scripts…), placed in the name
-line, a bullet and the posting at once, scores in tens of milliseconds under the community policy
-with every locale pack applied (`tests/integration/adversarial.test.ts`, which fails past 1.5 s). Patterns in a _policy_ or a _pack_
+**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 81
+shapes, 76 written on one line (letter runs, digit runs, unclosed tags, comma lists, mixed
+scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each), placed in the name
+line, a bullet and the posting at once, and again under the certification and language headings,
+scores under the community policy with every locale pack applied in tens of milliseconds for most
+one-line shapes and a few hundred at most, short lines included, on a developer machine
+(`tests/integration/adversarial.test.ts`, which fails any shape past 1.5 s). The analysis's
+redaction (`/ai`) takes milliseconds on 150 000 characters. Patterns in a _policy_ or a _pack_
 are operator-supplied: `parseAtsPolicy` checks that they compile, not that they are linear, so
 review a policy's patterns as you would code — `tests/integration/regressions.test.ts` re-runs the
 adversarial suite against a private policy when one is present.
@@ -66,12 +70,29 @@ What does not depend on the model:
   Dates in parse repair must name a year the text contains.
 - Free text a model writes (an explanation, a recommendation) is advice and is not grounded:
   show it as the model's words, not as facts about the candidate.
-- `analyze` redacts the name, email, phone and links before the request leaves (postal addresses
-  are not recognised). Parse repair and conversion must see contact details and do not redact.
+- `analyze` redacts contact details before the request leaves, best effort and only these
+  forms. The name as the parser read it, in any case or letter spacing, also as "Doe, Jane", with
+  or without a middle initial, and inside a web address built from it (`janedoe.dev`); not
+  initials ("J. Doe"), the first name alone, or a handle written another way (`jane_doe`). Every
+  email address in the text, with a domain in any script. The links the parser read. The phone
+  by its national number: with or without the country code (`+44`, `0044`, `+44 (0)`), with a
+  trunk zero (`020`, `(020)`) or a North American `1-`, any spaces, brackets, dots, slashes or
+  dashes between the digits, and an extension after it; not other phone numbers. Postal
+  addresses are not recognised. The report's `advice` is not sent: it quotes the file name,
+  which can hold the name in a form redaction cannot know (`Jane_Doe_Resume.pdf`). The resume is
+  cut to 50 000 characters after redaction. Parse repair and conversion must see contact details
+  and do not redact.
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
   including text smuggled in Unicode tag characters or PDF metadata.
 
-**API keys in the CLI.** `ats-engine check --ai` reads the key from the environment only, never
+**API keys.** The `/ai` adapters send the key only to the address you configure: they never
+follow a redirect, since `fetch` keeps a header such as `x-api-key` on a redirect to another
+origin and a 307 resends the request body. They ask `fetch` to hand a redirect back
+(`redirect: "manual"`) and refuse any response that is one, by the response itself: a 3xx, a
+browser's opaque redirect (status 0), or a response reached by following one. The call fails,
+without a retry, with an error that names the redirect and the address's origin, never its path.
+A `fetch` you pass in receives the option and must pass it on: one that follows a redirect
+anyway has already sent the key on, and only its answer is refused. `ats-engine check --ai` reads the key from the environment only, never
 from a flag, so it does not land in shell history or the process list, and never prints it. The
 CLI says which provider and model the resume is about to be sent to before the request leaves,
 and refuses to send a key over plain `http` to any host but this machine (`localhost`,
@@ -92,5 +113,11 @@ sends to its own model provider.
 **The GitHub Action.** Its inputs reach `run.mjs` as environment variables, never pasted into a
 shell command, so a file name cannot inject code. `version` must look like a version or a
 dist-tag. The CLI runs through `npx` outside the checkout, so a repository's own `package.json`
-cannot swap in another engine. Resume and posting text written to the job summary is escaped for
-Markdown and cut to 300 characters per cell.
+cannot swap in another engine. Resume and posting text written to the job summary is cut to 300
+characters per cell, never inside a character, then shown as text: `&`, `<` and `>` are written as
+HTML entities, so no tag survives, the backslash and Markdown's own characters are escaped, and
+every colon, every `@` and the dot after `www` are written as entities too, so an address written
+on its own (`https://…`, `www.…`, `name@host`) is not made a link. A
+workflow command the Action prints has its `%`, carriage returns and line breaks encoded, so an
+input cannot start a second command, and the CLI's warnings, which can quote the resume, are passed
+on between `::stop-commands::` and its closing token, a random one per run.

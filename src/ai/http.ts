@@ -16,6 +16,10 @@ export type FetchResponseLike = {
   ok: boolean;
   status: number;
   text(): Promise<string>;
+  /** True when `fetch` followed a redirect to get this response: it is refused. */
+  redirected?: boolean;
+  /** `"opaqueredirect"` is a browser's redirect handed back unfollowed: it is refused. */
+  type?: string;
 };
 
 /** Just enough of `fetch` for the adapters: one POST. Pass your own to proxy or record calls. */
@@ -26,6 +30,13 @@ export type FetchLike = (
     headers: Record<string, string>;
     body: string;
     signal?: AbortSignalLike;
+    /**
+     * Always `"manual"`: a redirect is handed back, never followed, and the call fails. `fetch`
+     * keeps headers such as `x-api-key` on a redirect to another origin, and a 307 or 308 resends
+     * the body, so following one would hand the key and the resume to whoever answered. Pass it
+     * on to the `fetch` you wrap; a response that was redirected anyway is refused.
+     */
+    redirect?: "manual";
   },
 ) => Promise<FetchResponseLike>;
 
@@ -56,6 +67,59 @@ export class AbortedError extends Error {
 }
 
 /**
+ * Whether the response is a redirect, by the response alone: a 3xx handed back (Node, workers),
+ * a browser's opaque redirect (status 0), or a response a caller's `fetch` reached by following
+ * one regardless.
+ */
+function isRedirect(response: FetchResponseLike): boolean {
+  return (
+    (response.status >= 300 && response.status < 400) ||
+    response.status === 0 ||
+    response.type === "opaqueredirect" ||
+    response.redirected === true
+  );
+}
+
+/** Scheme, host and port only: a path or query can carry a deployment's own tokens. */
+function originOf(url: string): string {
+  // No `URL` here: the package compiles without DOM or Node types. Any user:password goes too.
+  const match = /^([a-z][a-z\d+.-]*:\/\/)([^/?#]*)/i.exec(url);
+  return match ? `${match[1]}${match[2]!.replace(/^.*@/, "")}` : "the configured address";
+}
+
+/** A header whose value is a credential. */
+const SECRET_HEADER = /auth|key|token|secret/i;
+
+/**
+ * A bearer token, or a key in a provider's usual form: OpenAI and Anthropic ("sk-…", "sk-ant-…"),
+ * Google ("AIza…"), Groq ("gsk_…"), Hugging Face ("hf_…"), xAI ("xai-…"), Replicate ("r8_…"),
+ * Together ("tgp_v1_…").
+ */
+const SECRET =
+  /\b[Bb]earer\s+[^\s"',;]+|\b(?:sk|pk|rk|xai)-[\w-]{8,}|\b(?:gsk|hf|r8|tgp_v1)_[\w-]{8,}|\bAIza[\w-]{20,}/g;
+
+/** A JSON member, its name and its string value: `"api_key": "…"`. */
+const JSON_MEMBER = /"([\w-]{1,64})"(\s*:\s*)"(?:[^"\\]|\\.)*"/g;
+
+/**
+ * An error body with the credentials taken out. A proxy or gateway that echoes the request puts
+ * the key in its error, and the error's message is printed and logged.
+ */
+function withoutSecrets(text: string, headers: Record<string, string>): string {
+  let out = text;
+  for (const [name, value] of Object.entries(headers))
+    if (SECRET_HEADER.test(name))
+      // At least eight characters each: a short test key would rewrite every word it is part of.
+      for (const secret of [value, value.replace(/^Bearer\s+/i, "")])
+        if (secret.length >= 8) out = out.split(secret).join("[redacted]");
+  return out
+    .replace(JSON_MEMBER, (member, name: string, colon: string) =>
+      SECRET_HEADER.test(name) ? `"${name}"${colon}"[redacted]"` : member,
+    )
+    .replace(SECRET, (match) => (/^Bearer/i.test(match) ? "Bearer [redacted]" : "[redacted]"));
+}
+
+/**
  * POSTs `body` as JSON and returns the parsed JSON response.
  *
  * Every failure becomes an `LlmProviderError` with the shared retry rule applied, except an
@@ -83,9 +147,18 @@ export async function postJson(
       headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
       signal,
+      redirect: "manual",
     });
+    if (isRedirect(response)) {
+      const status = response.status >= 300 && response.status < 400;
+      throw new LlmProviderError(
+        `The provider at ${originOf(url)} answered with a redirect${status ? ` (HTTP ${response.status})` : ""}, which is never followed: it would take the API key and the request elsewhere. Set the base URL to the address the provider answers at.`,
+        { retryable: false, ...(status && { status: response.status }) },
+      );
+    }
     raw = await response.text();
   } catch (error) {
+    if (error instanceof LlmProviderError) throw error;
     if (options.signal?.aborted) throw new AbortedError(error);
     throw new LlmProviderError(timeout.aborted ? "Provider request timed out." : "Network error.", {
       retryable: true,
@@ -94,7 +167,8 @@ export async function postJson(
   }
 
   if (!response.ok) {
-    throw new LlmProviderError(`Provider returned HTTP ${response.status}: ${raw.slice(0, 500)}`, {
+    const excerpt = withoutSecrets(raw.slice(0, 1_000), headers).slice(0, 500);
+    throw new LlmProviderError(`Provider returned HTTP ${response.status}: ${excerpt}`, {
       status: response.status,
       retryable: isRetryableStatus(response.status),
     });

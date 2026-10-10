@@ -8,8 +8,9 @@ import { expectFast } from "../fixtures/timing.js";
 /**
  * Every input shape that has made, or could make, a pattern backtrack: 50 KB of it as the name
  * line, as a bullet and as the posting, under the community policy with every locale pack
- * applied. The ceiling is far above the few milliseconds these take and far below the seconds a
- * super-linear pattern takes. SECURITY.md promises this.
+ * applied. Most take tens of milliseconds, 25,000 short lines a few hundred: the ceiling is above
+ * that and far below the seconds a super-linear pattern, or a search repeated on every line by
+ * every reader, takes. SECURITY.md promises this.
  */
 
 const N = 50_000;
@@ -97,6 +98,13 @@ const SHAPES: Record<string, string> = {
   "slash number run": rep("a/1/"),
   "link run": rep("a://b/"),
   "scheme run": rep("a+b.c-"),
+  // Many short lines: every reader of a line looks for its dates, so 25,000 lines cost each of
+  // them 25,000 searches.
+  "digit lines": rep("1\n"),
+  "two-digit lines": rep("12\n"),
+  "digit dot lines": rep("1.\n"),
+  "devanagari lines": rep("क\n"),
+  "letter lines": rep("a\n"),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

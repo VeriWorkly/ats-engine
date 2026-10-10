@@ -102,15 +102,90 @@ describe("the GitHub Action", () => {
   });
 });
 
-describe("the job summary", () => {
-  it("escapes Markdown a resume's text carries, so the table stays a table", () => {
-    const odd = join(dir, "odd.txt");
-    writeFileSync(
-      odd,
-      "Jane | Doe\njane@example.com\n\nExperience\nEngineer, Acme_Corp\nJan 2020 - Present\n- Built *things*.\n",
+describe("text from the resume", () => {
+  // A stand-in CLI that prints a report carrying hostile text, and hostile lines on stderr, as a
+  // resume or a posting can make the real one do.
+  const stub = join(dir, "stub-cli.mjs");
+  const hostile = String.raw`\<a href=https://evil.example/apply#\>apply here\</a\>`;
+  writeFileSync(
+    stub,
+    `process.stderr.write("Warning: x\\n::error::injected from stderr\\n::add-mask::x\\n");
+process.stdout.write(JSON.stringify({
+  readinessScore: 50,
+  failedChecks: [
+    { id: "a", severity: "error", evidence: ${JSON.stringify(hostile)}, fix: "Jane | Doe *x* & <b>y</b>" },
+    { id: "b", severity: "warning", evidence: "x".repeat(299) + "😀😀", fix: "\\r\\n::error::in a cell" },
+  ],
+  requirements: [
+    { status: "missing", text: "<img src=x onerror=alert(1)>" },
+    { status: "missing", text: "Apply at https://evil.example/login, WWW.evil.com or hr@evil.example" },
+  ],
+}));
+`,
+  );
+  const stubbed = (inputs: Record<string, string> = {}) => {
+    const summaryPath = join(dir, `summary-${Math.random()}`);
+    writeFileSync(summaryPath, "");
+    const run = spawnSync(process.execPath, [join(root, "action/run.mjs")], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        ATS_RESUME: resume,
+        ATS_ENGINE_CLI: stub,
+        GITHUB_STEP_SUMMARY: summaryPath,
+        GITHUB_OUTPUT: "",
+        RUNNER_TEMP: dir,
+        ...inputs,
+      },
+    });
+    return { ...run, summary: readFileSync(summaryPath, "utf8") };
+  };
+  /** The workflow commands a runner would act on: each line that starts one. */
+  const commands = (text: string) => text.split(/\r?\n/).filter((line) => line.startsWith("::"));
+
+  it("is shown as text in the job summary, never as HTML or Markdown", () => {
+    const { status, summary } = stubbed();
+    expect(status).toBe(0);
+    // No tag survives: a backslash before "<" no longer leaves the "<" live.
+    expect(summary).not.toMatch(/<(?!sub>|\/sub>)/);
+    expect(summary).toContain("\\\\&lt;a href=https&#58;//evil.example/apply#\\\\&gt;apply here");
+    expect(summary).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(summary).toContain("Jane \\| Doe \\*x\\* &amp; &lt;b&gt;y&lt;/b&gt;");
+    // Nor a link GitHub would make of an address on its own: the colon of a scheme, the dot
+    // after "www" and the "@" are written as entities, which read the same.
+    expect(summary).toContain(
+      "Apply at https&#58;//evil.example/login, WWW&#46;evil.com or hr&#64;evil.example",
     );
-    const { summary } = action({ ATS_RESUME: odd });
-    expect(summary).not.toContain("${c}");
+    const rows = summary.split("\n").filter((line) => line.startsWith("|"));
+    expect(rows.join("\n")).not.toMatch(/:\/\/|www\.|@/i);
+    // Each table row stays one line, and a cut never splits a character in two.
+    expect(summary).toContain("|  &#58;&#58;error&#58;&#58;in a cell |");
+    expect(summary).toContain(`${"x".repeat(299)}😀 |`);
+    expect(summary).not.toMatch(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/,
+    );
+  });
+
+  it("starts no workflow command from the CLI's stderr", () => {
+    const { stderr, stdout } = stubbed();
+    const lines = commands(stderr);
+    const token = /^::stop-commands::(\w{16,})$/.exec(lines[0] ?? "")?.[1];
+    expect(token).toBeTruthy();
+    expect(lines).toEqual([
+      `::stop-commands::${token}`,
+      "::error::injected from stderr",
+      "::add-mask::x",
+      `::${token}::`,
+    ]);
+    expect(commands(stdout)).toEqual([]);
+  });
+
+  it("starts no workflow command from an input", () => {
+    const { status, stdout } = stubbed({ ATS_MIN_SCORE: "abc\n::warning::injected\r%0A" });
+    expect(status).toBe(1);
+    expect(commands(stdout)).toEqual([
+      '::error::min-score must be a number from 0 to 100, not "abc%0A::warning::injected%0D%250A".',
+    ]);
   });
 });
 

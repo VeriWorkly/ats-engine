@@ -2,7 +2,7 @@ import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsParsedCertification, AtsParsedLanguage, AtsParsedResume } from "../types.js";
 import { parseCertificationList, parseCertifications } from "./certifications.js";
 import { EMAIL, LINK, findName } from "./contact.js";
-import { findDateRange } from "./dates.js";
+import { findDateRange, readingDatesAt } from "./dates.js";
 import { degreeLevel, parseEducation } from "./education.js";
 import { BULLET, BULLET_PREFIX } from "../text/text.js";
 import { opensWithVerb, parseRoles, titleWordsOf } from "./experience.js";
@@ -118,7 +118,7 @@ export function parseResume(
   policy: AtsEnginePolicy,
   now = new Date(),
 ): AtsParsedResume {
-  return parseReadLines(readResumeLines(lines, policy).lines, policy, now);
+  return parseReadLines(readResumeLines(lines, policy).lines, policy, readingDatesAt(now));
 }
 
 /**

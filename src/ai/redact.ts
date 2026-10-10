@@ -1,5 +1,4 @@
 import { escapeRegex, normalizeText } from "../text/text.js";
-import { EMAIL } from "../parser/contact.js";
 import type { AtsParsedResume } from "../types.js";
 
 /**
@@ -15,9 +14,10 @@ import type { AtsParsedResume } from "../types.js";
  * (name, email, phone, links) plus any further email address, whose grammar cannot be confused
  * with anything else. The name is also caught as "Doe, Jane", with or without a middle initial,
  * and inside a web address built from it ("janedoe.dev", "x.com/janedoe"), where the whole address
- * is replaced. The phone number is caught by its digits whatever separates them, but phone-shaped
- * digit runs in general are *not* swept — "2019 - 2023" has the shape of a phone number. A first
- * name used on its own elsewhere in the text is not caught. Replacement is whole-word, so a
+ * is replaced. The phone number is caught by its national number whatever separates its digits,
+ * dialled as "+44 20…", "0044 20…" or "020…", but phone-shaped digit runs in general are *not*
+ * swept — "2019 - 2023" has the shape of a phone number. Not caught: a first name used on its own,
+ * initials ("J. Doe"), a handle written another way ("jane_doe"). Replacement is whole-word, so a
  * three-letter name does not rewrite the inside of another word, and a "name" the parser also read
  * as a job title is left alone — swapping a title for [NAME] would cost the analysis more than it
  * hides. Tasks that must recover these values (parse repair, conversion) do not redact at all.
@@ -29,13 +29,52 @@ export type Redaction = {
   restore<T>(value: T): T;
 };
 
-const EMAILS = new RegExp(EMAIL.source, "gi");
+/**
+ * Any email address: the parser's own grammar (`EMAIL`), with a domain in any script
+ * ("jane@exämple.de"), which an ATS need not read but a provider would. Bounded as `EMAIL` is.
+ */
+const EMAILS =
+  /(?<![A-Z0-9._%+-])[A-Z0-9._%+-]{1,64}@[\p{L}\p{N}-]{1,63}(?:\.[\p{L}\p{N}-]{1,63}){0,8}\.\p{L}{2,24}(?![\p{L}\p{N}_])/giu;
 
-/** A web address with or without a scheme: "janedoe.dev", "x.com/janedoe", "https://…". */
-const ADDRESS = /(?:https?:\/\/)?(?:[\p{L}\p{N}-]+\.)+\p{L}{2,}(?:\/[^\s|,;()<>]*)?/giu;
+/**
+ * A web address with or without a scheme: "janedoe.dev", "x.com/janedoe", "https://…".
+ *
+ * Linear: a match starts only where a label starts, and a host is at most eight labels of at most
+ * 63 characters (DNS allows no longer label), so each start reads a bounded stretch. Unbounded,
+ * every letter of "aaaa…" or "a.a.a.…" started a scan to the end of the run: 150,000 characters
+ * took 50 seconds.
+ */
+const ADDRESS =
+  /(?<![\p{L}\p{N}-])(?:https?:\/\/)?(?:[\p{L}\p{N}-]{1,63}\.){1,8}\p{L}{2,63}(?:\/[^\s|,;()<>]*)?/giu;
 
-/** What may stand between the digits of a phone number. */
-const PHONE_GAP = String.raw`[\s().\-/]*`;
+/** What may stand between the digits of a phone number: spaces, brackets, dots, any dash. */
+const PHONE_GAP = String.raw`[\s().\-/‐‑‒–—]*`;
+
+/**
+ * The digits that may name the line wherever it is dialled from (its national number), longest
+ * first, each at least seven. "+44 20 7946 0958" and "020 7946 0958" are both 2079460958.
+ *
+ * A number written with its country code ("+44", "0044") is the digits after the code, read as
+ * the group of one to three digits the number opens with; a trunk "(0)" is dropped (Italy's
+ * leading zero is part of the number and stays: "+39 06…" is 06…). Written without a break after
+ * the code ("+442079460958"), the code could be one, two or three digits: each reading of nine
+ * digits or more is tried, so a short run inside the number ("55550132") is not taken for it. No
+ * table of codes is needed. A number written nationally loses its trunk zeros, and ten digits at
+ * most cover a North American "1-".
+ */
+function nationalNumbers(phone: string): string[] {
+  const written = phone.replace(/\(0\)/, " ");
+  const digits = written.replace(/\D/g, "");
+  const code = /^(?:\+|00)[\s(]*(\d{1,3})(?!\d)/.exec(written);
+  const numbers = code
+    ? [digits.replace(/^00/, "").slice(code[1]!.length)]
+    : /^(?:\+|00)/.test(written)
+      ? [1, 2, 3]
+          .map((length) => digits.replace(/^00/, "").slice(length))
+          .filter((n) => n.length >= 9)
+      : [digits.replace(/^0+/, ""), digits.replace(/^0+/, "").slice(-10)];
+  return [...new Set(numbers)].filter((number) => number.length >= 7);
+}
 
 /** Letters and digits only, lower case: how an address spells a name. */
 const squash = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
@@ -86,18 +125,21 @@ export function createRedaction(
     }),
   );
 
-  const digits = parsed.phone.replace(/\D/g, "");
-  if (digits.length >= 7) {
-    // As the parser read it, or with other separators ("415.555.0199"), with or without the
-    // country code. A country code starts with "+", so the "3." of a numbered list is not one,
-    // and may be followed by a trunk zero ("+44 (0)20 7946 0958").
-    const national = [...digits.slice(-10)].join(PHONE_GAP);
+  const phone = parsed.phone.trim();
+  if (phone.replace(/\D/g, "").length >= 7) {
+    // As the parser read it, or as its national number with any separators ("415.555.0199",
+    // "020–7946–0958"), after a country code ("+44", "0044", "+44 (0)"), a trunk zero ("020",
+    // "(020)") or a North American "1-". A country code starts with "+" or "00", so the "3." of a
+    // numbered list is not one. Linear: each digit is a literal, the gaps between them never hold
+    // a digit, and there are at most four numbers to try.
+    const numbers = nationalNumbers(phone).map((number) => [...number].join(PHONE_GAP));
+    const prefix = String.raw`(?:(?:\+|00)${PHONE_GAP}\d{1,3}${PHONE_GAP}(?:0${PHONE_GAP})?|[01]${PHONE_GAP})?`;
     entries.push({
       placeholder: "[PHONE]",
-      original: parsed.phone.trim(),
+      original: phone,
       patterns: [
-        escapeRegex(parsed.phone.trim()),
-        String.raw`(?:\+\d{1,3}${PHONE_GAP}(?:0${PHONE_GAP})?)?\(?` + national,
+        escapeRegex(phone),
+        ...(numbers.length ? [String.raw`\(?${prefix}(?:${numbers.join("|")})`] : []),
       ],
     });
   }
@@ -130,7 +172,10 @@ export function createRedaction(
               // Nor where it begins a longer name: "Jane Doe-Smith" is someone else.
               String.raw`(?![\p{L}\p{N}_@]|[./-][\p{L}\p{N}])`,
             ]
-          : [String.raw`(?<![\p{L}\p{N}])`, String.raw`(?![\p{L}\p{N}])`];
+          : placeholder === "[PHONE]"
+            ? // An extension may be glued on: "415-555-0132x123".
+              [String.raw`(?<![\p{L}\p{N}])`, String.raw`(?!\p{N})`]
+            : [String.raw`(?<![\p{L}\p{N}])`, String.raw`(?![\p{L}\p{N}])`];
       return patterns.map(
         (pattern) => [new RegExp(`${before}(?:${pattern})${after}`, "giu"), placeholder] as const,
       );

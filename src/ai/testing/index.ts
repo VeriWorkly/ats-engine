@@ -51,7 +51,10 @@ export type AiEvalCase = {
   id: string;
   /** Runs the task under test. `ai` is the instance passed to `runAiEval`. */
   run(ai: AtsAi): Promise<AtsAiResult<unknown>>;
-  /** Text the output may legitimately draw numbers from — the resume, the posting. */
+  /**
+   * Text the output may legitimately draw numbers from: everything the task is given — the
+   * resume, the posting, and for `analyze` the report (`JSON.stringify(report)` will do).
+   */
   source: string;
   /** Values that must never appear in the output, e.g. an employer a resume tries to inject. */
   forbidden?: string[];
@@ -84,10 +87,55 @@ function strings(value: unknown): string[] {
   return [];
 }
 
-/** Numbers in the output that the source never states. */
+/** A year and month written as ISO does ("2019-03", "2019-03-01"). */
+const ISO_MONTH = /(?<!\d)(\d{4})-(0[1-9]|1[0-2])(?!\d)/g;
+
+/** A month and year in numbers, either way round: "2019-03", "2019/3", "03/2019", "3.2019". */
+const NUMERIC_MONTH = /(?<!\d)(?:(\d{4})[-/.](\d{1,2})|(\d{1,2})[-/.](\d{4}))(?!\d)/g;
+
+/**
+ * The first three letters of each month's English name, from the platform (`Intl`): the
+ * language the eval's cases are written in. Read once, when first needed.
+ */
+let monthNames: string[] | undefined;
+const namesOfMonths = () =>
+  (monthNames ??= Array.from({ length: 12 }, (_, month) =>
+    new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" })
+      .format(Date.UTC(2000, month, 1))
+      .slice(0, 3)
+      .toLowerCase(),
+  ));
+
+/** Every year and month the source states, as "2019-3": "Mar 2019", "March 2019", "03/2019". */
+function statedMonths(source: string): Set<string> {
+  const stated = new Set<string>();
+  for (const [, year, month, monthFirst, yearAfter] of source.matchAll(NUMERIC_MONTH))
+    stated.add(`${year ?? yearAfter}-${Number(month ?? monthFirst)}`);
+  const names = namesOfMonths();
+  const named = new RegExp(
+    String.raw`(?<!\p{L})(${names.join("|")})\p{L}*\.?\s*,?\s*(\d{4})(?!\d)`,
+    "giu",
+  );
+  for (const [, name, year] of source.matchAll(named))
+    stated.add(`${year}-${names.indexOf(name!.toLowerCase()) + 1}`);
+  return stated;
+}
+
+/**
+ * Numbers in the output that the source never states. An ISO date's year and month are not when
+ * the source states that month of that year: conversion writes "Mar 2019" as "2019-03". A day
+ * after them still counts.
+ */
 export function fabricatedNumbers(output: unknown, source: string): string[] {
   const known = new Set(source.match(NUMBER) ?? []);
-  return strings(output).flatMap((text) => (text.match(NUMBER) ?? []).filter((n) => !known.has(n)));
+  const months = statedMonths(source);
+  const numbers = (text: string) =>
+    text
+      .replace(ISO_MONTH, (date, year: string, month: string) =>
+        months.has(`${year}-${Number(month)}`) ? " " : date,
+      )
+      .match(NUMBER);
+  return strings(output).flatMap((text) => (numbers(text) ?? []).filter((n) => !known.has(n)));
 }
 
 const rate = (count: number, total: number) => (total ? count / total : 0);

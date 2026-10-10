@@ -55,12 +55,14 @@ function report(text: string, jobDescription?: string) {
 }
 
 export function evalCases(): AiEvalCase[] {
+  const standard = report(STANDARD, JOB);
   return [
     {
       id: "analyze/standard-with-job",
-      source: `${STANDARD}\n${JOB}`,
-      run: (ai) =>
-        ai.analyze({ resumeText: STANDARD, report: report(STANDARD, JOB), jobDescription: JOB }),
+      // The report is the task's input too: its scores and word count are the model's to quote.
+      // As analyze sends it: without the text as read and the advice.
+      source: `${STANDARD}\n${JOB}\n${JSON.stringify({ ...standard, lines: undefined, advice: undefined })}`,
+      run: (ai) => ai.analyze({ resumeText: STANDARD, report: standard, jobDescription: JOB }),
     },
     {
       id: "repair/interleaved-columns",
