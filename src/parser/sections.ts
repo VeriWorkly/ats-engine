@@ -1,6 +1,6 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { policyRegex } from "../policy/regex.js";
-import { wordListRegex } from "../text/text.js";
+import { BULLET, wordListRegex } from "../text/text.js";
 import { memo } from "../util/memo.js";
 import { findDateRange } from "./dates.js";
 import { degreeLevel } from "./education.js";
@@ -250,7 +250,8 @@ function unknownHeadings(
   policy: AtsEnginePolicy,
 ) {
   const found = new Set<number>();
-  const known = lines.filter((_, at) => headings[at]);
+  // A heading in the gutter is the first cell of its line.
+  const known = lines.filter((_, at) => headings[at]).map((line) => line.split("\t")[0]!);
   if (known.length < 2) return found;
   const capitalised = (line: string) =>
     line
@@ -303,13 +304,34 @@ function unknownHeadings(
  * parser still reads it for spoken languages). A bare "Languages" on its own line still opens a
  * section.
  *
+ * A heading in the left gutter, level with its section's first line ("EXPERIENCE⇥Senior
+ * Engineer, Acme"), opens its section with the rest of the line as that first line.
+ *
  * A heading word with a word after it that joins no heading ("Experience Strategist") over a
  * line of bare dates is a role, not a heading. And an Education section is closed by a heading the policy
  * does not know, so the roles under "Volunteer Work" are not read as schools (`unknownHeadings`).
  */
 export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeSection[] {
   const matchers = sectionMatchers(policy);
-  const headings = lines.map((line, at) => {
+  // Bare dates, with letters around them for no more than a word: "Volunteer⇥Jan 2016 - Dec 2019".
+  const bareDates = (line: string) => {
+    const found = findDateRange(line, policy.resumeParse, UNBOUNDED);
+    return found && !/\p{L}{3}/u.test(line.replace(found.matched, " "));
+  };
+  // "EXPERIENCE⇥Senior Engineer, Acme": a heading in the left gutter, level with the first line
+  // of its section, which the PDF reader joined to it with a tab. A bare heading in the first
+  // cell is the heading, and the rest of the line is the section's first line, on a page that
+  // sets its headings there: two or more, and more than stand on lines of their own. Elsewhere a
+  // heading word in a first cell is a role's title ("Volunteer⇥Red Cross⇥2016 - 2019"), a line
+  // of a role ("Leadership⇥Led 5 engineers") or a row of a skills table. Beside bare dates it is
+  // a title wherever it stands.
+  const cells = lines.map((line) => {
+    const tab = line.indexOf("\t");
+    const cell = tab === -1 ? null : classifyHeading(line.slice(0, tab), matchers);
+    const rest = line.slice(tab + 1).trim();
+    return cell && !cell.tail && !cell.rest && !bareDates(rest) ? { ...cell, rest } : null;
+  });
+  const plain = lines.map((line, at) => {
     const heading = classifyHeading(line, matchers);
     if (!heading?.tail) return heading;
     // More heading words ("& Certifications", "and Leadership", "Summary") make a longer heading.
@@ -317,19 +339,78 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
     if (matchers.connector.test(first) || classifyHeading(heading.tail, matchers)) return heading;
     // Any other word over a line of bare dates is a job title the policy does not list: no section
     // opens on dates alone, and "Work Experience Highlights" opens on a role.
-    const next = lines[at + 1] ?? "";
-    const found = findDateRange(next, policy.resumeParse, UNBOUNDED);
-    return found && !/\p{L}{3}/u.test(next.replace(found.matched, " ")) ? null : heading;
+    return bareDates(lines[at + 1] ?? "") ? null : heading;
   });
+  const inGutter = cells.filter(Boolean).length;
+  const gutter = inGutter >= 2 && inGutter > plain.filter((h, at) => h && !cells[at]).length;
+  const headings = plain.map((heading, at) => (gutter && cells[at]) || heading);
+  const gutters = (at: number) => gutter && cells[at] !== null;
+  // Whether the heading at `at` is set as the page's other headings are: in capitals where they
+  // all are, every word capitalised where they all are, with a colon only where they all have one.
+  const own = lines.flatMap((line, at) => (headings[at] && !gutters(at) ? [line] : []));
+  const styles = [
+    (line: string) => !line.includes(":"),
+    (line: string) => line === line.toUpperCase(),
+    (line: string) =>
+      line
+        .replace(/:.*/u, "")
+        .trim()
+        .split(/\s+/)
+        .every((word) => /^\p{Lu}/u.test(word) || matchers.connector.test(word)),
+  ];
+  const counts = styles.map((style) => own.filter(style).length);
+  const styled = (line: string) =>
+    styles.every(
+      (style, at) => style(line) || counts[at]! - +style(line) < own.length - 1 || own.length < 2,
+    );
   const unknown = unknownHeadings(lines, headings, matchers, policy);
+  // Whether a dated line that is not a bullet comes after each line before the next heading:
+  // computed once, the first time it is asked.
+  let dated: boolean[] | undefined;
+  const datedAfter = (at: number) => {
+    if (!dated) {
+      dated = [];
+      for (let line = lines.length - 1, seen = false; line >= 0; line -= 1) {
+        dated[line] = seen;
+        if (headings[line]) seen = false;
+        else if (!BULLET.test(lines[line]!))
+          seen ||= findDateRange(lines[line]!, policy.resumeParse, UNBOUNDED) !== null;
+      }
+    }
+    return dated[at];
+  };
 
   const sections: ResumeSection[] = [];
   let current: ResumeSection = { kind: "other", lines: [], headed: false };
 
   for (const [at, line] of lines.entries()) {
+    // A heading the policy does not know closes Education, and Skills when what is under it is
+    // dated, as roles and activities are; a category of skills on its own line is not.
     const heading =
-      headings[at] ?? (current.kind === "education" && unknown.has(at) ? UNKNOWN : null);
-    if (!heading || (current.kind === "skills" && heading.rest && heading.kind !== "skills")) {
+      headings[at] ??
+      (unknown.has(at) &&
+      (current.kind === "education" || (current.kind === "skills" && datedAfter(at)))
+        ? UNKNOWN
+        : null);
+    // Inside Skills, a heading with content is a category of skills ("Languages: TypeScript"); in
+    // the gutter, any but the work history and education is ("Languages⇥TypeScript, Go").
+    const category =
+      heading?.rest &&
+      current.kind === "skills" &&
+      heading.kind !== "skills" &&
+      (!gutters(at) || (heading.kind !== "experience" && heading.kind !== "education"));
+    // Inside the work history or the projects, with a dated line after it before the next
+    // heading, a heading is a line of the role when it names skills with content after it
+    // ("Technologies: React" over the next role) or is not set as the page's headings are: "Key
+    // Projects:", "Tech Stack" or "Accomplishments" under a role, on a page of headings in
+    // capitals.
+    const inRole =
+      headings[at] &&
+      !gutters(at) &&
+      (current.kind === "experience" || current.kind === "projects") &&
+      datedAfter(at) &&
+      ((heading!.kind === "skills" && heading!.rest !== "") || !styled(line));
+    if (!heading || category || inRole) {
       current.lines.push(line);
       continue;
     }

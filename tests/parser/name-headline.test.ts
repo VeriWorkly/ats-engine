@@ -77,6 +77,17 @@ describe("the name when a sidebar is read first", () => {
     expect(name(linkedIn(["Machine Learning"]))).toBe("Jordan Ellery");
   });
 
+  it.each([
+    "Senior Software Engineer at Acme Corp | Building payment systems for small businesses",
+    "Staff Engineer - Payments, Ledgers and Fraud Systems at Acme Corp",
+  ])("reads the name over a long headline whose title comes first: %j", (headline) => {
+    const text = linkedIn(["Machine Learning"]).replace(
+      "Senior Software Engineer at Acme Corp",
+      headline,
+    );
+    expect(name(text)).toBe("Jordan Ellery");
+  });
+
   it("keeps a skills list that opens the page when no name is found", () => {
     const text = [
       "Skills",
@@ -143,5 +154,25 @@ describe("a letter-spaced name whose word gap was lost", () => {
 
   it("is left alone when the email does not spell it", () => {
     expect(name(sidebarFirst("J A N E D O E", "jd1987@example.com"))).not.toBe("JANE DOE");
+  });
+});
+
+describe("a surname that is also a job title", () => {
+  it.each([
+    "Alex Teller",
+    "ALEX NURSE",
+    "Sam Clerk",
+    "Jordan Writer",
+    "Sam Tutor",
+    "Morgan Lawyer",
+    "Morgan Mechanic",
+    "Maria Teller-Smith",
+    "Morgan Teacher",
+  ])("is still the name: %j", (person) => {
+    expect(
+      name(
+        `${person}\nalex@example.com | (555) 123-4567\nExperience\nSoftware Engineer, Acme Corp\nJan 2020 - Present`,
+      ),
+    ).toBe(person);
   });
 });

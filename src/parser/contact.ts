@@ -1,6 +1,6 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { wordListPattern } from "../text/text.js";
-import { placeWords, titleWordsOf } from "./experience.js";
+import { placeWords, splitTitleAndEmployer, titleWordsOf } from "./experience.js";
 import { isSectionHeading, sectionKind } from "./sections.js";
 import { memo } from "../util/memo.js";
 
@@ -201,12 +201,15 @@ export function findName(
   // A name directly above a headline ("LUCAS MOREAU" over "Senior Product Designer") is the
   // name, wherever the reading order put it: a sidebar read first pushes it below the contact
   // block, out of the first few lines. Never from the work history, where "Acme Corporation"
-  // over "Senior Engineer" has the same shape.
+  // over "Senior Engineer" has the same shape. A headline may run on after the title it opens
+  // with ("Senior Engineer at Acme Corp | Building payment systems"): the title is what is judged.
   const headlined = () => {
     for (const [index, line] of trimmed.slice(0, 40).entries()) {
       if (sectionKind(line, policy) === "experience") break;
       const next = trimmed[index + 1];
-      if (!next || next.split(/\s+/).length > 6 || !titleWords.test(next)) continue;
+      const title = next ? splitTitleAndEmployer(next, policy).title : "";
+      if (!next?.startsWith(title) || title.split(/\s+/).length > 6 || !titleWords.test(title))
+        continue;
       if (isSectionHeading(next, policy)) continue;
       const found = nameIn(line, index + 1, false);
       if (found && !found.cut) return found.name;

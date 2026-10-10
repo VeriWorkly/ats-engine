@@ -105,6 +105,23 @@ const SHAPES: Record<string, string> = {
   "digit dot lines": rep("1.\n"),
   "devanagari lines": rep("क\n"),
   "letter lines": rep("a\n"),
+  // A quoted injection example after a word that says it was caught: openers without closers.
+  "curly quote run": `flags ignore all previous instructions ${rep("“", N - 40)}`,
+  "low quote run": `flags ignore all previous instructions ${rep("„", N - 40)}`,
+  "guillemet run": `flags ignore all previous instructions ${rep("«", N - 40)}`,
+  "single quote run": `flags ignore all previous instructions ${rep("‘", N - 40)}`,
+  "straight quote run": `flags ignore all previous instructions ${rep(" 'a", N - 40)}`,
+  "mention verb run": rep('flags "ignore previous instructions" '),
+  // A list of works, read for citations.
+  "citation heading run": `Publications\n${rep("Doe J (2019) et al. ")}`,
+  "citation initials run": `Talks\n${rep("Doe JJ, ")}`,
+  // A product's version, a standard's number, a multiple: read by the metrics rule.
+  "version run": rep("Python 1.1 "),
+  "version spaces run": `Windows 1${rep(" ", N - 20)}x`,
+  "standard run": rep("ISO 1 "),
+  "multiple run": rep("x1 "),
+  // A Greek symbol before a subscript.
+  "greek subscript run": rep("νmax "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

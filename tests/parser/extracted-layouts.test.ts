@@ -284,3 +284,103 @@ Founder & Developer - VeriWorkly
     ]);
   });
 });
+
+describe("a heading in the left gutter, on the line of its first entry", () => {
+  // A moderncv-style page prints each heading in a narrow left column, level with the first line
+  // of its section; the PDF reader joins the two with a tab.
+  const GUTTER = `${HEAD}EXPERIENCE\tSenior Software Engineer, Acme Corp\tJan 2020 - Present
+- Built a billing service handling two million requests a day
+Software Engineer, Globex Inc\tJun 2016 - Dec 2019
+- Introduced contract tests across twelve services
+EDUCATION\tB.S. Computer Science, Ohio State University\t2012 - 2016
+SKILLS\tTypeScript, Go, PostgreSQL, Kubernetes, Terraform
+`;
+
+  it("opens its section and leaves the rest of the line to it", () => {
+    const parsed = parse(GUTTER);
+    expect(parsed.roles.map((role) => [role.title, role.employer])).toEqual([
+      ["Senior Software Engineer", "Acme Corp"],
+      ["Software Engineer", "Globex Inc"],
+    ]);
+    expect(parsed.education.map((entry) => entry.school)).toEqual(["Ohio State University"]);
+    expect(parsed.skills).toEqual(["TypeScript", "Go", "PostgreSQL", "Kubernetes", "Terraform"]);
+    const titleCase = GUTTER.replace(
+      /^([A-Z])([A-Z]+)\t/gm,
+      (_, a, b) => `${a}${b.toLowerCase()}\t`,
+    );
+    expect(parse(titleCase).roles).toEqual(parsed.roles);
+    expect(parse(titleCase).skills).toEqual(parsed.skills);
+  });
+
+  it("closes the skills, unless it names a category of them", () => {
+    const parsed = parse(`${HEAD}SKILLS\tTypeScript, Go
+Languages\tPython, Rust
+EDUCATION\tB.S. Computer Science, Ohio State University\t2012 - 2016
+`);
+    expect(parsed.skills).toEqual(expect.arrayContaining(["TypeScript", "Go", "Rust"]));
+    expect(parsed.spokenLanguages).toEqual([]);
+    expect(parsed.education.map((entry) => entry.school)).toEqual(["Ohio State University"]);
+  });
+
+  it("finds every heading for the structure rules", () => {
+    const ids = failed(GUTTER);
+    for (const id of ["structure.experience", "structure.education", "structure.skills"])
+      expect(ids.some((rule) => rule.endsWith(id))).toBe(false);
+  });
+
+  it("is not a heading when the first cell only starts with a heading word", () => {
+    const parsed = parse(`${HEAD}EXPERIENCE\nExperience Designer\tAcme Corp\tJan 2020 - Present\n`);
+    expect(parsed.roles.map((role) => [role.title, role.employer])).toEqual([
+      ["Experience Designer", "Acme Corp"],
+    ]);
+  });
+
+  // A page whose headings stand on lines of their own puts none in the gutter: a heading word in
+  // a first cell there is a role's title or a line of the role, with a right-aligned date or a
+  // DOCX tab after it.
+  const roleWith = (row: string, heading = (h: string) => h) =>
+    parse(`${HEAD}${heading("EXPERIENCE")}
+Senior Engineer, Acme Corp\tJan 2020 - Present
+- Built the payments platform
+${row}
+Engineer, Globex Inc\tMar 2012 - Dec 2015
+- Built search
+${heading("EDUCATION")}
+B.S. Mathematics, Ohio State University, 2012
+`).roles.map((role) => [role.title, role.employer]);
+
+  it.each([
+    ["Volunteer\tRed Cross\tJan 2016 - Dec 2019", ["Volunteer", "Red Cross"]],
+    ["Volunteer\tJan 2016 - Dec 2019\nRed Cross", ["Volunteer", "Red Cross"]],
+    ["Internship\tAcme Labs\tJun 2019 - Aug 2019", ["Internship", "Acme Labs"]],
+  ])("reads %j as a role between the others", (row, role) => {
+    for (const heading of [(h: string) => h, (h: string) => h[0] + h.slice(1).toLowerCase()])
+      expect(roleWith(row, heading)).toEqual([
+        ["Senior Engineer", "Acme Corp"],
+        role,
+        ["Engineer", "Globex Inc"],
+      ]);
+  });
+
+  it.each([
+    "Training\tPMP certification course",
+    "Summary\tLed the payments platform",
+    "Leadership\tLed 5 engineers",
+  ])("keeps %j inside the role", (row) => {
+    expect(roleWith(row)).toEqual([
+      ["Senior Engineer", "Acme Corp"],
+      ["Engineer", "Globex Inc"],
+    ]);
+  });
+
+  it.each(["Leadership\tMentoring, Hiring", "Training\tAWS courses", "Projects\tLedger, Billing"])(
+    "keeps the row %j of a skills table in the skills",
+    (row) => {
+      const parsed = parse(
+        `${HEAD}EXPERIENCE\nSenior Engineer, Acme Corp\tJan 2020 - Present\nSKILLS\nProgramming\tPython, Go\n${row}\nCloud\tAWS, GCP\n`,
+      );
+      // The skills line reader keeps a row's label with its first skill, as it did before.
+      expect(parsed.skills).toEqual(expect.arrayContaining(["Go", "GCP"]));
+    },
+  );
+});

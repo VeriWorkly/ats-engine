@@ -9,34 +9,44 @@ type HeaderMatchers = {
   titleWords: RegExp;
   /** What parts a header: separators, a column gap, or a joining word. Global, to walk them. */
   separators: RegExp;
+  /** The separators stronger than a comma. Global. */
+  strong: RegExp;
   /** A separator that is one of the words joining a title to its employer ("at", "bei"). */
   employerWord: RegExp;
   /** A school's word: "University", "College", "Institute". */
   school: RegExp;
+  /** A word naming an organisation: a school's, a legal form ("Inc"), a kind ("Hospital"). */
+  organisation: RegExp;
+  /** The same, global, to take them out. */
+  organisations: RegExp;
   verbOpener: RegExp;
   duration: RegExp;
 };
 
-const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatchers => ({
-  titleWords: wordListRegex(rp.titleWords),
-  // "4 yrs 9 mos", "(4 years 9 months)": how long, which LinkedIn prints beside the dates.
-  duration: new RegExp(
-    String.raw`(?<![\p{L}\p{N}])\d{1,2}\+?\s*${wordListPattern(rp.durationUnits)}\.?`,
-    "giu",
-  ),
+const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatchers => {
   // Split before collapsing whitespace: a tab or a run of spaces is a column gap between
   // title and employer, and collapsing it first merged the two into one field. The words
   // that join a title to its employer ("Engineer at Acme", "Entwickler bei Acme") are data; an
   // "@" standing alone ("Data Scientist @ Netflix") is the symbol for them, and spaced so an
   // email address is never cut.
-  separators: new RegExp(
-    String.raw`\s*[|·•]\s*|\s+[-–—@]\s+|\t+|\s{2,}|,\s+|\s+${wordListPattern(rp.employerWords)}\s+`,
-    "giu",
-  ),
-  employerWord: new RegExp(String.raw`^\s+${wordListPattern(rp.employerWords)}\s+$`, "iu"),
-  school: wordListRegex(rp.schoolWords),
-  verbOpener: new RegExp(`^${wordListPattern(text.contentLineVerbs)}`, "iu"),
-}));
+  const strong = String.raw`\s*[|·•]\s*|\s+[-–—@]\s+|\t+|\s{2,}|\s+${wordListPattern(rp.employerWords)}\s+`;
+  const organisations = [...rp.organisationWords, ...rp.schoolWords];
+  return {
+    titleWords: wordListRegex(rp.titleWords),
+    // "4 yrs 9 mos", "(4 years 9 months)": how long, which LinkedIn prints beside the dates.
+    duration: new RegExp(
+      String.raw`(?<![\p{L}\p{N}])\d{1,2}\+?\s*${wordListPattern(rp.durationUnits)}\.?`,
+      "giu",
+    ),
+    separators: new RegExp(String.raw`${strong}|,\s+`, "giu"),
+    strong: new RegExp(strong, "giu"),
+    employerWord: new RegExp(String.raw`^\s+${wordListPattern(rp.employerWords)}\s+$`, "iu"),
+    school: wordListRegex(rp.schoolWords),
+    organisation: wordListRegex(organisations),
+    organisations: wordListRegex(organisations, "gi"),
+    verbOpener: new RegExp(`^${wordListPattern(text.contentLineVerbs)}`, "iu"),
+  };
+});
 
 const placesOf = memo((rp: AtsEnginePolicy["resumeParse"]) => ({
   code: new RegExp(`^(?:${rp.regionCodes.join("|")})$`, "u"),
@@ -87,8 +97,12 @@ const WRAP_WIDTH = 48;
  * University of Texas at Austin" is one employer, where "Research Assistant at University of
  * Michigan" is a title and an employer.
  */
-function splitHeader(header: string, policy: AtsEnginePolicy): string[] {
-  const { separators, employerWord, school } = matchersOf(policy);
+function splitHeader(
+  header: string,
+  policy: AtsEnginePolicy,
+  separators = matchersOf(policy).separators,
+): string[] {
+  const { employerWord, school } = matchersOf(policy);
   const parts: string[] = [];
   let part = "";
   let from = 0;
@@ -127,17 +141,64 @@ function headerParts(header: string, policy: AtsEnginePolicy) {
  * neither side looks like a title the first is taken as the title, which is the more common
  * order; the field is still reported, and the completeness check below is what tells the
  * candidate the pair was ambiguous.
+ *
+ * A comma also parts a title from its qualifier ("Director, Product Management", "VP,
+ * Engineering"). The title keeps its comma when what follows it up to the employer is not the
+ * employer: when a separator stronger than a comma (a bar, a dash, a tab, "at") parts it from
+ * a part naming an organisation ("Director, Product Management | Acme Corp"), or, with commas
+ * only, when a later part names one ("VP, Engineering, Acme Corp"). An organisation is named by
+ * its legal form ("Inc", "GmbH") or its kind ("Hospital", "University"): without one, "Software
+ * Engineer, Acme | Berlin" is a title, an employer and where.
  */
 export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
-  const parts = headerParts(header, policy);
+  const { titleWords, organisation, organisations, strong } = matchersOf(policy);
+  // The parts between strong separators, each cut at its commas.
+  const segments = splitHeader(header.replace(BULLET_PREFIX, ""), policy, strong)
+    .map((segment) => headerParts(segment, policy))
+    .filter((segment) => segment.length);
+  const parts = segments.flat();
 
   if (parts.length === 0) return { title: "", employer: "" };
   if (parts.length === 1) return { title: parts[0], employer: "" };
 
-  const { titleWords } = matchersOf(policy);
-  const titleIndex = parts.findIndex((part) => titleWords.test(part));
-
-  if (titleIndex === -1) return { title: parts[0], employer: withoutPlace(parts.slice(1), policy) };
+  const named = (text: string) => organisation.test(text);
+  // With no title word on either side, an organisation's name first ("Globex Corporation,
+  // Croupier") is the employer, unless what follows it is only where.
+  let titleIndex = parts.findIndex((part) => titleWords.test(part));
+  if (titleIndex === -1)
+    titleIndex = +(
+      named(parts[0]!) &&
+      !named(parts[1]!) &&
+      !isPlace(parts.slice(1).join(", "), policy)
+    );
+  // Where the employer starts after a title of several parts, or -1.
+  let end = -1;
+  if (segments.length > 1) {
+    let at = 0;
+    const own = segments.find((segment) => (at += segment.length) > titleIndex)!;
+    const other = segments.find(
+      (segment) => segment !== own && !isPlace(segment.join(", "), policy),
+    );
+    if (own.length > 1 && own[0] === parts[titleIndex] && other && named(other.join(" "))) end = at;
+  } else {
+    // A name, capitalised, and not the start of a place: "an Alphabet company" describes the
+    // employer before it, and "Bank Street, NY" is where.
+    const found = parts.findIndex(
+      (part, at) =>
+        at > titleIndex &&
+        named(part) &&
+        /^\p{Lu}/u.test(part) &&
+        !isPlace(parts.slice(at).join(", "), policy),
+    );
+    // A legal form on its own ("Acme, Inc.") is the end of the part before it.
+    end = found - +!/[\p{L}\p{N}]/u.test(parts[found]?.replace(organisations, "") ?? "x");
+    if (end < titleIndex + 2) end = -1;
+  }
+  if (end !== -1)
+    return {
+      title: parts.slice(titleIndex, end).join(", "),
+      employer: withoutPlace([...parts.slice(0, titleIndex), ...parts.slice(end)], policy),
+    };
 
   const employer = withoutPlace(
     parts.filter((_, index) => index !== titleIndex),
@@ -151,7 +212,8 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
  * Francisco, CA" is Acme, "Acme, Remote" is Acme. Only "City, ST" and workplace words are places
  * (see `isPlace`); "Acme, Berlin" keeps its city. A workplace word alone ("Remote") or a city
  * of one or two words and its state ("Austin, TX") names no employer, so there is none; a
- * longer one may be an employer run into its city ("Oakmont Foods Portland, OR"), and is kept.
+ * longer one may be an employer run into its city ("Oakmont Foods Portland, OR"), and is kept. A
+ * place in brackets after the name ("Netflix (Remote)") goes too.
  */
 function withoutPlace(parts: string[], policy: AtsEnginePolicy): string {
   const { code, workplace } = placesOf(policy.resumeParse);
@@ -170,7 +232,11 @@ function withoutPlace(parts: string[], policy: AtsEnginePolicy): string {
     parts[end - 2]!.split(/\s+/).length <= 3
   )
     end -= 2;
-  return parts.slice(0, end).join(", ");
+  const employer = parts.slice(0, end).join(", ");
+  // Where, in brackets after the name: "Netflix (Remote)", "Acme (Austin, TX)". The parts'
+  // whitespace is collapsed, so one space at most comes before the bracket.
+  const where = / ?\(([^()]{1,60})\)$/u.exec(employer);
+  return where?.index && isPlace(where[1]!, policy) ? employer.slice(0, where.index) : employer;
 }
 
 /**

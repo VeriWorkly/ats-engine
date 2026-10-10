@@ -66,6 +66,7 @@ const vocabularyShape = {
   postNominals: optionalList("postNominals"),
   regionCodes: optionalList("regionCodes"),
   workplaceWords: optionalList("workplaceWords"),
+  organisationWords: optionalList("organisationWords"),
   openEnded: optionalList("openEnded"),
   rangeWords: optionalList("rangeWords"),
   sinceWords: optionalList("sinceWords"),

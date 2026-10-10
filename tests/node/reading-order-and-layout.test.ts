@@ -5,7 +5,7 @@ import { check, DEFAULT_POLICY } from "../../src/index.js";
 import { extractJobPosting, jobHtmlToText, jobTextFromHtml } from "../../src/job/index.js";
 import { measureDocx } from "../../src/node/docx.js";
 import { detectResumeFormat, extractResume } from "../../src/node/extract.js";
-import { pageText } from "../../src/node/lines.js";
+import { joinPages, pageText } from "../../src/node/lines.js";
 import {
   buildDocxBody,
   buildRichDocx,
@@ -198,6 +198,187 @@ describe("DOCX headers and footers are read", () => {
       "Experience",
       "Senior Backend Engineer, HubSpot",
       "References available on request",
+    ]);
+  });
+});
+
+describe("a PDF's running header and footer are read once, and its page numbers not at all", () => {
+  // A role whose title ends page 1 and whose dates open page 2, with the page's footer and the
+  // next page's header printed between them.
+  const HEADER = "Jordan Ellery - Resume | jordan.ellery@example.com";
+  const pages = (header: "both" | "later" | "none") => {
+    const first = [
+      at(45, 740, "Jordan Ellery", 20),
+      at(45, 722, "jordan.ellery@example.com | (415) 555-0132"),
+      at(45, 690, "EXPERIENCE", 12),
+      at(45, 670, "Staff Engineer, Initech"),
+      at(470, 670, "Mar 2021 - Present"),
+      at(60, 654, "- Built the payments platform used by forty teams"),
+      at(45, 60, "Senior Engineer, Hooli"),
+      at(520, 30, "Page 1 of 2", 8),
+    ];
+    const second = [
+      at(45, 740, "Jan 2017 - Feb 2021"),
+      at(60, 726, "- Built the search ranking service"),
+      at(45, 690, "EDUCATION", 12),
+      at(45, 674, "B.S. Mathematics, Ohio State University, 2016"),
+      at(520, 30, "Page 2 of 2", 8),
+    ];
+    if (header === "both") first.unshift(at(45, 770, HEADER, 8));
+    if (header !== "none") second.unshift(at(45, 770, HEADER, 8));
+    return buildPdfPages([first.join("\n"), second.join("\n")]);
+  };
+  const read = async (header: "both" | "later" | "none") => {
+    const { text } = await extractResume(pages(header), "pdf");
+    const report = check(text, DEFAULT_POLICY, { now: new Date("2026-10-01T00:00:00Z") });
+    return { text, roles: report.parsed.roles.map((role) => [role.title, role.employer]) };
+  };
+  const ROLES = [
+    ["Staff Engineer", "Initech"],
+    ["Senior Engineer", "Hooli"],
+  ];
+
+  it("keeps a role whose title and dates the page break parts", async () => {
+    for (const header of ["both", "later", "none"] as const)
+      expect((await read(header)).roles).toEqual(ROLES);
+  });
+
+  it("reads a header printed on every page once, before the text", async () => {
+    const { text } = await read("both");
+    expect(lines(text)[0]).toBe(HEADER);
+    expect(text.split(HEADER)).toHaveLength(2);
+    expect(text).not.toMatch(/Page \d of 2/);
+  });
+
+  it("drops a later page's header that repeats the name the first page opens with", async () => {
+    expect((await read("later")).text).not.toContain("Resume");
+  });
+
+  it("keeps a line repeated on two pages in their body, or at another height", async () => {
+    const page = (name: string, y: number) =>
+      [
+        at(45, 740, name),
+        at(45, 700, "- Led the platform team"),
+        at(45, 600, "Kubernetes, Terraform"),
+        at(45, 500, "- Cut cloud spend by 31%"),
+        at(45, y, "2019 - 2021"),
+      ].join("\n");
+    const { text } = await extractResume(
+      buildPdfPages([page("Jordan Ellery", 30), page("Senior Engineer, Hooli", 40)]),
+      "pdf",
+    );
+    expect(text.split("Kubernetes, Terraform")).toHaveLength(3);
+    expect(text.split("2019 - 2021")).toHaveLength(3);
+  });
+
+  it("stays linear over thousands of pages printing the same lines", () => {
+    const pages = Array.from({ length: 20_000 }, (_, page) => ({
+      lines: ["Jordan Ellery - Resume", "x", "y", "z", `Page ${page + 1}`],
+      ys: [10, 40, 52, 64, 94],
+    }));
+    const started = performance.now();
+    const joined = joinPages(pages);
+    expect(joined.startsWith("Jordan Ellery - Resume\n\nx\ny\nz\n\n")).toBe(true);
+    expect(joined).not.toContain("Page");
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
+  // Pages of a role each: "Senior Engineer, Hooli" ends a page and its dates open the next.
+  const filler = (top: number, tag: string) =>
+    [0, 1, 2].map((row) => at(60, top - 14 * row, `- ${tag} improved the service number ${row}`));
+  const head = [
+    at(45, 740, "Jordan Ellery", 20),
+    at(45, 722, "jordan.ellery@example.com | (415) 555-0132"),
+    at(45, 690, "EXPERIENCE", 12),
+  ];
+  const rolesOf = async (pages: string[][]) => {
+    const { text } = await extractResume(
+      buildPdfPages(pages.map((page) => page.join("\n"))),
+      "pdf",
+    );
+    const report = check(text, DEFAULT_POLICY, { now: new Date("2026-10-01T00:00:00Z") });
+    return { text, roles: report.parsed.roles.map((role) => [role.title, role.employer]) };
+  };
+
+  it.each([
+    ["2021 - 2024", "2017 - 2021", "2012 - 2016"],
+    ["03/2021 - 04/2024", "01/2017 - 02/2021", "05/2012 - 12/2016"],
+  ])("keeps dates that open a page and differ only in their numbers: %j", async (...dates) => {
+    const { roles } = await rolesOf([
+      [
+        ...head,
+        at(45, 670, "Staff Engineer, Initech"),
+        at(45, 656, dates[0]!),
+        ...filler(642, "a"),
+        at(45, 60, "Senior Engineer, Hooli"),
+      ],
+      [at(45, 740, dates[1]!), ...filler(726, "b"), at(45, 60, "Engineer, Globex")],
+      [
+        at(45, 740, dates[2]!),
+        ...filler(726, "c"),
+        at(45, 690, "EDUCATION", 12),
+        at(45, 674, "B.S. Mathematics, Ohio State University, 2012"),
+      ],
+    ]);
+    expect(roles).toEqual([
+      ["Staff Engineer", "Initech"],
+      ["Senior Engineer", "Hooli"],
+      ["Engineer", "Globex"],
+    ]);
+  });
+
+  it("keeps the body's last lines, alike or differing in their numbers, where they are", async () => {
+    const page = (role: string, dates: string, tag: string, last: string[], top = 740) => [
+      at(45, top, role),
+      at(470, top, dates),
+      ...filler(top - 14, tag),
+      ...last.map((line, index) => at(45, 54 - 14 * index, line)),
+    ];
+    const { text } = await rolesOf([
+      [
+        ...head,
+        ...page(
+          "Staff Engineer, Initech",
+          "Mar 2021 - Present",
+          "a",
+          ["- Grew revenue 20% a year", "- Cut costs by 15%"],
+          670,
+        ),
+      ],
+      page("Senior Engineer, Hooli", "Jan 2017 - Feb 2021", "b", [
+        "- Grew revenue 35% a year",
+        "- Cut costs by 22%",
+      ]),
+      page("Engineer, Globex", "Jun 2012 - Dec 2016", "c", ["SKILLS", "Python, Go, Kubernetes"]),
+      page("Intern, Initech", "Jun 2011 - Aug 2011", "d", ["PROJECTS", "Python, Go, Kubernetes"]),
+    ]);
+    const lines = text.split("\n").filter(Boolean);
+    expect(lines).toEqual(
+      expect.arrayContaining(["- Grew revenue 20% a year", "- Cut costs by 22%"]),
+    );
+    expect(lines.indexOf("Python, Go, Kubernetes")).toBe(lines.indexOf("SKILLS") + 1);
+    expect(lines.at(-1)).toBe("Python, Go, Kubernetes");
+  });
+
+  it("keeps a later page's first line that only starts like the first page's, at its height", async () => {
+    const { roles } = await rolesOf([
+      [
+        at(45, 740, "Senior Engineer", 20),
+        at(45, 722, "Jordan Ellery | jordan.ellery@example.com"),
+        at(45, 690, "EXPERIENCE", 12),
+        at(45, 670, "Staff Engineer, Initech"),
+        at(470, 670, "Mar 2021 - Present"),
+        ...filler(654, "a"),
+      ],
+      [
+        at(45, 740, "Senior Engineer, Hooli"),
+        at(470, 740, "Jan 2017 - Feb 2021"),
+        ...filler(726, "b"),
+      ],
+    ]);
+    expect(roles).toEqual([
+      ["Staff Engineer", "Initech"],
+      ["Senior Engineer", "Hooli"],
     ]);
   });
 });
@@ -682,6 +863,118 @@ describe("the new scans stay linear on hostile input", () => {
   });
 });
 
+describe("a sidebar taller than the main column is a column", () => {
+  // The name and headline across the top, a sidebar that runs on below the work history beside
+  // it. Measured from the sidebar's side, under half of its text lay beside the main column, so
+  // no gutter was found: the lines were read across both columns, a role's employer became
+  // "jordan.ellery@example.com, Acme Corp", and the skills were lost.
+  const sidebar = [
+    [700, "CONTACT", 11],
+    [684, "jordan.ellery@example.com", 8],
+    [672, "(415) 555-0132", 8],
+    [660, "Austin, TX", 8],
+    [630, "SKILLS", 11],
+    [614, "TypeScript", 9],
+    [602, "Go", 9],
+    [590, "PostgreSQL", 9],
+    [578, "Kubernetes", 9],
+    [548, "EDUCATION", 11],
+    [532, "B.S. Computer Science", 9],
+    [520, "Ohio State University", 9],
+    [508, "2012 - 2016", 9],
+  ] as const;
+  const main = [at(200, 700, "EXPERIENCE", 11)];
+  let y = 684;
+  for (const [header, dates] of [
+    ["Senior Software Engineer, Acme Corp", "Jan 2020 - Present"],
+    ["Software Engineer, Globex Inc", "Jun 2016 - Dec 2019"],
+  ]) {
+    main.push(at(200, y, header), at(480, y, dates));
+    y -= 13;
+    for (const bullet of [
+      "- Built a billing service handling 2M requests a day",
+      "- Cut cloud spend by 31% moving batch to spot",
+      "- Led migration of 40 services to Kubernetes",
+    ]) {
+      main.push(at(210, y, bullet, 9));
+      y -= 12;
+    }
+    y -= 8;
+  }
+  const ops = [
+    at(45, 750, "Jordan Ellery", 22),
+    at(45, 732, "Senior Software Engineer"),
+    ...sidebar.map(([line, value, size]) => at(40, line, value, size)),
+    ...main,
+  ].join("\n");
+
+  it("reads each column whole and reports the second column", async () => {
+    const { text: extracted, layout } = await pdf(ops);
+    expect(layout?.columnRatio).toBeGreaterThan(0.15);
+    const report = check(extracted, DEFAULT_POLICY, {
+      now: new Date("2026-10-01T00:00:00Z"),
+      layout,
+    });
+    expect(report.parsed.roles.map((role) => [role.title, role.employer])).toEqual([
+      ["Senior Software Engineer", "Acme Corp"],
+      ["Software Engineer", "Globex Inc"],
+    ]);
+    expect(report.parsed.skills).toEqual(["TypeScript", "Go", "PostgreSQL", "Kubernetes"]);
+  });
+
+  it("is no column on a one-column page with a few right-aligned lines at its top and foot", () => {
+    // The name at the left and the contact block right-aligned beside it, the dates under the
+    // titles, an education year right-aligned, and a page number at the foot.
+    const run = (str: string, x: number, y: number, width: number, size = 10) => ({
+      str,
+      transform: [size, 0, 0, size, x, y],
+      width,
+      height: size,
+      hasEOL: false,
+    });
+    const right = (str: string, y: number, width: number, size = 9) =>
+      run(str, 560 - width, y, width, size);
+    const items = [
+      run("Jordan Ellery", 45, 740, 140, 22),
+      run("Senior Software Engineer", 45, 720, 120),
+      right("jordan.ellery@example.com", 745, 110),
+      right("(415) 555-0132", 733, 62),
+      right("Austin, TX", 721, 44),
+      run("EXPERIENCE", 45, 680, 75, 12),
+    ];
+    let y = 662;
+    for (const [header, dates] of [
+      ["Senior Software Engineer, Acme Corp", "Jan 2020 - Present"],
+      ["Software Engineer, Globex Inc", "Jun 2016 - Dec 2019"],
+      ["Junior Developer, Initech", "May 2014 - May 2016"],
+    ]) {
+      items.push(run(header!, 45, y, 180), run(dates!, 45, y - 13, 90));
+      y -= 26;
+      for (const bullet of [
+        "- Built a billing service handling two million requests a day",
+        "- Cut cloud spend by 31% by moving batch jobs to spot instances",
+      ]) {
+        items.push(run(bullet, 55, y, 270, 9));
+        y -= 12;
+      }
+      y -= 8;
+    }
+    items.push(
+      run("EDUCATION", 45, y, 70, 12),
+      run("B.S. Computer Science, Ohio State University", 45, y - 18, 220),
+      right("2012 - 2016", y - 18, 55, 10),
+      run("SKILLS", 45, y - 43, 45, 12),
+      run("TypeScript, Go, PostgreSQL, Kubernetes, Terraform", 45, y - 61, 250),
+      right("Page 1 of 1", 40, 40, 8),
+    );
+    const { lines, columns } = pageText(items, (x, yy) => [x, 792 - yy], 612);
+    expect(columns).toBe(0);
+    expect(lines.findIndex((line) => line.includes("Austin, TX"))).toBeLessThan(
+      lines.indexOf("EXPERIENCE"),
+    );
+  });
+});
+
 describe("a centred heading over a short block is not a second column", () => {
   // The last page of a two-page @react-pdf resume, as pdf.js reports it: a centred "SKILLS"
   // heading, then four short lines at the left margin, each a bold label, a colon and values.
@@ -712,8 +1005,8 @@ describe("a centred heading over a short block is not a second column", () => {
   const read = () => pageText(lastPage, (x, y) => [x, 841.5 - y], 595.5);
 
   it("reads the heading before the lines under it, and reports no second column", () => {
-    const { text: extracted, columns } = read();
-    expect(extracted.split("\n")).toEqual([
+    const { lines, columns } = read();
+    expect(lines).toEqual([
       "SKILLS",
       "Languages: TypeScript, JavaScript, SQL",
       "Frontend: React, Next.js, Tailwind CSS",
@@ -724,10 +1017,19 @@ describe("a centred heading over a short block is not a second column", () => {
   });
 
   it("finds the skills under it", () => {
-    const resume = ["Jane Doe", "jane.doe@example.com | +1 415 555 0142", read().text].join("\n");
+    const resume = ["Jane Doe", "jane.doe@example.com | +1 415 555 0142", ...read().lines].join(
+      "\n",
+    );
     const report = check(resume, DEFAULT_POLICY, { now: new Date("2026-10-01T00:00:00Z") });
     expect(report.parsed.skills).toEqual(
       expect.arrayContaining(["TypeScript", "React", "PostgreSQL", "System Design"]),
     );
+  });
+
+  it("is not a column with a centred footer under the block either", () => {
+    const withFooter = [...lastPage, item("Page 2 of 2", 9, 276, 40, 45)];
+    const { lines, columns } = pageText(withFooter, (x, y) => [x, 841.5 - y], 595.5);
+    expect(lines[0]).toBe("SKILLS");
+    expect(columns).toBe(0);
   });
 });

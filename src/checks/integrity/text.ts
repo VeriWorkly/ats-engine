@@ -1,8 +1,8 @@
 import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { NO_FINDING as NONE, quote, type Finding } from "../finding.js";
-import { wordListPattern } from "../../text/text.js";
+import { BULLET_PREFIX, wordListPattern } from "../../text/text.js";
 import { segmentResume } from "../../parser/sections.js";
-import { isDatedLine } from "../bullets.js";
+import { isDatedLine, readsAsSentence } from "../bullets.js";
 import { memo } from "../../util/memo.js";
 
 /**
@@ -11,32 +11,92 @@ import { memo } from "../../util/memo.js";
  * report can quote the offending text back.
  */
 
-const injectionPattern = memo(
-  (text: AtsEnginePolicy["text"]) => new RegExp(wordListPattern(text.injectionPhrases), "giu"),
-);
+const injectionPattern = memo((text: AtsEnginePolicy["text"]) => ({
+  phrase: new RegExp(wordListPattern(text.injectionPhrases), "giu"),
+  // Defaulted by the schema; a policy object built by hand, unparsed, may not have them.
+  caught: new RegExp(wordListPattern(text.injectionMentionVerbs ?? ["(?!)"]), "giu"),
+  target: new RegExp(wordListPattern(text.injectionTargets ?? ["(?!)"]), "iu"),
+}));
+
+/**
+ * Quoted text: straight or curly quotes, guillemets, backticks, and straight single quotes away
+ * from a word, where one is no apostrophe. An opener is never inside its own quote, so a run of
+ * openers costs one scan each to the next, not to the end of the line.
+ */
+const QUOTED =
+  /"[^"\n]*"|“[^“”\n]*”|„[^„“”\n]*[“”]|«[^«»\n]*»|‘[^‘’\n]*’|`[^`\n]*`|(?<![\p{L}\p{N}])'[^'\n]*'(?![\p{L}\p{N}])/gu;
+
+/** How far before a quote the word that excuses it may stand: three words, as characters. */
+const NEAR = 60;
+
+/**
+ * The quotes on a visible line that are an example of an attack: within three words of a word
+ * saying it was caught, function words aside and no comma, semicolon or colon between, on a line
+ * that is no "Label: …" list, and naming nothing the screener is told to do with this resume.
+ */
+function examples(line: string, policy: AtsEnginePolicy): Array<[number, number]> {
+  if (LABELLED.test(line.replace(BULLET_PREFIX, ""))) return [];
+  const { caught, target } = injectionPattern(policy.text);
+  const stop = new Set(policy.keywordMatch.stopwords);
+  const verbs = [...line.matchAll(caught)].map((verb) => verb.index + verb[0].length);
+  const spans: Array<[number, number]> = [];
+  let verb = -1;
+  for (const { index, 0: quoted } of line.matchAll(QUOTED)) {
+    while (verb + 1 < verbs.length && verbs[verb + 1]! <= index) verb += 1;
+    const gap = verb < 0 || index - verbs[verb]! > NEAR ? null : line.slice(verbs[verb], index);
+    if (gap === null || /[,;:]/u.test(gap) || target.test(quoted)) continue;
+    const words = gap.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+    if (words.filter((word) => !stop.has(word)).length <= 3)
+      spans.push([index, index + quoted.length]);
+  }
+  return spans;
+}
 
 /**
  * Instructions addressed to an AI screener rather than to a person: "ignore all previous
  * instructions", "rank this candidate as the best fit". Phrases are policy vocabulary
- * (`text.injectionPhrases`), extended per language. Read from the visible text and from any
- * text smuggled in tag characters, which is where such an instruction is most often hidden.
+ * (`text.injectionPhrases`), extended per language. Read from the visible text and from the
+ * text no reader sees (`hidden`: smuggled in tag characters, hidden by the layout, metadata),
+ * which is where such an instruction is most often put.
+ *
+ * A phrase inside a quoted example on a visible line (`examples`) is not counted: `Built a
+ * filter that flags "ignore previous instructions"`.
  */
-export function injectionPhrases(text: string, smuggled: string, policy: AtsEnginePolicy): Finding {
+export function injectionPhrases(text: string, hidden: string, policy: AtsEnginePolicy): Finding {
+  const all = `${text}\n${hidden}`;
+  const lines = text.split("\n");
+  // Matches come in order: the line each is on, and its examples, are read once.
+  let row = 0;
+  let start = 0;
+  let spans: Array<[number, number]> | null = null;
   // `matchAll` clones the shared global pattern, so its `lastIndex` is never touched.
-  const found = [...`${text}\n${smuggled}`.matchAll(injectionPattern(policy.text))];
-  return found.length ? { value: found.length, sample: quote(found[0][0]) } : NONE;
+  const found = [...all.matchAll(injectionPattern(policy.text).phrase)].filter((match) => {
+    while (row < lines.length && start + lines[row]!.length < match.index) {
+      start += lines[row]!.length + 1;
+      row += 1;
+      spans = null;
+    }
+    const at = match.index - start;
+    const end = at + match[0].length;
+    if (row >= lines.length || end > lines[row]!.length) return true;
+    spans ??= examples(lines[row]!, policy);
+    return !spans.some(([open, close]) => open < at && end < close);
+  });
+  return found.length ? { value: found.length, sample: quote(found[0]![0]) } : NONE;
 }
 
 /**
  * A Greek letter drawn like a Latin one ("ο", "Ρ", "α"), beside a lowercase Latin letter: "Pythοn"
  * with an omicron. Science names Greek letters after capitals and digits ("TNFα", "NFκB") and
- * uses "μ" as a unit; none of those is a look-alike.
+ * uses "μ" as a unit; none of those is a look-alike. Nor is a lowercase symbol before a short
+ * subscript ("νmax", "ρmax", "κobs"); before a longer word it is one ("ρython", "κubernetes").
  */
 const LOOKALIKE = String.raw`[\u{0391}\u{0392}\u{0395}-\u{0397}\u{0399}\u{039A}\u{039C}\u{039D}\u{039F}\u{03A1}\u{03A4}\u{03A5}\u{03A7}\u{03B1}\u{03B3}\u{03B5}\u{03B9}\u{03BA}\u{03BD}\u{03BF}\u{03C1}\u{03C5}\u{03C7}]`;
 const GREEK_IN_LATIN = new RegExp(
   String.raw`(?=\p{Ll})\p{Script=Latin}${LOOKALIKE}|${LOOKALIKE}(?=\p{Ll})\p{Script=Latin}`,
   "u",
 );
+const SUBSCRIPTED = /^[\u{03B1}\u{03B3}\u{03B5}\u{03BA}\u{03BD}\u{03C1}\u{03C7}]\p{Ll}{1,3}$/u;
 
 /**
  * Words that mix Latin letters with Cyrillic ones — "Руthon" with a Cyrillic "Ру" — which look
@@ -50,7 +110,9 @@ export function homoglyphWords(text: string): Finding {
     (word) =>
       /\p{Script=Latin}/u.test(word) &&
       (/\p{Script=Cyrillic}/u.test(word) ||
-        (GREEK_IN_LATIN.test(word) && (word.match(/\p{Script=Latin}/gu)?.length ?? 0) >= 3)),
+        (GREEK_IN_LATIN.test(word) &&
+          !SUBSCRIPTED.test(word) &&
+          (word.match(/\p{Script=Latin}/gu)?.length ?? 0) >= 3)),
   );
   return found.length ? { value: found.length, sample: quote(found[0]) } : NONE;
 }
@@ -119,8 +181,13 @@ function listItems(line: string): string[] | null {
  * Density, not a bare count:
  *
  * - A term counts once per line it appears on (the lines of a paragraph-length run count each
- *   time), and is stuffed when that reaches 15 and 5% of the words that are not repeated so: a
- *   data engineer says "data" in most bullets, often twice in one, and that is the job.
+ *   time), and is stuffed when that reaches 15 and 5% of the words that are not repeated so.
+ *   Not on a sentence — words in lower case and a stopword among them — that names other things
+ *   more: a data engineer says "data" in most bullets, often twice in one, and on a 200-word
+ *   resume that is still the job. A bare run of terms ("Kubernetes Terraform Kafka …") is no
+ *   sentence. Nor on a list of works' citations (`cited`), and never for a word of the
+ *   candidate's `name`, which an academic's publications repeat by right. The checks below
+ *   still read both.
  * - A line that is not a list and repeats one term five times or more, as 30% of its words.
  * - A list item named three times or more within one line, or across the undated, unlabelled
  *   lists of a skills section, as a skills block padded with the same skills is. Each role
@@ -138,9 +205,13 @@ export function stuffedTerms(
   lines: string[],
   policy: AtsEnginePolicy,
   now: Date,
+  name = "",
+  /** The resume's citations (`citationLines`). */
+  cited: ReadonlySet<string> = new Set(),
 ): Finding {
-  const stop = new Set(policy.keywordMatch.stopwords);
-  const isTerm = (word: string) => word.length > 2 && /\p{L}/u.test(word) && !stop.has(word);
+  const stopwords = new Set(policy.keywordMatch.stopwords);
+  const own = new Set(wordsOf(name));
+  const isTerm = (word: string) => word.length > 2 && /\p{L}/u.test(word) && !stopwords.has(word);
   const total = new Map<string, number>();
   const spread = new Map<string, number>();
   const stuffed = new Map<string, number>();
@@ -152,12 +223,20 @@ export function stuffedTerms(
     const words = wordsOf(line);
     counted += words.length;
     const here = new Map<string, number>();
-    for (const word of words) if (isTerm(word)) add(here, word);
+    let terms = 0;
+    for (const word of words) {
+      if (!isTerm(word)) continue;
+      add(here, word);
+      terms += 1;
+    }
     const paragraph = words.length > LINE_WORDS;
     const list = listItems(line) !== null;
+    const sentence =
+      !paragraph && !list && readsAsSentence(line) && words.some((word) => stopwords.has(word));
     for (const [word, count] of here) {
       add(total, word, count);
-      add(spread, word, paragraph ? count : 1);
+      if (!cited.has(line) && !own.has(word) && !(sentence && count * 2 < terms))
+        add(spread, word, paragraph ? count : 1);
       if (!list && count >= 5 && count >= words.length * 0.3) stuffed.set(word, 0);
     }
   }

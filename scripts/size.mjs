@@ -9,7 +9,10 @@ const { exports } = JSON.parse(readFileSync("package.json", "utf8"));
 /** Gzipped KB. */
 const BUDGETS = {
   // 95: zod/mini in place of zod (same schemas and messages) took it from 171.9 to 91.7.
-  ".": 95,
+  // 97: 0.6.0's reading and keyword fixes took it from 93.6 to 96.2, mostly policy data: the
+  // headings, title and organisation words, en-GB stemming rows, injection-mention and
+  // citation words, and the section rules that read gutter headings and role sub-headings.
+  ".": 97,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
@@ -37,7 +40,14 @@ const BUDGETS = {
   // distinct warnings, over 2 MB) took it to 20.0, and reading only a regular local file, measured
   // before it is opened and read through one bounded handle (no network path, pipe or device), to
   // 20.2. The rest is little room: the next addition trims or argues for more.
-  "./node": 20.5,
+  // 20.6: reading a PDF's running header and footer once and its page numbers not at all (between
+  // two pages they parted a role's title from its dates) took it from 20.20 to 20.57.
+  // 20.7: a sidebar taller than the main column read as a column (20.60), and a scan with a
+  // scanner's text stamp still counted as a picture (20.66).
+  // 20.9: a running header or footer told from body text by the margin it sits in, all of it
+  // repeated, and a page number by matching its page (dates opening each page, bullets differing
+  // in their figures and a skills line at the foot of two pages were dropped), took it to 20.89.
+  "./node": 20.9,
 };
 
 let failed = false;

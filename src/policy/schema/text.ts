@@ -366,7 +366,10 @@ export const engineTextSchema = z.prefault(
       String.raw`(?:give|award|assign)\s+(?:this|my)\s+(?:resume|cv|candidate|applicant|profile|application)\s+(?:an?\s+|the\s+)?(?:10\s*/\s*10|100\s*/\s*100|perfect|full\s+marks|top\s+(?:score|marks|rating)|highest|maximum)`,
       // Not "system prompt:", which an engineer writes about the prompts they built.
       String.raw`(?:new|updated|real)\s+(?:instructions?|prompt)\s*:|system\s+instructions?\s*:`,
-      String.raw`(?:you\s+are|pretend\s+to\s+be)\s+(?:an?\s+)?(?:ai|assistant|language\s+model|llm|recruiter|hiring\s+manager|resume\s+screener)`,
+      String.raw`(?:you\s+are|pretend\s+to\s+be)\s+(?:an?\s+)?(?:ai|assistant|language\s+model|llm|resume\s+screener)`,
+      // A person's role, said to a screener; not "If you are a hiring manager looking for…",
+      // which a person writes to a person.
+      String.raw`(?:(?<!(?:if|when)\s{1,3})you\s+are|pretend\s+to\s+be)\s+(?:an?\s+)?(?:recruiter|hiring\s+manager)`,
       // "Act as" is a recruiter's job description ("act as hiring manager"), so it counts only
       // with an AI for its object.
       String.raw`act\s+as\s+(?:an?\s+)?(?:(?:ai|automated)\s+(?:assistant|recruiter|screener|reviewer|hiring\s+manager|model)|language\s+model|llm|resume\s+screener)`,
@@ -385,6 +388,41 @@ export const engineTextSchema = z.prefault(
       String.raw`(?:respond|reply|answer|output)\s+with\s+(?:yes|hire|qualified)(?=\s*(?:[.!;"”\n]|$))`,
       // A markdown "### System Design" heading is not a prompt delimiter; "### System:" is.
       String.raw`<\|?(?:im_start|system|endoftext)\|?>|\[/?(?:inst|system)\]|###\s*(?:instructions?|system\s*:)`,
+    ]),
+    /**
+     * Words that say an injection phrase was caught, not given: `Built a filter that flags
+     * "ignore previous instructions"`. A phrase in quotes or backticks within three words of one
+     * of these (function words aside, no comma or colon between) is an example an AI security
+     * engineer quotes, and is not counted. Not on a labelled line ("Skills: …"), not unquoted
+     * (a bare "[INST]" too), not in text hidden in tag characters or by the layout, and never a
+     * quote naming one of `injectionTargets`.
+     */
+    injectionMentionVerbs: z._default(wordList("text.injectionMentionVerbs"), [
+      // Each with its "-s", "-ed" and "-ing": "flags", "flagged", "scanning", "red-teamed".
+      String.raw`(?:flag|detect|block|filter|prevent|red[\s-]?team|test|scan|spot|reject)(?:s|g?ed|g?ing|ned|ning|ted|ting)?`,
+      String.raw`catch(?:es|ing)?|caught|detections?`,
+      String.raw`(?:mitigat|saniti[sz])(?:e|es|ed|ing)`,
+    ]),
+    /** What a quote that tells the screener what to make of this resume names: never an example. */
+    injectionTargets: z._default(wordList("text.injectionTargets"), [
+      String.raw`this\s+(?:candidate|applicant|resume|cv|profile|application)`,
+      String.raw`(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\s+me`,
+    ]),
+    /**
+     * Headings of a list of works, read where a section heading opens one: its lines shaped as
+     * citations (a year, a quoted title, "et al.", initials: "Kovalenko O, Marsh T. Ligand field
+     * effects… 2019") are not bullets. They have no action verb to open with and repeat the
+     * author's name, so the verb and metric rules do not read them, nor does keyword stuffing
+     * count a term across them; a line repeating a term there is still stuffing, and any other
+     * line there is read as any line is.
+     */
+    citationHeadings: z._default(wordList("text.citationHeadings"), [
+      String.raw`publications?`,
+      String.raw`presentations?`,
+      String.raw`(?:invited\s+)?talks`,
+      "conferences",
+      "patents",
+      "posters",
     ]),
   }),
   // `prefault`, not `default`: zod 4's `default` returns the fallback as-is without parsing it,

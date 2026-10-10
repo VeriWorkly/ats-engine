@@ -1,7 +1,8 @@
 import { findDateRange } from "../parser/dates.js";
-import { segmentResume } from "../parser/sections.js";
+import { sectionKind, segmentResume } from "../parser/sections.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
-import { BULLET } from "../text/text.js";
+import { BULLET, wordListPattern } from "../text/text.js";
+import { memo } from "../util/memo.js";
 
 /**
  * Any year a resume could print. These helpers only ask whether a line is shaped like a role's
@@ -49,4 +50,34 @@ export function roleBodyLines(lines: readonly string[], policy: AtsEnginePolicy)
     }
   }
   return body;
+}
+
+const citationHeading = memo(
+  (text: AtsEnginePolicy["text"]) =>
+    // Defaulted by the schema; a policy object built by hand, unparsed, may not have it.
+    new RegExp(`^${wordListPattern(text.citationHeadings ?? ["(?!)"])}`, "iu"),
+);
+
+/**
+ * What a citation carries: a year, a quoted title, "et al." or an author's initials ("Doe J,",
+ * "J. Doe").
+ */
+const CITATION =
+  /(?<!\d)(?:19|20)\d{2}(?!\d)|["“”]|(?<![\p{L}])et\s+al(?![\p{L}])|(?<![\p{L}])\p{Lu}\.\s?\p{Lu}|(?<![\p{L}])\p{Lu}\p{Ll}+\s\p{Lu}{1,2}[,.]/u;
+
+/**
+ * The citations under a section heading that opens a list of works (`text.citationHeadings`):
+ * "Publications", "Invited Talks". Lines shaped as one, not bullets; any other line there is
+ * read as any line is.
+ */
+export function citationLines(lines: readonly string[], policy: AtsEnginePolicy) {
+  const heading = citationHeading(policy.text);
+  const found = new Set<string>();
+  let listing = false;
+  for (const line of lines) {
+    const kind = sectionKind(line, policy);
+    if (kind !== null) listing = kind === "other" && heading.test(line.trim());
+    else if (listing && CITATION.test(line)) found.add(line);
+  }
+  return found;
 }
