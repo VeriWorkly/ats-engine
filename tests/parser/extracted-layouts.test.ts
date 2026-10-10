@@ -284,3 +284,54 @@ Founder & Developer - VeriWorkly
     ]);
   });
 });
+
+describe("a heading in the left gutter, on the line of its first entry", () => {
+  // A moderncv-style page prints each heading in a narrow left column, level with the first line
+  // of its section; the PDF reader joins the two with a tab.
+  const GUTTER = `${HEAD}EXPERIENCE\tSenior Software Engineer, Acme Corp\tJan 2020 - Present
+- Built a billing service handling two million requests a day
+Software Engineer, Globex Inc\tJun 2016 - Dec 2019
+- Introduced contract tests across twelve services
+EDUCATION\tB.S. Computer Science, Ohio State University\t2012 - 2016
+SKILLS\tTypeScript, Go, PostgreSQL, Kubernetes, Terraform
+`;
+
+  it("opens its section and leaves the rest of the line to it", () => {
+    const parsed = parse(GUTTER);
+    expect(parsed.roles.map((role) => [role.title, role.employer])).toEqual([
+      ["Senior Software Engineer", "Acme Corp"],
+      ["Software Engineer", "Globex Inc"],
+    ]);
+    expect(parsed.education.map((entry) => entry.school)).toEqual(["Ohio State University"]);
+    expect(parsed.skills).toEqual(["TypeScript", "Go", "PostgreSQL", "Kubernetes", "Terraform"]);
+    const titleCase = GUTTER.replace(
+      /^([A-Z])([A-Z]+)\t/gm,
+      (_, a, b) => `${a}${b.toLowerCase()}\t`,
+    );
+    expect(parse(titleCase).roles).toEqual(parsed.roles);
+    expect(parse(titleCase).skills).toEqual(parsed.skills);
+  });
+
+  it("closes the skills, unless it names a category of them", () => {
+    const parsed = parse(`${HEAD}SKILLS\tTypeScript, Go
+Languages\tPython, Rust
+EDUCATION\tB.S. Computer Science, Ohio State University\t2012 - 2016
+`);
+    expect(parsed.skills).toEqual(expect.arrayContaining(["TypeScript", "Go", "Rust"]));
+    expect(parsed.spokenLanguages).toEqual([]);
+    expect(parsed.education.map((entry) => entry.school)).toEqual(["Ohio State University"]);
+  });
+
+  it("finds every heading for the structure rules", () => {
+    const ids = failed(GUTTER);
+    for (const id of ["structure.experience", "structure.education", "structure.skills"])
+      expect(ids.some((rule) => rule.endsWith(id))).toBe(false);
+  });
+
+  it("is not a heading when the first cell only starts with a heading word", () => {
+    const parsed = parse(`${HEAD}EXPERIENCE\nExperience Designer\tAcme Corp\tJan 2020 - Present\n`);
+    expect(parsed.roles.map((role) => [role.title, role.employer])).toEqual([
+      ["Experience Designer", "Acme Corp"],
+    ]);
+  });
+});

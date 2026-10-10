@@ -250,7 +250,8 @@ function unknownHeadings(
   policy: AtsEnginePolicy,
 ) {
   const found = new Set<number>();
-  const known = lines.filter((_, at) => headings[at]);
+  // A heading in the gutter is the first cell of its line.
+  const known = lines.filter((_, at) => headings[at]).map((line) => line.split("\t")[0]!);
   if (known.length < 2) return found;
   const capitalised = (line: string) =>
     line
@@ -303,13 +304,26 @@ function unknownHeadings(
  * parser still reads it for spoken languages). A bare "Languages" on its own line still opens a
  * section.
  *
+ * A heading in the left gutter, level with its section's first line ("EXPERIENCE⇥Senior
+ * Engineer, Acme"), opens its section with the rest of the line as that first line.
+ *
  * A heading word with a word after it that joins no heading ("Experience Strategist") over a
  * line of bare dates is a role, not a heading. And an Education section is closed by a heading the policy
  * does not know, so the roles under "Volunteer Work" are not read as schools (`unknownHeadings`).
  */
 export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeSection[] {
   const matchers = sectionMatchers(policy);
+  const gutters = new Set<number>();
   const headings = lines.map((line, at) => {
+    // "EXPERIENCE⇥Senior Engineer, Acme": a heading in the left gutter, level with the first line
+    // of its section, which the PDF reader joined to it with a tab. A bare heading in the first
+    // cell is the heading, and the rest of the line is the section's first line.
+    const tab = line.indexOf("\t");
+    const cell = tab === -1 ? null : classifyHeading(line.slice(0, tab), matchers);
+    if (cell && !cell.tail && !cell.rest) {
+      gutters.add(at);
+      return { ...cell, rest: line.slice(tab + 1).trim() };
+    }
     const heading = classifyHeading(line, matchers);
     if (!heading?.tail) return heading;
     // More heading words ("& Certifications", "and Leadership", "Summary") make a longer heading.
@@ -329,7 +343,14 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
   for (const [at, line] of lines.entries()) {
     const heading =
       headings[at] ?? (current.kind === "education" && unknown.has(at) ? UNKNOWN : null);
-    if (!heading || (current.kind === "skills" && heading.rest && heading.kind !== "skills")) {
+    // Inside Skills, a heading with content is a category of skills ("Languages: TypeScript"); in
+    // the gutter, only a languages or certifications one is ("Languages⇥TypeScript, Go").
+    const category =
+      current.kind === "skills" &&
+      heading?.rest &&
+      heading.kind !== "skills" &&
+      (!gutters.has(at) || heading.kind === "languages" || heading.kind === "certifications");
+    if (!heading || category) {
       current.lines.push(line);
       continue;
     }
