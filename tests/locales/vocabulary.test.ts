@@ -42,6 +42,19 @@ describe("German pack vocabulary for dates, durations and names", () => {
     );
     expect(report.parsed.roles[0]?.start).toEqual({ year: 2018, month: 6 });
   });
+
+  it.each([
+    ["Softwareentwicklerin, Acme GmbH, München, Bayern, Deutschland", "Acme GmbH"],
+    ["Softwareentwicklerin | Acme | Wien, Österreich", "Acme"],
+    // A city-state is a city: no country after it, so it stays with the employer.
+    ["Softwareentwicklerin, Acme, Berlin", "Acme, Berlin"],
+  ])("reads a German state or country as where in %j", (header, employer) => {
+    const report = AtsScoringService.check(resume([header, "01/2020 – heute"]), policy, {
+      now: NOW,
+    });
+    expect(report.locale.languages).toContain("de");
+    expect(report.parsed.roles[0]?.employer).toBe(employer);
+  });
 });
 
 describe("region codes from a region pack", () => {

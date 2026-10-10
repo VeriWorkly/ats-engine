@@ -49,6 +49,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       nameLabels: union(rp.nameLabels, v.nameLabels),
       postNominals: union(rp.postNominals, v.postNominals),
       regionCodes: union(rp.regionCodes, v.regionCodes),
+      placeNames: union(rp.placeNames, v.placeNames),
       workplaceWords: union(rp.workplaceWords, v.workplaceWords),
       organisationWords: union(rp.organisationWords, v.organisationWords),
       openEnded: union(rp.openEnded, v.openEnded),

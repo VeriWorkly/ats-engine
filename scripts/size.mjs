@@ -12,16 +12,24 @@ const BUDGETS = {
   // 97: 0.6.0's reading and keyword fixes took it from 93.6 to 96.2, mostly policy data: the
   // headings, title and organisation words, en-GB stemming rows, injection-mention and
   // citation words, and the section rules that read gutter headings and role sub-headings.
-  ".": 97,
+  // 98.6: the subscripts a Greek symbol opens and the department words (0.3), then the names of
+  // countries and of the states of the US, Canada, India and Australia and the UK's nations, so
+  // "Berlin, Germany" and "Austin, Texas, United States" are where a role is worked (`placeNames`,
+  // 1.9 of it data: one string cut at its bars, each country's spellings one pattern), took it
+  // from 96.2 to 98.5. No cities: a gazetteer of those would cost tens of KB.
+  ".": 98.6,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
   // optional end tags, a tag scan that skips scripts and comments, and hidden-element rules (0.2).
   "./job": 3.8,
   // 70: zod/mini in place of zod took it from 141.1 to 67.5.
-  "./locales": 70,
+  // 70.9: the place names (see "."), and the German pack's for Germany, Austria, Switzerland and
+  // the German states, took it from 68.5 to 70.8.
+  "./locales": 70.9,
   // 70: zod/mini in place of zod took it from 141.0 to 67.5.
-  "./ai": 70,
+  // 71.6: the policy's place names (see "."), with what else "." gained, took it from 69.3 to 71.5.
+  "./ai": 71.6,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,

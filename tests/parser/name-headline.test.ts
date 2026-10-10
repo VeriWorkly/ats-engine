@@ -157,6 +157,23 @@ describe("a letter-spaced name whose word gap was lost", () => {
   });
 });
 
+describe("a name that is also a place", () => {
+  it.each([
+    "Jordan Ellery",
+    "Georgia Lane",
+    "Victoria Chen",
+    "Chad Morgan",
+    "Israel Ortiz",
+    "Carolina Ruiz",
+  ])("is still the name over a city, state and country: %j", (person) => {
+    expect(
+      name(
+        `${person}\nAustin, Texas, United States | person@example.com\nExperience\nSoftware Engineer, Georgia Pacific\nJan 2020 - Present`,
+      ),
+    ).toBe(person);
+  });
+});
+
 describe("a surname that is also a job title", () => {
   it.each([
     "Alex Teller",

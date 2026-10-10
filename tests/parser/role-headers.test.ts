@@ -119,6 +119,39 @@ describe("a city and state beside the dates", () => {
   });
 });
 
+describe("a city with its state or country named in full", () => {
+  it.each([
+    [["Software Engineer, Acme Corp, Berlin, Germany\tJan 2020 - Present"]],
+    [["Software Engineer | Acme Corp | Bengaluru, Karnataka, India\tJan 2020 - Present"]],
+    [["Software Engineer, Acme Corp, Toronto, ON, Canada\tJan 2020 - Present"]],
+    [["Software Engineer | Acme Corp | India\tJan 2020 - Present"]],
+    [["Software Engineer | Acme Corp", "Jan 2020 - Present | Austin, Texas, United States"]],
+    [["Software Engineer | Acme Corp", "Jan 2020 - Present | Remote, India"]],
+    [["Software Engineer", "Acme Corp", "Berlin, Germany", "Jan 2020 - Present"]],
+    [["Acme Corp", "Software Engineer", "Austin, Texas, United States", "Jan 2020 - Present"]],
+    // A first part ending in a legal form is the employer, not a city: it was dropped as one.
+    [["Software Engineer", "Acme Corp, TX", "Jan 2020 - Present"]],
+  ])("is neither the title nor the employer in %j", (block) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer: "Acme Corp" }]);
+  });
+
+  it.each([
+    ["Software Engineer, Georgia Pacific", "Georgia Pacific"],
+    ["Reporter, Washington Post, Washington, DC", "Washington Post"],
+    ["Analyst, Bank of America, Charlotte, North Carolina", "Bank of America"],
+    // No country or state after it: the city is not told from part of the employer.
+    ["Software Engineer, Acme, Berlin", "Acme, Berlin"],
+  ])("keeps a name that holds a place's in %j", (header, employer) => {
+    expect(rolesIn(`${header}\tJan 2020 - Present`)[0]?.employer).toBe(employer);
+  });
+
+  it("is not a place when its first part is a job title", () => {
+    expect(rolesIn("Software Engineer, India\tJan 2020 - Present")[0]?.title).toBe(
+      "Software Engineer",
+    );
+  });
+});
+
 describe("an employer whose name holds an employer word", () => {
   it.each([
     [
@@ -217,7 +250,8 @@ describe("a comma inside the title", () => {
     // A comma part beside a place, or a city and its country, is still the employer.
     ["Senior Engineer, Acme — Austin, TX", "Senior Engineer", "Acme"],
     ["Senior Engineer, Acme | Remote", "Senior Engineer", "Acme"],
-    ["Software Engineer, Acme | Berlin, Germany", "Software Engineer", "Acme, Berlin, Germany"],
+    // The city goes with its country (`placeNames`): it was kept as part of the employer.
+    ["Software Engineer, Acme | Berlin, Germany", "Software Engineer", "Acme"],
     // Without a company's legal form after it, a third part is where.
     ["Software Engineer, Acme, Berlin", "Software Engineer", "Acme, Berlin"],
     // A description of the employer is not an employer of its own, nor a street named for one.

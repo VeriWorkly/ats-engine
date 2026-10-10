@@ -159,6 +159,14 @@
         "minLength": 1
       }
     },
+    "placeNames": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "workplaceWords": {
       "minItems": 1,
       "type": "array",
