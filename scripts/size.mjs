@@ -32,7 +32,11 @@ const BUDGETS = {
   // took it to 18.9 (0.2).
   // 19.6: the missing-reader message naming the command that installs the readers, and how
   // with -g or npx, took it from 19.44 to 19.52.
-  "./node": 19.6,
+  // 20.5: refusing, before mammoth parses it, a DOCX whose XML its parser would take seconds to
+  // minutes over (unclosed markup, malformed tags, a prefix bound to two namespaces, thousands of
+  // distinct warnings, over 2 MB) took it to 20.0. The rest is little room: the next addition
+  // trims or argues for more.
+  "./node": 20.5,
 };
 
 let failed = false;

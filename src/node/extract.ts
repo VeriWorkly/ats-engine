@@ -1,6 +1,7 @@
 import type { AtsLayoutSignals } from "../types.js";
 import { decodeEntities, htmlText, readHtml } from "../job/html.js";
 import {
+  checkParsedXml,
   docxChunks,
   docxMargins,
   MAX_DOCX_EXPANDED_BYTES,
@@ -8,6 +9,7 @@ import {
   measureDocx,
   readableArchive,
   UNMEASURABLE_DOCX,
+  UNREADABLE_DOCX,
   withinExpansionLimit,
 } from "./docx.js";
 import { withLinks } from "./lines.js";
@@ -131,9 +133,6 @@ function sequence(data: Uint8Array, at: number): number {
 /** Windows-1252's characters for 0x80-0x9F; its five unassigned codes stay as they are. */
 const CP1252 = "€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ";
 
-/** What a DOCX upload that is not one fails with; the reader's own error is kept as the cause. */
-const UNREADABLE_DOCX = "The document could not be read as DOCX.";
-
 /** A link's target in `mammoth`'s HTML: one bounded run of attribute text. */
 const HREF = /<a href="([^"<>]*)"/g;
 
@@ -154,16 +153,25 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
     if ((error as Error).message === UNMEASURABLE_DOCX) throw error;
     // An archive this reader cannot follow otherwise yields no signals, not a failed upload.
   }
+  // Before `mammoth` parses a part: its XML parser takes seconds to minutes over markup that
+  // never closes, or over more XML than a resume holds, and a CLI or a server reading in-process
+  // cannot stop it.
+  checkParsedXml(data);
   const mammoth = await optional(() => import("mammoth"), "mammoth");
   // Through HTML rather than mammoth's raw text: Word keeps bullets as list numbering, not as
   // characters, and the raw text drops them, which read every bulleted DOCX resume as prose.
   // Images become empty tags instead of the embedded base64 mammoth writes by default.
+  // A style map the file carries (`mammoth/style-map`) is not applied: it can drop paragraphs
+  // an ATS reads, and its rules are matched against every paragraph unchecked.
   // A malformed file fails inside mammoth with whatever its parser hit — "Cannot read properties
   // of null" — which says nothing to the person who uploaded it.
   const { value: html } = await mammoth
     .convertToHtml(
       { buffer: Buffer.from(data) },
-      { convertImage: mammoth.images.imgElement(async () => ({ src: "" })) },
+      {
+        convertImage: mammoth.images.imgElement(async () => ({ src: "" })),
+        includeEmbeddedStyleMap: false,
+      },
     )
     .catch((cause: unknown) => {
       throw new Error(UNREADABLE_DOCX, { cause });

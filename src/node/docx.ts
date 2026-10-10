@@ -445,17 +445,23 @@ const relationshipsOf = (path: string) => {
 const HEADER_OR_FOOTER = /^word\/(?:header|footer)\d*\.xml$/;
 
 /**
- * The parts `mammoth` 1.x's `docx-reader` reads, and how many times it reads each: its main
- * document — the package's `officeDocument` relationship, else `word/document.xml` — that
- * document's relationships (twice), its styles, numbering, notes and comments as those name them,
- * and the relationships of the notes and comments. A relationship may name any part, the main
- * document itself included, and each read inflates it again. Null where a relationships file
- * cannot be read.
+ * The parts `mammoth` 1.x's `docx-reader` reads, and how many times it reads each: its content
+ * types, its main document — the package's `officeDocument` relationship, else
+ * `word/document.xml` — that document's relationships (twice), its styles, numbering, notes and
+ * comments as those name them, and the relationships of the notes and comments. A relationship
+ * may name any part, the main document itself included, and each read inflates it again. Null
+ * where a relationships file cannot be read.
  */
 function mammothParts(files: Map<string, ZipEntry>) {
   const exists = (path: string) => files.get(path)?.dir === false;
   const reads = new Map<string, number>();
-  const read = (path: string) => reads.set(path, (reads.get(path) ?? 0) + 1);
+  // The reads `mammoth` parses as XML: all but the embedded chunks, headers and footers.
+  const parsed = new Map<string, number>();
+  const read = (path: string, xml = true) => {
+    reads.set(path, (reads.get(path) ?? 0) + 1);
+    if (xml) parsed.set(path, (parsed.get(path) ?? 0) + 1);
+  };
+  read("[Content_Types].xml");
   const relationships = (path: string) => {
     read(path);
     if (!exists(path)) return new Map<string, string[]>();
@@ -470,7 +476,7 @@ function mammothParts(files: Map<string, ZipEntry>) {
   const packageRelationships = relationships("_rels/.rels");
   if (!packageRelationships) return null;
   const main = find(packageRelationships, "officeDocument", "", "word/document.xml");
-  if (!exists(main)) return { main, reads, styles: null, chunks: [], comments: null };
+  if (!exists(main)) return { main, reads, parsed, styles: null, chunks: [], comments: null };
   const related = relationships(relationshipsOf(main));
   if (!related) return null;
   const [base] = splitPath(main);
@@ -488,11 +494,12 @@ function mammothParts(files: Map<string, ZipEntry>) {
   const chunks = (related.get(`${RELATIONSHIP_TYPE}aFChunk`) ?? [])
     .map((target) => joinPath(base!, target).replace(/^\//, ""))
     .filter(exists);
-  for (const chunk of chunks) read(chunk);
-  for (const key of files.keys()) if (HEADER_OR_FOOTER.test(key)) read(key);
+  for (const chunk of chunks) read(chunk, false);
+  for (const key of files.keys()) if (HEADER_OR_FOOTER.test(key)) read(key, false);
   return {
     main,
     reads,
+    parsed,
     styles: exists(styles) ? styles : null,
     chunks,
     comments: exists(comments) ? comments : null,
@@ -525,6 +532,111 @@ export function withinExpansionLimit(data: Uint8Array): boolean {
     left -= content.length * reads;
   }
   return true;
+}
+
+/**
+ * The most XML `mammoth` is given to parse: every part it parses, each charged as often as it
+ * parses it. Its parser takes up to about a second a megabyte on dense markup — a tag or a line
+ * every few bytes — so this keeps the worst accepted document near two seconds. Word's own
+ * templates hold under 600 KB, their resumes under 120 KB, most of it the styles part.
+ */
+const MAX_PARSED_XML_BYTES = 2 * 1024 * 1024;
+
+/**
+ * The most the parts `mammoth` parses may hold, between them, of each of:
+ * - comments, processing instructions and CDATA sections. Word writes one processing instruction
+ *   a part (the `<?xml ?>` declaration) and none of the others; closed, each costs the parser
+ *   little, so this only bounds what no writer produces;
+ * - distinct elements (a name in a namespace), and style, break, symbol and content-type tags
+ *   whose values `mammoth` puts in a warning. It merges its warnings pairwise, so N distinct ones
+ *   cost N²: 10,000 took twelve seconds. Word's templates hold under 300.
+ */
+const MAX_MARKUP = 1_000;
+
+/**
+ * The tags whose values reach a `mammoth` warning, by local name, with or without a prefix: a
+ * style it does not know (`pStyle`, `rStyle`, `tblStyle`), a break or symbol it does not know,
+ * an image's content type (`Default`, `Override`).
+ */
+const NAMED_TAG = /(?:^|:)(?:[A-Za-z]*Style|br|sym|Default|Override)$/;
+
+/**
+ * What a DOCX upload that is not one, or not one to give `mammoth`, fails with; where `mammoth`
+ * fails, its own error is kept as the cause.
+ */
+export const UNREADABLE_DOCX = "The document could not be read as DOCX.";
+
+/**
+ * Refuses a document before `mammoth` parses any of it: with `UNREADABLE_DOCX` where its XML
+ * parser (`@xmldom/xmldom` 0.8) would not read every part in time linear in it, or its warnings
+ * would cost their square; as too long past `MAX_PARSED_XML_BYTES`. Every part it parses is
+ * read: content types, relationships, styles, numbering, notes, comments and the document. Run
+ * after `withinExpansionLimit`, within which every part inflated.
+ *
+ * The parser goes back to the end of the part for each comment, processing instruction or CDATA
+ * section that never closes, so a 1.4 KB file of `<!--` held it for two minutes. A `<` that
+ * starts no tag, or a tag cut short, is an error that costs it tens of microseconds each, and a
+ * document type declaration no OOXML part may hold. Each is an error `mammoth` then refuses the
+ * document for, or markup no writer produces. So is a prefix bound, within a part, to a second
+ * namespace: refused, each prefix names one namespace, and an element is counted once by its
+ * name in it. Each tag is matched by `RELS_TAG`, which stops at the next `<`: linear, each step
+ * starting where the last ended.
+ */
+export function checkParsedXml(data: Uint8Array): void {
+  const files = zipFiles(data);
+  const seen = new Set<string>();
+  let markup = 0;
+  let left = MAX_PARSED_XML_BYTES;
+  const readable = (xml: string) => {
+    // Each prefix's namespace in this part ("" the default one).
+    const namespaces = new Map<string, string>();
+    for (let at = xml.indexOf("<"); at >= 0; at = xml.indexOf("<", at)) {
+      const open = xml.startsWith("<!--", at)
+        ? "<!--"
+        : xml.startsWith("<![CDATA[", at)
+          ? "<![CDATA["
+          : xml.startsWith("<?", at)
+            ? "<?"
+            : "";
+      if (open) {
+        at = xml.indexOf(MARKUP_CLOSE.get(open)!, at + open.length);
+        if (at < 0 || ++markup > MAX_MARKUP) return false;
+        continue;
+      }
+      RELS_TAG.lastIndex = at;
+      const tag = RELS_TAG.exec(xml);
+      const [whole, closing, name, attrs, selfClosing] = tag ?? [];
+      if (!tag || name![0] === "!" || (closing && attrs! + selfClosing)) return false;
+      at = RELS_TAG.lastIndex;
+      if (closing) continue;
+      for (const [, key, double, single] of attrs!.matchAll(RELS_ATTR)) {
+        if (key !== "xmlns" && !key!.startsWith("xmlns:")) continue;
+        const prefix = key!.slice(6);
+        const uri = double ?? single!;
+        if ((namespaces.get(prefix) ?? uri) !== uri) return false;
+        namespaces.set(prefix, uri);
+      }
+      // `mammoth` names an element it does not know by its namespace and local name.
+      const colon = name!.indexOf(":");
+      const prefix = name!.slice(0, Math.max(colon, 0));
+      seen.add(`${namespaces.get(prefix) ?? prefix} ${name!.slice(colon + 1)}`);
+      if (NAMED_TAG.test(name!)) seen.add(whole!);
+      if (seen.size > MAX_MARKUP) return false;
+    }
+    return true;
+  };
+  for (const [path, reads] of (files && mammothParts(files))?.parsed ?? []) {
+    const entry = files!.get(path);
+    if (entry?.dir !== false) continue;
+    const content = inflate(entry, Math.floor(left / reads));
+    if (!content)
+      throw new Error(
+        `The document's XML expands to more than ${MAX_PARSED_XML_BYTES >> 20} MB, more than this reader takes.`,
+      );
+    left -= content.length * reads;
+    // Decoded as `mammoth` decodes it; a byte-order mark is no `<`.
+    if (!readable(content.toString())) throw new Error(UNREADABLE_DOCX);
+  }
 }
 
 function luminance(hex: string) {

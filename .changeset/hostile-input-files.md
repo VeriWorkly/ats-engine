@@ -1,0 +1,6 @@
+---
+"@veriworkly/ats-engine": patch
+"@veriworkly/ats-engine-mcp": patch
+---
+
+A DOCX whose XML would keep `mammoth`'s parser busy for seconds or minutes is now refused before `mammoth` parses any of it: a 1.4 KB file of unclosed comments (`<!--` repeated) held `extractResume`, the CLI and the MCP server for two minutes. Refused with "The document could not be read as DOCX.": a comment, processing instruction or CDATA section that never closes in any part `mammoth` parses (the document, styles, numbering, notes, comments, relationships, content types), more than 1,000 of them, a document type declaration, a `<` that starts no well-formed tag, a namespace prefix bound to a second namespace within a part, and more than 1,000 distinct elements and style, break, symbol or content-type tags, which `mammoth` would each warn about. A document holding more than 2 MB of that XML is refused with "The document's XML expands to more than 2 MB, more than this reader takes." Word's own templates hold under 600 KB and its resume templates under 120 KB. A style map embedded in the file (`mammoth/style-map`) is no longer applied: it could drop every paragraph (`p => !`), and 200,000 rules took over five minutes.
