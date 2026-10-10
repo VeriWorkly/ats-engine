@@ -1,5 +1,6 @@
-import { readFile, stat } from "node:fs/promises";
-import { basename, extname } from "node:path";
+import { constants, type Stats } from "node:fs";
+import { open, stat } from "node:fs/promises";
+import { basename, extname, resolve } from "node:path";
 
 import { isJsonResume, isResumeDocument } from "../document/index.js";
 import type { AtsResumeInput } from "../input.js";
@@ -29,19 +30,55 @@ export type AtsReadFileOptions = {
   maxBytes?: number;
 };
 
-/** A file's bytes, with the usual mistakes — no such file, a folder, too large — named plainly. */
+/** The folder, the pipe or device, and the file over the limit, refused with their reasons. */
+function checkFile(info: Stats, path: string, maxBytes: number) {
+  if (info.isDirectory()) throw new AtsFileError(`${path} is a folder, not a file.`);
+  if (!info.isFile()) throw new AtsFileError(`${path} is not a regular file.`);
+  if (info.size > maxBytes)
+    throw new AtsFileError(
+      `${path} is ${size(info.size)}; files over ${size(maxBytes)} are not read.`,
+    );
+}
+
+/**
+ * A file's bytes, with the usual mistakes — no such file, a folder, too large — named plainly.
+ * Only a regular file on this computer is read: a network share would be read over the network,
+ * and a pipe or a device reports no size and can stream without end. Read through one handle, at
+ * most one byte past the limit, so a file that grows after it was measured is still refused.
+ */
 export async function readFileBytes(
   path: string,
   { maxBytes = MAX_FILE_BYTES }: AtsReadFileOptions = {},
 ): Promise<Buffer> {
+  // A path that starts with two slashes names another computer (`\\host\share`, `//host/share`,
+  // `\\?\UNC\…`) or a device (`\\.\pipe\…`, `\\?\GLOBALROOT\…`), except the long form of a local
+  // path, `\\?\C:\…`. Checked as given and as resolved: on Windows a relative path resolves onto
+  // a share when the working folder is one. Only the path's form is read: a mapped drive letter,
+  // a link to a share or a network mount looks local and is read over the network.
+  if ([path, resolve(path)].some((form) => /^[\\/]{2}(?!\?\\[A-Za-z]:\\)/.test(form)))
+    throw new AtsFileError(`${path} is a network share or a device, not a file on this computer.`);
   try {
-    const info = await stat(path);
-    if (info.isDirectory()) throw new AtsFileError(`${path} is a folder, not a file.`);
-    if (info.size > maxBytes)
-      throw new AtsFileError(
-        `${path} is ${size(info.size)}; files over ${size(maxBytes)} are not read.`,
-      );
-    return await readFile(path);
+    // Measured before it is opened: opening a device can act on it (a watchdog arms, a tape
+    // rewinds) or wait.
+    checkFile(await stat(path), path, maxBytes);
+    // Read-only (`O_RDONLY` is 0) and without blocking: opening a FIFO otherwise waits for a
+    // writer. Windows has no such flag, and no FIFOs.
+    const handle = await open(path, constants.O_NONBLOCK ?? "r");
+    try {
+      // The handle's file is the one measured and read, whatever the path names meanwhile.
+      const info = await handle.stat();
+      checkFile(info, path, maxBytes);
+      const chunks: Buffer[] = [];
+      for await (const chunk of handle.createReadStream({ end: maxBytes, autoClose: false }))
+        chunks.push(chunk as Buffer);
+      const data = Buffer.concat(chunks);
+      // At the size read: a file that grew past the limit after it was measured is refused too.
+      info.size = data.length;
+      checkFile(info, path, maxBytes);
+      return data;
+    } finally {
+      await handle.close();
+    }
   } catch (error) {
     const code = (error as { code?: string }).code;
     if (code === "ENOENT") throw new AtsFileError(`No such file: ${path}`);

@@ -96,7 +96,8 @@ and the hand-written one per field and fails on any miss `bench/baseline.json` d
 count is tested by the count (`tests/node/visibility-budget.test.ts`), not the clock.
 
 `node/files` reads a resume or a posting from a path (`readResumeFile`, `readJobFile`) with the
-limits and messages the CLI and the MCP server share, and says what the file was (`file`: name,
+limits and messages the CLI and the MCP server share — a regular file on this computer only, no
+network path, pipe or device — and says what the file was (`file`: name,
 size, format) for the file advice; `node/docx` counts tracked changes and comments while it
 measures and checks every part `mammoth` will parse before it parses any (`checkParsedXml`), and
 `node/pdf` notes an encrypted PDF that opened without a password. `printable` in

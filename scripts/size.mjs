@@ -34,8 +34,9 @@ const BUDGETS = {
   // with -g or npx, took it from 19.44 to 19.52.
   // 20.5: refusing, before mammoth parses it, a DOCX whose XML its parser would take seconds to
   // minutes over (unclosed markup, malformed tags, a prefix bound to two namespaces, thousands of
-  // distinct warnings, over 2 MB) took it to 20.0. The rest is little room: the next addition
-  // trims or argues for more.
+  // distinct warnings, over 2 MB) took it to 20.0, and reading only a regular local file, measured
+  // before it is opened and read through one bounded handle (no network path, pipe or device), to
+  // 20.2. The rest is little room: the next addition trims or argues for more.
   "./node": 20.5,
 };
 

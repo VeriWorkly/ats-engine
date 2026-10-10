@@ -286,6 +286,17 @@ describe("ats-engine-mcp refuses a bad call with a tool error", () => {
     expect(textOf(result)).toMatch(/Give the job posting: job_path or job_text/);
   });
 
+  // On Windows a UNC path is read over SMB: the server makes no network requests.
+  it.skipIf(process.platform !== "win32")(
+    "match_job with a job file on a network share",
+    async () => {
+      const job_path = String.raw`\\127.0.0.1\C$\Windows\win.ini`;
+      const result = await call("match_job", { path: pdfPath, job_path });
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toMatch(/is a network share or a device, not a file on this computer/);
+    },
+  );
+
   it("explain_rule with an unknown id lists the valid ids", async () => {
     const result = await call("explain_rule", { rule_id: "no-such-rule" });
     expect(result.isError).toBe(true);
