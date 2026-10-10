@@ -1,6 +1,6 @@
 {
   "name": "@veriworkly/ats-engine",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "ATS resume checker and parser: reads a resume (PDF, DOCX, text, JSON Resume) the way an applicant tracking system does, scores it with a published deterministic rubric, and matches it to a job description. Browser- and edge-safe.",
   "keywords": [
     "ats",
