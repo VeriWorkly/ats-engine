@@ -43,6 +43,7 @@ jobs:
   action:
     # The GitHub Action as a workflow uses it, the composite step on each OS, against the engine
     # built from this commit: the version it pins is published only when this commit is released.
+    # The last step is the exception: it runs the latest published engine through npx.
     name: GitHub Action on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -70,6 +71,24 @@ jobs:
           SCORE: ${{ steps.check.outputs.score }}
           REPORT: ${{ steps.check.outputs.report }}
         run: test "$SCORE" -ge 1 && test -f "$REPORT"
+      # The path a user's workflow takes: npx, the latest published engine, and the PDF reader it
+      # must install itself. The version is looked up, not read from action.yml, because a release
+      # pull request raises that pin before the version is on npm. No ATS_ENGINE_CLI, so a
+      # missing peer fails here. The PDF is the test resume, written by tests/fixtures/buildPdf.ts.
+      - name: PDF resume through npx
+        shell: bash
+        env:
+          PDF: ${{ runner.temp }}/resume.pdf
+        run: |
+          node --import tsx --input-type=module -e '
+          import { readFileSync, writeFileSync } from "node:fs";
+          import { buildPdf, text } from "./tests/fixtures/buildPdf.ts";
+          const lines = readFileSync("action/test/resume.md", "utf8").match(/[^\n]+/g);
+          const ops = lines.map((line, i) => text(40, 770 - 22 * i, line.replace(/[#*]/g, "")));
+          writeFileSync(process.env.PDF, buildPdf(ops.join("\n")));
+          '
+          version=$(npm view @veriworkly/ats-engine version)
+          ATS_RESUME="$PDF" ATS_VERSION="$version" node action/run.mjs
 
   package:
     name: Bundle size, exports, browser and edge smoke, benchmark

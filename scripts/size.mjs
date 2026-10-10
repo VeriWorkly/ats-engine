@@ -30,7 +30,9 @@ const BUDGETS = {
   // 1.3), and reading a resume or a posting from a path (`readResumeFile`, `readJobFile`, shared
   // by the CLI and the MCP server, which validate a .json resume with `/document`'s guards, 1.6),
   // took it to 18.9 (0.2).
-  "./node": 19.5,
+  // 19.6: the missing-reader message naming the command that installs the readers, and how
+  // with -g or npx, took it from 19.44 to 19.52.
+  "./node": 19.6,
 };
 
 let failed = false;

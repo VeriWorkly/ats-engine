@@ -33,7 +33,7 @@ npm install @veriworkly/ats-engine
 To read PDF and DOCX files on Node, also install the optional peer dependencies:
 
 ```sh
-npm install pdf-parse pdfjs-dist@5.4.296 mammoth
+npm install pdf-parse@2 pdfjs-dist@5.4.296 mammoth
 ```
 
 The core runs on Node 22.12 or later and in any modern browser or edge runtime.
@@ -42,11 +42,14 @@ The package is ESM only. From CommonJS on Node 22.12 or later, `require("@veriwo
 
 ## Quick start
 
-Score a file from the command line without writing any code:
+Score a file from the command line without writing any code. PDF and DOCX files need the optional readers, which `npx` does not install on its own, so install them once with the CLI:
 
 ```sh
-npx @veriworkly/ats-engine check resume.pdf --job posting.txt
+npm install -g @veriworkly/ats-engine pdf-parse@2 pdfjs-dist@5.4.296 mammoth
+ats-engine check resume.pdf --job posting.txt
 ```
+
+For a one-off run without installing, name the readers to `npx`: `npx -p @veriworkly/ats-engine -p pdf-parse@2 -p pdfjs-dist@5.4.296 -p mammoth ats-engine check resume.pdf`. A `.txt`, `.md`, `.html` or `.json` resume needs none of them: `npx @veriworkly/ats-engine check resume.md`.
 
 ```text
 Readiness  97/100 (good) — 32/35 checks passed
@@ -115,10 +118,10 @@ Add `--ai` to have a model explain the report and suggest what to fix first. The
 ```sh
 # macOS and Linux (PowerShell: $env:GEMINI_API_KEY = "...")
 export GEMINI_API_KEY=...
-npx @veriworkly/ats-engine check resume.pdf --ai --provider gemini --model <model-id>
+ats-engine check resume.pdf --ai --provider gemini --model <model-id>
 
 # Ollama on your own machine needs no key, and the resume never leaves it
-npx @veriworkly/ats-engine check resume.pdf --ai --provider ollama --model llama3.1
+ats-engine check resume.pdf --ai --provider ollama --model llama3.1
 ```
 
 | Option              | What it does                                                                                                               |
