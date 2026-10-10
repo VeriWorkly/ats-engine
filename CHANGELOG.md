@@ -3,6 +3,20 @@
 Release notes are generated from `.changeset/` by `changeset version`. See
 [.changeset/README.md](.changeset/README.md) for what counts as breaking.
 
+## 0.5.1
+
+### Patch Changes
+
+- dcff044: The AI tasks keep the API key and the candidate's details where they belong.
+
+  - **Redirects are never followed.** The `anthropic` and `openAiCompatible` adapters followed an HTTP redirect from the provider's address, and `fetch` keeps the `x-api-key` header on a redirect to another origin while a 307 resends the body: a base URL that answered with a redirect handed the key and the resume to the address it named. The adapters now call `fetch` with `redirect: "manual"` (a `fetch` you pass in receives it in `init.redirect` and must pass it on) and refuse a response that is a redirect — a 3xx, a browser's opaque redirect, or one `fetch` reached by following a redirect regardless (`FetchResponseLike` gains optional `redirected` and `type`) — failing the call, without a retry, with "The provider at <origin> answered with a redirect (HTTP 307), which is never followed…".
+  - **`analyze` redacts more of the forms the name, phone and email are written in.** The report's `advice` is no longer sent: it quotes the file name, so "Jane_Doe_Resume_final_v3 (2).pdf" and its suggested "Jane-Doe-Resume.pdf" went to the provider though the name was redacted everywhere else. The candidate's phone is now caught by its national number, with an extension glued on ("415-555-0132x123"): "+44 20 7946 0958" read from the header no longer leaves "020 7946 0958", "(020) 7946-0958", "0044 20 7946 0958" or "020–7946–0958" (an en or em dash) in the text sent. An email address at a domain in another script ("jane@exämple.de") is redacted too. Still sent: the name as initials ("J. Doe") or a first name alone, a handle written another way ("jane_doe"), other phone numbers, and postal addresses; SECURITY.md lists what is covered. The analysis itself is unchanged; `advice` was never scored.
+  - A provider's error body is quoted in the error without the credentials a proxy may echo back: the request's own key (eight characters or more), a `Bearer …` token, keys in the usual forms of OpenAI and Anthropic (`sk-…`, `sk-ant-…`), Google (`AIza…`), Groq (`gsk_…`), Hugging Face (`hf_…`), xAI (`xai-…`), Replicate (`r8_…`) and Together (`tgp_v1_…`), and the string value of a JSON member named like a key, token, secret or authorization (`"api_key": "…"`) read "[redacted]".
+  - **`analyze` finds web addresses to redact in linear time, and sends at most 50,000 characters of the resume**, as much as the engine reads, cut after redaction so a phone or an email the cut falls in is not sent in part. Looking for an address built from the candidate's name took 1.5 seconds on 50,000 letters and 50 seconds on 150,000, which a library caller could pass since `analyze` did not cut the text.
+  - `fabricatedNumbers` (and so `runAiEval`'s `fabricatedNumberRate`, from `/ai/testing`) no longer counts an ISO date's year and month ("2019-03") when the source states that month of that year ("Mar 2019", "March 2019", "03/2019"): conversion writes dates that way, and the "03" was flagged as made up. A year alone, or another month of it, still leaves the month counted. An `AiEvalCase`'s `source` is documented as everything the task is given; for `analyze` that includes the report as sent, whose scores and word count a model quotes.
+
+- 7f1903f: A resume of many short lines is read up to ten times faster. Each line's dates are now looked for once per `check` (and per `parseResume`), not once by each reader of the line, and a line without two digits in a row, which holds no date, is not searched at all. 50 KB of "1" on 25,000 lines took 1.4 to 3 seconds to check, as name, bullet and posting at once with every locale pack; it now takes about 150 ms. Reports are unchanged.
+
 ## 0.5.0
 
 ### Minor Changes
