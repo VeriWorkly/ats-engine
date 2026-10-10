@@ -181,7 +181,15 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
     );
     if (own.length > 1 && own[0] === parts[titleIndex] && other && named(other.join(" "))) end = at;
   } else {
-    const found = parts.findIndex((part, at) => at > titleIndex && named(part));
+    // A name, capitalised, and not the start of a place: "an Alphabet company" describes the
+    // employer before it, and "Bank Street, NY" is where.
+    const found = parts.findIndex(
+      (part, at) =>
+        at > titleIndex &&
+        named(part) &&
+        /^\p{Lu}/u.test(part) &&
+        !isPlace(parts.slice(at).join(", "), policy),
+    );
     // A legal form on its own ("Acme, Inc.") is the end of the part before it.
     end = found - +!/[\p{L}\p{N}]/u.test(parts[found]?.replace(organisations, "") ?? "x");
     if (end < titleIndex + 2) end = -1;

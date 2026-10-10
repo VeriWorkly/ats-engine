@@ -207,6 +207,13 @@ describe("a comma inside the title", () => {
     ["Software Engineer, Acme | Berlin, Germany", "Software Engineer", "Acme, Berlin, Germany"],
     // Without a company's legal form after it, a third part is where.
     ["Software Engineer, Acme, Berlin", "Software Engineer", "Acme, Berlin"],
+    // A description of the employer is not an employer of its own, nor a street named for one.
+    [
+      "Software Engineer, Waymo, an Alphabet company",
+      "Software Engineer",
+      "Waymo, an Alphabet company",
+    ],
+    ["Software Engineer, Acme, Bank Street, NY", "Software Engineer", "Acme"],
   ])("still reads the employer after the comma in %j", (header, title, employer) => {
     expect(roleOf(header)).toMatchObject({ title, employer });
   });
