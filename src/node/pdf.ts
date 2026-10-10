@@ -18,8 +18,12 @@ const MAX_PAGES_MEASURED = 6;
 const MAX_VISIBILITY_PAGES = 60;
 /** Fewer text characters than this on a page with an image, and the page is a picture. */
 const MIN_PAGE_TEXT = 20;
-/** Fewer than this over an image across most of the page, and the page is a picture. */
-const STAMP_TEXT = 200;
+/**
+ * Fewer than this over an image across most of the page, and the page is a picture: a scanner's
+ * one-line stamp ("Scanned with CamScanner"), not two short sections on a designed template's
+ * background.
+ */
+const STAMP_TEXT = 40;
 /** Points a side (about 0.7in) an image must reach to count as a photo. */
 const PHOTO_MIN = 50;
 

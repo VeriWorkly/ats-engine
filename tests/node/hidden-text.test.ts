@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
 import { extractResume } from "../../src/node/index.js";
-import { buildPdf } from "../fixtures/buildPdf.js";
+import { buildPdf, buildPdfPages } from "../fixtures/buildPdf.js";
 import { expectFastAsync } from "../fixtures/timing.js";
 
 /**
@@ -135,6 +135,24 @@ describe("a scan with a small text stamp", () => {
       buildPdf(
         [IMAGE(0, 0, 612, 792), ...[0, 1, 2, 3].map((at) => line(700 - 20 * at, body))].join("\n"),
       ),
+      "pdf",
+    );
+    expect(layout?.imageOnlyPages).toBe(0);
+  });
+
+  it("is not a picture when a designed template's short last page sits on its background", async () => {
+    // A background picture across every page, and a second page of two short sections.
+    const background = IMAGE(0, 0, 612, 792);
+    const first = [background, ...Array.from({ length: 20 }, (_, at) => line(700 - 14 * at))];
+    const second = [
+      background,
+      line(740, "SKILLS", 12),
+      line(722, "TypeScript, Go, PostgreSQL, Kubernetes, Terraform, AWS, Docker"),
+      line(690, "EDUCATION", 12),
+      line(672, "B.S. Computer Science, Ohio State University, 2016"),
+    ];
+    const { layout } = await extractResume(
+      buildPdfPages([first.join("\n"), second.join("\n")]),
       "pdf",
     );
     expect(layout?.imageOnlyPages).toBe(0);
