@@ -80,24 +80,21 @@ export const keywordMatchSchema = z
         // "market".
         { suffix: "accounting", minLength: 0, replacement: "accounting" },
         { suffix: "marketing", minLength: 0, replacement: "marketing" },
-        // A framework named for its script is the framework: "Vue.js" is "Vue", "Next.js"
-        // "Next"; the "s" rule below left "vue.j". "three.js" keeps its name: "three" alone is
-        // a number word.
-        { suffix: "three.js", minLength: 0, replacement: "three.js" },
-        { suffix: ".js", minLength: 3, replacement: "" },
+        // A name with ".js" is kept whole; the "s" rule below left "vue.j". It is not folded onto
+        // its plain word: "Next.js" is no "next release", "Express.js" no "expressed concerns".
+        // `synonyms` name the ones whose plain name is the framework ("Vue").
+        { suffix: ".js", minLength: 0, replacement: ".js" },
         // British spellings fold with American ones, each as its whole family: "modelling" and
         // "modeling", "optimisation" and "optimization", "analysed" and "analyzed", "behaviours"
         // and "behaviors". Every "-ise" word folds so, its own forms with it ("enterprise",
         // "enterprises"); "-lling" only after the letters no one-syllable "-ell" word ends in,
-        // so "selling" stays "sell".
+        // so "selling" stays "sell", and not after "c", or "excelled" would be "Excel".
         { suffix: "delling", minLength: 0, replacement: "del" },
         { suffix: "delled", minLength: 0, replacement: "del" },
         { suffix: "belling", minLength: 0, replacement: "bel" },
         { suffix: "belled", minLength: 0, replacement: "bel" },
         { suffix: "velling", minLength: 0, replacement: "vel" },
         { suffix: "velled", minLength: 0, replacement: "vel" },
-        { suffix: "celling", minLength: 0, replacement: "cel" },
-        { suffix: "celled", minLength: 0, replacement: "cel" },
         { suffix: "isations", minLength: 0, replacement: "ization" },
         { suffix: "isation", minLength: 0, replacement: "ization" },
         { suffix: "isers", minLength: 5, replacement: "izer" },
@@ -136,11 +133,11 @@ export const keywordMatchSchema = z
         { suffix: "us", minLength: 2, replacement: "u" },
         { suffix: "ases", minLength: 4, replacement: "as" },
         { suffix: "ase", minLength: 3, replacement: "as" },
-        // Greek plurals in "-es" for "-is": "analysis" and "analyses" both to "analys". Only
-        // the endings that are always such a pair: a general "-ses" rule would part "response"
-        // from "responses", and "-oses" would part "close" from "closes".
-        { suffix: "ysis", minLength: 5, replacement: "ys" },
-        { suffix: "yses", minLength: 5, replacement: "ys" },
+        // Greek plurals in "-es" for "-is": "analysis" and "analyses" both to "analyz", as
+        // "analyse" and "analyze" are. Only the endings that are always such a pair: a general
+        // "-ses" rule would part "response" from "responses", and "-oses" "close" from "closes".
+        { suffix: "ysis", minLength: 5, replacement: "yz" },
+        { suffix: "yses", minLength: 5, replacement: "yz" },
         { suffix: "thesis", minLength: 6, replacement: "thes" },
         { suffix: "theses", minLength: 6, replacement: "thes" },
         { suffix: "gnosis", minLength: 6, replacement: "gnos" },

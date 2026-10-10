@@ -210,8 +210,8 @@ export const DEFAULT_KEYWORD_MATCH = {
     node: "node.js",
     reactjs: "react",
     "react.js": "react",
-    // ".js" folds away in `stemming`; these name the frameworks as skills, as "next" and
-    // "express", ordinary words, are not.
+    // A ".js" name whose plain name is the framework; "Next.js" and "Express.js" stay whole, as
+    // "next" and "express" are ordinary words.
     "vue.js": "vue",
     "nuxt.js": "nuxt",
     // AngularJS, not Angular, its successor.

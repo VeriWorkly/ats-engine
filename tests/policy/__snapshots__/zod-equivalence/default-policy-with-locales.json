@@ -836,14 +836,9 @@
         "replacement": "marketing"
       },
       {
-        "suffix": "three.js",
-        "minLength": 0,
-        "replacement": "three.js"
-      },
-      {
         "suffix": ".js",
-        "minLength": 3,
-        "replacement": ""
+        "minLength": 0,
+        "replacement": ".js"
       },
       {
         "suffix": "delling",
@@ -874,16 +869,6 @@
         "suffix": "velled",
         "minLength": 0,
         "replacement": "vel"
-      },
-      {
-        "suffix": "celling",
-        "minLength": 0,
-        "replacement": "cel"
-      },
-      {
-        "suffix": "celled",
-        "minLength": 0,
-        "replacement": "cel"
       },
       {
         "suffix": "isations",
@@ -1028,12 +1013,12 @@
       {
         "suffix": "ysis",
         "minLength": 5,
-        "replacement": "ys"
+        "replacement": "yz"
       },
       {
         "suffix": "yses",
         "minLength": 5,
-        "replacement": "ys"
+        "replacement": "yz"
       },
       {
         "suffix": "thesis",

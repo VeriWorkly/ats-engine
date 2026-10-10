@@ -88,9 +88,7 @@ describe("a framework's .js name and a British spelling meet their other forms",
 
   it.each([
     ["vue.js", "vue"],
-    ["next.js", "next"],
     ["nuxt.js", "nuxt"],
-    ["express.js", "express"],
     ["node.js", "node", "nodejs"],
     ["react.js", "react", "reactjs"],
     ["angular.js", "angularjs"],
@@ -103,6 +101,7 @@ describe("a framework's .js name and a British spelling meet their other forms",
     ["organisation", "organization", "organisations", "organizations"],
     ["organiser", "organizer", "organisers"],
     ["analyse", "analyze", "analysed", "analyzed", "analysing", "analyzing", "analyzes"],
+    ["analysis", "analyses", "analyse", "analysed", "analyze", "analyzed"],
     ["behaviour", "behavior", "behaviours", "behaviors"],
     ["behavioural", "behavioral"],
     ["colour", "color", "colours"],
@@ -112,6 +111,13 @@ describe("a framework's .js name and a British spelling meet their other forms",
 
   it.each([
     ["angular.js", "angular"],
+    // ".js" names an ordinary word too: "the next release", "expressed concerns".
+    ["next.js", "next"],
+    ["express.js", "expressed"],
+    ["solid.js", "solid"],
+    ["tensorflow.js", "tensorflow"],
+    ["excel", "excelled"],
+    ["excel", "excelling"],
     ["hour", "hor"],
     ["sell", "sel"],
   ])("keeps %s apart from %s", (a, b) => {
@@ -133,12 +139,30 @@ describe("a framework's .js name and a British spelling meet their other forms",
     expect(canonical("three.js")).not.toBeNull();
   });
 
-  it("meets Vue, Next, full stack and modeling in either spelling", () => {
+  it("does not meet Next.js with the next release, nor Advanced Excel with excelled", () => {
+    const report = check(
+      `Kai Moreno
+kai@example.com
+Experience
+Frontend Engineer, Bluebird
+Jan 2020 - Present
+- Planned the next release for 3 clients
+- Excelled at stakeholder management`,
+      DEFAULT_POLICY,
+      {
+        now: new Date("2026-10-01T00:00:00Z"),
+        jobDescription: "Requirements\n- Next.js\n- Advanced Excel",
+      },
+    );
+    expect(report.requirements.map((r) => r.status)).toEqual(["missing", "missing"]);
+  });
+
+  it("meets Vue, Next.js, full stack and modeling in either spelling", () => {
     const resume = (skills: string) =>
       `Kai Moreno\nkai@example.com\nExperience\nFrontend Engineer, Bluebird\nJan 2020 - Present\n- Built apps for 3 clients\nSkills\n${skills}`;
     for (const [has, asks] of [
-      ["Vue.js, Next.js, full stack, modelling", "Vue, Next, Full-stack, Modeling"],
-      ["Vue, Next, Full-stack, modeling", "Vue.js, Next.js, Full stack, Modelling"],
+      ["Vue.js, Next.js, full stack, modelling", "Vue, Next.js, Full-stack, Modeling"],
+      ["Vue, Next.js, Full-stack, modeling", "Vue.js, Next.js, Full stack, Modelling"],
     ] as const) {
       const report = check(resume(has), DEFAULT_POLICY, {
         now: new Date("2026-10-01T00:00:00Z"),
