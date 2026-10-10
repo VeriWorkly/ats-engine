@@ -92,10 +92,17 @@ function besideEachOther(rows: Iterable<PositionedRun[]>, split: number): boolea
     }
   const [thin, thick] = sides[0]!.mass <= sides[1]!.mass ? sides : [sides[1]!, sides[0]!];
   if (!thin.mass) return true;
-  let within = 0;
-  for (const run of thin.runs)
-    if (run.y! >= thick.top - 1 && run.y! <= thick.bottom + 1) within += run.mass;
-  return within >= thin.mass / 2;
+  // One side's runs between the other's first and last baselines, and their characters.
+  const inside = (side: typeof thin, other: typeof thin) =>
+    side.runs.filter((run) => run.y! >= other.top - 1 && run.y! <= other.bottom + 1);
+  const mass = (runs: PositionedRun[]) => runs.reduce((sum, run) => sum + run.mass, 0);
+  const beside = inside(thin, thick);
+  // Or the thicker side lies within the thinner one's, with more than one run of it beside: a
+  // main column beside a sidebar that runs on below it, under a name across the top.
+  return (
+    mass(beside) >= thin.mass / 2 ||
+    (mass(inside(thick, thin)) >= thick.mass / 2 && beside.length > 1)
+  );
 }
 
 export function findGutter(runs: readonly PositionedRun[], pageWidth: number): Gutter | null {

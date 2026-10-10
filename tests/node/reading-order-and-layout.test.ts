@@ -763,6 +763,66 @@ describe("the new scans stay linear on hostile input", () => {
   });
 });
 
+describe("a sidebar taller than the main column is a column", () => {
+  // The name and headline across the top, a sidebar that runs on below the work history beside
+  // it. Measured from the sidebar's side, under half of its text lay beside the main column, so
+  // no gutter was found: the lines were read across both columns, a role's employer became
+  // "jordan.ellery@example.com, Acme Corp", and the skills were lost.
+  const sidebar = [
+    [700, "CONTACT", 11],
+    [684, "jordan.ellery@example.com", 8],
+    [672, "(415) 555-0132", 8],
+    [660, "Austin, TX", 8],
+    [630, "SKILLS", 11],
+    [614, "TypeScript", 9],
+    [602, "Go", 9],
+    [590, "PostgreSQL", 9],
+    [578, "Kubernetes", 9],
+    [548, "EDUCATION", 11],
+    [532, "B.S. Computer Science", 9],
+    [520, "Ohio State University", 9],
+    [508, "2012 - 2016", 9],
+  ] as const;
+  const main = [at(200, 700, "EXPERIENCE", 11)];
+  let y = 684;
+  for (const [header, dates] of [
+    ["Senior Software Engineer, Acme Corp", "Jan 2020 - Present"],
+    ["Software Engineer, Globex Inc", "Jun 2016 - Dec 2019"],
+  ]) {
+    main.push(at(200, y, header), at(480, y, dates));
+    y -= 13;
+    for (const bullet of [
+      "- Built a billing service handling 2M requests a day",
+      "- Cut cloud spend by 31% moving batch to spot",
+      "- Led migration of 40 services to Kubernetes",
+    ]) {
+      main.push(at(210, y, bullet, 9));
+      y -= 12;
+    }
+    y -= 8;
+  }
+  const ops = [
+    at(45, 750, "Jordan Ellery", 22),
+    at(45, 732, "Senior Software Engineer"),
+    ...sidebar.map(([line, value, size]) => at(40, line, value, size)),
+    ...main,
+  ].join("\n");
+
+  it("reads each column whole and reports the second column", async () => {
+    const { text: extracted, layout } = await pdf(ops);
+    expect(layout?.columnRatio).toBeGreaterThan(0.15);
+    const report = check(extracted, DEFAULT_POLICY, {
+      now: new Date("2026-10-01T00:00:00Z"),
+      layout,
+    });
+    expect(report.parsed.roles.map((role) => [role.title, role.employer])).toEqual([
+      ["Senior Software Engineer", "Acme Corp"],
+      ["Software Engineer", "Globex Inc"],
+    ]);
+    expect(report.parsed.skills).toEqual(["TypeScript", "Go", "PostgreSQL", "Kubernetes"]);
+  });
+});
+
 describe("a centred heading over a short block is not a second column", () => {
   // The last page of a two-page @react-pdf resume, as pdf.js reports it: a centred "SKILLS"
   // heading, then four short lines at the left margin, each a bold label, a colon and values.
@@ -810,5 +870,12 @@ describe("a centred heading over a short block is not a second column", () => {
     expect(report.parsed.skills).toEqual(
       expect.arrayContaining(["TypeScript", "React", "PostgreSQL", "System Design"]),
     );
+  });
+
+  it("is not a column with a centred footer under the block either", () => {
+    const withFooter = [...lastPage, item("Page 2 of 2", 9, 276, 40, 45)];
+    const { text: extracted, columns } = pageText(withFooter, (x, y) => [x, 841.5 - y], 595.5);
+    expect(extracted.split("\n")[0]).toBe("SKILLS");
+    expect(columns).toBe(0);
   });
 });
