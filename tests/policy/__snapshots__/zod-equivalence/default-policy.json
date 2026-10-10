@@ -1641,13 +1641,13 @@
   },
   "resumeParse": {
     "sections": {
-      "experience": "^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment)\\s+)?(?:experience|employment|history)|^internships?|^academic\\s+(?:appointments|positions)|^professional\\s+background",
+      "experience": "^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment|selected|additional|other|military|freelance)\\s+)?(?:experience|employment|history)|^internships?|^academic\\s+(?:appointments|positions)|^professional\\s+background",
       "education": "^educational\\s+(?:background|qualifications?|history|details)|^education|^academic\\s+(?:background|qualifications?|history|record|credentials)",
-      "skills": "^(?:(?:technical|core|key|top)\\s+)?skills|^technologies|^core\\s+competenc(?:y|ies)|^areas\\s+of\\s+expertise",
-      "projects": "^projects",
+      "skills": "^(?:(?:technical|core|key|top)\\s+)?skills|^technologies|^core\\s+competenc(?:y|ies)|^areas\\s+of\\s+expertise|^technical\\s+proficienc(?:y|ies)|^tech(?:nology)?\\s+stack|^tools",
+      "projects": "^(?:(?:personal|academic|side|selected|key)\\s+)?projects|^open[\\s-]source(?:\\s+(?:projects|contributions))?",
       "certifications": "^(?:(?:professional\\s+)?certifications?|certificates|licen[cs]es?|licensure|credentials)",
       "languages": "^(?:(?:spoken|foreign)\\s+)?languages|^language\\s+(?:skills|proficienc(?:y|ies)|competenc(?:y|ies))",
-      "other": "^(?:summary|objective|profile|awards?|publications?|interests|volunteering|references|links|online\\s+profiles?|achievements|hobbies|contact(?:\\s+(?:details|information|info))?|personal\\s+(?:details|information|data)|honou?rs|grants|funding|fellowships|patents|presentations|invited\\s+talks|talks|conferences|memberships|affiliations|professional\\s+(?:affiliations|memberships|service|development)|editorial\\s+(?:boards?|service|activities)|board\\s+(?:memberships|positions|service|seats)|boards|courses(?:\\s+taught)?|coursework|relevant\\s+coursework|training|activities|extra[\\s-]?curricular(?:\\s+activities)?|declaration)"
+      "other": "^(?:(?:summary\\s+of\\s+)?qualifications|(?:(?:professional|career|executive)\\s+)?summary|accomplishments|leadership|objective|profile|awards?|publications?|interests|volunteer(?:ing|\\s+(?:experience|work))?|references|links|online\\s+profiles?|achievements|hobbies|contact(?:\\s+(?:details|information|info))?|personal\\s+(?:details|information|data)|honou?rs|grants|funding|fellowships|patents|presentations|invited\\s+talks|talks|conferences|memberships|affiliations|professional\\s+(?:affiliations|memberships|service|development)|editorial\\s+(?:boards?|service|activities)|board\\s+(?:memberships|positions|service|seats)|boards|courses(?:\\s+taught)?|coursework|relevant\\s+coursework|training|activities|extra[\\s-]?curricular(?:\\s+activities)?|declaration)"
     },
     "languageLevels": {
       "native\\s+or\\s+bilingual(?:\\s+proficiency)?": "C2",

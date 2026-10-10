@@ -81,6 +81,75 @@ describe("experience and skills headings beyond software's", () => {
     },
   );
 
+  const kindAt = (heading: string) =>
+    segmentResume(
+      ["Jane Doe", "Education", "BS Biology, State University, 2018", heading, "x"],
+      DEFAULT_POLICY,
+    ).at(-1);
+
+  it.each([
+    ["Selected Experience", "experience"],
+    ["Additional Experience", "experience"],
+    ["Military Experience", "experience"],
+    ["Freelance Experience", "experience"],
+    ["Technical Proficiencies", "skills"],
+    ["Tech Stack", "skills"],
+    ["Tools", "skills"],
+    ["Tools & Technologies", "skills"],
+    ["Personal Projects", "projects"],
+    ["Academic Projects", "projects"],
+    ["Side Projects", "projects"],
+    ["Open Source", "projects"],
+    ["Open Source Contributions", "projects"],
+    ["Professional Summary", "other"],
+    ["Career Summary", "other"],
+    ["Executive Summary", "other"],
+    ["Volunteer", "other"],
+    ["Volunteer Experience", "other"],
+    ["Leadership", "other"],
+    ["Leadership & Activities", "other"],
+    ["Qualifications", "other"],
+    ["Summary of Qualifications", "other"],
+    ["Accomplishments", "other"],
+  ])("reads %j as a heading of %s", (heading, kind) => {
+    expect(kindAt(heading)).toMatchObject({ kind, lines: ["x"] });
+  });
+
+  it("finds the work history under Selected Experience", () => {
+    const report = AtsScoringService.check(
+      "Jane Doe\njane@example.com\nSelected Experience\nSenior Engineer, Acme Corp    Jan 2020 - Present\n- Built things\nEducation\nBS Biology, State University, 2018\nSkills\nGo",
+      DEFAULT_POLICY,
+      { now: NOW },
+    );
+    expect(report.failedChecks.map((rule) => rule.id)).not.toContain("ats-v2.structure.experience");
+    expect(report.parsed.roles).toHaveLength(1);
+  });
+
+  it("closes Skills at a heading it does not know, over dated entries", () => {
+    const parsed = parse(
+      "Jane Doe\nExperience\nSenior Engineer, Acme Corp    Jan 2020 - Present\nSkills\nGo, Rust\nCommunity Involvement\nCode2040\tJan 2018 - Dec 2019\n- Mentored students",
+    );
+    expect(parsed.skills).toEqual(["Go", "Rust"]);
+  });
+
+  it("keeps a skill category on a line of its own inside Skills", () => {
+    const parsed = parse(
+      "Jane Doe\nExperience\nSenior Engineer, Acme Corp    Jan 2020 - Present\nSkills\nFrameworks\nReact, Vue\nCloud Platforms\nAWS, GCP\nEducation\nBS Biology, State University, 2018",
+    );
+    expect(parsed.skills).toEqual(expect.arrayContaining(["React", "Vue", "AWS", "GCP"]));
+  });
+
+  it.each(["Tools: Jira, Figma", "Technologies: React, Node.js", "Tech Stack\tReact, Node.js"])(
+    "reads %j under a role as the role's, not as the Skills section",
+    (stack) => {
+      const parsed = parse(
+        `Jane Doe\nExperience\nSenior Engineer, Acme Corp    Jan 2020 - Present\n- Built things\n${stack}\nEngineer, Globex Inc    Jun 2016 - Dec 2019\n- Built more\nSkills\nGo, Rust`,
+      );
+      expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp", "Globex Inc"]);
+      expect(parsed.skills).toEqual(["Go", "Rust"]);
+    },
+  );
+
   it("closes Education at a heading it does not know, written like the ones it does", () => {
     const sections = segmentResume(
       [

@@ -1,6 +1,6 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { policyRegex } from "../policy/regex.js";
-import { wordListRegex } from "../text/text.js";
+import { BULLET, wordListRegex } from "../text/text.js";
 import { memo } from "../util/memo.js";
 import { findDateRange } from "./dates.js";
 import { degreeLevel } from "./education.js";
@@ -336,20 +336,46 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
     return found && !/\p{L}{3}/u.test(next.replace(found.matched, " ")) ? null : heading;
   });
   const unknown = unknownHeadings(lines, headings, matchers, policy);
+  // Whether a dated line that is not a bullet comes after each line before the next heading:
+  // computed once, the first time it is asked.
+  let dated: boolean[] | undefined;
+  const datedAfter = (at: number) => {
+    if (!dated) {
+      dated = [];
+      for (let line = lines.length - 1, seen = false; line >= 0; line -= 1) {
+        dated[line] = seen;
+        if (headings[line]) seen = false;
+        else if (!BULLET.test(lines[line]!))
+          seen ||= findDateRange(lines[line]!, policy.resumeParse, UNBOUNDED) !== null;
+      }
+    }
+    return dated[at];
+  };
 
   const sections: ResumeSection[] = [];
   let current: ResumeSection = { kind: "other", lines: [], headed: false };
 
   for (const [at, line] of lines.entries()) {
+    // A heading the policy does not know closes Education, and Skills when what is under it is
+    // dated, as roles and activities are; a category of skills on its own line is not.
     const heading =
-      headings[at] ?? (current.kind === "education" && unknown.has(at) ? UNKNOWN : null);
+      headings[at] ??
+      (unknown.has(at) &&
+      (current.kind === "education" || (current.kind === "skills" && datedAfter(at)))
+        ? UNKNOWN
+        : null);
     // Inside Skills, a heading with content is a category of skills ("Languages: TypeScript"); in
-    // the gutter, only a languages or certifications one is ("Languages⇥TypeScript, Go").
+    // the gutter, only a languages or certifications one is ("Languages⇥TypeScript, Go"). Inside
+    // the work history or the projects, a skills heading with content and a dated line after it
+    // is a role's stack ("Tools: Jira, Figma" over the next role).
     const category =
-      current.kind === "skills" &&
       heading?.rest &&
-      heading.kind !== "skills" &&
-      (!gutters.has(at) || heading.kind === "languages" || heading.kind === "certifications");
+      ((current.kind === "skills" &&
+        heading.kind !== "skills" &&
+        (!gutters.has(at) || heading.kind === "languages" || heading.kind === "certifications")) ||
+        ((current.kind === "experience" || current.kind === "projects") &&
+          heading.kind === "skills" &&
+          datedAfter(at)));
     if (!heading || category) {
       current.lines.push(line);
       continue;

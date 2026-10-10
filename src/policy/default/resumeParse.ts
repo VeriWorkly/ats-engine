@@ -51,12 +51,16 @@ export const DEFAULT_RESUME_PARSE = {
   // spoken languages have kinds of their own, read as rows; their headings are the schema's
   // defaults (`sections.certifications`, `sections.languages`), so a licence's dates are never
   // read as a job. "Top Skills" is the skills heading of a LinkedIn profile export's sidebar.
+  // Unknown, a heading after Skills was read as skills too, with every line under it: "Selected
+  // Experience", "Tech Stack", "Side Projects", "Professional Summary" and "Volunteer
+  // Experience" are common enough to know. Volunteer work is "other", as "Volunteering" was, so
+  // it adds no months to the work history.
   sections: {
-    experience: String.raw`^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment)\s+)?(?:experience|employment|history)|^internships?|^academic\s+(?:appointments|positions)|^professional\s+background`,
+    experience: String.raw`^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment|selected|additional|other|military|freelance)\s+)?(?:experience|employment|history)|^internships?|^academic\s+(?:appointments|positions)|^professional\s+background`,
     education: String.raw`^educational\s+(?:background|qualifications?|history|details)|^education|^academic\s+(?:background|qualifications?|history|record|credentials)`,
-    skills: String.raw`^(?:(?:technical|core|key|top)\s+)?skills|^technologies|^core\s+competenc(?:y|ies)|^areas\s+of\s+expertise`,
-    projects: String.raw`^projects`,
-    other: String.raw`^(?:summary|objective|profile|awards?|publications?|interests|volunteering|references|links|online\s+profiles?|achievements|hobbies|contact(?:\s+(?:details|information|info))?|personal\s+(?:details|information|data)|honou?rs|grants|funding|fellowships|patents|presentations|invited\s+talks|talks|conferences|memberships|affiliations|professional\s+(?:affiliations|memberships|service|development)|editorial\s+(?:boards?|service|activities)|board\s+(?:memberships|positions|service|seats)|boards|courses(?:\s+taught)?|coursework|relevant\s+coursework|training|activities|extra[\s-]?curricular(?:\s+activities)?|declaration)`,
+    skills: String.raw`^(?:(?:technical|core|key|top)\s+)?skills|^technologies|^core\s+competenc(?:y|ies)|^areas\s+of\s+expertise|^technical\s+proficienc(?:y|ies)|^tech(?:nology)?\s+stack|^tools`,
+    projects: String.raw`^(?:(?:personal|academic|side|selected|key)\s+)?projects|^open[\s-]source(?:\s+(?:projects|contributions))?`,
+    other: String.raw`^(?:(?:summary\s+of\s+)?qualifications|(?:(?:professional|career|executive)\s+)?summary|accomplishments|leadership|objective|profile|awards?|publications?|interests|volunteer(?:ing|\s+(?:experience|work))?|references|links|online\s+profiles?|achievements|hobbies|contact(?:\s+(?:details|information|info))?|personal\s+(?:details|information|data)|honou?rs|grants|funding|fellowships|patents|presentations|invited\s+talks|talks|conferences|memberships|affiliations|professional\s+(?:affiliations|memberships|service|development)|editorial\s+(?:boards?|service|activities)|board\s+(?:memberships|positions|service|seats)|boards|courses(?:\s+taught)?|coursework|relevant\s+coursework|training|activities|extra[\s-]?curricular(?:\s+activities)?|declaration)`,
   },
   titleWords: [
     "engineer",
