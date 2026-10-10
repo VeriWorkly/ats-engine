@@ -61,10 +61,14 @@ function zip(files: Array<[name: string, content: string | Buffer]>, deflate = f
   return Buffer.concat([...locals, directory, end]);
 }
 
+/** A tab in a line is a `<w:tab/>`, as Word writes the gap before a flush-right date. */
 export function buildDocx(lines: string[]): Buffer {
-  return buildDocxBody(
-    lines.map((line) => `<w:p><w:r><w:t>${escapeXml(line)}</w:t></w:r></w:p>`).join(""),
-  );
+  const run = (line: string) =>
+    line
+      .split("\t")
+      .map((part) => `<w:t xml:space="preserve">${escapeXml(part)}</w:t>`)
+      .join("<w:tab/>");
+  return buildDocxBody(lines.map((line) => `<w:p><w:r>${run(line)}</w:r></w:p>`).join(""));
 }
 
 /**

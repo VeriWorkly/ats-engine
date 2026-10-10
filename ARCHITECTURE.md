@@ -86,9 +86,14 @@ Tests mirror `src/`: `tests/parser/`, `tests/matching/`, `tests/scoring/`, `test
 per module, each file named for what it covers. `tests/action/` runs the GitHub Action's
 `run.mjs` against the local build. `tests/integration/` holds what crosses modules: hostile input
 (`adversarial`), generated-input properties (`properties`), Unicode, and end-to-end regressions.
-`tests/fixtures/` builds PDFs, DOCX files and the labelled corpus; `timing.ts` has `expectFast`,
-which every time budget uses so a busy machine cannot fail a test. Work bounded by a count is
-tested by the count (`tests/node/visibility-budget.test.ts`), not the clock.
+`tests/fixtures/` builds PDFs, DOCX files and the labelled corpus. `generatedResumes.ts` writes a
+seeded set of invented resumes (varied separators, date forms, city placement, headings and section
+order) and renders each as text, a one-column PDF, a two-column PDF and a DOCX, labelled from its
+inputs and never from what the engine reads. `npm run bench` (`bench/run.ts`) scores both that set
+and the hand-written one per field and fails on any miss `bench/baseline.json` does not list; the
+≥0.95 per-locale gate in `tests/locales/` runs on the hand-written set. `timing.ts` has
+`expectFast`, which every time budget uses so a busy machine cannot fail a test. Work bounded by a
+count is tested by the count (`tests/node/visibility-budget.test.ts`), not the clock.
 
 `node/files` reads a resume or a posting from a path (`readResumeFile`, `readJobFile`) with the
 limits and messages the CLI and the MCP server share, and says what the file was (`file`: name,

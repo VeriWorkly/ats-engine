@@ -2,5 +2,30 @@
   "hand-written": [
     "de/de-letterspaced: education.credential[0]",
     "en-IN/en-in-national-phone: education.credential[1]"
+  ],
+  "generated": [
+    "gen-02/pdf-2col: role.title[0]",
+    "gen-02/pdf-2col: role.employer[0]",
+    "gen-02/pdf-2col: role.title[1]",
+    "gen-02/pdf-2col: role.employer[1]",
+    "gen-09/pdf-2col: role.title[0]",
+    "gen-09/pdf-2col: role.employer[0]",
+    "gen-09/pdf-2col: role.title[1]",
+    "gen-09/pdf-2col: role.employer[1]",
+    "gen-09/pdf-2col: role.title[2]",
+    "gen-09/pdf-2col: role.employer[2]",
+    "gen-11/pdf-2col: role.title[0]",
+    "gen-11/pdf-2col: role.employer[0]",
+    "gen-11/pdf-2col: role.title[1]",
+    "gen-11/pdf-2col: role.employer[1]",
+    "gen-17/pdf-2col: role.title[0]",
+    "gen-17/pdf-2col: role.employer[0]",
+    "gen-17/pdf-2col: role.title[1]",
+    "gen-17/pdf-2col: role.employer[1]",
+    "gen-27/pdf-2col: role.title[0]",
+    "gen-27/pdf-2col: role.employer[0]",
+    "gen-27/pdf-2col: role.title[1]",
+    "gen-27/pdf-2col: role.employer[1]",
+    "gen-28/pdf-2col: cert.expires[0]"
   ]
 }

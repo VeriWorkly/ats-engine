@@ -1,19 +1,26 @@
-// Parsing benchmark: field accuracy and time per resume over the labelled synthetic corpus in
-// tests/fixtures (invented people only), read as text. `npm run bench`; add a resume there to grow
-// the corpus.
+// Parsing benchmark: field accuracy over two labelled corpora of invented resumes, and time per
+// resume. `npm run bench`.
 //
-// bench/baseline.json lists every field the corpus misses today. The run fails on a miss that is
+// - "hand-written": the resumes in tests/fixtures, read as text. A regression check: the engine
+//   was built against them.
+// - "generated": a seeded corpus (tests/fixtures/generatedResumes.ts) rendered as text, a PDF, a
+//   two-column PDF and a DOCX, labelled from its inputs. Not tuned to the engine.
+//
+// bench/baseline.json lists every field each corpus misses today. The run fails on a miss that is
 // not in it, so one field read better cannot hide another read worse; `npm run bench -- --update`
 // rewrites it, in the change that earns the difference.
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../src/index.js";
+import { AtsScoringService, DEFAULT_POLICY, type AtsLayoutSignals } from "../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../src/locales/index.js";
 import { fieldChecks, type FieldCheck } from "../tests/fixtures/accuracy.js";
+import { RENDERINGS, generateResumes, renderResume } from "../tests/fixtures/generatedResumes.js";
 import { LOCALE_FIXTURES } from "../tests/fixtures/locale-resumes.js";
 
 const BASELINE = new URL("./baseline.json", import.meta.url);
+const GENERATED_COUNT = 30;
 const update = process.argv.includes("--update");
+const verbose = process.argv.includes("--verbose");
 
 const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 const now = new Date("2026-10-01T00:00:00Z");
@@ -41,9 +48,9 @@ function record(set: string, corpus: string, id: string, checks: FieldCheck[]) {
   }
 }
 
-function checkTimed(text: string) {
+function checkTimed(text: string, layout?: AtsLayoutSignals) {
   const started = performance.now();
-  const report = AtsScoringService.check(text, policy, { now });
+  const report = AtsScoringService.check(text, policy, { now, layout });
   timings.push(performance.now() - started);
   return report;
 }
@@ -59,6 +66,13 @@ for (const [locale, fixtures] of Object.entries(LOCALE_FIXTURES))
       `${locale}/${fixture.id}`,
       fieldChecks(checkTimed(fixture.text), fixture),
     );
+
+for (const resume of generateResumes(GENERATED_COUNT))
+  for (const rendering of RENDERINGS) {
+    const { text, layout } = await renderResume(resume, rendering);
+    const checks = fieldChecks(checkTimed(text, layout), resume);
+    record(`generated, ${rendering}`, "generated", `${resume.id}/${rendering}`, checks);
+  }
 
 const percent = (ratio: number) => `${(100 * ratio).toFixed(1).padStart(5)}%`;
 for (const [set, tally] of tallies) {
@@ -83,6 +97,8 @@ const list = (title: string, corpus: string) => {
   if (rows.length) console.log(["", `${title}:`, ...rows].join("\n"));
 };
 list("missed in hand-written", "hand-written");
+if (verbose) list("missed in generated", "generated");
+else console.log(`\n${misses.get("generated")?.size ?? 0} generated misses (--verbose lists them)`);
 
 const current = Object.fromEntries([...misses].map(([corpus, keys]) => [corpus, [...keys.keys()]]));
 if (update) {

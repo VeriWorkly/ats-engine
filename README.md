@@ -411,7 +411,7 @@ node dist/cli/index.js check path/to/resume.pdf --job path/to/posting.txt
 | `npm run dev`   | Rebuild on every change                                           |
 | `npm test`      | Run the test suite                                                |
 | `npm run lint`  | ESLint and Prettier checks                                        |
-| `npm run bench` | Field accuracy over the labelled corpus of synthetic resumes      |
+| `npm run bench` | Field accuracy over the labelled and generated synthetic resumes  |
 | `npm run check` | Everything CI runs: build, types, lint, tests, sizes, smoke, pack |
 
 ## Documentation
