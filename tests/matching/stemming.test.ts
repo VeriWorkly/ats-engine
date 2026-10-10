@@ -82,6 +82,77 @@ describe("a word ending in a silent e folds with its other forms", () => {
   });
 });
 
+describe("a framework's .js name and a British spelling meet their other forms", () => {
+  const vocab = buildVocabulary(km);
+  const canonical = (word: string) => canonicalize(word, km, vocab);
+
+  it.each([
+    ["vue.js", "vue"],
+    ["next.js", "next"],
+    ["nuxt.js", "nuxt"],
+    ["express.js", "express"],
+    ["node.js", "node", "nodejs"],
+    ["react.js", "react", "reactjs"],
+    ["angular.js", "angularjs"],
+    ["full-stack", "fullstack"],
+    ["modelling", "modeling", "modelled", "modeled", "model"],
+    ["labelling", "labeling", "labelled", "labeled", "label"],
+    ["travelling", "traveling", "travelled", "traveled", "travel"],
+    ["optimisation", "optimization", "optimisations", "optimizations"],
+    ["optimise", "optimize", "optimised", "optimized", "optimising", "optimizing", "optimises"],
+    ["organisation", "organization", "organisations", "organizations"],
+    ["organiser", "organizer", "organisers"],
+    ["analyse", "analyze", "analysed", "analyzed", "analysing", "analyzing", "analyzes"],
+    ["behaviour", "behavior", "behaviours", "behaviors"],
+    ["behavioural", "behavioral"],
+    ["colour", "color", "colours"],
+  ])("%s", (...forms) => {
+    expect(new Set(forms.map(canonical)).size).toBe(1);
+  });
+
+  it.each([
+    ["angular.js", "angular"],
+    ["hour", "hor"],
+    ["sell", "sel"],
+  ])("keeps %s apart from %s", (a, b) => {
+    expect(canonical(a)).not.toBe(canonical(b));
+  });
+
+  it.each([
+    ["rise", "rises"],
+    ["raise", "raises", "raising", "raised"],
+    ["enterprise", "enterprises"],
+    ["hour", "hours"],
+    ["tour", "tours"],
+    ["selling", "sell", "sells"],
+  ])("still folds %s with its own forms", (...forms) => {
+    expect(new Set(forms.map(canonical)).size).toBe(1);
+  });
+
+  it("keeps three.js a keyword, not the number word three", () => {
+    expect(canonical("three.js")).not.toBeNull();
+  });
+
+  it("meets Vue, Next, full stack and modeling in either spelling", () => {
+    const resume = (skills: string) =>
+      `Kai Moreno\nkai@example.com\nExperience\nFrontend Engineer, Bluebird\nJan 2020 - Present\n- Built apps for 3 clients\nSkills\n${skills}`;
+    for (const [has, asks] of [
+      ["Vue.js, Next.js, full stack, modelling", "Vue, Next, Full-stack, Modeling"],
+      ["Vue, Next, Full-stack, modeling", "Vue.js, Next.js, Full stack, Modelling"],
+    ] as const) {
+      const report = check(resume(has), DEFAULT_POLICY, {
+        now: new Date("2026-10-01T00:00:00Z"),
+        jobDescription: `Requirements\n${asks.replace(/^|, /g, "\n- ").trim()}`,
+      });
+      expect(report.missingKeywords, has).toEqual([]);
+      expect(
+        report.requirements.map((r) => r.status),
+        has,
+      ).toEqual(["met", "met", "met", "met"]);
+    }
+  });
+});
+
 describe("words the rules keep apart", () => {
   it.each([
     ["account", "accounting"],

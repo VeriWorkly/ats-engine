@@ -210,6 +210,14 @@ export const DEFAULT_KEYWORD_MATCH = {
     node: "node.js",
     reactjs: "react",
     "react.js": "react",
+    // ".js" folds away in `stemming`; these name the frameworks as skills, as "next" and
+    // "express", ordinary words, are not.
+    "vue.js": "vue",
+    "nuxt.js": "nuxt",
+    // AngularJS, not Angular, its successor.
+    "angular.js": "angularjs",
+    "full-stack": "full stack",
+    fullstack: "full stack",
     // A soft skill's other spellings, so "communicating" in a posting meets "communication" on a
     // resume. Each is a soft skill, never a hard one (see `softSkills`).
     communicate: "communication",
@@ -315,6 +323,7 @@ export const DEFAULT_KEYWORD_MATCH = {
     "i/o",
     "ts/sci",
     "software engineer",
+    "full stack",
     // Kept whole: "business" is a stopword, and "development" alone is a software engineer's.
     "business development",
     "documentation",

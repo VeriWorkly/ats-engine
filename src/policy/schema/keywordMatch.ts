@@ -80,6 +80,40 @@ export const keywordMatchSchema = z
         // "market".
         { suffix: "accounting", minLength: 0, replacement: "accounting" },
         { suffix: "marketing", minLength: 0, replacement: "marketing" },
+        // A framework named for its script is the framework: "Vue.js" is "Vue", "Next.js"
+        // "Next"; the "s" rule below left "vue.j". "three.js" keeps its name: "three" alone is
+        // a number word.
+        { suffix: "three.js", minLength: 0, replacement: "three.js" },
+        { suffix: ".js", minLength: 3, replacement: "" },
+        // British spellings fold with American ones, each as its whole family: "modelling" and
+        // "modeling", "optimisation" and "optimization", "analysed" and "analyzed", "behaviours"
+        // and "behaviors". Every "-ise" word folds so, its own forms with it ("enterprise",
+        // "enterprises"); "-lling" only after the letters no one-syllable "-ell" word ends in,
+        // so "selling" stays "sell".
+        { suffix: "delling", minLength: 0, replacement: "del" },
+        { suffix: "delled", minLength: 0, replacement: "del" },
+        { suffix: "belling", minLength: 0, replacement: "bel" },
+        { suffix: "belled", minLength: 0, replacement: "bel" },
+        { suffix: "velling", minLength: 0, replacement: "vel" },
+        { suffix: "velled", minLength: 0, replacement: "vel" },
+        { suffix: "celling", minLength: 0, replacement: "cel" },
+        { suffix: "celled", minLength: 0, replacement: "cel" },
+        { suffix: "isations", minLength: 0, replacement: "ization" },
+        { suffix: "isation", minLength: 0, replacement: "ization" },
+        { suffix: "isers", minLength: 5, replacement: "izer" },
+        { suffix: "iser", minLength: 4, replacement: "izer" },
+        { suffix: "ising", minLength: 6, replacement: "iz" },
+        { suffix: "ised", minLength: 5, replacement: "iz" },
+        { suffix: "ises", minLength: 5, replacement: "iz" },
+        { suffix: "ise", minLength: 4, replacement: "iz" },
+        { suffix: "yser", minLength: 4, replacement: "yzer" },
+        { suffix: "ysing", minLength: 6, replacement: "yz" },
+        { suffix: "ysed", minLength: 5, replacement: "yz" },
+        { suffix: "yse", minLength: 4, replacement: "yz" },
+        // Past four letters: "hour" and "four" stay as they are.
+        { suffix: "oural", minLength: 5, replacement: "oral" },
+        { suffix: "ours", minLength: 5, replacement: "or" },
+        { suffix: "our", minLength: 4, replacement: "or" },
         { suffix: "ing", minLength: 6, replacement: "" },
         { suffix: "ies", minLength: 5, replacement: "y" },
         { suffix: "ed", minLength: 5, replacement: "" },
