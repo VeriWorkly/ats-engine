@@ -92,12 +92,12 @@ export const DEFAULT_RESUME_PARSE = {
     "professor",
     "lecturer",
     "researcher",
-    // Beyond the office: without these, "Deloitte, Accountant" and "Mercy Hospital, Registered
-    // Nurse" were read with the employer as the title. Words that are also common surnames
-    // ("Driver", "Cook", "Baker") are left out: a name holding one is not taken as the name.
-    "nurse",
+    // Beyond the office: without these, "Deloitte, Accountant" and "Target - Cashier" were read
+    // with the employer as the title. Words that are also surnames ("Nurse", "Teller", "Clerk",
+    // "Writer", "Tutor", "Lawyer", "Mechanic", "Driver", "Cook", "Baker") are left out: a name
+    // holding one was not taken as the name. "Mercy Hospital, Registered Nurse" is read by its
+    // employer's word instead (`organisationWords`).
     "teacher",
-    "tutor",
     "instructor",
     "counsell?or",
     "therapist",
@@ -107,19 +107,14 @@ export const DEFAULT_RESUME_PARSE = {
     "bookkeeper",
     "auditor",
     "attorney",
-    "lawyer",
     "paralegal",
     "cashier",
-    "teller",
-    "clerk",
     "receptionist",
     "secretary",
     "barista",
-    "mechanic",
     "electrician",
     "programmer",
     "recruiter",
-    "writer",
     "editor",
     "representative",
     "executive",

@@ -156,3 +156,22 @@ describe("a letter-spaced name whose word gap was lost", () => {
     expect(name(sidebarFirst("J A N E D O E", "jd1987@example.com"))).not.toBe("JANE DOE");
   });
 });
+
+describe("a surname that is also a job title", () => {
+  it.each([
+    "Alex Teller",
+    "ALEX NURSE",
+    "Sam Clerk",
+    "Jordan Writer",
+    "Sam Tutor",
+    "Morgan Lawyer",
+    "Morgan Mechanic",
+    "Maria Teller-Smith",
+  ])("is still the name: %j", (person) => {
+    expect(
+      name(
+        `${person}\nalex@example.com | (555) 123-4567\nExperience\nSoftware Engineer, Acme Corp\nJan 2020 - Present`,
+      ),
+    ).toBe(person);
+  });
+});
