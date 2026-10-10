@@ -288,42 +288,98 @@ describe("redirects", () => {
     return [server, `http://127.0.0.1:${(server.address() as AddressInfo).port}`];
   }
 
-  it("never follows one, so the key and the body stay with the configured address", async () => {
+  /** A provider address that redirects with `status` to a second server, which records calls. */
+  async function redirecting(status: number) {
     const seen: http.IncomingHttpHeaders[] = [];
     const [other, otherUrl] = await listen((req, res) => {
       seen.push(req.headers);
       req.resume();
       res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ content: [{ type: "text", text: "{}" }] }));
+      res.end(JSON.stringify({ content: [{ type: "text", text: "{}" }], choices: [] }));
     });
-    const [configured, configuredUrl] = await listen((req, res) => {
+    const [configured, url] = await listen((req, res) => {
       req.resume();
-      res.statusCode = 307;
+      res.statusCode = status;
       res.setHeader("location", `${otherUrl}/steal`);
       res.end();
     });
-    try {
-      for (const provider of [
-        anthropic({ apiKey: "sk-ant-invented", baseUrl: configuredUrl }),
-        openAiCompatible({ apiKey: "sk-invented", baseUrl: configuredUrl }),
-      ]) {
-        const error = await provider.complete(request()).catch((caught: unknown) => caught);
-        expect(error).toBeInstanceOf(LlmProviderError);
-        expect(error).toMatchObject({
-          retryable: false,
-          message: expect.stringMatching(/redirect/),
-        });
+    return { seen, url, close: () => (configured.close(), other.close()) };
+  }
+  const providers = (baseUrl: string, fetch?: FetchLike) => [
+    anthropic({ apiKey: "sk-ant-invented", baseUrl, ...(fetch && { fetch }) }),
+    openAiCompatible({ apiKey: "sk-invented", baseUrl, ...(fetch && { fetch }) }),
+  ];
+
+  it.each([301, 302, 303, 307, 308])(
+    "never follows a %i, so the key and the body stay with the configured address",
+    async (status) => {
+      const { seen, url, close } = await redirecting(status);
+      try {
+        for (const provider of providers(url)) {
+          const error = await provider.complete(request()).catch((caught: unknown) => caught);
+          expect(error).toBeInstanceOf(LlmProviderError);
+          expect(error).toMatchObject({ retryable: false });
+          // The origin only: a path can carry a deployment's own tokens.
+          expect((error as Error).message).toBe(
+            `The provider at ${new URL(url).origin} answered with a redirect (HTTP ${status}), which is never followed: it would take the API key and the request elsewhere. Set the base URL to the address the provider answers at.`,
+          );
+        }
+        expect(seen).toEqual([]);
+      } finally {
+        close();
       }
-      expect(seen).toEqual([]);
+    },
+  );
+
+  it("refuses the answer of a caller's fetch that followed one anyway", async () => {
+    const { url, close } = await redirecting(307);
+    // A wrapper that drops `redirect`, so the platform's fetch follows: the key has gone, but the
+    // answer is not used and the caller hears why.
+    const following: FetchLike = (target, init) =>
+      fetch(target, {
+        method: init.method,
+        headers: init.headers,
+        body: init.body,
+        signal: init.signal as AbortSignal,
+      });
+    try {
+      for (const provider of providers(url, following))
+        await expect(provider.complete(request())).rejects.toMatchObject({
+          retryable: false,
+          message: expect.stringMatching(/answered with a redirect, which is never followed/),
+        });
     } finally {
-      configured.close();
-      other.close();
+      close();
     }
   });
 
-  it("asks a caller's own fetch not to follow one", async () => {
+  it("asks a caller's own fetch to hand back a redirect rather than follow it", async () => {
     const fetch = fetchReturning(200, { content: [] });
     await anthropic({ apiKey: "k", fetch }).complete(request());
-    expect(fetch.mock.calls[0]![1]).toMatchObject({ redirect: "error" });
+    expect(fetch.mock.calls[0]![1]).toMatchObject({ redirect: "manual" });
+  });
+
+  it("reads a browser's opaque redirect as one, and a network error naming 'redirect' as none", async () => {
+    const opaque = vi.fn<FetchLike>(async () => ({
+      ok: false,
+      status: 0,
+      type: "opaqueredirect",
+      text: async () => "",
+    }));
+    await expect(
+      anthropic({ apiKey: "k", fetch: opaque }).complete(request()),
+    ).rejects.toMatchObject({
+      retryable: false,
+      message: expect.stringMatching(/answered with a redirect, which/),
+    });
+
+    const offline = vi.fn<FetchLike>(async () => {
+      throw new TypeError("fetch failed", {
+        cause: new Error("getaddrinfo ENOTFOUND redirect.example.com"),
+      });
+    });
+    await expect(
+      anthropic({ apiKey: "k", fetch: offline }).complete(request()),
+    ).rejects.toMatchObject({ retryable: true, message: "Network error." });
   });
 });

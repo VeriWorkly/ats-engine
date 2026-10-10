@@ -16,6 +16,10 @@ export type FetchResponseLike = {
   ok: boolean;
   status: number;
   text(): Promise<string>;
+  /** True when `fetch` followed a redirect to get this response: it is refused. */
+  redirected?: boolean;
+  /** `"opaqueredirect"` is a browser's redirect handed back unfollowed: it is refused. */
+  type?: string;
 };
 
 /** Just enough of `fetch` for the adapters: one POST. Pass your own to proxy or record calls. */
@@ -27,11 +31,12 @@ export type FetchLike = (
     body: string;
     signal?: AbortSignalLike;
     /**
-     * Always `"error"`: a redirect is never followed. `fetch` keeps headers such as `x-api-key`
-     * on a redirect to another origin, and a 307 or 308 resends the body, so following one would
-     * hand the key and the resume to whoever answered. Pass it on to the `fetch` you wrap.
+     * Always `"manual"`: a redirect is handed back, never followed, and the call fails. `fetch`
+     * keeps headers such as `x-api-key` on a redirect to another origin, and a 307 or 308 resends
+     * the body, so following one would hand the key and the resume to whoever answered. Pass it
+     * on to the `fetch` you wrap; a response that was redirected anyway is refused.
      */
-    redirect?: "error";
+    redirect?: "manual";
   },
 ) => Promise<FetchResponseLike>;
 
@@ -62,17 +67,24 @@ export class AbortedError extends Error {
 }
 
 /**
- * Whether a failed `fetch` refused a redirect. Node says so in the cause ("unexpected
- * redirect"); a browser says only "Failed to fetch", which stays a network error. Read by
- * shape: the platform's errors may come from another realm.
+ * Whether the response is a redirect, by the response alone: a 3xx handed back (Node, workers),
+ * a browser's opaque redirect (status 0), or a response a caller's `fetch` reached by following
+ * one regardless.
  */
-function refusedRedirect(error: unknown): boolean {
-  let cause = error as { message?: unknown; cause?: unknown } | undefined;
-  for (let depth = 0; cause && typeof cause === "object" && depth < 5; depth++) {
-    if (typeof cause.message === "string" && /\bredirect\b/i.test(cause.message)) return true;
-    cause = cause.cause as typeof cause;
-  }
-  return false;
+function isRedirect(response: FetchResponseLike): boolean {
+  return (
+    (response.status >= 300 && response.status < 400) ||
+    response.status === 0 ||
+    response.type === "opaqueredirect" ||
+    response.redirected === true
+  );
+}
+
+/** Scheme, host and port only: a path or query can carry a deployment's own tokens. */
+function originOf(url: string): string {
+  // No `URL` here: the package compiles without DOM or Node types. Any user:password goes too.
+  const match = /^([a-z][a-z\d+.-]*:\/\/)([^/?#]*)/i.exec(url);
+  return match ? `${match[1]}${match[2]!.replace(/^.*@/, "")}` : "the configured address";
 }
 
 /** A header whose value is a credential. */
@@ -124,16 +136,19 @@ export async function postJson(
       headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
       signal,
-      redirect: "error",
+      redirect: "manual",
     });
+    if (isRedirect(response)) {
+      const status = response.status >= 300 && response.status < 400;
+      throw new LlmProviderError(
+        `The provider at ${originOf(url)} answered with a redirect${status ? ` (HTTP ${response.status})` : ""}, which is never followed: it would take the API key and the request elsewhere. Set the base URL to the address the provider answers at.`,
+        { retryable: false, ...(status && { status: response.status }) },
+      );
+    }
     raw = await response.text();
   } catch (error) {
+    if (error instanceof LlmProviderError) throw error;
     if (options.signal?.aborted) throw new AbortedError(error);
-    if (refusedRedirect(error))
-      throw new LlmProviderError(
-        `The provider at ${url} answered with a redirect, which is never followed: it would take the API key and the request elsewhere. Set the base URL to the address the provider answers at.`,
-        { retryable: false, cause: error },
-      );
     throw new LlmProviderError(timeout.aborted ? "Provider request timed out." : "Network error.", {
       retryable: true,
       cause: error,
