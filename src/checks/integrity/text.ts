@@ -2,7 +2,7 @@ import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { NO_FINDING as NONE, quote, type Finding } from "../finding.js";
 import { BULLET_PREFIX, wordListPattern } from "../../text/text.js";
 import { segmentResume } from "../../parser/sections.js";
-import { citationLines, isDatedLine, readsAsSentence } from "../bullets.js";
+import { isDatedLine, readsAsSentence } from "../bullets.js";
 import { memo } from "../../util/memo.js";
 
 /**
@@ -184,8 +184,9 @@ function listItems(line: string): string[] | null {
  *   Not on a sentence — words in lower case and a stopword among them — that names other things
  *   more: a data engineer says "data" in most bullets, often twice in one, and on a 200-word
  *   resume that is still the job. A bare run of terms ("Kubernetes Terraform Kafka …") is no
- *   sentence. Nor on the lines of a list of works (`citationLines`); and the words of the
- *   candidate's `name`, which an academic's publications repeat by right, are no terms.
+ *   sentence. Nor on a list of works' citations (`cited`), and never for a word of the
+ *   candidate's `name`, which an academic's publications repeat by right. The checks below
+ *   still read both.
  * - A line that is not a list and repeats one term five times or more, as 30% of its words.
  * - A list item named three times or more within one line, or across the undated, unlabelled
  *   lists of a skills section, as a skills block padded with the same skills is. Each role
@@ -204,12 +205,12 @@ export function stuffedTerms(
   policy: AtsEnginePolicy,
   now: Date,
   name = "",
+  /** The resume's citations (`citationLines`). */
+  cited: ReadonlySet<string> = new Set(),
 ): Finding {
   const stopwords = new Set(policy.keywordMatch.stopwords);
   const own = new Set(wordsOf(name));
-  const isTerm = (word: string) =>
-    word.length > 2 && /\p{L}/u.test(word) && !stopwords.has(word) && !own.has(word);
-  const cited = citationLines(lines, policy);
+  const isTerm = (word: string) => word.length > 2 && /\p{L}/u.test(word) && !stopwords.has(word);
   const total = new Map<string, number>();
   const spread = new Map<string, number>();
   const stuffed = new Map<string, number>();
@@ -233,7 +234,7 @@ export function stuffedTerms(
       !paragraph && !list && readsAsSentence(line) && words.some((word) => stopwords.has(word));
     for (const [word, count] of here) {
       add(total, word, count);
-      if (!cited.has(line) && !(sentence && count * 2 < terms))
+      if (!cited.has(line) && !own.has(word) && !(sentence && count * 2 < terms))
         add(spread, word, paragraph ? count : 1);
       if (!list && count >= 5 && count >= words.length * 0.3) stuffed.set(word, 0);
     }

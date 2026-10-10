@@ -419,11 +419,12 @@ export const engineTextSchema = z.prefault(
       String.raw`(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\s+me`,
     ]),
     /**
-     * Headings of a list of works, read where a section heading opens one: its lines are
-     * citations ("Kovalenko O, Marsh T. Ligand field effects…"), not bullets. They have no
-     * action verb to open with and repeat the author's name, so the verb and metric rules do not
-     * read them, nor does keyword stuffing count a term across them; a line repeating a term
-     * there is still stuffing.
+     * Headings of a list of works, read where a section heading opens one: its lines shaped as
+     * citations (a year, a quoted title, "et al.", initials: "Kovalenko O, Marsh T. Ligand field
+     * effects… 2019") are not bullets. They have no action verb to open with and repeat the
+     * author's name, so the verb and metric rules do not read them, nor does keyword stuffing
+     * count a term across them; a line repeating a term there is still stuffing, and any other
+     * line there is read as any line is.
      */
     citationHeadings: z._default(wordList("text.citationHeadings"), [
       String.raw`publications?`,

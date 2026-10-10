@@ -309,6 +309,20 @@ ${Array.from(
       passed: false,
     });
   });
+
+  it.each([
+    ["Publications", "Kubernetes docker Kubernetes cloud"],
+    ["Talks", "Spoke about Kubernetes at the Kubernetes meetup"],
+  ])("still flags lines that are no citations under a %s heading", (heading, line) => {
+    // Each line its own, so no line is pasted again.
+    const lines = Array.from({ length: 18 }, (_, i) => `- ${line} ${i + 1}`).join("\n");
+    expect(stuffing(`${SALES}\n${heading}\n${lines}`)).toMatchObject({ passed: false });
+  });
+
+  it("still flags a line repeating a word of the candidate's name", () => {
+    const resume = SALES.replace("Priya Raman", "Priya Kubernetes");
+    expect(stuffing(`${resume}\n${"Kubernetes ".repeat(6)}`)).toMatchObject({ passed: false });
+  });
 });
 
 describe("instructions aimed at an AI screener", () => {

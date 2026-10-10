@@ -59,8 +59,16 @@ const citationHeading = memo(
 );
 
 /**
- * The lines under a section heading that opens a list of works (`text.citationHeadings`):
- * "Publications", "Invited Talks". Citations, not bullets.
+ * What a citation carries: a year, a quoted title, "et al." or an author's initials ("Doe J,",
+ * "J. Doe").
+ */
+const CITATION =
+  /(?<!\d)(?:19|20)\d{2}(?!\d)|["“”]|(?<![\p{L}])et\s+al(?![\p{L}])|(?<![\p{L}])\p{Lu}\.\s?\p{Lu}|(?<![\p{L}])\p{Lu}\p{Ll}+\s\p{Lu}{1,2}[,.]/u;
+
+/**
+ * The citations under a section heading that opens a list of works (`text.citationHeadings`):
+ * "Publications", "Invited Talks". Lines shaped as one, not bullets; any other line there is
+ * read as any line is.
  */
 export function citationLines(lines: readonly string[], policy: AtsEnginePolicy) {
   const heading = citationHeading(policy.text);
@@ -69,7 +77,7 @@ export function citationLines(lines: readonly string[], policy: AtsEnginePolicy)
   for (const line of lines) {
     const kind = sectionKind(line, policy);
     if (kind !== null) listing = kind === "other" && heading.test(line.trim());
-    else if (listing) found.add(line);
+    else if (listing && CITATION.test(line)) found.add(line);
   }
   return found;
 }
