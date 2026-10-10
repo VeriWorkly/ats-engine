@@ -149,8 +149,11 @@ describe("hard and soft skills in a posting", () => {
 
   it("folds a soft skill's hyphenated and spaced spellings together", () => {
     const report = check(
-      resume("Praised as self-motivated, a team-player with critical-thinking"),
-      "Requirements\n- Self motivated\n- Team player\n- Critical thinking",
+      resume(
+        "Praised as self-motivated, a team-player with critical-thinking",
+        "Detail-oriented, with a growth-mindset",
+      ),
+      "Requirements\n- Self motivated\n- Team player\n- Critical thinking\n- Detail oriented\n- Growth mindset",
     );
     expect(report.missingKeywordGroups.soft).toEqual([]);
   });

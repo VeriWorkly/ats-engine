@@ -238,10 +238,11 @@ export const DEFAULT_KEYWORD_MATCH = {
     "multi-tasking": "multitasking",
     "problem-solving": "problem solving",
     "decision-making": "decision making",
-    "detail-oriented": "attention to detail",
+    "detail-oriented": "detail oriented",
     "self-motivated": "self motivated",
     "critical-thinking": "critical thinking",
     "team-player": "team player",
+    "growth-mindset": "growth mindset",
   },
   // What a posting asks of the person rather than of their work. They weigh `softSkillWeight` of
   // an ordinary word and the report lists them apart. Placed by one test: does a resume evidence

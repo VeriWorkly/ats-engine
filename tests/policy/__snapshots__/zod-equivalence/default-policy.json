@@ -1686,10 +1686,11 @@
       "multi-tasking": "multitasking",
       "problem-solving": "problem solving",
       "decision-making": "decision making",
-      "detail-oriented": "attention to detail",
+      "detail-oriented": "detail oriented",
       "self-motivated": "self motivated",
       "critical-thinking": "critical thinking",
-      "team-player": "team player"
+      "team-player": "team player",
+      "growth-mindset": "growth mindset"
     },
     "implies": {
       "terraform": [
