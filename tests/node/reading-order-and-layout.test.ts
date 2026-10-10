@@ -821,6 +821,59 @@ describe("a sidebar taller than the main column is a column", () => {
     ]);
     expect(report.parsed.skills).toEqual(["TypeScript", "Go", "PostgreSQL", "Kubernetes"]);
   });
+
+  it("is no column on a one-column page with a few right-aligned lines at its top and foot", () => {
+    // The name at the left and the contact block right-aligned beside it, the dates under the
+    // titles, an education year right-aligned, and a page number at the foot.
+    const run = (str: string, x: number, y: number, width: number, size = 10) => ({
+      str,
+      transform: [size, 0, 0, size, x, y],
+      width,
+      height: size,
+      hasEOL: false,
+    });
+    const right = (str: string, y: number, width: number, size = 9) =>
+      run(str, 560 - width, y, width, size);
+    const items = [
+      run("Jordan Ellery", 45, 740, 140, 22),
+      run("Senior Software Engineer", 45, 720, 120),
+      right("jordan.ellery@example.com", 745, 110),
+      right("(415) 555-0132", 733, 62),
+      right("Austin, TX", 721, 44),
+      run("EXPERIENCE", 45, 680, 75, 12),
+    ];
+    let y = 662;
+    for (const [header, dates] of [
+      ["Senior Software Engineer, Acme Corp", "Jan 2020 - Present"],
+      ["Software Engineer, Globex Inc", "Jun 2016 - Dec 2019"],
+      ["Junior Developer, Initech", "May 2014 - May 2016"],
+    ]) {
+      items.push(run(header!, 45, y, 180), run(dates!, 45, y - 13, 90));
+      y -= 26;
+      for (const bullet of [
+        "- Built a billing service handling two million requests a day",
+        "- Cut cloud spend by 31% by moving batch jobs to spot instances",
+      ]) {
+        items.push(run(bullet, 55, y, 270, 9));
+        y -= 12;
+      }
+      y -= 8;
+    }
+    items.push(
+      run("EDUCATION", 45, y, 70, 12),
+      run("B.S. Computer Science, Ohio State University", 45, y - 18, 220),
+      right("2012 - 2016", y - 18, 55, 10),
+      run("SKILLS", 45, y - 43, 45, 12),
+      run("TypeScript, Go, PostgreSQL, Kubernetes, Terraform", 45, y - 61, 250),
+      right("Page 1 of 1", 40, 40, 8),
+    );
+    const { text: extracted, columns } = pageText(items, (x, yy) => [x, 792 - yy], 612);
+    expect(columns).toBe(0);
+    const lines = extracted.split("\n");
+    expect(lines.findIndex((line) => line.includes("Austin, TX"))).toBeLessThan(
+      lines.indexOf("EXPERIENCE"),
+    );
+  });
 });
 
 describe("a centred heading over a short block is not a second column", () => {

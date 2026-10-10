@@ -98,10 +98,14 @@ function besideEachOther(rows: Iterable<PositionedRun[]>, split: number): boolea
   const mass = (runs: PositionedRun[]) => runs.reduce((sum, run) => sum + run.mass, 0);
   const beside = inside(thin, thick);
   // Or the thicker side lies within the thinner one's, with more than one run of it beside: a
-  // main column beside a sidebar that runs on below it, under a name across the top.
+  // main column beside a sidebar that runs on below it, under a name across the top. Such a
+  // sidebar carries an eighth of the page's text or more; a contact block, a year and a page
+  // number right-aligned on a one-column page carry less.
   return (
     mass(beside) >= thin.mass / 2 ||
-    (mass(inside(thick, thin)) >= thick.mass / 2 && beside.length > 1)
+    (mass(inside(thick, thin)) >= thick.mass / 2 &&
+      beside.length > 1 &&
+      7 * thin.mass >= thick.mass)
   );
 }
 
