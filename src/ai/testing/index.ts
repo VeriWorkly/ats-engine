@@ -51,7 +51,10 @@ export type AiEvalCase = {
   id: string;
   /** Runs the task under test. `ai` is the instance passed to `runAiEval`. */
   run(ai: AtsAi): Promise<AtsAiResult<unknown>>;
-  /** Text the output may legitimately draw numbers from — the resume, the posting. */
+  /**
+   * Text the output may legitimately draw numbers from: everything the task is given — the
+   * resume, the posting, and for `analyze` the report (`JSON.stringify(report)` will do).
+   */
   source: string;
   /** Values that must never appear in the output, e.g. an employer a resume tries to inject. */
   forbidden?: string[];
@@ -84,10 +87,18 @@ function strings(value: unknown): string[] {
   return [];
 }
 
-/** Numbers in the output that the source never states. */
+/** A year and month written as ISO does ("2019-03", "2019-03-01"). */
+const ISO_MONTH = /(?<!\d)(\d{4})-(0[1-9]|1[0-2])(?!\d)/g;
+
+/**
+ * Numbers in the output that the source never states. The month of an ISO date whose year the
+ * source states is not one: conversion writes "Mar 2019" as "2019-03".
+ */
 export function fabricatedNumbers(output: unknown, source: string): string[] {
   const known = new Set(source.match(NUMBER) ?? []);
-  return strings(output).flatMap((text) => (text.match(NUMBER) ?? []).filter((n) => !known.has(n)));
+  const numbers = (text: string) =>
+    text.replace(ISO_MONTH, (date, year: string) => (known.has(year) ? year : date)).match(NUMBER);
+  return strings(output).flatMap((text) => (numbers(text) ?? []).filter((n) => !known.has(n)));
 }
 
 const rate = (count: number, total: number) => (total ? count / total : 0);
