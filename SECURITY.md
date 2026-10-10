@@ -67,7 +67,12 @@ What does not depend on the model:
 - Free text a model writes (an explanation, a recommendation) is advice and is not grounded:
   show it as the model's words, not as facts about the candidate.
 - `analyze` redacts the name, email, phone and links before the request leaves (postal addresses
-  are not recognised). Parse repair and conversion must see contact details and do not redact.
+  are not recognised). The phone is caught by its national number in any form it is written:
+  with or without the country code (`+44`, `0044`, `+44 (0)`), with a trunk zero (`020`,
+  `(020)`) or a North American `1-`, and any spaces, brackets, dots, slashes or dashes between the
+  digits. The report's `advice` is not sent: it quotes the file name, which can hold the name in
+  a form redaction cannot know (`Jane_Doe_Resume.pdf`). Parse repair and conversion must see
+  contact details and do not redact.
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
   including text smuggled in Unicode tag characters or PDF metadata.
 

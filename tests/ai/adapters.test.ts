@@ -143,6 +143,26 @@ describe("openai-compatible transport", () => {
     expect(error).toMatchObject({ status, retryable });
   });
 
+  it("keeps keys out of an error body that echoes the request", async () => {
+    // A proxy that echoes what it was sent puts the key in the body, and so in the message.
+    const echo = [
+      "authorization: Bearer sk-invented-0123456789",
+      "x-api-key: sk-ant-api03-other-key_9876543210",
+      "x-goog-api-key: AIzaInvented0123456789abcdef",
+      "token=Bearer eyJhbGciOiJIUzI1NiJ9.invented",
+    ].join("\n");
+    const provider = openAiCompatible({
+      apiKey: "sk-invented-0123456789",
+      headers: { "x-goog-api-key": "AIzaInvented0123456789abcdef" },
+      fetch: fetchReturning(400, echo),
+    });
+    const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
+    expect(error.message).toContain("HTTP 400");
+    expect(error.message).toContain("authorization:");
+    for (const secret of ["0123456789", "9876543210", "AIzaInvented", "eyJhbGci"])
+      expect(error.message).not.toContain(secret);
+  });
+
   it("treats an unreadable body and a network failure as retryable", async () => {
     const garbled = openAiCompatible({ apiKey: "k", fetch: fetchReturning(200, "<html>") });
     await expect(garbled.complete(request())).rejects.toMatchObject({ retryable: true });

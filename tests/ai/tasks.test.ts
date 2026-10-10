@@ -64,6 +64,18 @@ describe("analyze", () => {
     ]);
   });
 
+  it("leaves the advice out, so the file name does not carry the name", async () => {
+    const withFile = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+      file: { name: "Jane_Doe_Resume_final_v3 (2).pdf", format: "pdf", bytes: 1_000 },
+    });
+    expect(JSON.stringify(withFile.advice)).toMatch(/Jane.Doe/); // the advice quotes it
+    const provider = scriptedProvider(insights());
+    await createAtsAi({ provider, routes }).analyze({ resumeText: RESUME, report: withFile });
+
+    expect(provider.calls[0]!.messages[0]!.content).not.toMatch(/jane/i);
+    expect(userMessage(provider).deterministicReport.advice).toBeUndefined();
+  });
+
   it("sends contact details when redaction is switched off", async () => {
     const provider = scriptedProvider(insights());
     const ai = createAtsAi({ provider, routes, redact: { analyze: false } });

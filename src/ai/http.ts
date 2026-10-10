@@ -75,6 +75,27 @@ function refusedRedirect(error: unknown): boolean {
   return false;
 }
 
+/** A header whose value is a credential. */
+const SECRET_HEADER = /auth|key|token|secret/i;
+
+/** A bearer token, or a key in a provider's usual form ("sk-…", "sk-ant-…", "AIza…"). */
+const SECRET = /\b[Bb]earer\s+[^\s"',;]+|\b(?:sk|pk|rk)-[\w-]{8,}|\bAIza[\w-]{20,}/g;
+
+/**
+ * An error body with the credentials taken out. A proxy or gateway that echoes the request puts
+ * the key in its error, and the error's message is printed and logged.
+ */
+function withoutSecrets(text: string, headers: Record<string, string>): string {
+  let out = text;
+  for (const [name, value] of Object.entries(headers))
+    if (SECRET_HEADER.test(name) && value.length >= 8)
+      for (const secret of [value, value.replace(/^Bearer\s+/i, "")])
+        out = out.split(secret).join("[redacted]");
+  return out.replace(SECRET, (match) =>
+    /^Bearer/i.test(match) ? "Bearer [redacted]" : "[redacted]",
+  );
+}
+
 /**
  * POSTs `body` as JSON and returns the parsed JSON response.
  *
@@ -120,7 +141,8 @@ export async function postJson(
   }
 
   if (!response.ok) {
-    throw new LlmProviderError(`Provider returned HTTP ${response.status}: ${raw.slice(0, 500)}`, {
+    const excerpt = withoutSecrets(raw.slice(0, 1_000), headers).slice(0, 500);
+    throw new LlmProviderError(`Provider returned HTTP ${response.status}: ${excerpt}`, {
       status: response.status,
       retryable: isRetryableStatus(response.status),
     });

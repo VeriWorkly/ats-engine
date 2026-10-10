@@ -154,6 +154,27 @@ describe("redaction variants", () => {
     expect(createRedaction(parsed("Jane Doe"), "").apply("Call 415.555.0199")).toBe("Call [PHONE]");
   });
 
+  it.each([
+    ["+44 20 7946 0958", "020 7946 0958"],
+    ["+44 20 7946 0958", "(020) 7946-0958"],
+    ["+44 20 7946 0958", "0044 20 7946 0958"],
+    ["+44 20 7946 0958", "+44 (0)20 7946 0958"],
+    ["+44 20 7946 0958", "020–7946–0958"],
+    ["+44 20 7946 0958", "+44 20 7946 0958"],
+    ["+49 30 1234 5678", "030/1234 5678"],
+    ["+39 06 1234 5678", "06 1234 5678"],
+    ["+41 44 668 18 00", "044 668 18 00"],
+    ["+44 (0)20 7946 0958", "+44 20 7946 0958"],
+    ["0044 20 7946 0958", "020 7946 0958"],
+    ["020 7946 0958", "+44 20 7946 0958"],
+    ["(415) 555-0199", "+1 415 555 0199"],
+    ["(415) 555-0199", "1-415-555-0199"],
+    ["(415) 555-0199", "415—555—0199"],
+  ])("catches the phone read as %s written as %s", (phone, written) => {
+    const redaction = createRedaction(parsed("Jane Doe", phone), "");
+    expect(redaction.apply(`Call ${written} today`)).toBe("Call [PHONE] today");
+  });
+
   it("leaves a longer hyphenated name and date ranges alone", () => {
     const redaction = createRedaction(parsed("Jane Doe"), "");
     expect(redaction.apply("Jane Doe-Smith")).toBe("Jane Doe-Smith");

@@ -15,7 +15,8 @@ import type { AtsParsedResume } from "../types.js";
  * (name, email, phone, links) plus any further email address, whose grammar cannot be confused
  * with anything else. The name is also caught as "Doe, Jane", with or without a middle initial,
  * and inside a web address built from it ("janedoe.dev", "x.com/janedoe"), where the whole address
- * is replaced. The phone number is caught by its digits whatever separates them, but phone-shaped
+ * is replaced. The phone number is caught by its national number whatever separates its digits and
+ * however it is dialled ("+44 20…", "0044 20…", "020…"), but phone-shaped
  * digit runs in general are *not* swept — "2019 - 2023" has the shape of a phone number. A first
  * name used on its own elsewhere in the text is not caught. Replacement is whole-word, so a
  * three-letter name does not rewrite the inside of another word, and a "name" the parser also read
@@ -34,8 +35,24 @@ const EMAILS = new RegExp(EMAIL.source, "gi");
 /** A web address with or without a scheme: "janedoe.dev", "x.com/janedoe", "https://…". */
 const ADDRESS = /(?:https?:\/\/)?(?:[\p{L}\p{N}-]+\.)+\p{L}{2,}(?:\/[^\s|,;()<>]*)?/giu;
 
-/** What may stand between the digits of a phone number. */
-const PHONE_GAP = String.raw`[\s().\-/]*`;
+/** What may stand between the digits of a phone number: spaces, brackets, dots, any dash. */
+const PHONE_GAP = String.raw`[\s().\-/‐‑‒–—]*`;
+
+/**
+ * The digits that may name the line wherever it is dialled from (its national number), longest
+ * first, each at least seven. "+44 20 7946 0958" and "020 7946 0958" are both 2079460958. A
+ * number written with its country code ("+44", "0044") is that many digits without a code of
+ * one, two or three digits, so no table of codes is needed; a trunk "(0)" is dropped (Italy's
+ * leading zero is part of the number and stays: "+39 06…" is 06…). A number written nationally
+ * loses its trunk zeros, and ten digits at most cover a North American "1-".
+ */
+function nationalNumbers(phone: string): string[] {
+  const digits = phone.replace(/\(0\)/, "").replace(/\D/g, "");
+  const numbers = /^(?:\+|00)/.test(phone)
+    ? [0, 1, 2, 3].map((code) => digits.replace(/^00/, "").slice(code))
+    : [digits.replace(/^0+/, ""), digits.replace(/^0+/, "").slice(-10)];
+  return [...new Set(numbers)].filter((number) => number.length >= 7);
+}
 
 /** Letters and digits only, lower case: how an address spells a name. */
 const squash = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
@@ -86,18 +103,21 @@ export function createRedaction(
     }),
   );
 
-  const digits = parsed.phone.replace(/\D/g, "");
-  if (digits.length >= 7) {
-    // As the parser read it, or with other separators ("415.555.0199"), with or without the
-    // country code. A country code starts with "+", so the "3." of a numbered list is not one,
-    // and may be followed by a trunk zero ("+44 (0)20 7946 0958").
-    const national = [...digits.slice(-10)].join(PHONE_GAP);
+  const phone = parsed.phone.trim();
+  if (phone.replace(/\D/g, "").length >= 7) {
+    // As the parser read it, or as its national number with any separators ("415.555.0199",
+    // "020–7946–0958"), after a country code ("+44", "0044", "+44 (0)"), a trunk zero ("020",
+    // "(020)") or a North American "1-". A country code starts with "+" or "00", so the "3." of a
+    // numbered list is not one. Linear: each digit is a literal, the gaps between them never hold
+    // a digit, and there are at most four numbers to try.
+    const numbers = nationalNumbers(phone).map((number) => [...number].join(PHONE_GAP));
+    const prefix = String.raw`(?:(?:\+|00)${PHONE_GAP}\d{1,3}${PHONE_GAP}(?:0${PHONE_GAP})?|[01]${PHONE_GAP})?`;
     entries.push({
       placeholder: "[PHONE]",
-      original: parsed.phone.trim(),
+      original: phone,
       patterns: [
-        escapeRegex(parsed.phone.trim()),
-        String.raw`(?:\+\d{1,3}${PHONE_GAP}(?:0${PHONE_GAP})?)?\(?` + national,
+        escapeRegex(phone),
+        ...(numbers.length ? [String.raw`\(?${prefix}(?:${numbers.join("|")})`] : []),
       ],
     });
   }
