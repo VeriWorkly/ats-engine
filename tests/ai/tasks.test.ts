@@ -6,6 +6,7 @@ import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
 import { AtsScoringService } from "../../src/scoring/engine.js";
 import type { AtsReport } from "../../src/types.js";
+import { expectFast } from "../fixtures/timing.js";
 
 const route = { model: "m", maxTokens: 100 };
 const routes = { analyze: route, repairParse: route, convertResume: route };
@@ -123,6 +124,13 @@ describe("analyze", () => {
     await ai.analyze({ resumeText: RESUME, report: report(), jobDescription: "x".repeat(30_000) });
     expect(userMessage(provider).jobDescription).toHaveLength(20_000);
   });
+
+  it("cuts the resume it sends to the 50,000 characters the engine reads", async () => {
+    const provider = scriptedProvider(insights());
+    const ai = createAtsAi({ provider, routes, redact: { analyze: false } });
+    await ai.analyze({ resumeText: `${RESUME}\n${"x".repeat(60_000)}`, report: report() });
+    expect(userMessage(provider).resume).toHaveLength(50_000);
+  });
 });
 
 describe("redaction", () => {
@@ -154,6 +162,15 @@ describe("redaction", () => {
     const value = { a: ["Jane Doe", { b: "call 415 555 0199" }], n: 3 };
     expect(redaction.restore(redaction.apply(value))).toEqual(value);
   });
+
+  it.each(["a", "a.", "a-", "1.", "é.", "a.a-", "https://a."])(
+    "finds web addresses in linear time in 150,000 characters of %j",
+    (shape) => {
+      // Longer than the engine reads: a library caller can pass any text.
+      const hostile = shape.repeat(Math.ceil(150_000 / shape.length));
+      expectFast(() => createRedaction(parsed, hostile).apply(hostile), 1_000, shape);
+    },
+  );
 });
 
 describe("repairParse", () => {

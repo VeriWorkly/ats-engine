@@ -32,8 +32,16 @@ export type Redaction = {
 
 const EMAILS = new RegExp(EMAIL.source, "gi");
 
-/** A web address with or without a scheme: "janedoe.dev", "x.com/janedoe", "https://…". */
-const ADDRESS = /(?:https?:\/\/)?(?:[\p{L}\p{N}-]+\.)+\p{L}{2,}(?:\/[^\s|,;()<>]*)?/giu;
+/**
+ * A web address with or without a scheme: "janedoe.dev", "x.com/janedoe", "https://…".
+ *
+ * Linear: a match starts only where a label starts, and a host is at most eight labels of at most
+ * 63 characters (DNS allows no longer label), so each start reads a bounded stretch. Unbounded,
+ * every letter of "aaaa…" or "a.a.a.…" started a scan to the end of the run: 150,000 characters
+ * took 50 seconds.
+ */
+const ADDRESS =
+  /(?<![\p{L}\p{N}-])(?:https?:\/\/)?(?:[\p{L}\p{N}-]{1,63}\.){1,8}\p{L}{2,63}(?:\/[^\s|,;()<>]*)?/giu;
 
 /** What may stand between the digits of a phone number: spaces, brackets, dots, any dash. */
 const PHONE_GAP = String.raw`[\s().\-/‐‑‒–—]*`;
