@@ -9,7 +9,13 @@ npm ci
 npm run check   # build, types, lint, tests, bundle sizes, browser/edge smoke, pack
 ```
 
-Node 22.12 or later. `npm run bench` prints field accuracy over the labelled corpus.
+Node 22.12 or later. `npm run bench` prints field accuracy over the labelled corpus and fails on any
+miss `bench/baseline.json` does not list (a resume, a field and its row), so a field read better
+elsewhere cannot hide one read worse. The baseline is not a goal and is not tuned to pass: it
+records what the engine misses today, and the run says when a listed miss is read right. Update it
+with `npm run bench -- --update` only in the change that earns the difference (a parser fix removes
+misses; a deliberate trade-off adds them, and the commit says why), and review the diff of
+`bench/baseline.json` like any other change. A new field or label that misses also needs an update.
 
 ## The rules
 
