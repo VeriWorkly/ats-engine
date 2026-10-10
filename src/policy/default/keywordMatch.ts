@@ -20,8 +20,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     preferred: String.raw`^(?:nice[\s-]+to[\s-]+haves?|preferred|bonus|desirable|desired|plus)`,
     responsibilities: String.raw`^(?:responsibilities|what\s+you.{0,3}ll\s+do|the\s+role|about\s+the\s+role)`,
     // "About Acme Robotics" is the employer's own section; its name is never a keyword. "About
-    // you" (required) and "About the role" (responsibilities) are matched before this.
-    excluded: String.raw`^(?:about\s+(?:us|the\s+(?:team|company))|benefits|perks|(?:what\s+)?we\s+offer|equal\s+opportunity|our\s+values|why\s+join|about\s+(?!(?:you|your|the|this)(?![\p{L}]))[\p{L}\p{N}&.'-]{1,40}(?:\s+[\p{L}\p{N}&.'-]{1,40}){0,3})`,
+    // you" (required) and "About the role" (responsibilities) are matched before this. What the
+    // job will teach ("Skills you'll gain", "What you'll learn") is not asked of anyone.
+    excluded: String.raw`^(?:about\s+(?:us|the\s+(?:team|company))|benefits|perks|(?:what\s+)?we\s+offer|skills\s+you(?:.{0,3}ll|\s+will)\s+(?:gain|learn|develop|build)|what\s+you(?:.{0,3}ll|\s+will)\s+learn|equal\s+opportunity|our\s+values|why\s+join|about\s+(?!(?:you|your|the|this)(?![\p{L}]))[\p{L}\p{N}&.'-]{1,40}(?:\s+[\p{L}\p{N}&.'-]{1,40}){0,3})`,
   },
   stopwords: [
     "the",

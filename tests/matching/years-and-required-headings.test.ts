@@ -127,6 +127,21 @@ describe("required headings", () => {
     expect(report.missingKeywords).not.toContain("offer");
   });
 
+  it.each([
+    "Skills you'll gain",
+    "Skills you’ll learn",
+    "Skills you will develop",
+    "Skills you'll build",
+    "What you'll learn",
+    "What you’ll learn",
+    "What you will learn",
+  ])("reads nothing under %s as a requirement or a keyword", (heading) => {
+    const report = check(body, `Requirements\n- Python\n${heading}\n- Kubernetes\n- Terraform`);
+    expect(report.requirements.map((r) => r.text)).toEqual(["Python"]);
+    for (const word of ["kubernetes", "terraform", "gain", "learn", "develop", "build"])
+      expect(report.missingKeywords).not.toContain(word);
+  });
+
   it.each(["Skills you'll gain", "Skills you will learn", "Skills we value"])(
     "does not read %s as a required heading",
     (heading) => {
