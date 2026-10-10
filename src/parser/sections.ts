@@ -345,6 +345,24 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
   const gutter = inGutter >= 2 && inGutter > plain.filter((h, at) => h && !cells[at]).length;
   const headings = plain.map((heading, at) => (gutter && cells[at]) || heading);
   const gutters = (at: number) => gutter && cells[at] !== null;
+  // Whether the heading at `at` is set as the page's other headings are: in capitals where they
+  // all are, every word capitalised where they all are, with a colon only where they all have one.
+  const own = lines.flatMap((line, at) => (headings[at] && !gutters(at) ? [line] : []));
+  const styles = [
+    (line: string) => !line.includes(":"),
+    (line: string) => line === line.toUpperCase(),
+    (line: string) =>
+      line
+        .replace(/:.*/u, "")
+        .trim()
+        .split(/\s+/)
+        .every((word) => /^\p{Lu}/u.test(word) || matchers.connector.test(word)),
+  ];
+  const counts = styles.map((style) => own.filter(style).length);
+  const styled = (line: string) =>
+    styles.every(
+      (style, at) => style(line) || counts[at]! - +style(line) < own.length - 1 || own.length < 2,
+    );
   const unknown = unknownHeadings(lines, headings, matchers, policy);
   // Whether a dated line that is not a bullet comes after each line before the next heading:
   // computed once, the first time it is asked.
@@ -375,18 +393,24 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
         ? UNKNOWN
         : null);
     // Inside Skills, a heading with content is a category of skills ("Languages: TypeScript"); in
-    // the gutter, any but the work history and education is ("Languages⇥TypeScript, Go"). Inside
-    // the work history or the projects, a skills heading with content and a dated line after it
-    // is a role's stack ("Tools: Jira, Figma" over the next role).
+    // the gutter, any but the work history and education is ("Languages⇥TypeScript, Go").
     const category =
       heading?.rest &&
-      ((current.kind === "skills" &&
-        heading.kind !== "skills" &&
-        (!gutters(at) || (heading.kind !== "experience" && heading.kind !== "education"))) ||
-        ((current.kind === "experience" || current.kind === "projects") &&
-          heading.kind === "skills" &&
-          datedAfter(at)));
-    if (!heading || category) {
+      current.kind === "skills" &&
+      heading.kind !== "skills" &&
+      (!gutters(at) || (heading.kind !== "experience" && heading.kind !== "education"));
+    // Inside the work history or the projects, with a dated line after it before the next
+    // heading, a heading is a line of the role when it names skills with content after it
+    // ("Technologies: React" over the next role) or is not set as the page's headings are: "Key
+    // Projects:", "Tech Stack" or "Accomplishments" under a role, on a page of headings in
+    // capitals.
+    const inRole =
+      headings[at] &&
+      !gutters(at) &&
+      (current.kind === "experience" || current.kind === "projects") &&
+      datedAfter(at) &&
+      ((heading!.kind === "skills" && heading!.rest !== "") || !styled(line));
+    if (!heading || category || inRole) {
       current.lines.push(line);
       continue;
     }

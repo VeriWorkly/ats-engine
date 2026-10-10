@@ -94,19 +94,17 @@ describe("experience and skills headings beyond software's", () => {
     ["Freelance Experience", "experience"],
     ["Technical Proficiencies", "skills"],
     ["Tech Stack", "skills"],
-    ["Tools", "skills"],
     ["Tools & Technologies", "skills"],
     ["Personal Projects", "projects"],
     ["Academic Projects", "projects"],
     ["Side Projects", "projects"],
-    ["Open Source", "projects"],
     ["Open Source Contributions", "projects"],
     ["Professional Summary", "other"],
     ["Career Summary", "other"],
     ["Executive Summary", "other"],
-    ["Volunteer", "other"],
     ["Volunteer Experience", "other"],
-    ["Leadership", "other"],
+    ["Volunteer Work", "other"],
+    ["Open Source Projects", "projects"],
     ["Leadership & Activities", "other"],
     ["Qualifications", "other"],
     ["Summary of Qualifications", "other"],
@@ -149,6 +147,61 @@ describe("experience and skills headings beyond software's", () => {
       expect(parsed.skills).toEqual(["Go", "Rust"]);
     },
   );
+
+  /** A role with `sub` under it, then another role, on a page of headings in capitals. */
+  const underRole = (sub: string) =>
+    parse(
+      `Jordan Ellery\njordan.ellery@example.com | (415) 555-0132\nEXPERIENCE\nSenior Engineer, Acme Corp\tJan 2020 - Present\n- Built the payments platform\n${sub}\nEngineer, Globex Inc\tMar 2016 - Dec 2019\n- Built search\nEDUCATION\nB.S. Mathematics, Ohio State University, 2016`,
+    );
+
+  it.each([
+    "Accomplishments:\n- Shipped v2",
+    "Key Accomplishments:\n- Shipped v2",
+    "Key Projects:\n- Ledger rewrite",
+    "Selected Projects\n- Ledger rewrite",
+    "Tools:\nJira, Figma, Confluence",
+    "Tools: Jira, Figma",
+    "Tech Stack\nReact, Node.js, PostgreSQL",
+    "Leadership:\n- Led 5 engineers",
+    "Qualifications\n- PMP",
+  ])("keeps a role's sub-heading %j inside the role", (sub) => {
+    const parsed = underRole(sub);
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp", "Globex Inc"]);
+    expect(parsed.skills.join(" ")).not.toContain("Globex");
+  });
+
+  it("still opens a section at a heading set as the page's others are, over dated lines", () => {
+    const parsed = underRole("PROJECTS\nLedger Rewrite\tJan 2018 - Dec 2018");
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+  });
+
+  const skillsOf = (lines: string) =>
+    parse(
+      `Jordan Ellery\njordan.ellery@example.com\nEXPERIENCE\nSenior Engineer, Acme Corp\tJan 2020 - Present\n- Built the payments platform\nSKILLS\n${lines}`,
+    ).skills;
+
+  it("keeps a skill that is also a heading word in the skills", () => {
+    expect(skillsOf("Python\nGo\nLeadership\nCommunication\nTeamwork")).toEqual([
+      "Python",
+      "Go",
+      "Leadership",
+      "Communication",
+      "Teamwork",
+    ]);
+    expect(skillsOf("Python, Go\nOpen Source\nReact, Kubernetes contributor")).toEqual(
+      expect.arrayContaining(["Open Source", "React"]),
+    );
+    expect(skillsOf("Python, Go\nLeadership Skills\nMentoring, Hiring")).toEqual(
+      expect.arrayContaining(["Mentoring", "Hiring"]),
+    );
+  });
+
+  it("reads a role titled with a heading word as a role", () => {
+    // Neither part holds a title word, so which is the title is the order's guess, as before.
+    expect(
+      underRole("Volunteer Firefighter\nAustin Fire Dept\tJan 2015 - Dec 2019").roles,
+    ).toHaveLength(3);
+  });
 
   it("closes Education at a heading it does not know, written like the ones it does", () => {
     const sections = segmentResume(
