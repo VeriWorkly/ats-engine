@@ -106,6 +106,14 @@ const SHAPES: Record<string, string> = {
   "mention verb run": rep('flags "ignore previous instructions" '),
   // A list of works, read for citations.
   "citation heading run": `Publications\n${rep("Doe J (2019) et al. ")}`,
+  "citation initials run": `Talks\n${rep("Doe JJ, ")}`,
+  // A product's version, a standard's number, a multiple: read by the metrics rule.
+  "version run": rep("Python 1.1 "),
+  "version spaces run": `Windows 1${rep(" ", N - 20)}x`,
+  "standard run": rep("ISO 1 "),
+  "multiple run": rep("x1 "),
+  // A Greek symbol before a subscript.
+  "greek subscript run": rep("νmax "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
