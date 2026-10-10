@@ -167,6 +167,7 @@ describe("a surname that is also a job title", () => {
     "Morgan Lawyer",
     "Morgan Mechanic",
     "Maria Teller-Smith",
+    "Morgan Teacher",
   ])("is still the name: %j", (person) => {
     expect(
       name(
