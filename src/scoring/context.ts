@@ -22,14 +22,9 @@ import { parseResumeDocument } from "../document/parse.js";
 import type { PreparedResume } from "../input.js";
 import { BULLET, wordListRegex, words } from "../text/text.js";
 import { statesDateOfBirth } from "../parser/contact.js";
-import { parseQuality, parseReadLines } from "../parser/index.js";
+import { parseQuality, parseReadLines, readSections } from "../parser/index.js";
 import { readResumeLines } from "../parser/lines.js";
-import {
-  headedKinds,
-  isHeadingLine,
-  segmentResume,
-  type ResumeSection,
-} from "../parser/sections.js";
+import { headedKinds, isHeadingLine, type ResumeSection } from "../parser/sections.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsLayoutSignals, AtsParsedResume } from "../types.js";
 import { memo } from "../util/memo.js";
@@ -98,7 +93,7 @@ export function readResume(
   },
 ): ReadResume {
   const { lines, spaced } = readResumeLines(prepared.text.split(/\n+/), policy);
-  const sections = segmentResume(lines, policy);
+  const sections = readSections(lines, policy);
   const text = lines.join(" ").replace(/\s+/g, " ").trim();
   const parsed = prepared.document
     ? parseResumeDocument(prepared.document, policy, now)

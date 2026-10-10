@@ -1643,7 +1643,7 @@
     "sections": {
       "experience": "^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment)\\s+)?(?:experience|employment|history)|^internships?|^academic\\s+(?:appointments|positions)|^professional\\s+background",
       "education": "^educational\\s+(?:background|qualifications?|history|details)|^education|^academic\\s+(?:background|qualifications?|history|record|credentials)",
-      "skills": "^(?:(?:technical|core|key)\\s+)?skills|^technologies|^core\\s+competenc(?:y|ies)|^areas\\s+of\\s+expertise",
+      "skills": "^(?:(?:technical|core|key|top)\\s+)?skills|^technologies|^core\\s+competenc(?:y|ies)|^areas\\s+of\\s+expertise",
       "projects": "^projects",
       "certifications": "^(?:(?:professional\\s+)?certifications?|certificates|licen[cs]es?|licensure|credentials)",
       "languages": "^(?:(?:spoken|foreign)\\s+)?languages|^language\\s+(?:skills|proficienc(?:y|ies)|competenc(?:y|ies))",

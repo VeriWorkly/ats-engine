@@ -6,7 +6,11 @@ import {
   type AtsEnginePolicy,
   type AtsResumeInput,
 } from "../../src/index.js";
+import { prepareResume } from "../../src/input.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
+import { extractResume } from "../../src/node/extract.js";
+import { readResume } from "../../src/scoring/context.js";
+import { buildPdf } from "../fixtures/buildPdf.js";
 import { livePolicy } from "../fixtures/livePolicy.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -334,6 +338,107 @@ describe("bullets, headings and bounded scans", () => {
       "Requirements\n      - Proficient communicator\n      - Kubernetes",
     );
     expect(missingKeywords[0]).toBe("kubernetes");
+  });
+});
+
+describe("a LinkedIn profile export", () => {
+  // A sidebar (Contact, Top Skills, Languages) read before the name, and roles grouped under
+  // their employer with the time there on a line of its own.
+  const SIDEBAR = [
+    "Contact",
+    "jordan.ellery@example.com",
+    "www.linkedin.com/in/jordanellery",
+    "Top Skills",
+    "Kubernetes",
+    "TypeScript",
+    "PostgreSQL",
+  ];
+  const MAIN = [
+    "Jordan Ellery",
+    "Senior Software Engineer at Acme Corp",
+    "Austin, Texas, United States",
+    "Summary",
+    "Backend engineer with nine years building payment systems.",
+    "Experience",
+    "Acme Corp",
+    "4 years 9 months",
+    "Senior Software Engineer",
+    "January 2022 - Present (4 years 9 months)",
+    "Austin, Texas, United States",
+    "- Built a billing service handling 2M requests a day",
+    "Software Engineer",
+    "September 2019 - December 2021 (2 years 4 months)",
+    "- Wrote the ledger reconciliation job",
+    "Education",
+    "Ohio State University",
+    "Bachelor of Science - BS, Computer Science · (2015 - 2019)",
+  ];
+  const read = (
+    resume: AtsResumeInput,
+    layout?: Parameters<typeof AtsScoringService.check>[2]["layout"],
+  ) => {
+    const { parsed } = AtsScoringService.check(resume, DEFAULT_POLICY, { now: NOW, layout });
+    return {
+      name: parsed.name,
+      roles: parsed.roles.map(({ title, employer }) => ({ title, employer })),
+      skills: parsed.skills,
+      schools: parsed.education.map((row) => row.school),
+    };
+  };
+  const EXPECTED = {
+    name: "Jordan Ellery",
+    roles: [
+      { title: "Senior Software Engineer", employer: "Acme Corp" },
+      { title: "Software Engineer", employer: "Acme Corp" },
+    ],
+    skills: ["Kubernetes", "TypeScript", "PostgreSQL"],
+    schools: ["Ohio State University"],
+  };
+
+  it("reads the name, the roles under their employer, and the top skills", () => {
+    expect(read([...SIDEBAR, ...MAIN].join("\n"))).toEqual(EXPECTED);
+  });
+
+  it("reads the same from the two-column PDF", async () => {
+    const esc = (value: string) => value.replace(/([()\\])/g, "\\$1");
+    const column = (x: number, rows: Array<[string, number]>) => {
+      let y = 740;
+      return rows.map(([value, size]) => {
+        const op = `BT /F1 ${size} Tf ${x} ${y} Td (${esc(value)}) Tj ET`;
+        y -= size + 6;
+        return op;
+      });
+    };
+    const heading = (value: string) => ["Contact", "Top Skills", "Languages"].includes(value);
+    const side = column(
+      40,
+      [...SIDEBAR, "Languages", "English (Native or Bilingual)"].map((value) => [
+        value,
+        heading(value) ? 11 : 8,
+      ]),
+    );
+    const main = column(
+      200,
+      MAIN.map((value, index) => [value, index === 0 ? 22 : 10]),
+    );
+    const extracted = await extractResume(buildPdf([...side, ...main].join("\n")), "pdf");
+    expect(read(extracted.text, extracted.layout)).toEqual(EXPECTED);
+  });
+
+  it("gives the scoring the sections the parser reads", () => {
+    const { sections } = readResume(
+      prepareResume([...SIDEBAR, ...MAIN].join("\n")),
+      DEFAULT_POLICY,
+      {
+        now: NOW,
+      },
+    );
+    const skills = sections.filter((section) => section.kind === "skills");
+    expect(skills.flatMap((section) => section.lines)).toEqual([
+      "Kubernetes",
+      "TypeScript",
+      "PostgreSQL",
+    ]);
   });
 });
 

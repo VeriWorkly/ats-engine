@@ -217,10 +217,15 @@ export function parseRoles(
       !opensWithVerb.test(line)
     );
   };
+  // How long a role or a stay at an employer ran, on a line of its own ("4 years 9 months" under
+  // LinkedIn's employer): neither a title nor an employer.
+  const durationOnly = (line: string | undefined) =>
+    line !== undefined && !/[\p{L}\p{N}]/u.test(line.replace(duration, ""));
   const isHeader = (line: string | undefined): line is string =>
     line !== undefined &&
     !BULLET.test(line) &&
     (isHeadingLine(line.replace(/\.$/, "")) || isPartedHeader(line.replace(/\.$/, ""))) &&
+    !durationOnly(line) &&
     !findDateRange(line, rp, now);
   const isLongHeader = (line: string | undefined): line is string =>
     line !== undefined &&
@@ -350,9 +355,10 @@ export function parseRoles(
     // over a title and its dates, then more titles and dates. The employer line names every role
     // under it, until a role names its own. It opens a group, so it starts the section or follows
     // the bullets of the role before; anywhere else, and as a place ("San Francisco, CA"), it is
-    // the end of the role before.
+    // the end of the role before. LinkedIn prints the time at the employer between it and the
+    // first title ("Acme Corp" / "4 years 9 months" / "Senior Engineer").
     if (split.title && !employer) {
-      const above = top - 1;
+      const above = durationOnly(lines[top - 1]) && !used.has(top - 1) ? top - 2 : top - 1;
       if (
         titled(top) &&
         free(above) &&

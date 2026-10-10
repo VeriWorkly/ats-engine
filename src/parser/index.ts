@@ -122,16 +122,40 @@ export function parseResume(
 }
 
 /**
+ * The resume's sections, with the name's line opening a block of its own when the name was read
+ * over a headline further down. A sidebar read before the main column (a LinkedIn export: "Top
+ * Skills" over its skills, then the name) leaves the name, the headline and the city under the
+ * sidebar's last heading, where they were read as skills or certifications. Only such a name
+ * cuts a section: one taken from a list's rows for want of another is one of its rows.
+ */
+export function readSections(lines: string[], policy: AtsEnginePolicy): ResumeSection[] {
+  const sections = segmentResume(lines, policy);
+  const { name, headlined } = findName(lines, policy);
+  if (!headlined) return sections;
+  const at = sections.findIndex((section) => section.lines.some((line) => line.trim() === name));
+  const section = sections[at];
+  if (!section?.headed) return sections;
+  const cut = section.lines.findIndex((line) => line.trim() === name);
+  return [
+    ...sections.slice(0, at),
+    { ...section, lines: section.lines.slice(0, cut) },
+    { kind: "other", lines: section.lines.slice(cut), headed: false },
+    ...sections.slice(at + 1),
+  ];
+}
+
+/**
  * `parseResume` on lines already through `readResumeLines`, as `check` has them, and already
- * segmented when the caller has done that too.
+ * read into sections (`readSections`) when the caller has done that too.
  */
 export function parseReadLines(
   lines: string[],
   policy: AtsEnginePolicy,
   now: Date,
-  sections = segmentResume(lines, policy),
+  sections = readSections(lines, policy),
 ): AtsParsedResume {
   const joined = lines.join("\n");
+  const { name } = findName(lines, policy);
 
   const take = (kind: ResumeSectionKind) =>
     sections.filter((section) => section.kind === kind).flatMap((section) => section.lines);
@@ -202,7 +226,7 @@ export function parseReadLines(
 
   return finalizeParsed(
     {
-      name: findName(lines, policy),
+      name,
       email: joined.match(EMAIL)?.[0] ?? "",
       phone: findPhone(joined, policy, now),
       links: (joined.match(LINK) ?? []).map((link) =>

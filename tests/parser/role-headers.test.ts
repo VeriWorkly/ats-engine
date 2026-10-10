@@ -142,3 +142,23 @@ describe("an employer whose name holds an employer word", () => {
     });
   });
 });
+
+describe("the time at an employer on a line of its own", () => {
+  it("is neither the title nor the employer of the roles under the employer", () => {
+    expect(
+      rolesIn(
+        "Acme Corp",
+        "4 years 9 months",
+        "Senior Software Engineer",
+        "January 2022 - Present (4 years 9 months)",
+        "Austin, Texas, United States",
+        "- Built a billing service handling 2M requests a day",
+        "Software Engineer",
+        "September 2019 - December 2021 (2 years 4 months)",
+      ),
+    ).toEqual([
+      { title: "Senior Software Engineer", employer: "Acme Corp" },
+      { title: "Software Engineer", employer: "Acme Corp" },
+    ]);
+  });
+});
