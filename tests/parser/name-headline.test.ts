@@ -88,6 +88,19 @@ describe("the name when a sidebar is read first", () => {
     expect(name(text)).toBe("Jordan Ellery");
   });
 
+  it.each([
+    "Helping fintechs ship faster | Payments | Distributed Systems",
+    "Building calm, reliable payment systems for small businesses everywhere",
+  ])("reads the name over a headline with no title, above where the person is: %j", (headline) => {
+    const text = linkedIn(["Machine Learning", "Kubernetes"]).replace(
+      "Senior Software Engineer at Acme Corp",
+      headline,
+    );
+    const { parsed } = AtsScoringService.check(text, DEFAULT_POLICY);
+    expect(parsed.name).toBe("Jordan Ellery");
+    expect(parsed.skills).toEqual(["Machine Learning", "Kubernetes"]);
+  });
+
   it("keeps a skills list that opens the page when no name is found", () => {
     const text = [
       "Skills",

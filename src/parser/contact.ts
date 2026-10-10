@@ -1,6 +1,6 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { wordListPattern } from "../text/text.js";
-import { placeWords, splitTitleAndEmployer, titleWordsOf } from "./experience.js";
+import { isPlace, placeWords, splitTitleAndEmployer, titleWordsOf } from "./experience.js";
 import { isSectionHeading, sectionKind } from "./sections.js";
 import { memo } from "../util/memo.js";
 
@@ -28,6 +28,9 @@ export const EMAIL =
  */
 export const LINK =
   /(?:https?:\/\/|www\.)[^\s|,]+|(?:linkedin\.com|github\.com|gitlab\.com|bitbucket\.org|dribbble\.com|behance\.net|orcid\.org|medium\.com|stackoverflow\.com|kaggle\.com|scholar\.google\.com)\/[^\s|,]+|(?<![\w.@/-])[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9][a-z0-9-]{0,62}){0,3}\.dev(?![\w@-])(?:\/[^\s|,]*)?/gi;
+
+/** A LinkedIn profile's address, which a LinkedIn export prints in its contact block. */
+const LINKEDIN_PROFILE = /linkedin\.com\/in\//i;
 
 /**
  * A word of a name: capitalised in a script with case ("Jane", "DOE", "O'Brien", "F."), or any
@@ -213,6 +216,24 @@ export function findName(
       if (isSectionHeading(next, policy)) continue;
       const found = nameIn(line, index + 1, false);
       if (found && !found.cut) return found.name;
+    }
+    return exported();
+  };
+
+  // A LinkedIn export read sidebar first (its contact block with the profile's address, then
+  // "Top Skills"): the name is over the headline, and the headline over where the person is,
+  // whatever the headline says ("Helping fintechs ship faster | Payments").
+  const exported = () => {
+    const profile = trimmed.slice(0, 40).findIndex((line) => LINKEDIN_PROFILE.test(line));
+    if (profile === -1) return "";
+    for (let at = profile + 1; at < Math.min(trimmed.length, 40); at += 1) {
+      const line = trimmed[at]!;
+      if (sectionKind(line, policy) === "experience") break;
+      const [headline, where] = [trimmed[at + 1], trimmed[at + 2]];
+      if (!headline || !where || !isPlace(where, policy) || isPlace(headline, policy)) continue;
+      if (isSectionHeading(headline, policy)) continue;
+      const found = nameIn(line, at + 1, false);
+      if (found && !found.cut && !found.place) return found.name;
     }
     return "";
   };
