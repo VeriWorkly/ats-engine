@@ -63,9 +63,12 @@ Releases go out from `main` through changesets and `.github/workflows/release.ym
    the lockfile, and `npm run rubric`.
 3. Merging that pull request leaves no changesets pending, so the workflow runs
    `npm run release` (`npm run check`, then `changeset publish`): each new version is published
-   to npm with provenance and tagged `<name>@<version>`, and a new engine version is published to
-   GitHub Packages too (`.github/workflows/github-packages.yml`). A new MCP server version is
-   then listed in the official MCP Registry with `mcp-publisher` over GitHub OIDC, under
+   to npm with provenance by trusted publishing (npm exchanges the workflow's GitHub OIDC token
+   for a short-lived one; each package names `VeriWorkly/ats-engine` and `release.yml` as its
+   trusted publisher on npmjs.com, and no npm token is stored as a secret) and tagged
+   `<name>@<version>`, and a new engine version is published to GitHub Packages too
+   (`.github/workflows/github-packages.yml`). A new MCP server version is then listed in the
+   official MCP Registry with `mcp-publisher` over GitHub OIDC, under
    `io.github.VeriWorkly/ats-engine` (the registry compares the casing). Nothing publishes
    without that pull request.
 

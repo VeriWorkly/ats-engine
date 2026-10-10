@@ -2,6 +2,9 @@ name: Release
 
 # On main: opens (or updates) a "Version Packages" pull request from the pending changesets.
 # Merging that pull request publishes to npm with provenance. Nothing publishes without it.
+# npm trusted publishing: npm exchanges this workflow's GitHub OIDC token (id-token below) for a
+# short-lived publish token, so no npm token is stored as a secret. Each package names this
+# repository and release.yml as its trusted publisher in its npm settings.
 on:
   push:
     branches: [main]
@@ -11,7 +14,7 @@ concurrency: release
 permissions:
   contents: write
   pull-requests: write
-  id-token: write # npm provenance
+  id-token: write # npm trusted publishing and provenance, and the MCP Registry login
   actions: write # starts the GitHub Packages workflow
 
 jobs:
@@ -23,7 +26,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          registry-url: https://registry.npmjs.org
+          # No registry-url: with one, setup-node writes an .npmrc whose _authToken is
+          # ${NODE_AUTH_TOKEN}, set to a placeholder when no secret is given, and every npm call
+          # sends it. Without it npm reads the public registry anonymously and publishes with
+          # the token its OIDC exchange returns.
+      # Trusted publishing needs npm 11.5.1 or later and Node 22.14 or later (`22` is the latest
+      # 22.x); Node 22 ships npm 10. Pinned exactly, at a version out for two weeks or more.
+      - run: npm install -g npm@11.20.0 && npm -v
       - run: npm ci
       # v2 reads the output of @changesets/cli v3; v1 published but could not see it, so it
       # created no git tag and no GitHub release.
@@ -32,10 +41,6 @@ jobs:
         with:
           version-script: npm run version-packages
           publish-script: npm run release
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
       # The same engine version on GitHub's registry, so it is listed under the repository's
       # Packages. With two packages in the workspace, changesets tags each release as
       # "<name>@<version>", and a release may publish the MCP server alone.
