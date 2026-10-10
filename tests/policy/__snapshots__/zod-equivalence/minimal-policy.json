@@ -926,6 +926,27 @@
       "work from home",
       "wfh"
     ],
+    "organisationWords": [
+      "inc\\.?",
+      "incorporated",
+      "l\\.?l\\.?c\\.?",
+      "l\\.?l\\.?p\\.?",
+      "ltd\\.?",
+      "limited",
+      "plc",
+      "gmbh",
+      "corp\\.?",
+      "corporation",
+      "co(?!-)\\.?",
+      "company",
+      "pvt\\.?",
+      "pty\\.?",
+      "hospital",
+      "clinic",
+      "bank",
+      "foundation",
+      "ministry"
+    ],
     "headingConnectors": [
       "and"
     ],

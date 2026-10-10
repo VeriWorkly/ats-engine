@@ -162,3 +162,48 @@ describe("the time at an employer on a line of its own", () => {
     ]);
   });
 });
+
+describe("a comma inside the title", () => {
+  it.each([
+    [
+      "Director, Product Management | Acme Corp | Jan 2020 - Present",
+      "Director, Product Management",
+      "Acme Corp",
+    ],
+    [
+      "Director, Product Management | Acme Corp | Austin, TX",
+      "Director, Product Management",
+      "Acme Corp",
+    ],
+    [
+      "Director, Product Management — Northwind Bank",
+      "Director, Product Management",
+      "Northwind Bank",
+    ],
+    [
+      "Teaching Assistant, Physics | Ohio State University",
+      "Teaching Assistant, Physics",
+      "Ohio State University",
+    ],
+    ["VP, Engineering, Acme, Inc.", "VP, Engineering", "Acme, Inc"],
+    ["VP, Engineering, Acme Corp", "VP, Engineering", "Acme Corp"],
+    [
+      "Senior Engineer, Platform Team, Northwind Inc., Austin, TX",
+      "Senior Engineer, Platform Team",
+      "Northwind Inc",
+    ],
+  ])("keeps the title of %j whole", (header, title, employer) => {
+    expect(roleOf(header)).toMatchObject({ title, employer });
+  });
+
+  it.each([
+    // A comma part beside a place, or a city and its country, is still the employer.
+    ["Senior Engineer, Acme — Austin, TX", "Senior Engineer", "Acme"],
+    ["Senior Engineer, Acme | Remote", "Senior Engineer", "Acme"],
+    ["Software Engineer, Acme | Berlin, Germany", "Software Engineer", "Acme, Berlin, Germany"],
+    // Without a company's legal form after it, a third part is where.
+    ["Software Engineer, Acme, Berlin", "Software Engineer", "Acme, Berlin"],
+  ])("still reads the employer after the comma in %j", (header, title, employer) => {
+    expect(roleOf(header)).toMatchObject({ title, employer });
+  });
+});

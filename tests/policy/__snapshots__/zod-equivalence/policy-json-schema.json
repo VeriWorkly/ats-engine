@@ -1890,6 +1890,35 @@
               "minLength": 1
             }
           },
+          "organisationWords": {
+            "default": [
+              "inc\\.?",
+              "incorporated",
+              "l\\.?l\\.?c\\.?",
+              "l\\.?l\\.?p\\.?",
+              "ltd\\.?",
+              "limited",
+              "plc",
+              "gmbh",
+              "corp\\.?",
+              "corporation",
+              "co(?!-)\\.?",
+              "company",
+              "pvt\\.?",
+              "pty\\.?",
+              "hospital",
+              "clinic",
+              "bank",
+              "foundation",
+              "ministry"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "headingConnectors": {
             "default": [
               "and"
@@ -3278,6 +3307,14 @@
                     "minLength": 1
                   }
                 },
+                "organisationWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "openEnded": {
                   "minItems": 1,
                   "type": "array",
@@ -3745,6 +3782,14 @@
                   }
                 },
                 "workplaceWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "organisationWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -6262,6 +6307,35 @@
               "minLength": 1
             }
           },
+          "organisationWords": {
+            "default": [
+              "inc\\.?",
+              "incorporated",
+              "l\\.?l\\.?c\\.?",
+              "l\\.?l\\.?p\\.?",
+              "ltd\\.?",
+              "limited",
+              "plc",
+              "gmbh",
+              "corp\\.?",
+              "corporation",
+              "co(?!-)\\.?",
+              "company",
+              "pvt\\.?",
+              "pty\\.?",
+              "hospital",
+              "clinic",
+              "bank",
+              "foundation",
+              "ministry"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "headingConnectors": {
             "default": [
               "and"
@@ -6380,6 +6454,7 @@
           "postNominals",
           "regionCodes",
           "workplaceWords",
+          "organisationWords",
           "headingConnectors",
           "dateOfBirthLabels",
           "dateOrder",
@@ -7700,6 +7775,14 @@
                     "minLength": 1
                   }
                 },
+                "organisationWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "openEnded": {
                   "minItems": 1,
                   "type": "array",
@@ -8167,6 +8250,14 @@
                   }
                 },
                 "workplaceWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "organisationWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {

@@ -266,6 +266,33 @@ export const resumeParseSchema = z.object({
     "wfh",
   ]),
   /**
+   * Words that name an organisation rather than a job title, besides `schoolWords`: a company's
+   * legal form ("Acme Corp", "Globex GmbH") or an institution's kind ("Mercy Hospital"). They
+   * tell an employer from a title's qualifier ("VP, Engineering, Acme Corp"). "Co" is one only
+   * when no hyphen follows: "Co-Founder" is a title.
+   */
+  organisationWords: z._default(wordList("organisationWords"), [
+    String.raw`inc\.?`,
+    "incorporated",
+    String.raw`l\.?l\.?c\.?`,
+    String.raw`l\.?l\.?p\.?`,
+    String.raw`ltd\.?`,
+    "limited",
+    "plc",
+    "gmbh",
+    String.raw`corp\.?`,
+    "corporation",
+    String.raw`co(?!-)\.?`,
+    "company",
+    String.raw`pvt\.?`,
+    String.raw`pty\.?`,
+    "hospital",
+    "clinic",
+    "bank",
+    "foundation",
+    "ministry",
+  ]),
+  /**
    * Lowercase words a capitalised heading may join its words with: "Skills and Tools". Any other
    * lowercase word after the heading word reads as prose ("History of Art BA").
    */
