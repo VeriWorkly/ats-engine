@@ -1,5 +1,13 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [ea2d476]
+- Updated dependencies [92b7ae9]
+  - @veriworkly/ats-engine@0.5.0
+
 ## 0.3.1
 
 ### Patch Changes
