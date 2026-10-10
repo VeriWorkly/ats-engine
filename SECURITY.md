@@ -69,7 +69,12 @@ What does not depend on the model:
 - `analyze` redacts the name, email, phone and links before the request leaves (postal addresses
   are not recognised). Parse repair and conversion must see contact details and do not redact.
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
-  including text smuggled in Unicode tag characters or PDF metadata.
+  including text smuggled in Unicode tag characters or PDF metadata. A phrase in quotes or
+  backticks, or a delimiter token ("[INST]"), after a word on its line that says it was caught
+  (`text.injectionMentionVerbs`: "flags", "blocked", "red-teamed") is an AI security engineer's
+  example and is not flagged: `Built a filter that flags "ignore previous instructions"`. An
+  attacker can dress an instruction so too, and a model reading the resume may still follow it;
+  the rule trades that for not failing honest security work. Unquoted, or hidden, it is flagged.
 
 **API keys in the CLI.** `ats-engine check --ai` reads the key from the environment only, never
 from a flag, so it does not land in shell history or the process list, and never prints it. The

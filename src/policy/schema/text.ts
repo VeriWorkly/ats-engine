@@ -366,7 +366,10 @@ export const engineTextSchema = z.prefault(
       String.raw`(?:give|award|assign)\s+(?:this|my)\s+(?:resume|cv|candidate|applicant|profile|application)\s+(?:an?\s+|the\s+)?(?:10\s*/\s*10|100\s*/\s*100|perfect|full\s+marks|top\s+(?:score|marks|rating)|highest|maximum)`,
       // Not "system prompt:", which an engineer writes about the prompts they built.
       String.raw`(?:new|updated|real)\s+(?:instructions?|prompt)\s*:|system\s+instructions?\s*:`,
-      String.raw`(?:you\s+are|pretend\s+to\s+be)\s+(?:an?\s+)?(?:ai|assistant|language\s+model|llm|recruiter|hiring\s+manager|resume\s+screener)`,
+      String.raw`(?:you\s+are|pretend\s+to\s+be)\s+(?:an?\s+)?(?:ai|assistant|language\s+model|llm|resume\s+screener)`,
+      // A person's role, said to a screener; not "If you are a hiring manager looking for…",
+      // which a person writes to a person.
+      String.raw`(?:(?<!(?:if|when)\s{1,3})you\s+are|pretend\s+to\s+be)\s+(?:an?\s+)?(?:recruiter|hiring\s+manager)`,
       // "Act as" is a recruiter's job description ("act as hiring manager"), so it counts only
       // with an AI for its object.
       String.raw`act\s+as\s+(?:an?\s+)?(?:(?:ai|automated)\s+(?:assistant|recruiter|screener|reviewer|hiring\s+manager|model)|language\s+model|llm|resume\s+screener)`,
@@ -385,6 +388,29 @@ export const engineTextSchema = z.prefault(
       String.raw`(?:respond|reply|answer|output)\s+with\s+(?:yes|hire|qualified)(?=\s*(?:[.!;"”\n]|$))`,
       // A markdown "### System Design" heading is not a prompt delimiter; "### System:" is.
       String.raw`<\|?(?:im_start|system|endoftext)\|?>|\[/?(?:inst|system)\]|###\s*(?:instructions?|system\s*:)`,
+    ]),
+    /**
+     * Words that say an injection phrase was caught, not given: `Built a filter that flags
+     * "ignore previous instructions"`. A phrase in quotes or backticks, or a delimiter token
+     * ("<|im_start|>", "[INST]"), after one of these on its line is an example an AI security
+     * engineer quotes, and is not counted. Unquoted, or in text hidden in tag characters, it
+     * still is.
+     */
+    injectionMentionVerbs: z._default(wordList("text.injectionMentionVerbs"), [
+      String.raw`flag(?:s|ged|ging)?`,
+      String.raw`detect(?:s|ed|ing|ion|ions)?`,
+      String.raw`block(?:s|ed|ing)?`,
+      String.raw`filter(?:s|ed|ing)?`,
+      String.raw`catch(?:es|ing)?`,
+      "caught",
+      String.raw`prevent(?:s|ed|ing)?`,
+      String.raw`mitigat(?:e|es|ed|ing)`,
+      String.raw`red[\s-]?team(?:s|ed|ing)?`,
+      String.raw`test(?:s|ed|ing)?`,
+      String.raw`scan(?:s|ned|ning)?`,
+      String.raw`spot(?:s|ted|ting)?`,
+      String.raw`reject(?:s|ed|ing)?`,
+      String.raw`saniti[sz](?:e|es|ed|ing)`,
     ]),
   }),
   // `prefault`, not `default`: zod 4's `default` returns the fallback as-is without parsing it,
