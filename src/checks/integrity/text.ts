@@ -74,11 +74,14 @@ export function injectionPhrases(text: string, smuggled: string, policy: AtsEngi
 /**
  * A Greek letter drawn like a Latin one ("ο", "Ρ", "α"), beside a lowercase Latin letter: "Pythοn"
  * with an omicron. Science names Greek letters after capitals and digits ("TNFα", "NFκB") and
- * uses "μ" as a unit; none of those is a look-alike.
+ * uses "μ" as a unit; none of those is a look-alike. Nor is a lowercase symbol opening a term
+ * ("νmax", "αhelix", "ρmax", "χsquared"); a capital or "ι", "ο", "υ", which name no symbol
+ * there, still is ("οracle").
  */
-const LOOKALIKE = String.raw`[\u{0391}\u{0392}\u{0395}-\u{0397}\u{0399}\u{039A}\u{039C}\u{039D}\u{039F}\u{03A1}\u{03A4}\u{03A5}\u{03A7}\u{03B1}\u{03B3}\u{03B5}\u{03B9}\u{03BA}\u{03BD}\u{03BF}\u{03C1}\u{03C5}\u{03C7}]`;
+const OPENING = String.raw`\u{0391}\u{0392}\u{0395}-\u{0397}\u{0399}\u{039A}\u{039C}\u{039D}\u{039F}\u{03A1}\u{03A4}\u{03A5}\u{03A7}\u{03B9}\u{03BF}\u{03C5}`;
+const LOOKALIKE = String.raw`[${OPENING}\u{03B1}\u{03B3}\u{03B5}\u{03BA}\u{03BD}\u{03C1}\u{03C7}]`;
 const GREEK_IN_LATIN = new RegExp(
-  String.raw`(?=\p{Ll})\p{Script=Latin}${LOOKALIKE}|${LOOKALIKE}(?=\p{Ll})\p{Script=Latin}`,
+  String.raw`(?=\p{Ll})\p{Script=Latin}${LOOKALIKE}|(?:(?<=\p{L})${LOOKALIKE}|^[${OPENING}])(?=\p{Ll})\p{Script=Latin}`,
   "u",
 );
 
