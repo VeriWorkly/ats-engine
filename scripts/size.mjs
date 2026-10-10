@@ -37,7 +37,9 @@ const BUDGETS = {
   // distinct warnings, over 2 MB) took it to 20.0, and reading only a regular local file, measured
   // before it is opened and read through one bounded handle (no network path, pipe or device), to
   // 20.2. The rest is little room: the next addition trims or argues for more.
-  "./node": 20.5,
+  // 20.6: reading a PDF's running header and footer once and its page numbers not at all (between
+  // two pages they parted a role's title from its dates) took it from 20.20 to 20.57.
+  "./node": 20.6,
 };
 
 let failed = false;

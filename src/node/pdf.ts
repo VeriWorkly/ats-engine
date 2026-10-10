@@ -5,7 +5,7 @@ import type { AtsLayoutSignals } from "../types.js";
 import { MAX_HIDDEN_TEXT } from "./docx.js";
 import { measureVisibility, seeThroughImages } from "./hidden.js";
 import type { Box } from "./surroundings.js";
-import { pageText, withLinks, type PdfTextItem } from "./lines.js";
+import { joinPages, pageText, withLinks, type PdfTextItem } from "./lines.js";
 import { optional } from "./peer.js";
 
 /** Pages whose pictures and ruled tables are counted, here and by pdf-parse. */
@@ -68,7 +68,8 @@ async function readPdf(
     });
 
   try {
-    let text = "";
+    let chars = 0;
+    const pages: Array<{ lines: string[]; ys: number[] }> = [];
     let columnRatio: number | null = null;
     const hidden: string[] = [];
     const links: string[] = [];
@@ -78,7 +79,7 @@ async function readPdf(
     let visibilityRead = true;
     let measured = 0;
 
-    for (let number = 1; number <= document.numPages && text.length < maxChars; number += 1) {
+    for (let number = 1; number <= document.numPages && chars < maxChars; number += 1) {
       const page = await document.getPage(number);
       const viewport = page.getViewport({ scale: 1 });
       const toViewport = (x: number, y: number) => viewport.convertToViewportPoint(x, y);
@@ -141,7 +142,8 @@ async function readPdf(
       }
 
       const lines = pageText(textItems, toViewport, viewport.width, marks);
-      text += `${lines.text}\n\n`;
+      pages.push(lines);
+      chars += lines.text.length + 2;
       // The worst page wins: one two-column page is a two-column resume, and averaging it
       // against clean pages would hide exactly the problem worth reporting.
       if (lines.columns !== null) columnRatio = Math.max(columnRatio ?? 0, lines.columns);
@@ -170,7 +172,7 @@ async function readPdf(
 
     return {
       tables,
-      text: withLinks(text, links),
+      text: withLinks(joinPages(pages), links),
       geometry: {
         ...(metadataText && { metadataText }),
         ...(encrypted && { encrypted }),

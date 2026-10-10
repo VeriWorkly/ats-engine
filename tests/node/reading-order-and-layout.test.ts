@@ -5,7 +5,7 @@ import { check, DEFAULT_POLICY } from "../../src/index.js";
 import { extractJobPosting, jobHtmlToText, jobTextFromHtml } from "../../src/job/index.js";
 import { measureDocx } from "../../src/node/docx.js";
 import { detectResumeFormat, extractResume } from "../../src/node/extract.js";
-import { pageText } from "../../src/node/lines.js";
+import { joinPages, pageText } from "../../src/node/lines.js";
 import {
   buildDocxBody,
   buildRichDocx,
@@ -199,6 +199,87 @@ describe("DOCX headers and footers are read", () => {
       "Senior Backend Engineer, HubSpot",
       "References available on request",
     ]);
+  });
+});
+
+describe("a PDF's running header and footer are read once, and its page numbers not at all", () => {
+  // A role whose title ends page 1 and whose dates open page 2, with the page's footer and the
+  // next page's header printed between them.
+  const HEADER = "Jordan Ellery - Resume | jordan.ellery@example.com";
+  const pages = (header: "both" | "later" | "none") => {
+    const first = [
+      at(45, 740, "Jordan Ellery", 20),
+      at(45, 722, "jordan.ellery@example.com | (415) 555-0132"),
+      at(45, 690, "EXPERIENCE", 12),
+      at(45, 670, "Staff Engineer, Initech"),
+      at(470, 670, "Mar 2021 - Present"),
+      at(60, 654, "- Built the payments platform used by forty teams"),
+      at(45, 60, "Senior Engineer, Hooli"),
+      at(520, 30, "Page 1 of 2", 8),
+    ];
+    const second = [
+      at(45, 740, "Jan 2017 - Feb 2021"),
+      at(60, 726, "- Built the search ranking service"),
+      at(45, 690, "EDUCATION", 12),
+      at(45, 674, "B.S. Mathematics, Ohio State University, 2016"),
+      at(520, 30, "Page 2 of 2", 8),
+    ];
+    if (header === "both") first.unshift(at(45, 770, HEADER, 8));
+    if (header !== "none") second.unshift(at(45, 770, HEADER, 8));
+    return buildPdfPages([first.join("\n"), second.join("\n")]);
+  };
+  const read = async (header: "both" | "later" | "none") => {
+    const { text } = await extractResume(pages(header), "pdf");
+    const report = check(text, DEFAULT_POLICY, { now: new Date("2026-10-01T00:00:00Z") });
+    return { text, roles: report.parsed.roles.map((role) => [role.title, role.employer]) };
+  };
+  const ROLES = [
+    ["Staff Engineer", "Initech"],
+    ["Senior Engineer", "Hooli"],
+  ];
+
+  it("keeps a role whose title and dates the page break parts", async () => {
+    for (const header of ["both", "later", "none"] as const)
+      expect((await read(header)).roles).toEqual(ROLES);
+  });
+
+  it("reads a header printed on every page once, before the text", async () => {
+    const { text } = await read("both");
+    expect(lines(text)[0]).toBe(HEADER);
+    expect(text.split(HEADER)).toHaveLength(2);
+    expect(text).not.toMatch(/Page \d of 2/);
+  });
+
+  it("drops a later page's header that repeats the name the first page opens with", async () => {
+    expect((await read("later")).text).not.toContain("Resume");
+  });
+
+  it("keeps a line repeated on two pages in their body, or at another height", async () => {
+    const page = (name: string, y: number) =>
+      [
+        at(45, 740, name),
+        at(45, 700, "- Led the platform team"),
+        at(45, 600, "Kubernetes, Terraform"),
+        at(45, 500, "- Cut cloud spend by 31%"),
+        at(45, y, "2019 - 2021"),
+      ].join("\n");
+    const { text } = await extractResume(
+      buildPdfPages([page("Jordan Ellery", 30), page("Senior Engineer, Hooli", 40)]),
+      "pdf",
+    );
+    expect(text.split("Kubernetes, Terraform")).toHaveLength(3);
+    expect(text.split("2019 - 2021")).toHaveLength(3);
+  });
+
+  it("stays linear over thousands of pages printing the same lines", () => {
+    const pages = Array.from({ length: 20_000 }, (_, page) => ({
+      lines: ["Jordan Ellery", "x", "y", `Page ${page}`],
+      ys: [10, 10.5, 11, 11.5],
+    }));
+    const started = performance.now();
+    // The first two lines of a page are its header, the last two its footer.
+    expect(joinPages(pages)).toBe("Jordan Ellery\nx\n\ny\n\n");
+    expect(performance.now() - started).toBeLessThan(1_000);
   });
 });
 

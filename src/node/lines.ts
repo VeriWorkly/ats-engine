@@ -78,7 +78,7 @@ export function pageText(
   toViewport: (x: number, y: number) => number[],
   pageWidth = 0,
   marks: readonly Box[] = [],
-): { text: string; columns: number | null } {
+): { text: string; columns: number | null } & PageLines {
   let placed: Placed[] = [];
   for (const item of items) {
     // An empty item only marks where pdf.js saw a line end; position says that here.
@@ -367,9 +367,70 @@ export function pageText(
     // page to say its mark is a timeline's.
     if ([-1, 0, 1].some(listed) || !decorative.has(Math.round(mark))) bulleted.add(at);
   });
-  const text = texts.map(({ out }, at) => (bulleted.has(at) ? `• ${out}` : out)).join("\n");
+  const read = texts.map(({ out }, at) => (bulleted.has(at) ? `• ${out}` : out));
 
-  return { text, columns: gutter?.ratio ?? null };
+  return {
+    text: read.join("\n"),
+    columns: gutter?.ratio ?? null,
+    lines: read,
+    ys: lines.map((line) => line[0]?.y ?? 0),
+  };
+}
+
+/** A page's lines and the height of each, from `pageText`. */
+type PageLines = { lines: string[]; ys: number[] };
+
+/**
+ * The pages' text, without what a PDF prints on every page. A line among the top or bottom two
+ * of a page, printed at the same height (within 2pt) on another page, runs on every page: with
+ * the same text it is a header or footer, read once, before the text or after it as a DOCX's
+ * are; with only its numbers changed ("Page 1 of 2") it is a page number, and is not read. A
+ * later page that opens with the line the first page opens with ("Jordan Ellery - Resume" over
+ * the name) opens with its header, which is not read either. Left in, each fell between the last
+ * line of one page and the first of the next, and a role the page break parted took it for its
+ * title and employer.
+ */
+export function joinPages(pages: readonly PageLines[]): string {
+  const kept = pages.map(({ lines }) => [...lines]);
+  const margins = [new Set<string>(), new Set<string>()];
+  // [page, line, height, 0 at the top or 1 at the bottom], by the line's text with its numbers
+  // masked.
+  const groups = new Map<string, number[][]>();
+  const tops = pages.map(({ lines, ys }, page) => {
+    const order = ys.map((_, at) => at).sort((a, b) => ys[a]! - ys[b]!);
+    order.forEach((at, rank) => {
+      const key = lines[at]!.trim().replace(/\d+/g, "#");
+      if (key && (rank < 2 || rank >= order.length - 2))
+        (groups.get(key) ?? groups.set(key, []).get(key)!).push([page, at, ys[at]!, +(rank > 1)]);
+    });
+    return order[0]!;
+  });
+  for (const group of groups.values()) {
+    // By height, each line is matched with the next on another page within 2pt.
+    group.sort((a, b) => a[2]! - b[2]!);
+    const running = new Set<number[]>();
+    group.forEach((line, at) => {
+      for (let next = at + 1; next < group.length && group[next]![2]! - line[2]! <= 2; next += 1)
+        if (group[next]![0] !== line[0]) {
+          running.add(line).add(group[next]!);
+          break;
+        }
+    });
+    const texts = new Set([...running].map(([page, at]) => pages[page!]!.lines[at!]!));
+    for (const [page, at, , side] of running) {
+      if (texts.size === 1) margins[side!]!.add(kept[page!]![at!]!);
+      kept[page!]![at!] = "\0";
+    }
+  }
+  // The line a page opens with.
+  const opening = (page: number) => pages[page]?.lines[tops[page]!]?.trim() ?? "";
+  if (opening(0).includes(" "))
+    for (let page = 1; page < pages.length; page += 1)
+      if (opening(page).includes(opening(0))) kept[page]![tops[page]!] = "\0";
+  return [margins[0]!, ...kept, margins[1]!]
+    .map((lines) => [...lines].filter((line) => line !== "\0").join("\n"))
+    .map((part) => part && `${part}\n\n`)
+    .join("");
 }
 
 /** At most this many link targets are added to a document's text. */
