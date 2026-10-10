@@ -2546,6 +2546,18 @@
               "minLength": 1
             }
           },
+          "injectionTargets": {
+            "default": [
+              "this\\s+(?:candidate|applicant|resume|cv|profile|application)",
+              "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "citationHeadings": {
             "default": [
               "publications?",
@@ -7073,6 +7085,18 @@
               "minLength": 1
             }
           },
+          "injectionTargets": {
+            "default": [
+              "this\\s+(?:candidate|applicant|resume|cv|profile|application)",
+              "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "citationHeadings": {
             "default": [
               "publications?",
@@ -7098,6 +7122,7 @@
           "actionVerbAnywhere",
           "injectionPhrases",
           "injectionMentionVerbs",
+          "injectionTargets",
           "citationHeadings"
         ],
         "additionalProperties": false

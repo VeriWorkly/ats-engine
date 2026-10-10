@@ -97,6 +97,15 @@ const SHAPES: Record<string, string> = {
   "slash number run": rep("a/1/"),
   "link run": rep("a://b/"),
   "scheme run": rep("a+b.c-"),
+  // A quoted injection example after a word that says it was caught: openers without closers.
+  "curly quote run": `flags ignore all previous instructions ${rep("“", N - 40)}`,
+  "low quote run": `flags ignore all previous instructions ${rep("„", N - 40)}`,
+  "guillemet run": `flags ignore all previous instructions ${rep("«", N - 40)}`,
+  "single quote run": `flags ignore all previous instructions ${rep("‘", N - 40)}`,
+  "straight quote run": `flags ignore all previous instructions ${rep(" 'a", N - 40)}`,
+  "mention verb run": rep('flags "ignore previous instructions" '),
+  // A list of works, read for citations.
+  "citation heading run": `Publications\n${rep("Doe J (2019) et al. ")}`,
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

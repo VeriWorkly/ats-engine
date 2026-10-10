@@ -2463,6 +2463,10 @@
       "reject(?:s|ed|ing)?",
       "saniti[sz](?:e|es|ed|ing)"
     ],
+    "injectionTargets": [
+      "this\\s+(?:candidate|applicant|resume|cv|profile|application)",
+      "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me"
+    ],
     "citationHeadings": [
       "publications?",
       "presentations?",

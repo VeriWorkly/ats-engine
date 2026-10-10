@@ -131,11 +131,13 @@ export function readResume(
       injectionPhrases: injectionPhrases(
         // By line: a quote is excused by the word on its own line that says it was caught.
         lines.join("\n"),
-        // Text no reader sees: smuggled in tag characters, or in the file's metadata. And lines
-        // opening with "#" as written: the line reader drops a Markdown heading's marks, and
-        // "### System:" is a prompt delimiter with them.
+        // Text no reader sees: smuggled in tag characters, hidden by the layout, or in the file's
+        // metadata, where no quote excuses it. And lines opening with "#" as written: the line
+        // reader drops a Markdown heading's marks, and "### System:" is a prompt delimiter with
+        // them.
         [
           prepared.hidden.smuggled,
+          layout?.hiddenText ?? "",
           layout?.metadataText ?? "",
           ...prepared.text.split("\n").filter((line) => line.trimStart().startsWith("#")),
         ].join("\n"),

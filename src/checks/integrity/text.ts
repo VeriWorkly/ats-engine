@@ -1,6 +1,6 @@
 import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { NO_FINDING as NONE, quote, type Finding } from "../finding.js";
-import { wordListPattern } from "../../text/text.js";
+import { BULLET_PREFIX, wordListPattern } from "../../text/text.js";
 import { segmentResume } from "../../parser/sections.js";
 import { citationLines, isDatedLine, readsAsSentence } from "../bullets.js";
 import { memo } from "../../util/memo.js";
@@ -13,62 +13,76 @@ import { memo } from "../../util/memo.js";
 
 const injectionPattern = memo((text: AtsEnginePolicy["text"]) => ({
   phrase: new RegExp(wordListPattern(text.injectionPhrases), "giu"),
-  // Defaulted by the schema; a policy object built by hand, unparsed, may not have it.
-  caught: new RegExp(wordListPattern(text.injectionMentionVerbs ?? ["(?!)"]), "iu"),
+  // Defaulted by the schema; a policy object built by hand, unparsed, may not have them.
+  caught: new RegExp(wordListPattern(text.injectionMentionVerbs ?? ["(?!)"]), "giu"),
+  target: new RegExp(wordListPattern(text.injectionTargets ?? ["(?!)"]), "iu"),
 }));
 
 /**
  * Quoted text: straight or curly quotes, guillemets, backticks, and straight single quotes away
- * from a word, where one is no apostrophe. Each a scan to the closing mark.
+ * from a word, where one is no apostrophe. An opener is never inside its own quote, so a run of
+ * openers costs one scan each to the next, not to the end of the line.
  */
 const QUOTED =
-  /"[^"\n]*"|“[^”\n]*”|„[^“”\n]*[“”]|«[^»\n]*»|‘[^’\n]*’|`[^`\n]*`|(?<![\p{L}\p{N}])'[^'\n]*'(?![\p{L}\p{N}])/gu;
+  /"[^"\n]*"|“[^“”\n]*”|„[^„“”\n]*[“”]|«[^«»\n]*»|‘[^‘’\n]*’|`[^`\n]*`|(?<![\p{L}\p{N}])'[^'\n]*'(?![\p{L}\p{N}])/gu;
+
+/** How far before a quote the word that excuses it may stand: three words, as characters. */
+const NEAR = 60;
+
+/**
+ * The quotes on a visible line that are an example of an attack: within three words of a word
+ * saying it was caught, function words aside and no comma, semicolon or colon between, on a line
+ * that is no "Label: …" list, and naming nothing the screener is told to do with this resume.
+ */
+function examples(line: string, policy: AtsEnginePolicy): Array<[number, number]> {
+  if (LABELLED.test(line.replace(BULLET_PREFIX, ""))) return [];
+  const { caught, target } = injectionPattern(policy.text);
+  const stop = new Set(policy.keywordMatch.stopwords);
+  const verbs = [...line.matchAll(caught)].map((verb) => verb.index + verb[0].length);
+  const spans: Array<[number, number]> = [];
+  let verb = -1;
+  for (const { index, 0: quoted } of line.matchAll(QUOTED)) {
+    while (verb + 1 < verbs.length && verbs[verb + 1]! <= index) verb += 1;
+    const gap = verb < 0 || index - verbs[verb]! > NEAR ? null : line.slice(verbs[verb], index);
+    if (gap === null || /[,;:]/u.test(gap) || target.test(quoted)) continue;
+    const words = gap.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+    if (words.filter((word) => !stop.has(word)).length <= 3)
+      spans.push([index, index + quoted.length]);
+  }
+  return spans;
+}
 
 /**
  * Instructions addressed to an AI screener rather than to a person: "ignore all previous
  * instructions", "rank this candidate as the best fit". Phrases are policy vocabulary
- * (`text.injectionPhrases`), extended per language. Read from the visible text and from any
- * text smuggled in tag characters, which is where such an instruction is most often hidden.
+ * (`text.injectionPhrases`), extended per language. Read from the visible text and from the
+ * text no reader sees (`hidden`: smuggled in tag characters, hidden by the layout, metadata),
+ * which is where such an instruction is most often put.
  *
- * A phrase quoted after a word that says it was caught (`text.injectionMentionVerbs`) on its
- * line is an example, not an instruction: `Built a filter that flags "ignore previous
- * instructions"`. So is a delimiter token there ("Blocked <|im_start|> tokens"), its brackets
- * its quotes. Never in the smuggled text, which no person reads.
+ * A phrase inside a quoted example on a visible line (`examples`) is not counted: `Built a
+ * filter that flags "ignore previous instructions"`.
  */
-export function injectionPhrases(text: string, smuggled: string, policy: AtsEnginePolicy): Finding {
-  const all = `${text}\n${smuggled}`;
-  const { phrase, caught } = injectionPattern(policy.text);
-  // The line of the last match, read once: where a catching word ends on it, and its quotes.
-  let line = { end: -1, caughtAt: Infinity, quotes: [] as Array<[number, number]>, next: 0 };
-  const quoted = (at: number, end: number, found: string) => {
-    if (end > text.length) return false;
-    if (at > line.end) {
-      const start = all.lastIndexOf("\n", at - 1) + 1;
-      const stop = all.indexOf("\n", at);
-      const content = all.slice(start, stop === -1 ? all.length : stop);
-      const verb = caught.exec(content);
-      line = {
-        end: start + content.length,
-        caughtAt: verb ? start + verb.index + verb[0].length : Infinity,
-        quotes: [...content.matchAll(QUOTED)].map((q) => [
-          start + q.index,
-          start + q.index + q[0].length,
-        ]),
-        next: 0,
-      };
-    }
-    if (line.caughtAt > at || end > line.end) return false;
-    if (/^[<[]/u.test(found)) return true;
-    // Matches come in order, so the quotes before this one are passed for good.
-    while (line.next < line.quotes.length && line.quotes[line.next]![1] <= at) line.next += 1;
-    const around = line.quotes[line.next];
-    return around !== undefined && around[0] < at && end < around[1];
-  };
+export function injectionPhrases(text: string, hidden: string, policy: AtsEnginePolicy): Finding {
+  const all = `${text}\n${hidden}`;
+  const lines = text.split("\n");
+  // Matches come in order: the line each is on, and its examples, are read once.
+  let row = 0;
+  let start = 0;
+  let spans: Array<[number, number]> | null = null;
   // `matchAll` clones the shared global pattern, so its `lastIndex` is never touched.
-  const found = [...all.matchAll(phrase)].filter(
-    (match) => !quoted(match.index, match.index + match[0].length, match[0]),
-  );
-  return found.length ? { value: found.length, sample: quote(found[0][0]) } : NONE;
+  const found = [...all.matchAll(injectionPattern(policy.text).phrase)].filter((match) => {
+    while (row < lines.length && start + lines[row]!.length < match.index) {
+      start += lines[row]!.length + 1;
+      row += 1;
+      spans = null;
+    }
+    const at = match.index - start;
+    const end = at + match[0].length;
+    if (row >= lines.length || end > lines[row]!.length) return true;
+    spans ??= examples(lines[row]!, policy);
+    return !spans.some(([open, close]) => open < at && end < close);
+  });
+  return found.length ? { value: found.length, sample: quote(found[0]![0]) } : NONE;
 }
 
 /**

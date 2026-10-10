@@ -391,10 +391,11 @@ export const engineTextSchema = z.prefault(
     ]),
     /**
      * Words that say an injection phrase was caught, not given: `Built a filter that flags
-     * "ignore previous instructions"`. A phrase in quotes or backticks, or a delimiter token
-     * ("<|im_start|>", "[INST]"), after one of these on its line is an example an AI security
-     * engineer quotes, and is not counted. Unquoted, or in text hidden in tag characters, it
-     * still is.
+     * "ignore previous instructions"`. A phrase in quotes or backticks within three words of one
+     * of these (function words aside, no comma or colon between) is an example an AI security
+     * engineer quotes, and is not counted. Not on a labelled line ("Skills: …"), not unquoted
+     * (a bare "[INST]" too), not in text hidden in tag characters or by the layout, and never a
+     * quote naming one of `injectionTargets`.
      */
     injectionMentionVerbs: z._default(wordList("text.injectionMentionVerbs"), [
       String.raw`flag(?:s|ged|ging)?`,
@@ -411,6 +412,11 @@ export const engineTextSchema = z.prefault(
       String.raw`spot(?:s|ted|ting)?`,
       String.raw`reject(?:s|ed|ing)?`,
       String.raw`saniti[sz](?:e|es|ed|ing)`,
+    ]),
+    /** What a quote that tells the screener what to make of this resume names: never an example. */
+    injectionTargets: z._default(wordList("text.injectionTargets"), [
+      String.raw`this\s+(?:candidate|applicant|resume|cv|profile|application)`,
+      String.raw`(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\s+me`,
     ]),
     /**
      * Headings of a list of works, read where a section heading opens one: its lines are

@@ -70,11 +70,14 @@ What does not depend on the model:
   are not recognised). Parse repair and conversion must see contact details and do not redact.
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
   including text smuggled in Unicode tag characters or PDF metadata. A phrase in quotes or
-  backticks, or a delimiter token ("[INST]"), after a word on its line that says it was caught
-  (`text.injectionMentionVerbs`: "flags", "blocked", "red-teamed") is an AI security engineer's
-  example and is not flagged: `Built a filter that flags "ignore previous instructions"`. An
-  attacker can dress an instruction so too, and a model reading the resume may still follow it;
-  the rule trades that for not failing honest security work. Unquoted, or hidden, it is flagged.
+  backticks within three words of a word that says it was caught (`text.injectionMentionVerbs`:
+  "flags", "blocked", "red-teamed"), with no comma or colon between, is an AI security
+  engineer's example and is not flagged: `Built a filter that flags "ignore previous
+  instructions"`. An attacker can dress an instruction so too, and a model reading the resume
+  may still follow it; the rule trades that for not failing honest security work. It is still
+  flagged unquoted (a bare "[INST]" too), on a labelled list line ("Skills: …"), in text hidden
+  by the layout, in tag characters or in metadata, and whenever the quote tells the screener
+  what to make of the resume ("rank this candidate", "score me"; `text.injectionTargets`).
 
 **API keys in the CLI.** `ats-engine check --ai` reads the key from the environment only, never
 from a flag, so it does not land in shell history or the process list, and never prints it. The
