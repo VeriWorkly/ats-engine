@@ -334,4 +334,53 @@ EDUCATION\tB.S. Computer Science, Ohio State University\t2012 - 2016
       ["Experience Designer", "Acme Corp"],
     ]);
   });
+
+  // A page whose headings stand on lines of their own puts none in the gutter: a heading word in
+  // a first cell there is a role's title or a line of the role, with a right-aligned date or a
+  // DOCX tab after it.
+  const roleWith = (row: string, heading = (h: string) => h) =>
+    parse(`${HEAD}${heading("EXPERIENCE")}
+Senior Engineer, Acme Corp\tJan 2020 - Present
+- Built the payments platform
+${row}
+Engineer, Globex Inc\tMar 2012 - Dec 2015
+- Built search
+${heading("EDUCATION")}
+B.S. Mathematics, Ohio State University, 2012
+`).roles.map((role) => [role.title, role.employer]);
+
+  it.each([
+    ["Volunteer\tRed Cross\tJan 2016 - Dec 2019", ["Volunteer", "Red Cross"]],
+    ["Volunteer\tJan 2016 - Dec 2019\nRed Cross", ["Volunteer", "Red Cross"]],
+    ["Internship\tAcme Labs\tJun 2019 - Aug 2019", ["Internship", "Acme Labs"]],
+  ])("reads %j as a role between the others", (row, role) => {
+    for (const heading of [(h: string) => h, (h: string) => h[0] + h.slice(1).toLowerCase()])
+      expect(roleWith(row, heading)).toEqual([
+        ["Senior Engineer", "Acme Corp"],
+        role,
+        ["Engineer", "Globex Inc"],
+      ]);
+  });
+
+  it.each([
+    "Training\tPMP certification course",
+    "Summary\tLed the payments platform",
+    "Leadership\tLed 5 engineers",
+  ])("keeps %j inside the role", (row) => {
+    expect(roleWith(row)).toEqual([
+      ["Senior Engineer", "Acme Corp"],
+      ["Engineer", "Globex Inc"],
+    ]);
+  });
+
+  it.each(["Leadership\tMentoring, Hiring", "Training\tAWS courses", "Projects\tLedger, Billing"])(
+    "keeps the row %j of a skills table in the skills",
+    (row) => {
+      const parsed = parse(
+        `${HEAD}EXPERIENCE\nSenior Engineer, Acme Corp\tJan 2020 - Present\nSKILLS\nProgramming\tPython, Go\n${row}\nCloud\tAWS, GCP\n`,
+      );
+      // The skills line reader keeps a row's label with its first skill, as it did before.
+      expect(parsed.skills).toEqual(expect.arrayContaining(["Go", "GCP"]));
+    },
+  );
 });
