@@ -175,6 +175,22 @@ describe("redaction variants", () => {
     expect(redaction.apply(`Call ${written} today`)).toBe("Call [PHONE] today");
   });
 
+  it.each([
+    ["+44 20 7946 0958", "011 44 20 7946 0958"], // dialled from the US or Canada
+    ["+61 2 9876 5432", "0011 61 2 9876 5432"], // from Australia
+    ["+44 20 7946 0958", "010 44 20 7946 0958"], // from Japan
+    ["(415) 555-0199", "011 1 415 555 0199"],
+  ])("takes the exit prefix with the phone read as %s written as %s", (phone, written) => {
+    const redaction = createRedaction(parsed("Jane Doe", phone), "");
+    expect(redaction.apply(`Call ${written} today`)).toBe("Call [PHONE] today");
+  });
+
+  it("takes an exit prefix only before a country code and the number", () => {
+    const redaction = createRedaction(parsed("Jane Doe", "+44 20 7946 0958"), "");
+    expect(redaction.apply("Code 011 then 020 7946 0958")).toBe("Code 011 then [PHONE]");
+    expect(redaction.apply("Room 011, ext 0958")).toBe("Room 011, ext 0958");
+  });
+
   it("catches a phone with an extension glued on, and an email at a domain in any script", () => {
     const redaction = createRedaction(parsed("Jane Doe", "(415) 555-0132"), "jane@exämple.de");
     expect(redaction.apply("Call 415-555-0132x123")).toBe("Call [PHONE]x123");

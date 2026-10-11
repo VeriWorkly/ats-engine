@@ -2,7 +2,7 @@ import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsParsedRole } from "../types.js";
 import { BULLET, BULLET_PREFIX, wordListPattern, wordListRegex } from "../text/text.js";
 import { findDateRange } from "./dates.js";
-import { isHeadingLine } from "./sections.js";
+import { headingConnector, isHeadingLine } from "./sections.js";
 import { memo } from "../util/memo.js";
 
 type HeaderMatchers = {
@@ -21,6 +21,8 @@ type HeaderMatchers = {
   organisations: RegExp;
   verbOpener: RegExp;
   duration: RegExp;
+  /** One word of a department's name: "Product", "Management". */
+  department: RegExp;
 };
 
 const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatchers => {
@@ -45,6 +47,7 @@ const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatc
     organisation: wordListRegex(organisations),
     organisations: wordListRegex(organisations, "gi"),
     verbOpener: new RegExp(`^${wordListPattern(text.contentLineVerbs)}`, "iu"),
+    department: new RegExp(`^(?:${rp.departmentWords.join("|")})$`, "iu"),
   };
 });
 
@@ -52,6 +55,9 @@ const placesOf = memo((rp: AtsEnginePolicy["resumeParse"]) => ({
   code: new RegExp(`^(?:${rp.regionCodes.join("|")})$`, "u"),
   postNominal: new RegExp(`^(?:${rp.postNominals.join("|")})$`, "iu"),
   workplace: new RegExp(`^(?:${rp.workplaceWords.join("|")})$`, "iu"),
+  name: new RegExp(`^(?:${rp.placeNames.join("|")})$`, "iu"),
+  /** A name ending in a legal form or an institution's kind: "Acme Corp", not "Bank Street". */
+  company: new RegExp(`${wordListPattern(rp.organisationWords)}$`, "iu"),
 }));
 
 /** The policy's state and province codes, credentials after a name, and workplace words. */
@@ -59,25 +65,39 @@ export const placeWords = (policy: AtsEnginePolicy) => placesOf(policy.resumePar
 
 /**
  * A line that says where a role is worked, not for whom: "San Francisco, CA", "Austin, TX
- * 78701", "Remote", "Boston, MA (Hybrid)". A city with a country ("Berlin, Germany") is not told
- * from an employer with its city ("Acme, Berlin") without a gazetteer, so it is not one.
+ * 78701", "Remote", "Boston, MA (Hybrid)", "Berlin, Germany", "Bengaluru, Karnataka, India",
+ * "Toronto, ON, Canada", "Remote, India". The policy names countries, states and provinces
+ * (`placeNames`) but no cities, so "Acme, Berlin" is not one, and "Acme, Germany" is told from
+ * "Berlin, Germany" only by a legal form ("Acme GmbH, Germany"), an institution's kind
+ * ("University of Georgia, Georgia") or a job title ("Software Engineer, Germany") in its first
+ * part.
+ *
+ * `named: false` reads only codes and workplace words, never a name: for a line of its own,
+ * which may as well be an employer with its country ("Infosys, India") or an employer named
+ * for a place ("Jordan") as where the role is worked.
  */
-export function isPlace(line: string, policy: AtsEnginePolicy) {
-  const { code, workplace } = placesOf(policy.resumeParse);
+export function isPlace(line: string, policy: AtsEnginePolicy, named = true) {
+  const { code, workplace, name, company } = placesOf(policy.resumeParse);
   const parts = line
     .replace(BULLET_PREFIX, "")
     .split(/[,|·•()\t]|\s{2,}/u)
     .map((part) => part.trim().replace(/\s\d{5}(?:-\d{4})?$/u, ""))
     .filter(Boolean);
-  const where = (part: string) => code.test(part) || workplace.test(part);
+  const isName = (part: string) => named && name.test(part);
+  const where = (part: string) => code.test(part) || isName(part) || workplace.test(part);
   if (parts.length === 0) return false;
   if (parts.every(where)) return true;
-  // "City, ST", then perhaps how it is worked.
+  // "City, ST", "City, State" or "City, Country", then perhaps more of where. A first part
+  // ending in a legal form is an employer ("Acme Corp, TX"), and one naming an organisation or
+  // holding a job title before a name is not a city ("Software Engineer, India").
+  const { titleWords, organisation } = matchersOf(policy);
   return (
     parts.length >= 2 &&
-    code.test(parts[1]) &&
+    (code.test(parts[1]) ||
+      (isName(parts[1]) && !titleWords.test(parts[0]) && !organisation.test(parts[0]))) &&
     parts.slice(2).every(where) &&
-    parts[0].split(/\s+/).length <= 3
+    parts[0].split(/\s+/).length <= 3 &&
+    !company.test(parts[0])
   );
 }
 
@@ -145,13 +165,18 @@ function headerParts(header: string, policy: AtsEnginePolicy) {
  * A comma also parts a title from its qualifier ("Director, Product Management", "VP,
  * Engineering"). The title keeps its comma when what follows it up to the employer is not the
  * employer: when a separator stronger than a comma (a bar, a dash, a tab, "at") parts it from
- * a part naming an organisation ("Director, Product Management | Acme Corp"), or, with commas
- * only, when a later part names one ("VP, Engineering, Acme Corp"). An organisation is named by
- * its legal form ("Inc", "GmbH") or its kind ("Hospital", "University"): without one, "Software
- * Engineer, Acme | Berlin" is a title, an employer and where.
+ * a part naming an organisation ("Director, Product Management | Acme Corp") or from any
+ * employer when what follows the comma is a department ("Director, Product Management | Google",
+ * `departmentWords`), or, with commas only, when a later part names an organisation ("VP,
+ * Engineering, Acme Corp"). An organisation is named by its legal form ("Inc", "GmbH") or its
+ * kind ("Hospital", "University"): without one, "Software Engineer, Acme | Berlin" is a title,
+ * an employer and where.
  */
 export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
-  const { titleWords, organisation, organisations, strong } = matchersOf(policy);
+  const { titleWords, organisation, organisations, strong, department } = matchersOf(policy);
+  const connector = headingConnector(policy.resumeParse);
+  const isDepartment = (part: string) =>
+    part.split(" ").every((word) => department.test(word) || connector.test(word));
   // The parts between strong separators, each cut at its commas.
   const segments = splitHeader(header.replace(BULLET_PREFIX, ""), policy, strong)
     .map((segment) => headerParts(segment, policy))
@@ -179,7 +204,13 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
     const other = segments.find(
       (segment) => segment !== own && !isPlace(segment.join(", "), policy),
     );
-    if (own.length > 1 && own[0] === parts[titleIndex] && other && named(other.join(" "))) end = at;
+    if (
+      own.length > 1 &&
+      own[0] === parts[titleIndex] &&
+      other &&
+      (named(other.join(" ")) || own.slice(1).every(isDepartment))
+    )
+      end = at;
   } else {
     // A name, capitalised, and not the start of a place: "an Alphabet company" describes the
     // employer before it, and "Bank Street, NY" is where.
@@ -209,29 +240,35 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
 
 /**
  * The employer's parts, joined, without where the role is worked after them: "Acme, San
- * Francisco, CA" is Acme, "Acme, Remote" is Acme. Only "City, ST" and workplace words are places
- * (see `isPlace`); "Acme, Berlin" keeps its city. A workplace word alone ("Remote") or a city
- * of one or two words and its state ("Austin, TX") names no employer, so there is none; a
- * longer one may be an employer run into its city ("Oakmont Foods Portland, OR"), and is kept. A
- * place in brackets after the name ("Netflix (Remote)") goes too.
+ * Francisco, CA" is Acme, "Acme, Remote" is Acme, and so are "Acme, Berlin, Germany" and "Acme,
+ * Bengaluru, Karnataka, India". Only "City, ST", the policy's countries and states, and workplace
+ * words are places (see `isPlace`); "Acme, Berlin" keeps its city. A workplace word alone
+ * ("Remote") or a city of one or two words and its state's code ("Austin, TX") names no
+ * employer, so there is none; a longer one may be an employer run into its city ("Oakmont Foods
+ * Portland, OR"), and is kept, as is one ending in a legal form ("Acme Corp, TX" is Acme Corp).
+ * A country or a state named in full goes, and the city before it when a part is left before
+ * that: "Infosys, India" is Infosys. A place in brackets after the name ("Netflix (Remote)")
+ * goes too.
  */
 function withoutPlace(parts: string[], policy: AtsEnginePolicy): string {
-  const { code, workplace } = placesOf(policy.resumeParse);
+  const { code, workplace, name, company } = placesOf(policy.resumeParse);
+  const coded = (part: string) => code.test(part.replace(/\s\d{5}(?:-\d{4})?$/u, ""));
+  const short = (part: string) => part.split(/\s+/).length <= 3 && !company.test(part);
   if (
     (parts.length === 1 && workplace.test(parts[0]!)) ||
     (parts.length === 2 &&
-      code.test(parts[1]!.replace(/\s\d{5}(?:-\d{4})?$/u, "")) &&
-      parts[0]!.split(/\s+/).length <= 2)
+      coded(parts[1]!) &&
+      parts[0]!.split(/\s+/).length <= 2 &&
+      !company.test(parts[0]!))
   )
     return "";
   let end = parts.length;
   while (end > 1 && workplace.test(parts[end - 1]!)) end -= 1;
-  if (
-    end > 2 &&
-    code.test(parts[end - 1]!.replace(/\s\d{5}(?:-\d{4})?$/u, "")) &&
-    parts[end - 2]!.split(/\s+/).length <= 3
-  )
-    end -= 2;
+  const named = end;
+  while (end > 1 && name.test(parts[end - 1]!)) end -= 1;
+  if (end > 2 && coded(parts[end - 1]!) && parts[end - 2]!.split(/\s+/).length <= 3) end -= 2;
+  else if (end > 1 && coded(parts[end - 1]!) && company.test(parts[end - 2]!)) end -= 1;
+  else if (end < named && end > 1 && short(parts[end - 1]!)) end -= 1;
   const employer = parts.slice(0, end).join(", ");
   // Where, in brackets after the name: "Netflix (Remote)", "Acme (Austin, TX)". The parts'
   // whitespace is collapsed, so one space at most comes before the bracket.
@@ -309,7 +346,10 @@ export function parseRoles(
     const found = BULLET.test(line) ? null : findDateRange(line, rp, now);
     if (!found) return [];
     const remainder = line.replace(found.matched, " ").replace(duration, " ").trim();
-    const own = lettersIn(remainder) >= 3 && !isPlace(remainder, policy) ? remainder : "";
+    // A country or a state names where only after the dates ("Jan 2020 - Present | Austin,
+    // Texas"); before them, "Infosys, India" is the employer.
+    const after = lettersIn(line.slice(0, line.indexOf(found.matched))) === 0;
+    const own = lettersIn(remainder) >= 3 && !isPlace(remainder, policy, after) ? remainder : "";
     return [{ index, found, own }];
   });
   const ownAt = new Map(anchors.map((anchor) => [anchor.index, anchor.own]));
@@ -328,7 +368,8 @@ export function parseRoles(
   // of the next role, whose dated line, two down, carries none of its own. A place ("Austin,
   // TX") is where the role is worked, not who it is for.
   const halfAt = (at: number, from: number) => {
-    if (!free(at) || opensWithVerb.test(lines[at]) || isPlace(lines[at], policy)) return null;
+    if (!free(at) || opensWithVerb.test(lines[at]) || isPlace(lines[at], policy, false))
+      return null;
     if (at > from && ownAt.get(at + 1) === "") return null;
     return headerParts(lines[at], policy)[0] ?? null;
   };
@@ -391,9 +432,14 @@ export function parseRoles(
     let top = index;
     if (!header && datesFirst && free(index + 1)) header = take(index + 1);
     // Where the role is worked, on a line of its own between its header and the dates
-    // ("Amazon" / "Seattle, WA" / "Jan 2020 - Present"), is dropped: the header is above it.
+    // ("Amazon" / "Seattle, WA" / "Jan 2020 - Present"), is dropped: the header is above it. A
+    // country or a state names where only when the lines above name the employer ("Engineer" /
+    // "Acme" / "Berlin, Germany"); under a title alone, "Infosys, India" is the employer.
+    const where = (at: number) =>
+      isPlace(lines[at]!, policy, false) ||
+      (isPlace(lines[at]!, policy) && (!isSingle(lines[at - 1]!) || stacked(at - 1)));
     let dates = index;
-    if (!header && free(index - 1) && free(index - 2) && isPlace(lines[index - 1], policy)) {
+    if (!header && free(index - 1) && free(index - 2) && where(index - 1)) {
       take(index - 1);
       dates = index - 1;
     }
@@ -431,7 +477,7 @@ export function parseRoles(
         !titled(above) &&
         employerLine(lines[above]) &&
         (above === 0 || BULLET.test(lines[above - 1])) &&
-        !isPlace(lines[above], policy)
+        !isPlace(lines[above], policy, false)
       ) {
         employer = headerParts(take(above), policy)[0] ?? "";
         group = employer;
@@ -503,4 +549,9 @@ function joinWrappedDates(lines: readonly string[], rp: AtsEnginePolicy["resumeP
 /** The policy's job-title words, compiled once. */
 export function titleWordsOf(policy: AtsEnginePolicy) {
   return matchersOf(policy).titleWords;
+}
+
+/** The policy's organisation and school words, compiled once. */
+export function organisationWordsOf(policy: AtsEnginePolicy) {
+  return matchersOf(policy).organisation;
 }

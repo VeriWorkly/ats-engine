@@ -122,6 +122,13 @@ const SHAPES: Record<string, string> = {
   "multiple run": rep("x1 "),
   // A Greek symbol before a subscript.
   "greek subscript run": rep("νmax "),
+  "greek look-alike run": rep("ρank "),
+  // A title's department, and a city with its state or country, read in a role's header.
+  "department run": rep("Director, Product Management | "),
+  "place name run": rep("Austin, Texas, United States, "),
+  "dated place run": `Jan 2020 - Present | ${rep("Austin, Texas, ", N - 40)}`,
+  "legal form run": rep("Acme Corp, "),
+  "co run": rep("Co "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

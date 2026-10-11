@@ -256,6 +256,71 @@ export const resumeParseSchema = z.object({
       "AB BC MB NB NL NS NT NU ON PE QC SK YT"
     ).split(" "),
   ),
+  /**
+   * Countries, with their common short forms, and the states, provinces and territories of the
+   * United States, Canada, India and Australia and the nations of the United Kingdom, named in
+   * full: what a city is written with ("Berlin, Germany", "Austin, Texas, United States",
+   * "Bengaluru, Karnataka, India"). No cities: "Acme, Berlin" keeps its city. Matched whole,
+   * ignoring case. Each entry is a pattern for one name and its spellings ("u[.]?k[.]?" is "UK"
+   * and "U.K."), so the list is written as one string cut at its bars, and no entry holds one.
+   */
+  placeNames: z._default(
+    wordList("placeNames"),
+    // Countries.
+    (
+      "afghanistan|albania|algeria|andorra|angola|antigua and barbuda|argentina|armenia|" +
+      "australia|austria|azerbaijan|(?:the )?bahamas|bahrain|bangladesh|barbados|belarus|" +
+      "belgium|belize|benin|bhutan|bolivia|bosnia and herzegovina|botswana|brazil|brunei|" +
+      "bulgaria|burkina faso|burundi|cabo verde|cape verde|cambodia|cameroon|canada|" +
+      "central african republic|chad|chile|china|colombia|comoros|congo|dr congo|" +
+      "democratic republic of the congo|costa rica|c[ôo]te d['’]ivoire|ivory coast|croatia|cuba|cyprus|" +
+      "czechia|czech republic|denmark|djibouti|dominica|dominican republic|ecuador|egypt|" +
+      "el salvador|equatorial guinea|eritrea|estonia|eswatini|ethiopia|fiji|finland|france|" +
+      "gabon|(?:the )?gambia|georgia|germany|ghana|greece|grenada|guatemala|guinea|" +
+      "guinea-bissau|guyana|haiti|honduras|hong kong|hungary|iceland|india|indonesia|iran|" +
+      "iraq|ireland|israel|italy|jamaica|japan|jordan|kazakhstan|kenya|kiribati|kosovo|kuwait|" +
+      "kyrgyzstan|laos|latvia|lebanon|lesotho|liberia|libya|liechtenstein|lithuania|" +
+      "luxembourg|maca[uo]|madagascar|malawi|malaysia|maldives|mali|malta|" +
+      "marshall islands|mauritania|mauritius|mexico|micronesia|moldova|monaco|mongolia|" +
+      "montenegro|morocco|mozambique|myanmar|namibia|nauru|nepal|(?:the )?netherlands|" +
+      "new zealand|nicaragua|niger|nigeria|north korea|north macedonia|norway|oman|pakistan|" +
+      "palau|palestine|panama|papua new guinea|paraguay|peru|(?:the )?philippines|poland|" +
+      "portugal|puerto rico|qatar|romania|russia|rwanda|saint kitts and nevis|saint lucia|" +
+      "saint vincent and the grenadines|samoa|san marino|s[ãa]o tom[ée] and pr[íi]ncipe|" +
+      "saudi arabia|senegal|serbia|seychelles|sierra leone|singapore|" +
+      "slovakia|slovenia|solomon islands|somalia|south africa|(?:south )?korea|south sudan|" +
+      "spain|sri lanka|sudan|suriname|sweden|switzerland|syria|taiwan|tajikistan|tanzania|" +
+      "thailand|timor-leste|togo|tonga|trinidad and tobago|tunisia|turkey|türkiye|" +
+      "turkmenistan|tuvalu|uganda|ukraine|(?:the )?united arab emirates|u[.]?a[.]?e[.]?|" +
+      "(?:the )?united kingdom|great britain|u[.]?k[.]?|(?:the )?united states(?: of america)?|" +
+      "u[.]?s[.]?(?:a[.]?)?|uruguay|uzbekistan|vanuatu|vatican city|venezuela|viet ?nam|yemen|" +
+      "zambia|zimbabwe|" +
+      // The United States.
+      "alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|" +
+      "hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|" +
+      "massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|" +
+      "new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|" +
+      "oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|" +
+      "utah|vermont|virginia|washington|west virginia|wisconsin|wyoming|district of columbia|" +
+      "d[.]c[.]|" +
+      // Canada.
+      "alberta|british columbia|manitoba|new brunswick|newfoundland and labrador|" +
+      "northwest territories|nova scotia|nunavut|ontario|prince edward island|qu[ée]bec|" +
+      "saskatchewan|yukon|" +
+      // India.
+      "andhra pradesh|arunachal pradesh|assam|bihar|chhattisgarh|goa|gujarat|haryana|" +
+      "himachal pradesh|jharkhand|karnataka|kerala|madhya pradesh|maharashtra|manipur|" +
+      "meghalaya|mizoram|nagaland|odisha|punjab|rajasthan|sikkim|tamil nadu|telangana|" +
+      "tripura|uttar pradesh|uttarakhand|west bengal|andaman and nicobar islands|chandigarh|" +
+      "dadra and nagar haveli and daman and diu|delhi|jammu and kashmir|ladakh|lakshadweep|" +
+      "puducherry|" +
+      // Australia.
+      "new south wales|victoria|queensland|south australia|western australia|tasmania|" +
+      "australian capital territory|northern territory|" +
+      // The United Kingdom.
+      "england|scotland|wales|northern ireland"
+    ).split("|"),
+  ),
   /** Words that say how or where a role is worked rather than for whom: "Remote", "Hybrid". */
   workplaceWords: z._default(wordList("workplaceWords"), [
     "remote",
@@ -292,6 +357,21 @@ export const resumeParseSchema = z.object({
     "foundation",
     "ministry",
   ]),
+  /**
+   * Words naming a department or a function, not an employer: what follows a title's comma in
+   * "Director, Product Management | Google". A part made only of these (and `headingConnectors`:
+   * "Research & Development") stays with the title before it, whatever the employer after it is
+   * named; "Software Engineer, Acme | Berlin" is still a title, an employer and where. Not
+   * "security": "Manager, Security Finance | Spartanburg" is at a company named so.
+   */
+  departmentWords: z._default(
+    wordList("departmentWords"),
+    (
+      "management engineering product marketing sales operations finance research development " +
+      "design platform infrastructure strategy technology data analytics growth " +
+      "partnerships communications business team"
+    ).split(" "),
+  ),
   /**
    * Lowercase words a capitalised heading may join its words with: "Skills and Tools". Any other
    * lowercase word after the heading word reads as prose ("History of Art BA").

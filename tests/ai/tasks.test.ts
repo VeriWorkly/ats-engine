@@ -186,6 +186,15 @@ describe("redaction", () => {
       expectFast(() => createRedaction(parsed, hostile).apply(hostile), 1_000, shape);
     },
   );
+
+  it.each(["0", "0 ", "011 ", "0011 44 ", "010 4 ", "011 44 20 7946 095 "])(
+    "finds a phone after an exit prefix in linear time in 150,000 characters of %j",
+    (shape) => {
+      const hostile = shape.repeat(Math.ceil(150_000 / shape.length));
+      const international = { ...parsed, phone: "+44 20 7946 0958" };
+      expectFast(() => createRedaction(international, hostile).apply(hostile), 1_000, shape);
+    },
+  );
 });
 
 describe("repairParse", () => {

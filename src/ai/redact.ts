@@ -15,7 +15,7 @@ import type { AtsParsedResume } from "../types.js";
  * with anything else. The name is also caught as "Doe, Jane", with or without a middle initial,
  * and inside a web address built from it ("janedoe.dev", "x.com/janedoe"), where the whole address
  * is replaced. The phone number is caught by its national number whatever separates its digits,
- * dialled as "+44 20…", "0044 20…" or "020…", but phone-shaped digit runs in general are *not*
+ * dialled as "+44 20…", "0044 20…", "011 44 20…" or "020…", but phone-shaped digit runs in general are *not*
  * swept — "2019 - 2023" has the shape of a phone number. Not caught: a first name used on its own,
  * initials ("J. Doe"), a handle written another way ("jane_doe"). Replacement is whole-word, so a
  * three-letter name does not rewrite the inside of another word, and a "name" the parser also read
@@ -129,11 +129,13 @@ export function createRedaction(
   if (phone.replace(/\D/g, "").length >= 7) {
     // As the parser read it, or as its national number with any separators ("415.555.0199",
     // "020–7946–0958"), after a country code ("+44", "0044", "+44 (0)"), a trunk zero ("020",
-    // "(020)") or a North American "1-". A country code starts with "+" or "00", so the "3." of a
-    // numbered list is not one. Linear: each digit is a literal, the gaps between them never hold
-    // a digit, and there are at most four numbers to try.
+    // "(020)") or a North American "1-". A country code follows "+" or an exit prefix ("00", or
+    // "011" from North America, "0011" from Australia, "010" from Japan), so the "3." of a
+    // numbered list is not one, and an exit prefix counts only with a code and the number after
+    // it. Linear: each digit is a literal, the gaps between them never hold a digit, and there are
+    // at most four numbers to try.
     const numbers = nationalNumbers(phone).map((number) => [...number].join(PHONE_GAP));
-    const prefix = String.raw`(?:(?:\+|00)${PHONE_GAP}\d{1,3}${PHONE_GAP}(?:0${PHONE_GAP})?|[01]${PHONE_GAP})?`;
+    const prefix = String.raw`(?:(?:\+|00|0011|011|010)${PHONE_GAP}\d{1,3}${PHONE_GAP}(?:0${PHONE_GAP})?|[01]${PHONE_GAP})?`;
     entries.push({
       placeholder: "[PHONE]",
       original: phone,

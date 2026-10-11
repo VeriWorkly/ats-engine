@@ -11,3 +11,8 @@ PLAN.md
 skills-lock.json
 # Local secrets, such as the live AI eval key.
 .env
+# The MCP Registry publisher when run by hand, and the tokens its login writes.
+mcp-publisher
+mcp-publisher.exe
+mcp-publisher*.tar.gz
+.mcpregistry_*

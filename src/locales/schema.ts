@@ -65,6 +65,8 @@ const vocabularyShape = {
    * region rather than a credential ("MH", "KA"). */
   postNominals: optionalList("postNominals"),
   regionCodes: optionalList("regionCodes"),
+  /** Countries and states in the pack's language: "Deutschland", "Bayern". */
+  placeNames: optionalList("placeNames"),
   workplaceWords: optionalList("workplaceWords"),
   organisationWords: optionalList("organisationWords"),
   openEnded: optionalList("openEnded"),

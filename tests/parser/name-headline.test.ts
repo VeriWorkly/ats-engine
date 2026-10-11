@@ -88,6 +88,62 @@ describe("the name when a sidebar is read first", () => {
     expect(name(text)).toBe("Jordan Ellery");
   });
 
+  it.each([
+    "Helping fintechs ship faster | Payments | Distributed Systems",
+    "Building calm, reliable payment systems for small businesses everywhere",
+  ])("reads the name over a headline with no title, above where the person is: %j", (headline) => {
+    const text = linkedIn(["Machine Learning", "Kubernetes"]).replace(
+      "Senior Software Engineer at Acme Corp",
+      headline,
+    );
+    const { parsed } = AtsScoringService.check(text, DEFAULT_POLICY);
+    expect(parsed.name).toBe("Jordan Ellery");
+    expect(parsed.skills).toEqual(["Machine Learning", "Kubernetes"]);
+  });
+
+  it.each([
+    // The name before the profile's address: no export's sidebar is between them.
+    [
+      [
+        "Skills",
+        "Python",
+        "Go",
+        "Jane Doe",
+        "linkedin.com/in/someone",
+        "Education",
+        "Rice University",
+        "BS Computer Science",
+        "Houston, Texas",
+      ],
+      "Jane Doe",
+    ],
+    // No name at all: a school over its degree and city is no name.
+    [
+      [
+        "jane@example.com",
+        "linkedin.com/in/someone",
+        "Skills",
+        "Python",
+        "Go",
+        "Education",
+        "Rice University",
+        "BS Computer Science",
+        "Houston, Texas",
+      ],
+      "",
+    ],
+  ])("reads no school as a LinkedIn export's name in %j", (top, expected) => {
+    const text = [...top, "Experience", "Software Engineer, Acme", "Mar 2021 – Present"];
+    expect(name(text.join("\n"))).toBe(expected);
+  });
+
+  it("never reads a school over a headline as a LinkedIn export's name", () => {
+    const text = linkedIn(["Machine Learning"])
+      .replace("Jordan Ellery", "Rice University")
+      .replace("Senior Software Engineer at Acme Corp", "Helping fintechs ship faster");
+    expect(name(text)).not.toBe("Rice University");
+  });
+
   it("keeps a skills list that opens the page when no name is found", () => {
     const text = [
       "Skills",
@@ -154,6 +210,23 @@ describe("a letter-spaced name whose word gap was lost", () => {
 
   it("is left alone when the email does not spell it", () => {
     expect(name(sidebarFirst("J A N E D O E", "jd1987@example.com"))).not.toBe("JANE DOE");
+  });
+});
+
+describe("a name that is also a place", () => {
+  it.each([
+    "Jordan Ellery",
+    "Georgia Lane",
+    "Victoria Chen",
+    "Chad Morgan",
+    "Israel Ortiz",
+    "Carolina Ruiz",
+  ])("is still the name over a city, state and country: %j", (person) => {
+    expect(
+      name(
+        `${person}\nAustin, Texas, United States | person@example.com\nExperience\nSoftware Engineer, Georgia Pacific\nJan 2020 - Present`,
+      ),
+    ).toBe(person);
   });
 });
 

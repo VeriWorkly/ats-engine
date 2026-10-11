@@ -139,6 +139,14 @@ export const de: AtsLanguagePackInput = {
   documentTitles: ["lebenslauf", "tabellarischer lebenslauf"],
   dateOfBirthLabels: ["geburtsdatum", String.raw`geboren(?:\s+am)?`, String.raw`geb\.`],
   headingConnectors: ["und"],
+  // Germany, Austria and Switzerland, and Germany's states, so "München, Bayern, Deutschland"
+  // is where. Not the city-states (Berlin, Hamburg, Bremen), which are cities: "Acme, Berlin"
+  // keeps its city.
+  placeNames: (
+    "deutschland|österreich|schweiz|baden-württemberg|bayern|brandenburg|hessen|" +
+    "mecklenburg-vorpommern|niedersachsen|nordrhein-westfalen|rheinland-pfalz|saarland|sachsen|" +
+    "sachsen-anhalt|schleswig-holstein|thüringen"
+  ).split("|"),
   contentLineVerbs: [
     "entwickelte",
     "leitete",

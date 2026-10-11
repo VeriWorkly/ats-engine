@@ -119,6 +119,82 @@ describe("a city and state beside the dates", () => {
   });
 });
 
+describe("a city with its state or country named in full", () => {
+  it.each([
+    [["Software Engineer, Acme Corp, Berlin, Germany\tJan 2020 - Present"]],
+    [["Software Engineer | Acme Corp | Bengaluru, Karnataka, India\tJan 2020 - Present"]],
+    [["Software Engineer, Acme Corp, Toronto, ON, Canada\tJan 2020 - Present"]],
+    [["Software Engineer | Acme Corp | India\tJan 2020 - Present"]],
+    [["Software Engineer | Acme Corp", "Jan 2020 - Present | Austin, Texas, United States"]],
+    [["Software Engineer | Acme Corp", "Jan 2020 - Present | Remote, India"]],
+    [["Software Engineer", "Acme Corp", "Berlin, Germany", "Jan 2020 - Present"]],
+    [["Acme Corp", "Software Engineer", "Austin, Texas, United States", "Jan 2020 - Present"]],
+    // A first part ending in a legal form is the employer, not a city: it was dropped as one.
+    [["Software Engineer", "Acme Corp, TX", "Jan 2020 - Present"]],
+  ])("is neither the title nor the employer in %j", (block) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer: "Acme Corp" }]);
+  });
+
+  it.each([
+    ["Software Engineer, Georgia Pacific", "Georgia Pacific"],
+    ["Reporter, Washington Post, Washington, DC", "Washington Post"],
+    ["Analyst, Bank of America, Charlotte, North Carolina", "Bank of America"],
+    // No country or state after it: the city is not told from part of the employer.
+    ["Software Engineer, Acme, Berlin", "Acme, Berlin"],
+  ])("keeps a name that holds a place's in %j", (header, employer) => {
+    expect(rolesIn(`${header}\tJan 2020 - Present`)[0]?.employer).toBe(employer);
+  });
+
+  it("is not a place when its first part is a job title", () => {
+    expect(rolesIn("Software Engineer, India\tJan 2020 - Present")[0]?.title).toBe(
+      "Software Engineer",
+    );
+  });
+
+  // An employer with its country or state on a line of its own has the shape of a city with
+  // its country: with no employer named elsewhere, it is the employer.
+  it.each([
+    [["Software Engineer", "Infosys, India", "Jan 2020 - Present"], "Infosys"],
+    [["Software Engineer", "Google, India", "Jan 2020 - Present"], "Google"],
+    [["Software Engineer", "Microsoft, Washington", "Jan 2020 - Present"], "Microsoft"],
+    [["Software Engineer", "Dell, Texas", "Jan 2020 - Present"], "Dell"],
+    [["Software Engineer", "Deloitte, USA", "Jan 2020 - Present"], "Deloitte"],
+    [["Software Engineer", "Accenture, UK", "Jan 2020 - Present"], "Accenture"],
+    [["Software Engineer", "Bank of America, Texas", "Jan 2020 - Present"], "Bank of America"],
+    [["Infosys, India", "Software Engineer", "Jan 2020 - Present"], "Infosys"],
+    [["Software Engineer | Jan 2020 - Present", "Infosys, India"], "Infosys"],
+    [["Software Engineer\tJan 2020 - Present", "Infosys, India"], "Infosys"],
+    // A country or state's name alone, as an employer's.
+    [["Software Engineer", "Jordan", "Jan 2020 - Present"], "Jordan"],
+    [["Software Engineer", "Victoria", "Jan 2020 - Present"], "Victoria"],
+    [["Software Engineer", "Washington", "Jan 2020 - Present"], "Washington"],
+  ])("keeps the employer of %j", (block, employer) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer }]);
+  });
+
+  it("keeps a school with its state", () => {
+    expect(
+      rolesIn("Teaching Assistant", "University of Georgia, Georgia", "Jan 2020 - Present"),
+    ).toEqual([{ title: "Teaching Assistant", employer: "University of Georgia" }]);
+  });
+
+  it("keeps an employer with its country over the roles under it", () => {
+    expect(
+      rolesIn(
+        "Infosys, India",
+        "Software Engineer",
+        "Mar 2021 - Present",
+        "- Built a billing service handling 2M requests a day",
+        "Associate Engineer",
+        "Jan 2018 - Feb 2021",
+      ),
+    ).toEqual([
+      { title: "Software Engineer", employer: "Infosys" },
+      { title: "Associate Engineer", employer: "Infosys" },
+    ]);
+  });
+});
+
 describe("an employer whose name holds an employer word", () => {
   it.each([
     [
@@ -196,6 +272,19 @@ describe("a comma inside the title", () => {
       "Senior Engineer, Platform Team",
       "Northwind Inc",
     ],
+    ["Senior Engineer, Platform, Acme Corp", "Senior Engineer, Platform", "Acme Corp"],
+    // A department after the comma (`departmentWords`) is the title's, whatever the employer.
+    [
+      "Director, Product Management | Google | Jan 2020 - Present",
+      "Director, Product Management",
+      "Google",
+    ],
+    ["Director, Product Management — Google", "Director, Product Management", "Google"],
+    [
+      "Manager, Research & Development | Northwind | Austin, TX",
+      "Manager, Research & Development",
+      "Northwind",
+    ],
   ])("keeps the title of %j whole", (header, title, employer) => {
     expect(roleOf(header)).toMatchObject({ title, employer });
   });
@@ -204,7 +293,8 @@ describe("a comma inside the title", () => {
     // A comma part beside a place, or a city and its country, is still the employer.
     ["Senior Engineer, Acme — Austin, TX", "Senior Engineer", "Acme"],
     ["Senior Engineer, Acme | Remote", "Senior Engineer", "Acme"],
-    ["Software Engineer, Acme | Berlin, Germany", "Software Engineer", "Acme, Berlin, Germany"],
+    // The city goes with its country (`placeNames`): it was kept as part of the employer.
+    ["Software Engineer, Acme | Berlin, Germany", "Software Engineer", "Acme"],
     // Without a company's legal form after it, a third part is where.
     ["Software Engineer, Acme, Berlin", "Software Engineer", "Acme, Berlin"],
     // A description of the employer is not an employer of its own, nor a street named for one.
@@ -214,6 +304,10 @@ describe("a comma inside the title", () => {
       "Waymo, an Alphabet company",
     ],
     ["Software Engineer, Acme, Bank Street, NY", "Software Engineer", "Acme"],
+    // No department after the comma: the employer, then where.
+    ["Software Engineer, Acme | Berlin", "Software Engineer", "Acme, Berlin"],
+    // A company named in words a department may be named in, before its city.
+    ["Manager, Security Finance | Spartanburg", "Manager", "Security Finance, Spartanburg"],
   ])("still reads the employer after the comma in %j", (header, title, employer) => {
     expect(roleOf(header)).toMatchObject({ title, employer });
   });
