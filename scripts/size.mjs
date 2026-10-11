@@ -12,13 +12,13 @@ const BUDGETS = {
   // 97: 0.6.0's reading and keyword fixes took it from 93.6 to 96.2, mostly policy data: the
   // headings, title and organisation words, en-GB stemming rows, injection-mention and
   // citation words, and the section rules that read gutter headings and role sub-headings.
-  // 98.6: the subscripts a Greek symbol opens and the department words (0.3), then the names of
+  // 98.6: the department words (0.2), then the names of
   // countries and of the states of the US, Canada, India and Australia and the UK's nations, so
   // "Berlin, Germany" and "Austin, Texas, United States" are where a role is worked (`placeNames`,
   // 1.9 of it data: one string cut at its bars, each country's spellings one pattern), took it
   // from 96.2 to 98.5. No cities: a gazetteer of those would cost tens of KB.
   // 98.7: a LinkedIn export's name read over a headline with no job title, above where the
-  // person is, took it to 98.6.
+  // person is, and an employer with its country kept on a line of its own, took it to 98.63.
   ".": 98.7,
   "./document": 3,
   "./format": 1.5,

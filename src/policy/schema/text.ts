@@ -409,18 +409,6 @@ export const engineTextSchema = z.prefault(
       String.raw`(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\s+me`,
     ]),
     /**
-     * Subscripts a lowercase Greek symbol opens in a scientific term ("νmax", "κobs", "αsyn"),
-     * where the symbol is not a look-alike letter. Before anything else it is one: "νery",
-     * "ρython". Only a three-letter subscript needs an entry, since a word with fewer than three
-     * Latin letters is never a look-alike word.
-     */
-    symbolSubscripts: z._default(wordList("text.symbolSubscripts"), [
-      // A limit or a statistic; an observed, effective or apparent value; a part or a place.
-      "max|min|lim|avg|rms|tot|opt|abs|rel|ref",
-      "obs|eff|app|sat|cat|syn",
-      "int|ext|sub|off|out|mix",
-    ]),
-    /**
      * Headings of a list of works, read where a section heading opens one: its lines shaped as
      * citations (a year, a quoted title, "et al.", initials: "Kovalenko O, Marsh T. Ligand field
      * effects… 2019") are not bullets. They have no action verb to open with and repeat the

@@ -147,7 +147,7 @@ export function readResume(
         value: prepared.hidden.count,
         sample: prepared.hidden.smuggled.slice(0, 80),
       },
-      homoglyphWords: homoglyphWords(text, policy),
+      homoglyphWords: homoglyphWords(text),
       copiedPostingRatio: jobDescription?.trim() ? copiedPosting(text, jobDescription) : null,
       stuffedTerms: stuffedTerms(text, lines, policy, now, parsed.name ?? "", cited),
       timelineIssues: timelineIssues(parsed.roles, parsed.monthsOfExperience, now),

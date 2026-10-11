@@ -1744,11 +1744,6 @@
       "this\\s+(?:candidate|applicant|resume|cv|profile|application)",
       "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me"
     ],
-    "symbolSubscripts": [
-      "max|min|lim|avg|rms|tot|opt|abs|rel|ref",
-      "obs|eff|app|sat|cat|syn",
-      "int|ext|sub|off|out|mix"
-    ],
     "citationHeadings": [
       "publications?",
       "presentations?",
