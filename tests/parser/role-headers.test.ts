@@ -364,6 +364,20 @@ describe("an employer written before the title", () => {
     expect(roleOf("Croupier, Globex")).toMatchObject({ title: "Croupier", employer: "Globex" });
   });
 
+  it.each([
+    ["Acme Corp, Berlin\tJan 2020 - Present", "Acme Corp, Berlin"],
+    ["Siemens AG, Munich\tJan 2020 - Present", "Siemens AG, Munich"],
+    ["Acme, Berlin\tJan 2020 - Present", "Acme, Berlin"],
+  ])("reads %j over a title alone as the employer and its city", (dated, employer) => {
+    expect(rolesIn(dated, "Software Engineer")).toEqual([{ title: "Software Engineer", employer }]);
+  });
+
+  it("still reads an organisation and a title with no title word beside the dates", () => {
+    expect(rolesIn("Globex Corporation, Croupier\tJan 2020 - Present")).toEqual([
+      { title: "Croupier", employer: "Globex Corporation" },
+    ]);
+  });
+
   it("reads a title word before an organisation's name", () => {
     expect(roleOf("Bank Manager, Globex")).toMatchObject({
       title: "Bank Manager",

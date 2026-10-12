@@ -426,6 +426,17 @@ export function parseRoles(
       if (full !== undefined) header = take(index + full);
       else if (side !== undefined)
         header = `${splitTitleAndEmployer(own, policy).title} | ${headerParts(take(index + side), policy)[0]}`;
+    } else if (own && !titled(index)) {
+      // No title word beside the dates ("Acme Corp, Berlin"), and a title alone beside them
+      // ("Software Engineer"): the dated line is the employer and where, not a title and its
+      // employer.
+      const side = sides.find(
+        (offset) =>
+          titled(index + offset) &&
+          halfAt(index + offset, index) !== null &&
+          isSingle(lines[index + offset]!),
+      );
+      if (side !== undefined) header = `${take(index + side)} | ${own}`;
     }
     // Stacked above a bare date line: "Engineer" over "Acme", or a title over "Acme, Munich" —
     // the line two up is the title when it holds one and the line above does not. Only the first
