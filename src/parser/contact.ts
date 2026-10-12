@@ -25,13 +25,14 @@ import { memo } from "../util/memo.js";
  * over a second per call, and a scan evaluates this pattern about nine times. The lookbehind
  * anchors a match to the start of a local-part run, and the lengths are RFC 5321's own limits.
  *
- * The local part may hold letters in any script and an apostrophe ("josé.garcía@correo.es",
- * "o'connor.pat@example.com"), as mail servers take them; not an apostrophe first, which is a
- * quote ("'pat@example.com'"). One after a letter belongs to the run, so a match never starts
- * inside it.
+ * The local part may hold Latin letters with their accents and an apostrophe
+ * ("josé.garcía@correo.es", "o'connor.pat@example.com"), as mail servers take them; not an
+ * apostrophe first, which is a quote ("'pat@example.com'"). One after a letter belongs to the
+ * run, so a match never starts inside it. Not letters of another script, which is how a label
+ * glued to the address is written ("邮箱jane@x.com", "Почтаjane@x.com").
  */
 export const EMAIL =
-  /(?<![\p{L}\p{M}\p{N}._%+-]|[\p{L}\p{M}\p{N}]['’])[\p{L}\p{M}\p{N}._%+-][\p{L}\p{M}\p{N}._%+'’-]{0,63}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/iu;
+  /(?<![\p{sc=Latn}\p{M}\p{N}._%+-]|[\p{sc=Latn}\p{M}\p{N}]['’])[\p{sc=Latn}\p{M}\p{N}._%+-][\p{sc=Latn}\p{M}\p{N}._%+'’-]{0,63}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/iu;
 /**
  * A web address: with a scheme or "www.", a profile on a site resumes link to without either
  * ("dribbble.com/jane", "orcid.org/0000-…"), or a personal site on `.dev`, a top-level domain
