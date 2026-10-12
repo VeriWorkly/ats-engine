@@ -159,6 +159,15 @@ describe("skills", () => {
       expect.arrayContaining(["node.js", "react"]),
     );
   });
+
+  it.each([
+    ["SAP S/4HANA", ["s", "4hana"]],
+    ["z/OS mainframes", ["z", "os"]],
+    ["Pub/Sub messaging", ["pub", "sub"]],
+  ])("keeps a name written with a slash whole: %s", (ask, junk) => {
+    const report = listing("Python", `Python, ${ask}`);
+    for (const part of junk) expect(report.missingKeywords).not.toContain(part);
+  });
 });
 
 describe("knockouts", () => {

@@ -208,6 +208,7 @@ export const DEFAULT_KEYWORD_MATCH = {
     iac: "infrastructure as code",
     // "CI" alone is continuous integration; "CD" alone is as often a compact disc.
     ci: "ci/cd",
+    pubsub: "pub/sub",
     nodejs: "node.js",
     node: "node.js",
     reactjs: "react",
@@ -325,6 +326,10 @@ export const DEFAULT_KEYWORD_MATCH = {
     "a/b",
     "i/o",
     "ts/sci",
+    // Products named with a slash: SAP's ERP, IBM's mainframe system, Google Cloud's messaging.
+    "s/4hana",
+    "z/os",
+    "pub/sub",
     "software engineer",
     "full stack",
     // Kept whole: "business" is a stopword, and "development" alone is a software engineer's.

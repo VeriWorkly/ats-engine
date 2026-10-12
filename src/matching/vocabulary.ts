@@ -36,7 +36,8 @@ const LINK =
  * The words a token stands for, each with its offset in the token. A slash joins words a
  * posting asks for together ("HTML/CSS", "Python/Django", "C#/.NET"), so each is a word of its
  * own. A term the policy names with its slash ("CI/CD", "TCP/IP") or lists as a stopword
- * ("n/a") stays whole, and so does a token with a part that is no word ("OS/2", "24/7").
+ * ("n/a") stays whole, and so does a token with a part that is no word ("OS/2", "24/7") or
+ * opens with a digit ("S/4HANA"): a product's name, not two skills.
  */
 export function slashParts(token: string, vocab: Vocabulary): Array<[string, number]> {
   const whole = token.toLowerCase().replace(TRAILING, "");
@@ -44,7 +45,7 @@ export function slashParts(token: string, vocab: Vocabulary): Array<[string, num
     !whole.includes("/") ||
     vocab.slashTerms.has(whole) ||
     vocab.stopwords.has(whole) ||
-    !whole.split("/").every((part) => /\p{L}/u.test(part))
+    !whole.split("/").every((part) => /\p{L}/u.test(part) && !/^\p{N}/u.test(part))
   )
     return [[token, 0]];
   const parts: Array<[string, number]> = [];
