@@ -36,7 +36,7 @@ const BUDGETS = {
   // 70: zod/mini in place of zod took it from 141.1 to 67.5.
   // 70.9: the place names (see "."), and the German pack's for Germany, Austria, Switzerland and
   // the German states, took it from 68.5 to 70.8.
-  // 71.1: the policy data this round's fixes added (see ".") took it to 71.00.
+  // 71.1: the policy data this round's fixes added (see ".") took it to 71.08.
   "./locales": 71.1,
   // 70: zod/mini in place of zod took it from 141.0 to 67.5.
   // 71.6: the policy's place names (see "."), with what else "." gained, took it from 69.3 to 71.5.

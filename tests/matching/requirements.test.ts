@@ -502,6 +502,12 @@ describe("a clearance, compared by its level", () => {
     });
   });
 
+  it("reads every level of a longer list before the clearance", () => {
+    expect(cleared("Active BPSS clearance", "Must hold BPSS, CTC, SC or DV clearance").status).toBe(
+      "met",
+    );
+  });
+
   it("reads a UK level in brackets after the clearance", () => {
     expect(
       cleared("Active BPSS clearance", "Must hold active UK security clearance (SC)"),

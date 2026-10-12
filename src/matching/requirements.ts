@@ -226,19 +226,25 @@ function clearanceRanks(text: string, matchers: Matchers) {
  */
 function askedClearanceRanks(text: string, matchers: Matchers) {
   // A requirement is at most 300 characters: cutting it at each clearance stays cheap.
-  const near = [...text.matchAll(matchers.clearanceAll)].flatMap(({ index, 0: found }) =>
-    clearanceRanks(
-      [
-        ...text.slice(0, index).split(/\s+/u).slice(-4),
-        found,
-        ...text
-          .slice(index + found.length)
-          .split(/\s+/u)
-          .slice(0, 4),
-      ].join(" "),
-      matchers,
-    ),
-  );
+  const near = [...text.matchAll(matchers.clearanceAll)].flatMap(({ index, 0: found }) => {
+    const before = text.slice(0, index).split(/\s+/u);
+    const after = text
+      .slice(index + found.length)
+      .split(/\s+/u)
+      .slice(0, 4);
+    const window = (from: number) =>
+      clearanceRanks([...before.slice(from), found, ...after].join(" "), matchers);
+    // Three words before it, and further back over a list of levels each adds ("BPSS, CTC,
+    // SC or DV clearance").
+    let from = Math.max(0, before.length - 4);
+    let ranks = window(from);
+    while (from > 0) {
+      const wider = window(from - 1);
+      if (wider.length <= ranks.length) break;
+      [from, ranks] = [from - 1, wider];
+    }
+    return ranks;
+  });
   return near.length ? near : clearanceRanks(text, matchers);
 }
 
