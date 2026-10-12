@@ -311,21 +311,21 @@
         {
           "name": "CTC",
           "patterns": [
-            "ctc",
+            "ctc(?=\\s+(?:clearance|vetting|cleared|check))",
             "counter[\\s-]+terrorist\\s+check"
           ]
         },
         {
           "name": "SC",
           "patterns": [
-            "(?<!\\.)sc",
+            "sc(?=\\s+(?:clearance|vetting|cleared))",
             "security\\s+check"
           ]
         },
         {
           "name": "DV",
           "patterns": [
-            "dv",
+            "dv(?=\\s+(?:clearance|vetting|cleared))",
             "developed\\s+vetting"
           ]
         },

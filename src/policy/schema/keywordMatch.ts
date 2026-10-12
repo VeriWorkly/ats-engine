@@ -342,10 +342,29 @@ export const keywordMatchSchema = z
               name: "BPSS",
               patterns: ["bpss", String.raw`baseline\s+personnel\s+security\s+standard`],
             },
-            { name: "CTC", patterns: ["ctc", String.raw`counter[\s-]+terrorist\s+check`] },
-            // Not the "Sc" of a degree ("M.Sc").
-            { name: "SC", patterns: [String.raw`(?<!\.)sc`, String.raw`security\s+check`] },
-            { name: "DV", patterns: ["dv", String.raw`developed\s+vetting`] },
+            // "CTC", "SC" and "DV" only before what they name: not "CTC up to 30 LPA" (pay),
+            // "Charleston, SC" or a "Diversity Visa (DV)".
+            {
+              name: "CTC",
+              patterns: [
+                String.raw`ctc(?=\s+(?:clearance|vetting|cleared|check))`,
+                String.raw`counter[\s-]+terrorist\s+check`,
+              ],
+            },
+            {
+              name: "SC",
+              patterns: [
+                String.raw`sc(?=\s+(?:clearance|vetting|cleared))`,
+                String.raw`security\s+check`,
+              ],
+            },
+            {
+              name: "DV",
+              patterns: [
+                String.raw`dv(?=\s+(?:clearance|vetting|cleared))`,
+                String.raw`developed\s+vetting`,
+              ],
+            },
             { name: "Confidential", patterns: ["confidential"] },
             { name: "Secret", patterns: ["secret"] },
             {

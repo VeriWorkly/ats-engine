@@ -428,6 +428,18 @@ describe("a clearance, compared by its level", () => {
   });
 
   it.each([
+    "Charleston, SC: Active Secret clearance required",
+    "Diversity Visa (DV) holders welcome; Secret clearance required",
+    "Secret clearance required, CTC up to 30 LPA",
+    "Secret clearance required; Sc.D. preferred",
+  ])("reads a UK level only beside a clearance or vetting: %s", (ask) => {
+    expect(cleared("Active Confidential clearance", ask)).toMatchObject({
+      status: "partial",
+      detail: "Confidential read, Secret asked",
+    });
+  });
+
+  it.each([
     ["TS/SCI (inactive since 2022)", "Active TS/SCI clearance"],
     ["Secret clearance, expired 2021", "Secret clearance"],
     ["Eligible for Secret clearance", "Secret clearance"],
