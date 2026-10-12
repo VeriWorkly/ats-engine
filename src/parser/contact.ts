@@ -134,7 +134,8 @@ function nameCandidate(line: string, label: RegExp) {
  * ("Suharto") sits, and anywhere lower a lone capitalised word is far more likely a heading — and
  * never when it is a section heading or the document's own title ("Resume").
  *
- * `headlined` says the name was read over a headline further down, where a sidebar read before
+ * `headlined` says the name was read over a headline further down, or over its email under a
+ * list heading ("SKILLS" over "Python" over "Jane Doe"), where a sidebar read before
  * the main column leaves it.
  */
 export function findName(
@@ -256,7 +257,8 @@ export function findName(
   // above a title further down; one whose cut tail is a state ("San Francisco, CA") is a place,
   // taken only when no other name is found.
   // A name under a sidebar's list heading ("Top Skills" over "Machine Learning") is more likely
-  // one of its rows, so a name over a headline further down comes first.
+  // one of its rows, so a name over a headline further down comes first; one over the email
+  // ("Python" / "Jane Doe" / "jane@example.com") is the name, before any further down.
   let onlyHeadingsAbove = true;
   let place = "";
   let listed = false;
@@ -271,8 +273,9 @@ export function findName(
     const found = nameIn(line, index, firstLine);
     if (!found) continue;
     if (found.place) place ||= found.name;
-    else if (listed) row ||= found.name;
-    else return { name: found.name, headlined: false };
+    else if (!listed) return { name: found.name, headlined: false };
+    else if (EMAIL.test(trimmed[index + 1] ?? "")) return { name: found.name, headlined: true };
+    else row ||= found.name;
   }
   const over = headlined();
   return over ? { name: over, headlined: true } : { name: row || place, headlined: false };

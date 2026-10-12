@@ -161,6 +161,43 @@ describe("the name when a sidebar is read first", () => {
       "Python",
     ]);
   });
+
+  /** A list heading first, the name over its email, then `rest`, then the work history. */
+  const listFirst = (list: string, rest: string) =>
+    `${list}\nJane Doe\njane@example.com\n${rest}\nEXPERIENCE\nSoftware Engineer, Acme Corp    2019 – 2022\n• Built things`;
+
+  it.each([
+    ["SKILLS\nPython, SQL", "REFERENCES\nJohn Smith\nEngineering Manager, Acme"],
+    ["SKILLS\nPython, SQL", "VOLUNTEERING\nRed Cross\nVolunteer Coordinator"],
+    ["SKILLS\nPython", "PROJECTS\nRide Share\nLead Developer"],
+    ["SKILLS\nPython, SQL", "EDUCATION\nBoston College\nTeaching Fellow"],
+    ["SKILLS\nPython", "CERTIFICATIONS\nAWS Certified\nSolutions Architect"],
+    ["LANGUAGES\nEnglish", "SUMMARY\nData scientist.\nPROJECTS\nCredit Risk Model\nLead Analyst"],
+  ])("reads the name over its email under %j, not a name over a title under %j", (list, rest) => {
+    const { parsed } = AtsScoringService.check(listFirst(list, rest), DEFAULT_POLICY);
+    expect(parsed.name).toBe("Jane Doe");
+    expect(parsed.skills).not.toContain("Jane Doe");
+  });
+
+  it("keeps the certifications under the name's list heading", () => {
+    const { parsed } = AtsScoringService.check(
+      listFirst("SKILLS\nPython", "CERTIFICATIONS\nAWS Certified\nSolutions Architect"),
+      DEFAULT_POLICY,
+    );
+    expect(parsed.certifications.map((cert) => cert.name)).toEqual([
+      "AWS Certified",
+      "Solutions Architect",
+    ]);
+  });
+
+  it("does not cut a list at its first row read as the name", () => {
+    const text =
+      "SKILLS\nPython\nKubernetes\nCERTIFICATIONS\nGoogle Cloud\nProfessional Cloud Architect\nJane Doe\njane@example.com\nEXPERIENCE\nSoftware Engineer, Acme Corp    2019 – 2022\n• Built things";
+    const { parsed } = AtsScoringService.check(text, DEFAULT_POLICY);
+    expect(parsed.certifications.map((cert) => cert.name)).toEqual(
+      expect.arrayContaining(["Google Cloud", "Professional Cloud Architect"]),
+    );
+  });
 });
 
 describe("a role row whose title and dates both wrap", () => {
