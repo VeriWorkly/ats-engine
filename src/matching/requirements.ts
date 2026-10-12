@@ -132,6 +132,8 @@ type Matchers = {
   citizenship: RegExp;
   residence: RegExp;
   clearance: RegExp;
+  /** The same, global: where in a line each clearance is named. */
+  clearanceAll: RegExp;
   /** Clearance levels, highest first, each with its rank (0 the lowest) and a global pattern. */
   clearanceLevels: Array<{ name: string; rank: number; pattern: RegExp }>;
   /** `qualifiers`, each folded to the tokens a line is read as. */
@@ -169,6 +171,7 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     citizenship: wordListRegex(r.citizenship),
     residence: wordListRegex(r.residence),
     clearance: wordListRegex(r.clearance),
+    clearanceAll: wordListRegex(r.clearance, "gi"),
     clearanceLevels: r.clearanceLevels
       .map(({ name, patterns }, rank) => ({ name, rank, pattern: wordListRegex(patterns, "gi") }))
       .reverse(),
@@ -207,6 +210,43 @@ function clearanceRanks(text: string, matchers: Matchers) {
     rest = blanked;
   }
   return ranks;
+}
+
+/** Where the word `count` words before `at` starts. */
+function wordsBefore(text: string, at: number, count: number) {
+  let from = at;
+  for (let left = count; left > 0; left -= 1) {
+    while (from > 0 && /\s/u.test(text[from - 1]!)) from -= 1;
+    while (from > 0 && /\S/u.test(text[from - 1]!)) from -= 1;
+  }
+  return from;
+}
+
+/** Where the word `count` words after `at` ends. */
+function wordsAfter(text: string, at: number, count: number) {
+  let to = at;
+  for (let left = count; left > 0; left -= 1) {
+    while (to < text.length && /\s/u.test(text[to]!)) to += 1;
+    while (to < text.length && /\S/u.test(text[to]!)) to += 1;
+  }
+  return to;
+}
+
+/**
+ * The levels a posting asks a clearance at: those named within three words of a clearance
+ * ("Secret or Top Secret clearance", "Security clearance (Secret or above)"), not a word further
+ * on ("Top Secret clearance required to handle confidential information" asks for Top Secret).
+ */
+function askedClearanceRanks(text: string, matchers: Matchers) {
+  return [...text.matchAll(matchers.clearanceAll)].flatMap((match) =>
+    clearanceRanks(
+      text.slice(
+        wordsBefore(text, match.index, 3),
+        wordsAfter(text, match.index + match[0].length, 3),
+      ),
+      matchers,
+    ),
+  );
 }
 
 /** A clearance the line says is held: not negated, not pending or past. */
@@ -650,7 +690,7 @@ export function judgeRequirements(
       const holds = (entry: { line: string }) => holdsClearance(entry.line, matchers);
       const evidence = evidenceFor(holds);
       // A level asked is met by it or one above; the lowest the ask names is the bar.
-      const asked = Math.min(...clearanceRanks(ask, matchers));
+      const asked = Math.min(...askedClearanceRanks(ask, matchers));
       const held = Math.max(
         -1,
         ...resumeLines.filter(holds).flatMap((entry) => clearanceRanks(entry.line, matchers)),

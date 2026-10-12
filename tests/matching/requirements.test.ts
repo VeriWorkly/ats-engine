@@ -339,6 +339,17 @@ describe("a clearance, compared by its level", () => {
     ["Confidential clearance (active)", "Secret clearance", "Confidential read, Secret asked"],
     ["Active Secret clearance", "Active TS clearance required", "Secret read, Top Secret asked"],
     ["Active security clearance", "Active Top Secret clearance", "No level read, Top Secret asked"],
+    // A level named well past the clearance is not its level.
+    [
+      "Active Secret clearance",
+      "Active Top Secret clearance required to handle confidential information",
+      "Secret read, Top Secret asked",
+    ],
+    [
+      "Active Confidential clearance",
+      "Security clearance (Secret or above)",
+      "Confidential read, Secret asked",
+    ],
   ])("is partial with a lower level: %s for %s", (statement, ask, detail) => {
     expect(cleared(statement, ask)).toMatchObject({
       kind: "clearance",
