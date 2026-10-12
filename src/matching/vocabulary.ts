@@ -23,8 +23,14 @@ export type Vocabulary = {
 /** A "." or "/" a word picked up from the sentence around it: "JavaScript.", "and/". */
 const TRAILING = /(?<![./])[./]+$/;
 
-/** A link, from its scheme on: "https://careers.example.com/jobs/123". Never a skill. */
-const LINK = /(?<![\p{L}\p{N}+.-])\p{L}[\p{L}\p{N}+.-]{0,30}:\/\/\S*/gu;
+/**
+ * A link, from its scheme on ("https://careers.example.com/jobs/123"), or a host of three labels
+ * or more without one ("www.example.com/careers", "jobs.example.com/rust"), its last label
+ * letters. Never a skill. A name of two ("Node.js/React", "ASP.NET/C#") is not one. Linear: a
+ * host starts only where a label starts, and is at most eight labels of 63 characters.
+ */
+const LINK =
+  /(?<![\p{L}\p{N}+.-])\p{L}[\p{L}\p{N}+.-]{0,30}:\/\/\S*|(?<![\p{L}\p{N}+.@/-])(?:[\p{L}\p{N}-]{1,63}\.){2,8}\p{L}{2,63}(?![\p{L}\p{N}-])(?:\/\S*)?/gu;
 
 /**
  * The words a token stands for, each with its offset in the token. A slash joins words a
@@ -171,7 +177,7 @@ export function extractVocabulary(
   const claimed = new Uint8Array(lower.length);
   // And the links, where neither a phrase ("a/b" in "https://x.com/a/b") nor a word is read.
   const linked = new Uint8Array(lower.length);
-  if (lower.includes("://"))
+  if (lower.includes("."))
     for (const link of lower.matchAll(LINK))
       linked.fill(1, link.index, link.index + link[0].length);
 

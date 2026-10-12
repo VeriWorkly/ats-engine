@@ -147,6 +147,18 @@ describe("skills", () => {
     for (const junk of ["n", "a", "os", "2", "on", "off"])
       expect(report.missingKeywords).not.toContain(junk);
   });
+
+  it("reads no skill inside a web address written without its scheme", () => {
+    for (const address of ["www.example.com/careers/rust/kafka", "jobs.example.com/rust/kafka"]) {
+      const report = listing("Python", `Python\n- Apply at ${address}`);
+      for (const junk of ["www.example.com", "jobs.example.com", "careers", "rust", "kafka"])
+        expect(report.missingKeywords, address).not.toContain(junk);
+    }
+    // A skill written with a dot and a slash is still a skill.
+    expect(listing("Python", "Python, Node.js/React").missingKeywords).toEqual(
+      expect.arrayContaining(["node.js", "react"]),
+    );
+  });
 });
 
 describe("knockouts", () => {
