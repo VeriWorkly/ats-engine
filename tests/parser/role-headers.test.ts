@@ -95,7 +95,9 @@ describe("a city and state beside the dates", () => {
   });
 
   it.each([
+    [["Senior Engineer", "Austin, TX", "Jan 2020 - Present"]],
     [["Senior Engineer\tJan 2020 - Present", "Austin, TX"]],
+    [["Senior Engineer, Austin, TX\tJan 2020 - Present"]],
     [["Senior Engineer, Remote\tJan 2020 - Present"]],
     // A workplace word with a state's code is where, never an employer.
     [["Senior Engineer, Hybrid, CA\tJan 2020 - Present"]],
@@ -104,28 +106,16 @@ describe("a city and state beside the dates", () => {
     expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer: "" }]);
   });
 
-  // "Austin, TX" over the dates, or after the title's comma, has the shape of "Google, CA": with
-  // no employer named elsewhere, its first part is the employer, as "Infosys, India"'s is.
   it.each([
-    [["Senior Engineer", "Austin, TX", "Jan 2020 - Present"], "Austin"],
-    [["Senior Engineer, Austin, TX\tJan 2020 - Present"], "Austin"],
-    [["Acme Corp", "Senior Engineer, Austin, TX\tJan 2020 - Present"], "Acme Corp"],
-    [["Acme Corp", "Senior Engineer", "Austin, TX", "Jan 2020 - Present"], "Acme Corp"],
-  ])("is not told from an employer with its state's code in %j", (block, employer) => {
-    expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer }]);
+    [["Acme Corp", "Senior Engineer, Austin, TX\tJan 2020 - Present"]],
+    [["Acme Corp", "Senior Engineer", "Austin, TX", "Jan 2020 - Present"]],
+  ])("leaves the employer line over it the employer in %j", (block) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer: "Acme Corp" }]);
   });
 
-  it.each([
-    [
-      [
-        "Acme Corp",
-        "Senior Engineer, Austin, TX\tJan 2020 - Present",
-        "- Led the ledger team",
-        "Engineer, Dallas, TX\tJan 2017 - Dec 2019",
-      ],
-    ],
-    [
-      [
+  it("is where for every role stacked under one employer", () => {
+    expect(
+      rolesIn(
         "Acme Corp",
         "Senior Engineer",
         "Austin, TX",
@@ -134,28 +124,10 @@ describe("a city and state beside the dates", () => {
         "Engineer",
         "Dallas, TX",
         "Jan 2017 - Dec 2019",
-      ],
-    ],
-  ])("is where for every role under one employer in %j", (block) => {
-    expect(rolesIn(...block)).toEqual([
+      ),
+    ).toEqual([
       { title: "Senior Engineer", employer: "Acme Corp" },
       { title: "Engineer", employer: "Acme Corp" },
-    ]);
-  });
-
-  it.each([
-    "Senior Engineer, Austin, TX\tJan 2020 - Present",
-    "Senior Engineer\nAustin, TX\nJan 2020 - Present",
-  ])("is where when the contact details name it: %j", (block) => {
-    const { roles } = parseResume(
-      `Jane Doe\njane@example.com | +1 512 555 0100 | Austin, TX\nExperience\n${block}\n- Built the ledger`.split(
-        "\n",
-      ),
-      DEFAULT_POLICY,
-      now,
-    );
-    expect(roles.map(({ title, employer }) => ({ title, employer }))).toEqual([
-      { title: "Senior Engineer", employer: "" },
     ]);
   });
 
@@ -179,12 +151,20 @@ describe("an employer with its state's code", () => {
   it.each([
     [["Analyst at Deloitte, NY\tJan 2020 - Present"], "Analyst", "Deloitte"],
     [["Nurse at Kaiser, CA\tJan 2020 - Present"], "Nurse", "Kaiser"],
+    [["Engineer @ Intel, OR\tJan 2020 - Present"], "Engineer", "Intel"],
     [["Engineer | Intel | OR\tJan 2020 - Present"], "Engineer", "Intel"],
-    [["Software Engineer, Google, CA\tJan 2020 - Present"], "Software Engineer", "Google"],
-    [["Data Analyst, Capital One, VA\tJan 2020 - Present"], "Data Analyst", "Capital One"],
-    [["Software Engineer", "Google, CA", "Jan 2020 - Present"], "Software Engineer", "Google"],
+    [["Engineer – Intel – OR\tJan 2020 - Present"], "Engineer", "Intel"],
   ])("keeps the title and the employer of %j", (block, title, employer) => {
     expect(rolesIn(...block)).toEqual([{ title, employer }]);
+  });
+
+  // Known limit: with commas only, or on a line of its own, "Google, CA" is not told from
+  // "Austin, TX" without a list of cities, and a blank employer is safer than a city.
+  it.each([
+    [["Software Engineer, Google, CA\tJan 2020 - Present"]],
+    [["Software Engineer", "Google, CA", "Jan 2020 - Present"]],
+  ])("takes no employer from %j", (block) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer: "" }]);
   });
 
   it.each(["Engineer, TX", "Manager, TX", "Officer, TX"])(

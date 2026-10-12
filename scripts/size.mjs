@@ -22,11 +22,10 @@ const BUDGETS = {
   // 99.4: the readings 0.4.0 got right restored (an employer with its state's code, a list under
   // a role, the name over its email, a duration over the dates), requirements read clause by
   // clause with the UK's clearance levels, and stricter injection and citation checks, took it to
-  // 99.32. 99.9: guards a review found those fixes needed (a city named in the contact
-  // details, an employer line over the roles, a sponsorship offered, a verdict in a quoted
-  // prompt, the web domains that end a link, a clearance not held past a semicolon) took it to
-  // 99.89, mostly policy data (`linkDomains`, `sponsorshipOffered`, `injectionVerdicts`).
-  ".": 99.9,
+  // 99.32. 99.7: guards a review found those fixes needed (a sponsorship offered, a verdict in a
+  // quoted prompt, the web domains that end a link, a clearance not held past a semicolon) took
+  // it to 99.67, mostly policy data (`linkDomains`, `sponsorshipOffered`, `injectionVerdicts`).
+  ".": 99.7,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
