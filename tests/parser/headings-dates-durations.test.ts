@@ -188,6 +188,33 @@ describe("experience and skills headings beyond software's", () => {
     expect(parsed.skills.join(" ")).not.toContain("Globex");
   });
 
+  /** A role, then `rest`, on a page of headings in capitals. */
+  const afterRole = (rest: string) =>
+    parse(
+      `Jane Doe\njane@example.com\nEXPERIENCE\nSoftware Engineer, Acme Corp\tJan 2019 - Dec 2022\n- Built payment systems\n${rest}`,
+    );
+
+  it.each([
+    [
+      "SKILLS\n- Python, Go, SQL\n- Kubernetes\nLEADERSHIP\nPresident, Robotics Club\t2016 - 2018",
+      "skills",
+    ],
+    ["SKILLS\n- Python, Go\nCOMMUNITY SERVICE\nPresident, Robotics Club\t2016 - 2018", "skills"],
+    [
+      "PROJECTS\n- Open-source maintainer\nLead Maintainer, Kubernetes SIG\t2020 - Present",
+      "projects",
+    ],
+    ["PROJECTS\n- Toy compiler\nVolunteer Developer, Code for America\t2018 - 2019", "projects"],
+  ])("still opens %j, a heading of one word or over an unknown heading", (rest) => {
+    expect(afterRole(rest).roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+  });
+
+  it("still reads the skills over a heading it does not know", () => {
+    expect(
+      afterRole("SKILLS\n- Python, Go\nLEADERSHIP\nPresident, Robotics Club\t2016 - 2018").skills,
+    ).toEqual(expect.arrayContaining(["Python", "Go"]));
+  });
+
   it.each([
     "EDUCATION",
     "Education",

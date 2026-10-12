@@ -386,13 +386,19 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
     }
     return dated[at];
   };
-  // A list under a role, then the next role: bullets right under the heading, and a job title
-  // on the lines from the first one that is not a bullet to its dates ("Key Projects" over "-
-  // Ledger rewrite" over "Engineer, Globex Inc⇥2016 - 2019"). A projects section opens on a
-  // project ("Ledger Rewrite⇥2018"), or names none with a job title.
+  // A list under a role, then the next role: a heading of two words or more, bullets right
+  // under it, and a job title on the lines from the first one that is not a bullet to its dates,
+  // before any heading, known or not ("Key Projects" over "- Ledger rewrite" over "Engineer,
+  // Globex Inc⇥2016 - 2019"). A projects section opens on a project ("Ledger Rewrite⇥2018"), or
+  // names none with a job title; a bare "PROJECTS" or "SKILLS" opens its section, whatever is
+  // dated in it ("Lead Maintainer, Kubernetes SIG"), as one does over "LEADERSHIP".
   const roleAfterList = (at: number) => {
-    if (!BULLET.test(lines[at + 1] ?? "")) return false;
-    for (let line = at + 2; line < lines.length && !headings[line]; line += 1) {
+    if (!/\S\s+\S/u.test(lines[at]!.trim()) || !BULLET.test(lines[at + 1] ?? "")) return false;
+    for (
+      let line = at + 2;
+      line < lines.length && !headings[line] && !unknown.has(line);
+      line += 1
+    ) {
       if (BULLET.test(lines[line]!)) continue;
       if (matchers.titleWords.test(lines[line]!)) return true;
       if (findDateRange(lines[line]!, policy.resumeParse, UNBOUNDED)) return false;
