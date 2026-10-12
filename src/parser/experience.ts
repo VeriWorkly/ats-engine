@@ -59,9 +59,15 @@ const placesOf = memo((rp: AtsEnginePolicy["resumeParse"]) => ({
   postNominal: new RegExp(`^(?:${rp.postNominals.join("|")})$`, "iu"),
   workplace: new RegExp(`^(?:${rp.workplaceWords.join("|")})$`, "iu"),
   name: new RegExp(`^(?:${rp.placeNames.join("|")})$`, "iu"),
+  /** A country or a state named anywhere: "not in the US". */
+  named: wordListRegex(rp.placeNames),
   /** A name ending in a legal form or an institution's kind: "Acme Corp", not "Bank Street". */
   company: new RegExp(`${wordListPattern(rp.organisationWords)}$`, "iu"),
 }));
+
+/** Whether the text names a country or a state (`placeNames`) anywhere. */
+export const namesPlace = (text: string, policy: AtsEnginePolicy) =>
+  placesOf(policy.resumeParse).named.test(text);
 
 /** The policy's state and province codes, credentials after a name, and workplace words. */
 export const placeWords = (policy: AtsEnginePolicy) => placesOf(policy.resumeParse);

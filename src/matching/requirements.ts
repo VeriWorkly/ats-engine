@@ -1,6 +1,7 @@
 import { isDatedLine } from "../checks/bullets.js";
 import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../format/index.js";
 import { degreeLevels } from "../parser/education.js";
+import { namesPlace } from "../parser/experience.js";
 import { canonicalLanguage, cefrLevel, compareCefr } from "../parser/languages.js";
 import { monthsOfExperience } from "../parser/tenure.js";
 import type { ResumeSection, ResumeSectionKind } from "../parser/sections.js";
@@ -270,6 +271,7 @@ function judgeAuthorization(
   ask: string,
   lines: ReadonlyArray<{ line: string }>,
   matchers: Matchers,
+  policy: AtsEnginePolicy,
 ): { status: Status | "unverifiable"; lines: Array<{ line: string }> } {
   const stated = lines.flatMap((entry) => {
     const { line } = entry;
@@ -283,14 +285,20 @@ function judgeAuthorization(
     if (matchers.needsSponsorship.test(rest)) return [{ entry, says: line, needs: true }];
     // Read clause by clause, so a negation about something else ("Authorized to work in the US
     // (no visa needed)", "…, not open to relocation") does not negate the statement.
-    const clauses = rest
-      .split(/[;,()]/u)
-      .filter(
-        (clause) =>
-          matchers.authorization.test(clause) ||
-          matchers.citizenship.test(clause) ||
-          matchers.residence.test(clause),
-      );
+    const states = (clause: string) =>
+      matchers.authorization.test(clause) ||
+      matchers.citizenship.test(clause) ||
+      matchers.residence.test(clause);
+    const parts = rest.split(/[;,()]/u);
+    // A clause of its own saying where it does not hold takes the statement back: "Authorized
+    // to work in Canada, not in the US".
+    if (
+      parts.some(
+        (part) => !states(part) && matchers.negation.test(part) && namesPlace(part, policy),
+      )
+    )
+      return [];
+    const clauses = parts.filter(states);
     const held = (clauses.length ? clauses : [rest]).filter(
       (clause) => !matchers.negation.test(clause),
     );
@@ -699,7 +707,7 @@ export function judgeRequirements(
 
     // The right to work and a clearance: settled in the application, unless the resume says.
     if (matchers.authorization.test(text)) {
-      const { status, lines: shown } = judgeAuthorization(ask, resumeLines, matchers);
+      const { status, lines: shown } = judgeAuthorization(ask, resumeLines, matchers, policy);
       const lines = new Set(shown);
       return {
         ...base,

@@ -315,6 +315,10 @@ describe("the right to work, read for what the statement says", () => {
     "Can't work in the US without sponsorship",
     "Not authorized to work without sponsorship",
     "Unable to work in the US without sponsorship",
+    // A clause of its own saying where not.
+    "Authorized to work in Canada, not in the US",
+    "Authorized to work in the EU, not in the US",
+    "Authorized to work in the UK (not the US)",
   ])("does not take a negated statement for one: %s", (statement) => {
     expect(authorized(statement, WITHOUT_SPONSORSHIP).status).not.toBe("met");
   });
