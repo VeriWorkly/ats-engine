@@ -458,14 +458,20 @@ export function parseRoles(
       isPlace(lines[at]!, policy, false) ||
       (isPlace(lines[at]!, policy) && (!isSingle(lines[at - 1]!) || stacked(at - 1)));
     let dates = index;
+    // How long the role ran, on a line of its own between its header and its dates ("Software
+    // Engineer, Acme Corp" / "2 years" / "Jan 2020 - Dec 2021"), is neither: the header is above.
+    if (!header && durationOnly(lines[dates - 1]) && !used.has(dates - 1)) {
+      dates -= 1;
+      take(dates);
+    }
     // Under a title alone, "Austin, TX" is not told from "Google, CA": its first part is the
     // employer when no other line names one.
     let near = "";
-    if (!header && free(index - 1) && free(index - 2) && where(index - 1)) {
-      if (titled(index - 2) && isSingle(lines[index - 2]!))
-        near = withoutPlace(headerParts(lines[index - 1]!, policy), policy, true);
-      take(index - 1);
-      dates = index - 1;
+    if (!header && free(dates - 1) && free(dates - 2) && where(dates - 1)) {
+      if (titled(dates - 2) && isSingle(lines[dates - 2]!))
+        near = withoutPlace(headerParts(lines[dates - 1]!, policy), policy, true);
+      take(dates - 1);
+      dates -= 1;
     }
     if (!header && free(dates - 1)) {
       if (wrapped(dates - 1)) {

@@ -263,6 +263,15 @@ describe("the time at an employer on a line of its own", () => {
       { title: "Software Engineer", employer: "Acme Corp" },
     ]);
   });
+
+  it.each([
+    [["Software Engineer, Acme Corp", "2 years", "Jan 2020 - Dec 2021"]],
+    [["Software Engineer | Acme Corp", "(2 years)", "Jan 2020 - Dec 2021"]],
+    [["Acme Corp", "Software Engineer", "2 yrs 3 mos", "Jan 2020 - Dec 2021"]],
+    [["Software Engineer", "Acme Corp", "2 years", "Jan 2020 - Dec 2021"]],
+  ])("between the header and its dates leaves the header in %j", (block) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer: "Acme Corp" }]);
+  });
 });
 
 describe("a comma inside the title", () => {
