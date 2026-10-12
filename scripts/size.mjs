@@ -19,7 +19,11 @@ const BUDGETS = {
   // from 96.2 to 98.5. No cities: a gazetteer of those would cost tens of KB.
   // 98.7: a LinkedIn export's name read over a headline with no job title, above where the
   // person is, and an employer with its country kept on a line of its own, took it to 98.63.
-  ".": 98.7,
+  // 99.4: the readings 0.4.0 got right restored (an employer with its state's code, a list under
+  // a role, the name over its email, a duration over the dates), requirements read clause by
+  // clause with the UK's clearance levels, and stricter injection and citation checks, took it to
+  // 99.32.
+  ".": 99.4,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then

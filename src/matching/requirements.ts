@@ -212,38 +212,23 @@ function clearanceRanks(text: string, matchers: Matchers) {
   return ranks;
 }
 
-/** Where the word `count` words before `at` starts. */
-function wordsBefore(text: string, at: number, count: number) {
-  let from = at;
-  for (let left = count; left > 0; left -= 1) {
-    while (from > 0 && /\s/u.test(text[from - 1]!)) from -= 1;
-    while (from > 0 && /\S/u.test(text[from - 1]!)) from -= 1;
-  }
-  return from;
-}
-
-/** Where the word `count` words after `at` ends. */
-function wordsAfter(text: string, at: number, count: number) {
-  let to = at;
-  for (let left = count; left > 0; left -= 1) {
-    while (to < text.length && /\s/u.test(text[to]!)) to += 1;
-    while (to < text.length && /\S/u.test(text[to]!)) to += 1;
-  }
-  return to;
-}
-
 /**
  * The levels a posting asks a clearance at: those named within three words of a clearance
  * ("Secret or Top Secret clearance", "Security clearance (Secret or above)"), not a word further
  * on ("Top Secret clearance required to handle confidential information" asks for Top Secret).
  */
 function askedClearanceRanks(text: string, matchers: Matchers) {
-  return [...text.matchAll(matchers.clearanceAll)].flatMap((match) =>
+  // A requirement is at most 300 characters: cutting it at each clearance stays cheap.
+  return [...text.matchAll(matchers.clearanceAll)].flatMap(({ index, 0: found }) =>
     clearanceRanks(
-      text.slice(
-        wordsBefore(text, match.index, 3),
-        wordsAfter(text, match.index + match[0].length, 3),
-      ),
+      [
+        ...text.slice(0, index).split(/\s+/u).slice(-4),
+        found,
+        ...text
+          .slice(index + found.length)
+          .split(/\s+/u)
+          .slice(0, 4),
+      ].join(" "),
       matchers,
     ),
   );
@@ -257,22 +242,16 @@ function askedClearanceRanks(text: string, matchers: Matchers) {
  * incidents" holds Secret, and "Secret clearance, expired 2021" holds none.
  */
 function heldClearances(line: string, matchers: Matchers) {
-  const named = [...line.matchAll(matchers.clearanceAll)];
-  const semicolons = [...line.matchAll(/;/gu)].map((semicolon) => semicolon.index);
-  let next = 0;
-  return named.flatMap((match, at) => {
-    const end = match.index + match[0].length;
-    const before = named[at - 1];
-    while (next < semicolons.length && semicolons[next]! < match.index) next += 1;
-    let after = next;
-    while (after < semicolons.length && semicolons[after]! < end) after += 1;
-    const from = Math.max(
-      before ? before.index + before[0].length : 0,
-      next > 0 ? semicolons[next - 1]! + 1 : 0,
-    );
-    const to = Math.min(named[at + 1]?.index ?? line.length, semicolons[after] ?? line.length);
-    const about = line.slice(from, to);
-    return matchers.negation.test(about) || matchers.notHeld.test(about) ? [] : [about];
+  return line.split(";").flatMap((part) => {
+    const named = [...part.matchAll(matchers.clearanceAll)];
+    return named.flatMap((match, at) => {
+      const before = named[at - 1];
+      const about = part.slice(
+        before ? before.index + before[0].length : 0,
+        named[at + 1]?.index ?? part.length,
+      );
+      return matchers.negation.test(about) || matchers.notHeld.test(about) ? [] : [about];
+    });
   });
 }
 
