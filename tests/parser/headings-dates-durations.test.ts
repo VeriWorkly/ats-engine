@@ -188,6 +188,28 @@ describe("experience and skills headings beyond software's", () => {
     expect(parsed.skills.join(" ")).not.toContain("Globex");
   });
 
+  it.each([
+    "EDUCATION",
+    "Education",
+    "Education:",
+    "CERTIFICATIONS",
+    "Certifications",
+    "Licenses & Certifications",
+  ])("opens a section at %j after a role, however it is set", (heading) => {
+    const parsed = underRole(
+      `${heading}\nBSc Computer Science, MIT\t2015 - 2019\nAWS Solutions Architect\tMar 2021 - Mar 2024`,
+    );
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+  });
+
+  it("opens Education written with a colon on a page of headings without one", () => {
+    const parsed = parse(
+      "Jane Doe\nExperience\nSoftware Engineer, Acme Corp\tJan 2019 - Dec 2022\n- Built things\nEducation:\nBSc Computer Science, MIT\t2015 - 2019\nSkills\nPython, Go\nProjects\nRide\t2018",
+    );
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+    expect(parsed.education).toHaveLength(1);
+  });
+
   it("keeps Key Projects inside the role on a page of headings in title case", () => {
     const parsed = parse(
       "Jane Doe\nExperience\nSenior Engineer, Acme Corp\tJan 2020 - Present\n- Led platform work\nKey Projects\n- Payment gateway\nSoftware Engineer, Globex Inc\tJan 2017 - Dec 2019\n- Built APIs\nEducation\nBSc Computer Science, MIT\t2013 - 2017\nSkills\nPython, Go",

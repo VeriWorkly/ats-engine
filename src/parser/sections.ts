@@ -232,6 +232,13 @@ const UNBOUNDED = new Date(Date.UTC(9000, 0, 1));
 
 const UNKNOWN = { kind: "other", rest: "", tail: "" } as const;
 
+/** Headings never read as a line of a role for how they are set. */
+const SECTIONS_OF_THEIR_OWN = new Set<ResumeSectionKind>([
+  "experience",
+  "education",
+  "certifications",
+]);
+
 /** One to four words of letters, joined by spaces or "&", "/", "-": "VOLUNTEER WORK". */
 const HEADING_WORDS = /^\p{L}+(?:[ &/-]+\p{L}+){0,3}$/u;
 
@@ -417,14 +424,15 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
     // ("Technologies: React" over the next role), is not set as the page's headings are ("Key
     // Projects:", "Tech Stack" or "Accomplishments" under a role, on a page of headings in
     // capitals), or heads a list of skills or projects over the next role ("KEY PROJECTS", "TECH
-    // STACK").
+    // STACK"). The work history, education and certifications are never a role's lines, however
+    // they are set: "Education" on a page of headings in capitals opens Education.
     const inRole =
       headings[at] &&
       !gutters(at) &&
       (current.kind === "experience" || current.kind === "projects") &&
       datedAfter(at) &&
       ((heading!.kind === "skills" && heading!.rest !== "") ||
-        !styled(line) ||
+        (!styled(line) && !SECTIONS_OF_THEIR_OWN.has(heading!.kind)) ||
         ((heading!.kind === "skills" || heading!.kind === "projects") && roleAfterList(at)));
     if (!heading || category || inRole) {
       current.lines.push(line);
