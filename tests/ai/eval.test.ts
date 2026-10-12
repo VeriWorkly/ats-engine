@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createAtsAi } from "../../src/ai/index.js";
 import { fabricatedNumbers, runAiEval, scriptedProvider } from "../../src/ai/testing/index.js";
 import { evalCases } from "../fixtures/ai-eval-cases.js";
+import { expectFast } from "../fixtures/timing.js";
 
 /**
  * The harness itself, against scripted replies. What a real model scores is measured by
@@ -107,6 +108,11 @@ describe("fabricatedNumbers", () => {
     expect(fabricatedNumbers("Started 2019-07", "Joined in 2019")).toEqual(["07"]);
     expect(fabricatedNumbers("Started 2019-07", "Mar 2019")).toEqual(["07"]);
     expect(fabricatedNumbers("2000-10 people", "2000 users")).toEqual(["10"]);
+  });
+
+  it("reads a month's name before a long run of spaces in linear time", () => {
+    expectFast(() => fabricatedNumbers("", `mar${" ".repeat(50_000)}`), 50);
+    expect(fabricatedNumbers("2019-03", "Mar , 2019")).toEqual([]);
   });
 
   it("holds analyze to the report as sent, without the advice", () => {

@@ -140,7 +140,8 @@ the policy's.
 
 Everything else in a policy stays the policy's: `phrases`, `synonyms`, `implies`, `stemming`,
 what a right-to-work or clearance statement says (`requirements.needsSponsorship`,
-`noSponsorship`, `negation`, `notHeld`, `citizenship`, `residence`, `clearanceLevels`),
+`noSponsorship`, `sponsorshipOffered`, `negation`, `notHeld`, `citizenship`, `residence`,
+`clearanceLevels`),
 `numberWords`, `qualifiers`, `offerWords`, the `writing` and `advice` sections, and the rules
 and their weights, which only a region pack's `rules` and `ageAdvice` adjust.
 

@@ -60,10 +60,24 @@ const citationHeading = memo(
 
 /**
  * What a citation carries: a year, a quoted title, "et al." or an author's initials ("Doe J,",
- * "J. Doe").
+ * "J. Doe", "Doe, J.").
  */
-const CITATION =
-  /(?<!\d)(?:19|20)\d{2}(?!\d)|["“”]|(?<![\p{L}])et\s+al(?![\p{L}])|(?<![\p{L}])\p{Lu}\.\s?\p{Lu}|(?<![\p{L}])\p{Lu}\p{Ll}+\s\p{Lu}{1,2}[,.]/u;
+const CITATION_SIGNS = [
+  /(?<!\d)(?:19|20)\d{2}(?!\d)/u,
+  /["“”]/u,
+  /(?<![\p{L}])et\s+al(?![\p{L}])/u,
+  /(?<![\p{L}])\p{Lu}\.\s?\p{Lu}|(?<![\p{L}])\p{Lu}\p{Ll}+,?\s\p{Lu}{1,2}[,.]/u,
+];
+const CITATION = new RegExp(CITATION_SIGNS.map((sign) => sign.source).join("|"), "u");
+
+/**
+ * The citations that carry two of those signs: a year alone ("Kubernetes alpha project 2021")
+ * does not make a list of works of what a stuffed list is.
+ */
+export const fullCitations = (cited: ReadonlySet<string>) =>
+  new Set(
+    [...cited].filter((line) => CITATION_SIGNS.filter((sign) => sign.test(line)).length >= 2),
+  );
 
 /**
  * The citations under a section heading that opens a list of works (`text.citationHeadings`):

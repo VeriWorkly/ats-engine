@@ -19,7 +19,16 @@ const BUDGETS = {
   // from 96.2 to 98.5. No cities: a gazetteer of those would cost tens of KB.
   // 98.7: a LinkedIn export's name read over a headline with no job title, above where the
   // person is, and an employer with its country kept on a line of its own, took it to 98.63.
-  ".": 98.7,
+  // 99.4: the readings 0.4.0 got right restored (an employer with its state's code, a list under
+  // a role, the name over its email, a duration over the dates), requirements read clause by
+  // clause with the UK's clearance levels, and stricter injection and citation checks, took it to
+  // 99.32. 99.7: guards a review found those fixes needed (a sponsorship offered, a verdict in a
+  // quoted prompt, the web domains that end a link, a clearance not held past a semicolon) took
+  // it to 99.67, mostly policy data (`linkDomains`, `sponsorshipOffered`, `injectionVerdicts`).
+  // 99.9: UK levels read in a list and in brackets, the offer of sponsorship read in its clause,
+  // and each line's clearances read once, to 99.86. 100.0: the asked level read over a longer
+  // list of levels ("BPSS, CTC, SC or DV clearance"), to 99.93.
+  ".": 100.0,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
@@ -28,10 +37,13 @@ const BUDGETS = {
   // 70: zod/mini in place of zod took it from 141.1 to 67.5.
   // 70.9: the place names (see "."), and the German pack's for Germany, Austria, Switzerland and
   // the German states, took it from 68.5 to 70.8.
-  "./locales": 70.9,
+  // 71.1: the policy data this round's fixes added (see ".") took it to 71.08.
+  "./locales": 71.1,
   // 70: zod/mini in place of zod took it from 141.0 to 67.5.
   // 71.6: the policy's place names (see "."), with what else "." gained, took it from 69.3 to 71.5.
-  "./ai": 71.6,
+  // 71.8: the policy data and parsing this round's fixes added (see ".") took it to 71.75.
+  // 71.9: the same as "." at 99.9, to 71.84.
+  "./ai": 71.9,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume } from "../../src/index.js";
 import { livePolicy } from "../fixtures/livePolicy.js";
 
 // The live policy when present, the public default otherwise: parsing is exercised in every
@@ -205,4 +205,17 @@ describe("resume parsing — what an ATS recovers", () => {
 
     expect(parsed.highestDegree).toBe("doctorate");
   });
+});
+
+describe("an email glued to a label in another script", () => {
+  it.each(["邮箱", "メール", "이메일", "ईमेल", "Почта"])(
+    "reads the address without %s",
+    (label) => {
+      const parsed = parseResume(
+        ["Jane Doe", `${label}jane@x.com`, "Experience", "Engineer, Acme  2019 - 2022"],
+        DEFAULT_POLICY,
+      );
+      expect(parsed.email).toBe("jane@x.com");
+    },
+  );
 });

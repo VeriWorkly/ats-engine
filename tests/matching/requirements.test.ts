@@ -147,6 +147,54 @@ describe("skills", () => {
     for (const junk of ["n", "a", "os", "2", "on", "off"])
       expect(report.missingKeywords).not.toContain(junk);
   });
+
+  it("reads no skill inside a web address written without its scheme", () => {
+    for (const address of ["www.example.com/careers/rust/kafka", "jobs.example.com/rust/kafka"]) {
+      const report = listing("Python", `Python\n- Apply at ${address}`);
+      for (const junk of ["www.example.com", "jobs.example.com", "careers", "rust", "kafka"])
+        expect(report.missingKeywords, address).not.toContain(junk);
+    }
+    // A skill written with a dot and a slash is still a skill.
+    expect(listing("Python", "Python, Node.js/React").missingKeywords).toEqual(
+      expect.arrayContaining(["node.js", "react"]),
+    );
+  });
+
+  it.each([
+    ["System.Text.Json", "system.text.json"],
+    ["Microsoft.Extensions.DependencyInjection", "microsoft.extensions.dependencyinjection"],
+    ["org.springframework.boot", "org.springframework.boot"],
+    ["java.util.concurrent", "java.util.concurrent"],
+    ["Microsoft.Extensions.Logging/Serilog", "serilog"],
+    ["Microsoft.Graph.Net", "microsoft.graph.net"],
+    ["Microsoft.Bot.Builder.AI", "microsoft.bot.builder.ai"],
+    ["akka.stream.io", "akka.stream.io"],
+    ["com.example.app", "com.example.app"],
+    ["Microsoft.Extensions.AI/Ollama", "ollama"],
+    ["akka.stream.io/Pekko", "pekko"],
+    ["com.example.app/Kotlin", "kotlin"],
+    ["Microsoft.Graph.Net/Azure", "azure"],
+  ])("reads a dotted name, %s, as a keyword, not a web address", (ask, term) => {
+    expect(listing("Python", `Python, ${ask}`).missingKeywords).toContain(term);
+  });
+
+  it("reads no keyword inside a host whose last label is a country's", () => {
+    const report = listing("Python", "Python\n- Apply at careers.acme.co.uk");
+    expect(report.missingKeywords).not.toContain("careers.acme.co.uk");
+    const io = listing("Python", "Python\n- Apply at boards.greenhouse.io/acme/jobs/123");
+    expect(io.missingKeywords.join(" ")).not.toMatch(/greenhouse|acme|jobs/);
+    const careers = listing("Python", "Python\n- Apply at boards.greenhouse.io/careers/rust");
+    expect(careers.missingKeywords.join(" ")).not.toMatch(/greenhouse|careers|rust/);
+  });
+
+  it.each([
+    ["SAP S/4HANA", ["s", "4hana"]],
+    ["z/OS mainframes", ["z", "os"]],
+    ["Pub/Sub messaging", ["pub", "sub"]],
+  ])("keeps a name written with a slash whole: %s", (ask, junk) => {
+    const report = listing("Python", `Python, ${ask}`);
+    for (const part of junk) expect(report.missingKeywords).not.toContain(part);
+  });
 });
 
 describe("knockouts", () => {
@@ -235,6 +283,43 @@ describe("the right to work, read for what the statement says", () => {
       authorized("Will require visa sponsorship", "This role is not eligible for work sponsorship")
         .status,
     ).toBe("missing");
+    expect(
+      authorized(
+        "Will require H-1B visa sponsorship",
+        "Candidates requiring sponsorship will not be considered",
+      ).status,
+    ).toBe("missing");
+  });
+
+  it.each([
+    "Candidates requiring sponsorship are ineligible",
+    "Applicants who require sponsorship will be disqualified",
+    "Candidates needing sponsorship are excluded",
+    "Applications requiring sponsorship will be rejected",
+    // An offer word elsewhere in the line is about something else.
+    "Candidates requiring sponsorship cannot be offered a position",
+    "Applicants requiring sponsorship will not be offered employment",
+    "Candidates requiring sponsorship are ineligible for offer",
+    "Candidates requiring sponsorship are ineligible; benefits available",
+    "Candidates requiring sponsorship are not eligible; relocation offered",
+    "Applicants requiring sponsorship need not apply; remote work available",
+    "Candidates requiring sponsorship are ineligible. Competitive salary offered",
+    "Candidates requiring sponsorship are not eligible (no exceptions available)",
+    "Candidates requiring sponsorship: we will not provide it",
+  ])("is missing where the posting turns away who needs sponsorship: %s", (ask) => {
+    expect(authorized("Will require H-1B visa sponsorship", ask).status).toBe("missing");
+  });
+
+  it.each([
+    "Visa sponsorship is available for candidates who need sponsorship",
+    "We welcome applicants who require sponsorship",
+    "We will sponsor candidates who need sponsorship",
+    "Sponsorship provided for those who need sponsorship",
+  ])("is not missing where the posting offers sponsorship: %s", (ask) => {
+    expect(authorized("Will require H-1B visa sponsorship", ask)).toMatchObject({
+      kind: "authorization",
+      status: "unverifiable",
+    });
   });
 
   it.each([
@@ -252,6 +337,10 @@ describe("the right to work, read for what the statement says", () => {
     "Can't work in the US without sponsorship",
     "Not authorized to work without sponsorship",
     "Unable to work in the US without sponsorship",
+    // A clause of its own saying where not.
+    "Authorized to work in Canada, not in the US",
+    "Authorized to work in the EU, not in the US",
+    "Authorized to work in the UK (not the US)",
   ])("does not take a negated statement for one: %s", (statement) => {
     expect(authorized(statement, WITHOUT_SPONSORSHIP).status).not.toBe("met");
   });
@@ -261,6 +350,9 @@ describe("the right to work, read for what the statement says", () => {
     "U.S. citizen, does not require visa sponsorship",
     "Authorized to work in the US without sponsorship",
     "US Citizen; not requiring sponsorship",
+    // A negation about something else, in a clause of its own.
+    "Authorized to work in the US (no visa needed)",
+    "Authorized to work in the US, not open to relocation",
   ])("is met by a line that needs no sponsorship: %s", (statement) => {
     expect(authorized(statement, WITHOUT_SPONSORSHIP)).toMatchObject({
       status: "met",
@@ -323,6 +415,23 @@ describe("a clearance, compared by its level", () => {
     ["Confidential clearance (active)", "Secret clearance", "Confidential read, Secret asked"],
     ["Active Secret clearance", "Active TS clearance required", "Secret read, Top Secret asked"],
     ["Active security clearance", "Active Top Secret clearance", "No level read, Top Secret asked"],
+    // A level named well past the clearance is not its level.
+    [
+      "Active Secret clearance",
+      "Active Top Secret clearance required to handle confidential information",
+      "Secret read, Top Secret asked",
+    ],
+    [
+      "Active Confidential clearance",
+      "Security clearance (Secret or above)",
+      "Confidential read, Secret asked",
+    ],
+    // Named further from the clearance than three words, and no level beside it.
+    [
+      "Active Secret clearance",
+      "Must hold an active security clearance at the Top Secret level",
+      "Secret read, Top Secret asked",
+    ],
   ])("is partial with a lower level: %s for %s", (statement, ask, detail) => {
     expect(cleared(statement, ask)).toMatchObject({
       kind: "clearance",
@@ -340,8 +449,71 @@ describe("a clearance, compared by its level", () => {
     ["Active TS clearance", "Top Secret clearance required"],
     ["Active Secret clearance", "Active security clearance required"],
     ["Active Secret clearance", "Secret or Top Secret clearance"],
+    // A negation or a level not held yet that is about something else.
+    ["Active Secret clearance; no incidents", "Active Secret clearance required"],
+    ["Top Secret clearance (TS/SCI eligible)", "Active Top Secret clearance required"],
+    ["Inactive Confidential clearance, active Secret clearance", "Secret clearance required"],
   ])("is met by the level asked or one above: %s for %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("met");
+  });
+
+  it("does not read a level only eligible for as held", () => {
+    expect(
+      cleared("Top Secret clearance (TS/SCI eligible)", "TS/SCI clearance required"),
+    ).toMatchObject({ status: "partial", detail: "Top Secret read, TS/SCI asked" });
+  });
+
+  it("compares the UK's levels", () => {
+    expect(cleared("Active SC clearance", "Active DV clearance required")).toMatchObject({
+      status: "partial",
+      detail: "SC read, DV asked",
+    });
+    expect(cleared("Active CTC clearance", "SC clearance required").status).toBe("partial");
+    expect(cleared("Active DV clearance", "SC clearance required").status).toBe("met");
+    // Across the two, no worse than when the UK's were not known.
+    expect(cleared("Active SC clearance", "Secret clearance required").status).toBe("partial");
+    expect(cleared("Active Secret clearance", "SC clearance required").status).toBe("met");
+    // A degree's "Sc" is not SC.
+    expect(
+      cleared("Active Confidential clearance", "Secret clearance, M.Sc preferred").status,
+    ).toBe("partial");
+  });
+
+  it.each([
+    "Charleston, SC: Active Secret clearance required",
+    "Diversity Visa (DV) holders welcome; Secret clearance required",
+    "Secret clearance required, CTC up to 30 LPA",
+    "Secret clearance required; Sc.D. preferred",
+  ])("reads a UK level only beside a clearance or vetting: %s", (ask) => {
+    expect(cleared("Active Confidential clearance", ask)).toMatchObject({
+      status: "partial",
+      detail: "Confidential read, Secret asked",
+    });
+  });
+
+  it.each([
+    "Must hold SC or DV clearance",
+    "SC/DV clearance required",
+    "SC / DV clearance required",
+    "SC, DV clearance required",
+  ])("reads each of a list of UK levels before the clearance: %s", (ask) => {
+    expect(cleared("Active SC clearance", ask).status).toBe("met");
+    expect(cleared("Active BPSS clearance", ask)).toMatchObject({
+      status: "partial",
+      detail: "BPSS read, SC asked",
+    });
+  });
+
+  it("reads every level of a longer list before the clearance", () => {
+    expect(cleared("Active BPSS clearance", "Must hold BPSS, CTC, SC or DV clearance").status).toBe(
+      "met",
+    );
+  });
+
+  it("reads a UK level in brackets after the clearance", () => {
+    expect(
+      cleared("Active BPSS clearance", "Must hold active UK security clearance (SC)"),
+    ).toMatchObject({ status: "partial", detail: "BPSS read, SC asked" });
   });
 
   it.each([
@@ -350,6 +522,11 @@ describe("a clearance, compared by its level", () => {
     ["Eligible for Secret clearance", "Secret clearance"],
     ["Top Secret clearance pending", "Secret clearance"],
     ["Able to obtain a security clearance", "Active security clearance required"],
+    // Past a semicolon, a word saying it is not held any more still is about it.
+    ["Secret clearance; expired 2021", "Active Secret clearance required"],
+    ["Secret clearance; inactive since 2020", "Active Secret clearance required"],
+    ["Secret clearance; currently inactive", "Active Secret clearance required"],
+    ["Secret clearance; eligible for reinstatement", "Active Secret clearance required"],
   ])("takes no clearance from one not held: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("unverifiable");
   });

@@ -37,7 +37,7 @@ export type RuleContext = {
 };
 
 /** The bands metrics measured by a check that also quotes what it found. */
-export const FINDING_METRICS = [
+const FINDING_METRICS = [
   "injectionPhrases",
   "invisibleCharacters",
   "homoglyphWords",

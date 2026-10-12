@@ -99,8 +99,36 @@ describe("a city and state beside the dates", () => {
     [["Senior Engineer\tJan 2020 - Present", "Austin, TX"]],
     [["Senior Engineer, Austin, TX\tJan 2020 - Present"]],
     [["Senior Engineer, Remote\tJan 2020 - Present"]],
+    // A workplace word with a state's code is where, never an employer.
+    [["Senior Engineer, Hybrid, CA\tJan 2020 - Present"]],
+    [["Senior Engineer", "Remote, TX", "Jan 2020 - Present"]],
   ])("is not taken for the employer when none is named, in %j", (block) => {
     expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer: "" }]);
+  });
+
+  it.each([
+    [["Acme Corp", "Senior Engineer, Austin, TX\tJan 2020 - Present"]],
+    [["Acme Corp", "Senior Engineer", "Austin, TX", "Jan 2020 - Present"]],
+  ])("leaves the employer line over it the employer in %j", (block) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer: "Acme Corp" }]);
+  });
+
+  it("is where for every role stacked under one employer", () => {
+    expect(
+      rolesIn(
+        "Acme Corp",
+        "Senior Engineer",
+        "Austin, TX",
+        "Jan 2020 - Present",
+        "- Led the ledger team",
+        "Engineer",
+        "Dallas, TX",
+        "Jan 2017 - Dec 2019",
+      ),
+    ).toEqual([
+      { title: "Senior Engineer", employer: "Acme Corp" },
+      { title: "Engineer", employer: "Acme Corp" },
+    ]);
   });
 
   it.each([
@@ -117,6 +145,43 @@ describe("a city and state beside the dates", () => {
     const line = header.includes("2020") ? header : `${header}\tJan 2020 - Present`;
     expect(rolesIn(line)[0]?.employer).toBe(employer);
   });
+});
+
+describe("an employer with its state's code", () => {
+  it.each([
+    [["Analyst at Deloitte, NY\tJan 2020 - Present"], "Analyst", "Deloitte"],
+    [["Nurse at Kaiser, CA\tJan 2020 - Present"], "Nurse", "Kaiser"],
+    [["Engineer @ Intel, OR\tJan 2020 - Present"], "Engineer", "Intel"],
+    // An organisation's name keeps its place between bars, as it did.
+    [["Nurse | Mercy Hospital | CA\tJan 2020 - Present"], "Nurse", "Mercy Hospital"],
+  ])("keeps the title and the employer of %j", (block, title, employer) => {
+    expect(rolesIn(...block)).toEqual([{ title, employer }]);
+  });
+
+  // Known limit: with commas only, between bars or dashes, or on a line of its own, "Google, CA"
+  // is not told from "Austin, TX" without a list of cities, nor "Intel | OR" from "Seattle |
+  // WA", and a blank employer is safer than a city.
+  it.each([
+    [["Software Engineer, Google, CA\tJan 2020 - Present"]],
+    [["Software Engineer", "Google, CA", "Jan 2020 - Present"]],
+    [["Software Engineer | Intel | OR\tJan 2020 - Present"]],
+    [["Software Engineer – Intel – OR\tJan 2020 - Present"]],
+    [["Software Engineer | Seattle | WA\tJan 2020 - Present"]],
+    [["Software Engineer – Seattle – WA\tJan 2020 - Present"]],
+    [["Software Engineer | Full-time | TX\tJan 2020 - Present"]],
+    [["Software Engineer | Payments Team | CA\tJan 2020 - Present"]],
+  ])("takes no employer from %j", (block) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer: "" }]);
+  });
+
+  it.each(["Engineer, TX", "Manager, TX", "Officer, TX"])(
+    "reads a one-word city named like a title, %j, as where",
+    (city) => {
+      expect(rolesIn("Acme Corp", "Software Engineer", city, "Jan 2020 - Present")).toEqual([
+        { title: "Software Engineer", employer: "Acme Corp" },
+      ]);
+    },
+  );
 });
 
 describe("a city with its state or country named in full", () => {
@@ -241,6 +306,15 @@ describe("the time at an employer on a line of its own", () => {
       { title: "Software Engineer", employer: "Acme Corp" },
     ]);
   });
+
+  it.each([
+    [["Software Engineer, Acme Corp", "2 years", "Jan 2020 - Dec 2021"]],
+    [["Software Engineer | Acme Corp", "(2 years)", "Jan 2020 - Dec 2021"]],
+    [["Acme Corp", "Software Engineer", "2 yrs 3 mos", "Jan 2020 - Dec 2021"]],
+    [["Software Engineer", "Acme Corp", "2 years", "Jan 2020 - Dec 2021"]],
+  ])("between the header and its dates leaves the header in %j", (block) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer: "Acme Corp" }]);
+  });
 });
 
 describe("a comma inside the title", () => {
@@ -331,6 +405,20 @@ describe("an employer written before the title", () => {
 
   it("still reads the first part as the title when neither side names an organisation", () => {
     expect(roleOf("Croupier, Globex")).toMatchObject({ title: "Croupier", employer: "Globex" });
+  });
+
+  it.each([
+    ["Acme Corp, Berlin\tJan 2020 - Present", "Acme Corp, Berlin"],
+    ["Siemens AG, Munich\tJan 2020 - Present", "Siemens AG, Munich"],
+    ["Acme, Berlin\tJan 2020 - Present", "Acme, Berlin"],
+  ])("reads %j over a title alone as the employer and its city", (dated, employer) => {
+    expect(rolesIn(dated, "Software Engineer")).toEqual([{ title: "Software Engineer", employer }]);
+  });
+
+  it("still reads an organisation and a title with no title word beside the dates", () => {
+    expect(rolesIn("Globex Corporation, Croupier\tJan 2020 - Present")).toEqual([
+      { title: "Croupier", employer: "Globex Corporation" },
+    ]);
   });
 
   it("reads a title word before an organisation's name", () => {

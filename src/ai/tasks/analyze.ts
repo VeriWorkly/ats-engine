@@ -120,17 +120,21 @@ export function analyzeSpec(
 ): TaskSpec<AtsAiInsights, AtsAiInsights> {
   const job = input.jobDescription?.trim().slice(0, MAX_JOB_CHARS) ?? "";
   // Redacted before it is cut, with room past the cut, so a phone or an email the cut falls in
-  // is replaced whole rather than sent in part ("+1 (415) 555-01"); a placeholder the cut falls
-  // in goes.
+  // is replaced whole rather than sent in part ("+1 (415) 555-01"), and then cut where the
+  // resume's first 50,000 characters, redacted alone, part from it: before a contact the cut
+  // falls in, so nothing past the cut is sent. A placeholder the cut falls in goes.
   const read = input.resumeText.slice(0, MAX_RESUME_CHARS + CUT_MARGIN);
   const resume = read.slice(0, MAX_RESUME_CHARS);
   const redaction = redact ? createRedaction(input.report.parsed, read) : null;
   const hide = <T>(value: T) => (redaction ? redaction.apply(value) : value);
-  const sent = redaction
-    ? hide(read)
-        .slice(0, MAX_RESUME_CHARS)
-        .replace(/\[[A-Z_0-9]*$/, "")
-    : resume;
+  let sent = resume;
+  if (redaction) {
+    const whole = hide(read);
+    const head = hide(resume);
+    let same = 0;
+    while (same < head.length && head[same] === whole[same]) same += 1;
+    sent = whole.slice(0, Math.min(MAX_RESUME_CHARS, same)).replace(/\[[A-Z_0-9]*$/, "");
+  }
 
   return {
     task: "analyze",

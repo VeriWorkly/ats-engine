@@ -235,7 +235,7 @@ const extractOutput = {
 
 // The structured content of each tool, from a report ------------------------------------------
 
-export function checkResult(report: AtsReport, withJob: boolean) {
+function checkResult(report: AtsReport, withJob: boolean) {
   return {
     readinessScore: report.readinessScore,
     verdict: computeVerdict(report),

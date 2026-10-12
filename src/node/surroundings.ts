@@ -11,7 +11,7 @@ export type Drawn = {
 };
 
 /** At or above this opacity, something drawn over text hides it. */
-export const OPAQUE = 0.9;
+const OPAQUE = 0.9;
 
 const contains = ([x0, y0, x1, y1]: Box, [x, y]: [number, number]) =>
   x >= x0 && x <= x1 && y >= y0 && y <= y1;

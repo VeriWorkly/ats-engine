@@ -1,6 +1,7 @@
 import { isDatedLine } from "../checks/bullets.js";
 import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../format/index.js";
 import { degreeLevels } from "../parser/education.js";
+import { namesPlace } from "../parser/experience.js";
 import { canonicalLanguage, cefrLevel, compareCefr } from "../parser/languages.js";
 import { monthsOfExperience } from "../parser/tenure.js";
 import type { ResumeSection, ResumeSectionKind } from "../parser/sections.js";
@@ -125,6 +126,7 @@ type Matchers = {
   authorization: RegExp;
   needsSponsorship: RegExp;
   noSponsorship: RegExp;
+  sponsorshipOffered: RegExp;
   /** The same, global: blanked out to read what else a line says. */
   noSponsorshipAll: RegExp;
   negation: RegExp;
@@ -132,6 +134,8 @@ type Matchers = {
   citizenship: RegExp;
   residence: RegExp;
   clearance: RegExp;
+  /** The same, global: where in a line each clearance is named. */
+  clearanceAll: RegExp;
   /** Clearance levels, highest first, each with its rank (0 the lowest) and a global pattern. */
   clearanceLevels: Array<{ name: string; rank: number; pattern: RegExp }>;
   /** `qualifiers`, each folded to the tokens a line is read as. */
@@ -163,12 +167,15 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     authorization: wordListRegex(r.authorization),
     needsSponsorship: wordListRegex(r.needsSponsorship),
     noSponsorship: wordListRegex(r.noSponsorship),
+    // Defaulted by the schema; a policy object built by hand, unparsed, may not have it.
+    sponsorshipOffered: wordListRegex(r.sponsorshipOffered ?? ["(?!)"]),
     noSponsorshipAll: wordListRegex(r.noSponsorship, "gi"),
     negation: wordListRegex(r.negation),
     notHeld: wordListRegex(r.notHeld),
     citizenship: wordListRegex(r.citizenship),
     residence: wordListRegex(r.residence),
     clearance: wordListRegex(r.clearance),
+    clearanceAll: wordListRegex(r.clearance, "gi"),
     clearanceLevels: r.clearanceLevels
       .map(({ name, patterns }, rank) => ({ name, rank, pattern: wordListRegex(patterns, "gi") }))
       .reverse(),
@@ -195,23 +202,69 @@ function patternLanguages(text: string, matchers: Matchers) {
 }
 
 /**
- * The clearance levels a line names, by rank. Read from the highest down, each match blanked
- * before the next level is looked for, so "Top Secret" is not also "Secret".
+ * The clearance levels a line names, by rank. Read from the highest down, each on the whole
+ * line, a match within one of a higher level left out, so "Top Secret" is not also "Secret" and
+ * "SC or DV clearance" names both.
  */
 function clearanceRanks(text: string, matchers: Matchers) {
   const ranks: number[] = [];
-  let rest = text;
-  for (const { rank, pattern } of matchers.clearanceLevels) {
-    const blanked = rest.replace(pattern, (found) => " ".repeat(found.length));
-    if (blanked !== rest) ranks.push(rank);
-    rest = blanked;
-  }
+  const taken = new Uint8Array(text.length);
+  for (const { rank, pattern } of matchers.clearanceLevels)
+    for (const { index, 0: found } of text.matchAll(pattern)) {
+      if (taken.subarray(index, index + found.length).includes(1)) continue;
+      taken.fill(1, index, index + found.length);
+      if (!ranks.includes(rank)) ranks.push(rank);
+    }
   return ranks;
 }
 
-/** A clearance the line says is held: not negated, not pending or past. */
-const holdsClearance = (line: string, matchers: Matchers) =>
-  matchers.clearance.test(line) && !matchers.negation.test(line) && !matchers.notHeld.test(line);
+/**
+ * The levels a posting asks a clearance at: those named within three words of a clearance
+ * ("Secret or Top Secret clearance", "Security clearance (Secret or above)"), not a word further
+ * on ("Top Secret clearance required to handle confidential information" asks for Top Secret).
+ * With none beside it, any the line names: "a security clearance at the Top Secret level".
+ */
+function askedClearanceRanks(text: string, matchers: Matchers) {
+  // A requirement is at most 300 characters: cutting it at each clearance stays cheap.
+  const near = [...text.matchAll(matchers.clearanceAll)].flatMap(({ index, 0: found }) => {
+    const before = text.slice(0, index).split(/\s+/u);
+    const after = text
+      .slice(index + found.length)
+      .split(/\s+/u)
+      .slice(0, 4);
+    const window = (from: number) =>
+      clearanceRanks([...before.slice(from), found, ...after].join(" "), matchers);
+    // Three words before it, and further back over a list of levels each adds ("BPSS, CTC,
+    // SC or DV clearance").
+    let from = Math.max(0, before.length - 4);
+    let ranks = window(from);
+    while (from > 0) {
+      const wider = window(from - 1);
+      if (wider.length <= ranks.length) break;
+      [from, ranks] = [from - 1, wider];
+    }
+    return ranks;
+  });
+  return near.length ? near : clearanceRanks(text, matchers);
+}
+
+/**
+ * The clearances a resume line says are held, each as the text about it: from the clearance
+ * named before it to the one named after it. A word saying it is not held yet or any more
+ * anywhere in that text ("Top Secret clearance pending", "Secret clearance; expired 2021"), or a
+ * negation in it short of a semicolon, says this one is not held: "Top Secret clearance (TS/SCI
+ * eligible)" holds Top Secret, and "Active Secret clearance; no incidents" holds Secret.
+ */
+function heldClearances(line: string, matchers: Matchers) {
+  const named = [...line.matchAll(matchers.clearanceAll)];
+  return named.flatMap((match, at) => {
+    const before = named[at - 1];
+    const from = before ? before.index + before[0].length : 0;
+    const about = line.slice(from, named[at + 1]?.index ?? line.length);
+    const clause = about.slice(about.lastIndexOf(";", match.index - from) + 1).split(";", 1)[0]!;
+    return matchers.notHeld.test(about) || matchers.negation.test(clause) ? [] : [about];
+  });
+}
 
 /**
  * The right to work: met by a statement of it, never by one that says the opposite. A line is
@@ -226,6 +279,7 @@ function judgeAuthorization(
   ask: string,
   lines: ReadonlyArray<{ line: string }>,
   matchers: Matchers,
+  policy: AtsEnginePolicy,
 ): { status: Status | "unverifiable"; lines: Array<{ line: string }> } {
   const stated = lines.flatMap((entry) => {
     const { line } = entry;
@@ -236,25 +290,62 @@ function judgeAuthorization(
     )
       return [];
     const rest = line.replace(matchers.noSponsorshipAll, " ");
-    if (matchers.needsSponsorship.test(rest)) return [{ entry, needs: true }];
-    return matchers.negation.test(rest) ? [] : [{ entry, needs: false }];
+    if (matchers.needsSponsorship.test(rest)) return [{ entry, says: line, needs: true }];
+    // Read clause by clause, so a negation about something else ("Authorized to work in the US
+    // (no visa needed)", "…, not open to relocation") does not negate the statement.
+    const states = (clause: string) =>
+      matchers.authorization.test(clause) ||
+      matchers.citizenship.test(clause) ||
+      matchers.residence.test(clause);
+    const parts = rest.split(/[;,()]/u);
+    // A clause of its own saying where it does not hold takes the statement back: "Authorized
+    // to work in Canada, not in the US".
+    if (
+      parts.some(
+        (part) => !states(part) && matchers.negation.test(part) && namesPlace(part, policy),
+      )
+    )
+      return [];
+    const clauses = parts.filter(states);
+    const held = (clauses.length ? clauses : [rest]).filter(
+      (clause) => !matchers.negation.test(clause),
+    );
+    return held.length ? [{ entry, says: held.join(";"), needs: false }] : [];
   });
-  const shown = stated.filter(({ needs }) => !needs).map(({ entry }) => entry);
+  const shown = stated.filter(({ needs }) => !needs);
   const needing = stated.filter(({ needs }) => needs).map(({ entry }) => entry);
   if (matchers.citizenship.test(ask) && !matchers.residence.test(ask)) {
     const citizen = shown.filter(
-      ({ line }) =>
-        matchers.citizenship.test(line) &&
-        !matchers.residence.test(line) &&
-        !matchers.notHeld.test(line),
+      ({ says }) =>
+        matchers.citizenship.test(says) &&
+        !matchers.residence.test(says) &&
+        !matchers.notHeld.test(says),
     );
-    if (citizen.length) return { status: "met", lines: citizen };
-    const against = [...shown.filter(({ line }) => matchers.residence.test(line)), ...needing];
+    if (citizen.length) return { status: "met", lines: citizen.map(({ entry }) => entry) };
+    const against = [
+      ...shown.filter(({ says }) => matchers.residence.test(says)).map(({ entry }) => entry),
+      ...needing,
+    ];
     return { status: against.length ? "missing" : "unverifiable", lines: against };
   }
-  const excludes = matchers.noSponsorship.test(ask) || matchers.needsSponsorship.test(ask);
+  // A posting rules sponsorship out ("without sponsorship"), or turns away who needs it, with a
+  // negation ("will not be considered") or without offering it in the clause naming the need
+  // ("Candidates requiring sponsorship are ineligible; benefits available"); one offering it
+  // there ("We welcome applicants who require sponsorship") does not.
+  const offered = ask
+    .split(/[.;:,()]/u)
+    .some(
+      (clause) =>
+        matchers.needsSponsorship.test(clause) && matchers.sponsorshipOffered.test(clause),
+    );
+  const excludes =
+    matchers.noSponsorship.test(ask) ||
+    (matchers.needsSponsorship.test(ask) && (matchers.negation.test(ask) || !offered));
   if (excludes && needing.length) return { status: "missing", lines: needing };
-  return { status: shown.length ? "met" : "unverifiable", lines: shown };
+  return {
+    status: shown.length ? "met" : "unverifiable",
+    lines: shown.map(({ entry }) => entry),
+  };
 }
 
 /** The word after a position, when only spaces stand before it. */
@@ -623,6 +714,19 @@ export function judgeRequirements(
     ].filter((part) => part.text.length > 0);
   });
 
+  // The clearances each resume line holds, and their levels, read once for every clearance ask.
+  const heldOn = new WeakMap<object, number[] | null>();
+  const heldLevels = (entry: { line: string }) => {
+    if (!heldOn.has(entry)) {
+      const held = heldClearances(entry.line, matchers);
+      heldOn.set(
+        entry,
+        held.length ? held.flatMap((about) => clearanceRanks(about, matchers)) : null,
+      );
+    }
+    return heldOn.get(entry)!;
+  };
+
   return lines.map(({ text, importance: heading }) => {
     // What the line asks for, without the clauses it calls a plus.
     const { asked: ask, optional } = withoutOptional(text, matchers);
@@ -631,7 +735,7 @@ export function judgeRequirements(
 
     // The right to work and a clearance: settled in the application, unless the resume says.
     if (matchers.authorization.test(text)) {
-      const { status, lines: shown } = judgeAuthorization(ask, resumeLines, matchers);
+      const { status, lines: shown } = judgeAuthorization(ask, resumeLines, matchers, policy);
       const lines = new Set(shown);
       return {
         ...base,
@@ -642,14 +746,11 @@ export function judgeRequirements(
       } satisfies AtsRequirement;
     }
     if (matchers.clearance.test(text)) {
-      const holds = (entry: { line: string }) => holdsClearance(entry.line, matchers);
+      const holds = (entry: { line: string }) => heldLevels(entry) !== null;
       const evidence = evidenceFor(holds);
       // A level asked is met by it or one above; the lowest the ask names is the bar.
-      const asked = Math.min(...clearanceRanks(ask, matchers));
-      const held = Math.max(
-        -1,
-        ...resumeLines.filter(holds).flatMap((entry) => clearanceRanks(entry.line, matchers)),
-      );
+      const asked = Math.min(...askedClearanceRanks(ask, matchers));
+      const held = Math.max(-1, ...resumeLines.flatMap((entry) => heldLevels(entry) ?? []));
       const levels = km.requirements.clearanceLevels;
       const short = evidence.length > 0 && Number.isFinite(asked) && held < asked;
       return {

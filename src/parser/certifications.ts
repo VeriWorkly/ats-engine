@@ -170,7 +170,7 @@ function nameAndIssuer(text: string, words: Words): [string, string] {
  * One line as a certification row, or the dates of a line that names nothing else ("Issued Jan
  * 2021 · Expires Jan 2024", the line LinkedIn prints under a certification), or null.
  */
-export function readCertification(
+function readCertification(
   line: string,
   policy: AtsEnginePolicy,
   now: Date,

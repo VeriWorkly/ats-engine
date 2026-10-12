@@ -535,6 +535,13 @@
         "(?:cannot|unable\\s+to)\\s+(?:(?:offer|provide)\\s+)?(?:visa\\s+)?sponsor(?:ship)?",
         "sponsorship\\s+(?:is\\s+)?not\\s+(?:required|needed|available|offered|provided)"
       ],
+      "sponsorshipOffered": [
+        "available",
+        "welcome",
+        "provid(?:e|es|ed|ing)",
+        "offer(?:s|ed|ing)",
+        "(?:will|can|may|do|does)\\s+sponsor"
+      ],
       "negation": [
         "not",
         "no",
@@ -549,6 +556,9 @@
       "notHeld": [
         "eligible",
         "pending",
+        "inactive",
+        "expired",
+        "lapsed",
         "able\\s+to\\s+obtain",
         "former(?:ly)?"
       ],
@@ -561,10 +571,42 @@
         "(?:lawful\\s+)?permanent\\s+residen(?:t|cy|ce)"
       ],
       "clearance": [
-        "(?:security|confidential|secret|top\\s+secret|ts/sci|ts|sci|dv|sc|government|federal)\\s+clearance",
+        "(?:security|confidential|secret|top\\s+secret|ts/sci|ts|sci|dv|sc|ctc|bpss|government|federal)\\s+clearance",
         "ts(?:\\s*/\\s*|-)sci"
       ],
       "clearanceLevels": [
+        {
+          "name": "BPSS",
+          "patterns": [
+            "bpss",
+            "baseline\\s+personnel\\s+security\\s+standard"
+          ]
+        },
+        {
+          "name": "CTC",
+          "patterns": [
+            "ctc(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+            "(?<=(?:clearance|vetting)\\s{0,3}\\()ctc(?=\\))",
+            "ctc(?=\\s+check)",
+            "counter[\\s-]+terrorist\\s+check"
+          ]
+        },
+        {
+          "name": "SC",
+          "patterns": [
+            "sc(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+            "(?<=(?:clearance|vetting)\\s{0,3}\\()sc(?=\\))",
+            "security\\s+check"
+          ]
+        },
+        {
+          "name": "DV",
+          "patterns": [
+            "dv(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+            "(?<=(?:clearance|vetting)\\s{0,3}\\()dv(?=\\))",
+            "developed\\s+vetting"
+          ]
+        },
         {
           "name": "Confidential",
           "patterns": [
@@ -737,6 +779,26 @@
       "perks",
       "equity",
       "stock\\s+options"
+    ],
+    "linkDomains": [
+      "com",
+      "org",
+      "co",
+      "dev",
+      "(?:net|io|ai|app)(?=/[^\\s/]+/)",
+      "edu",
+      "gov",
+      "info",
+      "jobs",
+      "us",
+      "uk",
+      "ca",
+      "de",
+      "fr",
+      "in",
+      "au",
+      "eu",
+      "nl"
     ],
     "nationalityLabels": [
       "nationality",
@@ -1761,6 +1823,12 @@
     "injectionTargets": [
       "this\\s+(?:candidate|applicant|resume|cv|profile|application)",
       "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me"
+    ],
+    "injectionVerdicts": [
+      "(?:respond|reply|answer|output)\\s+(?:only\\s+)?with",
+      "\\d+\\s*/\\s*\\d+",
+      "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)",
+      "(?:this|my)\\s+(?:candidate|applicant|resume|cv|profile|application)"
     ],
     "citationHeadings": [
       "publications?",

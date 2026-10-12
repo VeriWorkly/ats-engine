@@ -173,6 +173,75 @@ describe("experience and skills headings beyond software's", () => {
   it("still opens a section at a heading set as the page's others are, over dated lines", () => {
     const parsed = underRole("PROJECTS\nLedger Rewrite\tJan 2018 - Dec 2018");
     expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+    // Over bullets, then a dated project with no job title.
+    const listed = underRole("SIDE PROJECTS\n- Built a chat bot\nChat Bot\tJan 2018 - Dec 2018");
+    expect(listed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+  });
+
+  it.each([
+    "KEY PROJECTS\n- Ledger rewrite",
+    "SELECTED PROJECTS\n- Ledger rewrite",
+    "TECH STACK\n- Python, AWS",
+  ])("keeps %j, set as the page's headings, inside the role over the next role", (sub) => {
+    const parsed = underRole(sub);
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp", "Globex Inc"]);
+    expect(parsed.skills.join(" ")).not.toContain("Globex");
+  });
+
+  /** A role, then `rest`, on a page of headings in capitals. */
+  const afterRole = (rest: string) =>
+    parse(
+      `Jane Doe\njane@example.com\nEXPERIENCE\nSoftware Engineer, Acme Corp\tJan 2019 - Dec 2022\n- Built payment systems\n${rest}`,
+    );
+
+  it.each([
+    [
+      "SKILLS\n- Python, Go, SQL\n- Kubernetes\nLEADERSHIP\nPresident, Robotics Club\t2016 - 2018",
+      "skills",
+    ],
+    ["SKILLS\n- Python, Go\nCOMMUNITY SERVICE\nPresident, Robotics Club\t2016 - 2018", "skills"],
+    [
+      "PROJECTS\n- Open-source maintainer\nLead Maintainer, Kubernetes SIG\t2020 - Present",
+      "projects",
+    ],
+    ["PROJECTS\n- Toy compiler\nVolunteer Developer, Code for America\t2018 - 2019", "projects"],
+  ])("still opens %j, a heading of one word or over an unknown heading", (rest) => {
+    expect(afterRole(rest).roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+  });
+
+  it("still reads the skills over a heading it does not know", () => {
+    expect(
+      afterRole("SKILLS\n- Python, Go\nLEADERSHIP\nPresident, Robotics Club\t2016 - 2018").skills,
+    ).toEqual(expect.arrayContaining(["Python", "Go"]));
+  });
+
+  it.each([
+    "EDUCATION",
+    "Education",
+    "Education:",
+    "CERTIFICATIONS",
+    "Certifications",
+    "Licenses & Certifications",
+  ])("opens a section at %j after a role, however it is set", (heading) => {
+    const parsed = underRole(
+      `${heading}\nBSc Computer Science, MIT\t2015 - 2019\nAWS Solutions Architect\tMar 2021 - Mar 2024`,
+    );
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+  });
+
+  it("opens Education written with a colon on a page of headings without one", () => {
+    const parsed = parse(
+      "Jane Doe\nExperience\nSoftware Engineer, Acme Corp\tJan 2019 - Dec 2022\n- Built things\nEducation:\nBSc Computer Science, MIT\t2015 - 2019\nSkills\nPython, Go\nProjects\nRide\t2018",
+    );
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+    expect(parsed.education).toHaveLength(1);
+  });
+
+  it("keeps Key Projects inside the role on a page of headings in title case", () => {
+    const parsed = parse(
+      "Jane Doe\nExperience\nSenior Engineer, Acme Corp\tJan 2020 - Present\n- Led platform work\nKey Projects\n- Payment gateway\nSoftware Engineer, Globex Inc\tJan 2017 - Dec 2019\n- Built APIs\nEducation\nBSc Computer Science, MIT\t2013 - 2017\nSkills\nPython, Go",
+    );
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp", "Globex Inc"]);
   });
 
   const skillsOf = (lines: string) =>

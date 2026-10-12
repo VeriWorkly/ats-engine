@@ -23,14 +23,27 @@ export type Vocabulary = {
 /** A "." or "/" a word picked up from the sentence around it: "JavaScript.", "and/". */
 const TRAILING = /(?<![./])[./]+$/;
 
-/** A link, from its scheme on: "https://careers.example.com/jobs/123". Never a skill. */
-const LINK = /(?<![\p{L}\p{N}+.-])\p{L}[\p{L}\p{N}+.-]{0,30}:\/\/\S*/gu;
+/**
+ * A link, from its scheme on ("https://careers.example.com/jobs/123"), or without one from
+ * "www." or a host of three labels or more ending in one of `linkDomains` ("jobs.example.com/
+ * rust"). Never a skill. A name of two labels ("Node.js/React") or ending otherwise
+ * ("System.Text.Json") is not one. Linear: a host starts only where a label starts, and is at
+ * most eight labels of 63 characters.
+ */
+const linkOf = memo(
+  (km: AtsEnginePolicy["keywordMatch"]) =>
+    new RegExp(
+      String.raw`(?<![\p{L}\p{N}+.-])\p{L}[\p{L}\p{N}+.-]{0,30}:\/\/\S*|(?<![\p{L}\p{N}+.@/-])(?:www\.(?:[\p{L}\p{N}-]{1,63}\.){0,7}\p{L}{2,63}|(?:[\p{L}\p{N}-]{1,63}\.){2,8}(?:${(km.linkDomains ?? []).join("|") || "(?!)"}))(?![\p{L}\p{N}-])(?:\/\S*)?`,
+      "gu",
+    ),
+);
 
 /**
  * The words a token stands for, each with its offset in the token. A slash joins words a
  * posting asks for together ("HTML/CSS", "Python/Django", "C#/.NET"), so each is a word of its
  * own. A term the policy names with its slash ("CI/CD", "TCP/IP") or lists as a stopword
- * ("n/a") stays whole, and so does a token with a part that is no word ("OS/2", "24/7").
+ * ("n/a") stays whole, and so does a token with a part that is no word ("OS/2", "24/7") or
+ * opens with a digit ("S/4HANA"): a product's name, not two skills.
  */
 export function slashParts(token: string, vocab: Vocabulary): Array<[string, number]> {
   const whole = token.toLowerCase().replace(TRAILING, "");
@@ -38,7 +51,7 @@ export function slashParts(token: string, vocab: Vocabulary): Array<[string, num
     !whole.includes("/") ||
     vocab.slashTerms.has(whole) ||
     vocab.stopwords.has(whole) ||
-    !whole.split("/").every((part) => /\p{L}/u.test(part))
+    !whole.split("/").every((part) => /\p{L}/u.test(part) && !/^\p{N}/u.test(part))
   )
     return [[token, 0]];
   const parts: Array<[string, number]> = [];
@@ -171,8 +184,8 @@ export function extractVocabulary(
   const claimed = new Uint8Array(lower.length);
   // And the links, where neither a phrase ("a/b" in "https://x.com/a/b") nor a word is read.
   const linked = new Uint8Array(lower.length);
-  if (lower.includes("://"))
-    for (const link of lower.matchAll(LINK))
+  if (lower.includes("."))
+    for (const link of lower.matchAll(linkOf(km)))
       linked.fill(1, link.index, link.index + link[0].length);
 
   for (const phrase of [...km.phrases, ...vocab.softPhrases]) {

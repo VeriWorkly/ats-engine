@@ -126,7 +126,9 @@ export function parseResume(
  * over a headline further down. A sidebar read before the main column (a LinkedIn export: "Top
  * Skills" over its skills, then the name) leaves the name, the headline and the city under the
  * sidebar's last heading, where they were read as skills or certifications. Only such a name
- * cuts a section: one taken from a list's rows for want of another is one of its rows.
+ * cuts a section: one taken from a list's rows for want of another is one of its rows, and so is
+ * one that is the first line under its heading ("CERTIFICATIONS" over "Google Cloud" over
+ * "Professional Cloud Architect").
  */
 export function readSections(lines: string[], policy: AtsEnginePolicy): ResumeSection[] {
   const sections = segmentResume(lines, policy);
@@ -136,6 +138,7 @@ export function readSections(lines: string[], policy: AtsEnginePolicy): ResumeSe
   const section = sections[at];
   if (!section?.headed) return sections;
   const cut = section.lines.findIndex((line) => line.trim() === name);
+  if (cut === 0) return sections;
   return [
     ...sections.slice(0, at),
     { ...section, lines: section.lines.slice(0, cut) },

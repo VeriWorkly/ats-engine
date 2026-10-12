@@ -24,9 +24,15 @@ import { memo } from "../util/memo.js";
  * every position of a long run like "a.a.a.…", which is quadratic: a 50k-character input took
  * over a second per call, and a scan evaluates this pattern about nine times. The lookbehind
  * anchors a match to the start of a local-part run, and the lengths are RFC 5321's own limits.
+ *
+ * The local part may hold Latin letters with their accents and an apostrophe
+ * ("josé.garcía@correo.es", "o'connor.pat@example.com"), as mail servers take them; not an
+ * apostrophe first, which is a quote ("'pat@example.com'"). One after a letter belongs to the
+ * run, so a match never starts inside it. Not letters of another script, which is how a label
+ * glued to the address is written ("邮箱jane@x.com", "Почтаjane@x.com").
  */
 export const EMAIL =
-  /(?<![A-Z0-9._%+-])[A-Z0-9._%+-]{1,64}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/i;
+  /(?<![\p{sc=Latn}\p{M}\p{N}._%+-]|[\p{sc=Latn}\p{M}\p{N}]['’])[\p{sc=Latn}\p{M}\p{N}._%+-][\p{sc=Latn}\p{M}\p{N}._%+'’-]{0,63}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/iu;
 /**
  * A web address: with a scheme or "www.", a profile on a site resumes link to without either
  * ("dribbble.com/jane", "orcid.org/0000-…"), or a personal site on `.dev`, a top-level domain
@@ -134,7 +140,8 @@ function nameCandidate(line: string, label: RegExp) {
  * ("Suharto") sits, and anywhere lower a lone capitalised word is far more likely a heading — and
  * never when it is a section heading or the document's own title ("Resume").
  *
- * `headlined` says the name was read over a headline further down, where a sidebar read before
+ * `headlined` says the name was read over a headline further down, or over its email under a
+ * list heading ("SKILLS" over "Python" over "Jane Doe"), where a sidebar read before
  * the main column leaves it.
  */
 export function findName(
@@ -256,23 +263,30 @@ export function findName(
   // above a title further down; one whose cut tail is a state ("San Francisco, CA") is a place,
   // taken only when no other name is found.
   // A name under a sidebar's list heading ("Top Skills" over "Machine Learning") is more likely
-  // one of its rows, so a name over a headline further down comes first.
+  // one of its rows, so a name over a headline further down comes first; one over the email
+  // ("Python" / "Jane Doe" / "jane@example.com") is the name, before any further down.
   let onlyHeadingsAbove = true;
   let place = "";
   let listed = false;
+  // The kind of the last heading: a name over an email is the name under a list ("SKILLS"), not
+  // under "REFERENCES", where it is a referee's.
+  let under: string | null = null;
   let row = "";
   for (const [index, line] of trimmed.slice(0, 6).entries()) {
     // The work history is never the header block, whatever is missing above it.
     const kind = sectionKind(line, policy);
     if (kind === "experience") break;
     listed ||= kind !== null && kind !== "other";
+    under = kind ?? under;
     const firstLine = onlyHeadingsAbove;
     onlyHeadingsAbove &&= titles.test(line) || isSectionHeading(line, policy);
     const found = nameIn(line, index, firstLine);
     if (!found) continue;
     if (found.place) place ||= found.name;
-    else if (listed) row ||= found.name;
-    else return { name: found.name, headlined: false };
+    else if (!listed) return { name: found.name, headlined: false };
+    else if (under !== "other" && EMAIL.test(trimmed[index + 1] ?? ""))
+      return { name: found.name, headlined: true };
+    else row ||= found.name;
   }
   const over = headlined();
   return over ? { name: over, headlined: true } : { name: row || place, headlined: false };

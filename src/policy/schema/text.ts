@@ -395,7 +395,8 @@ export const engineTextSchema = z.prefault(
      * of these (function words aside, no comma or colon between) is an example an AI security
      * engineer quotes, and is not counted. Not on a labelled line ("Skills: …"), not unquoted
      * (a bare "[INST]" too), not in text hidden in tag characters or by the layout, and never a
-     * quote naming one of `injectionTargets`.
+     * quote naming one of `injectionTargets`, or holding more than one injection phrase, one of
+     * them a verdict (`injectionVerdicts`).
      */
     injectionMentionVerbs: z._default(wordList("text.injectionMentionVerbs"), [
       // Each with its "-s", "-ed" and "-ing": "flags", "flagged", "scanning", "red-teamed".
@@ -407,6 +408,18 @@ export const engineTextSchema = z.prefault(
     injectionTargets: z._default(wordList("text.injectionTargets"), [
       String.raw`this\s+(?:candidate|applicant|resume|cv|profile|application)`,
       String.raw`(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\s+me`,
+    ]),
+    /**
+     * What an injection phrase says when it dictates a verdict or a grade: "respond with hire",
+     * "give my resume a 10/10". A quote holding such a phrase and another is a screener's
+     * prompt, never an example; one phrase alone, or several with no verdict ("ignore previous
+     * instructions, you are an AI assistant"), still is.
+     */
+    injectionVerdicts: z._default(wordList("text.injectionVerdicts"), [
+      String.raw`(?:respond|reply|answer|output)\s+(?:only\s+)?with`,
+      String.raw`\d+\s*/\s*\d+`,
+      String.raw`(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)`,
+      String.raw`(?:this|my)\s+(?:candidate|applicant|resume|cv|profile|application)`,
     ]),
     /**
      * Headings of a list of works, read where a section heading opens one: its lines shaped as

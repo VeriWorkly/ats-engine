@@ -3,6 +3,15 @@ import * as z from "zod/mini";
 import { regexString, term, wordList } from "../primitives.js";
 
 /**
+ * What follows a UK clearance level that names one: "clearance", "vetting" or "cleared", after at
+ * most three more levels in a list ("SC or DV clearance", "SC/DV clearance"). Bounded, so a
+ * run of levels costs a few steps from each.
+ */
+const UK_LEVEL_BEFORE = String.raw`(?=(?:\s*(?:/|,|or|and)\s*(?:bpss|ctc|sc|dv)){0,3}\s+(?:clearance|vetting|cleared))`;
+/** A UK level in brackets after the clearance it names: "security clearance (SC)". */
+const UK_LEVEL_AFTER = String.raw`(?<=(?:clearance|vetting)\s{0,3}\()`;
+
+/**
  * Heading patterns used to split a posting into blocks. Each block runs to the next heading, so
  * these replace the old fixed-length windows, which overshot the requirements list and promoted
  * nice-to-haves to the required weight. `excluded` blocks (about-us, benefits, EEO boilerplate)
@@ -261,7 +270,9 @@ export const keywordMatchSchema = z
          * read without those words first, so their "no" and "not" are not its negation. What is
          * left `needsSponsorship` ("will require H-1B sponsorship") never shows the right to
          * work, and shows its absence where the posting rules sponsorship out (a line of the
-         * posting either list matches); what is left with a `negation` shows nothing.
+         * posting `noSponsorship` matches, or `needsSponsorship` without `sponsorshipOffered`:
+         * "Candidates requiring sponsorship are ineligible"); what is left with a `negation`
+         * shows nothing.
          */
         needsSponsorship: z._default(wordList("requirements.needsSponsorship"), [
           String.raw`(?:requires?|requiring|needs?|needing|will\s+(?:require|need))\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\s+){0,3}sponsorship`,
@@ -274,6 +285,21 @@ export const keywordMatchSchema = z
           String.raw`(?:not|never|\p{L}+n['’]t)\s+(?:(?:currently|presently|now|ever|be|been|eligible|for|offer\p{L}*|provid\p{L}*|requir\p{L}*|need\p{L}*|an?|any|h-?1b|visa|work|employment|immigration|future)\s+){0,4}sponsor(?:ship)?`,
           String.raw`(?:cannot|unable\s+to)\s+(?:(?:offer|provide)\s+)?(?:visa\s+)?sponsor(?:ship)?`,
           String.raw`sponsorship\s+(?:is\s+)?not\s+(?:required|needed|available|offered|provided)`,
+        ]),
+        /**
+         * Words saying a posting offers sponsorship to who needs it ("Visa sponsorship is
+         * available for candidates who need sponsorship", "We welcome applicants who require
+         * sponsorship"), read in the clause naming the need. Without one there, or with a
+         * `negation` in the line, a posting naming a need for sponsorship turns it away
+         * ("Candidates requiring sponsorship are ineligible; benefits available").
+         */
+        sponsorshipOffered: z._default(wordList("requirements.sponsorshipOffered"), [
+          "available",
+          "welcome",
+          String.raw`provid(?:e|es|ed|ing)`,
+          // Not "offer" alone: "ineligible for offer".
+          String.raw`offer(?:s|ed|ing)`,
+          String.raw`(?:will|can|may|do|does)\s+sponsor`,
         ]),
         /** Words that say a statement is not so: "Not authorized to work", "no active clearance". */
         negation: z._default(wordList("requirements.negation"), [
@@ -289,12 +315,16 @@ export const keywordMatchSchema = z
         ]),
         /**
          * Words that say a clearance or a citizenship is not held yet, or any more: "eligible
-         * for", "pending", "able to obtain", "former". Not for the right to work itself:
-         * "eligible to work in the US" states it.
+         * for", "pending", "able to obtain", "former", "expired". Not for the right to work
+         * itself: "eligible to work in the US" states it. Read past a semicolon about a clearance
+         * ("Secret clearance; expired 2021"), where a `negation` is not ("…; no incidents").
          */
         notHeld: z._default(wordList("requirements.notHeld"), [
           "eligible",
           "pending",
+          "inactive",
+          "expired",
+          "lapsed",
           String.raw`able\s+to\s+obtain`,
           String.raw`former(?:ly)?`,
         ]),
@@ -313,14 +343,16 @@ export const keywordMatchSchema = z
         ]),
         // Qualified, never bare: "customs clearance" is logistics, not a security vetting.
         clearance: z._default(wordList("requirements.clearance"), [
-          String.raw`(?:security|confidential|secret|top\s+secret|ts/sci|ts|sci|dv|sc|government|federal)\s+clearance`,
+          String.raw`(?:security|confidential|secret|top\s+secret|ts/sci|ts|sci|dv|sc|ctc|bpss|government|federal)\s+clearance`,
           String.raw`ts(?:\s*/\s*|-)sci`,
         ]),
         /**
          * Clearance levels, lowest first. A level asked is met by it or any above it; the lowest
          * a posting names is its bar ("Secret or Top Secret"). The first pattern list that
          * matches, from the highest down, names a line's level: "Top Secret" is not also
-         * "Secret". "TS" is Top Secret only beside "clearance".
+         * "Secret". "TS" is Top Secret only beside "clearance". The UK's levels come before the
+         * US ones, a ladder of their own: a US level asked is not met by a UK one, and a UK level
+         * asked is met by a US one, as an ask that names no level is.
          */
         clearanceLevels: z._default(
           z.array(
@@ -330,6 +362,38 @@ export const keywordMatchSchema = z
             }),
           ),
           [
+            {
+              name: "BPSS",
+              patterns: ["bpss", String.raw`baseline\s+personnel\s+security\s+standard`],
+            },
+            // "CTC", "SC" and "DV" only beside what they name, alone or in a list ("SC or DV
+            // clearance", "security clearance (SC)"): not "CTC up to 30 LPA" (pay), "Charleston,
+            // SC" or a "Diversity Visa (DV)".
+            {
+              name: "CTC",
+              patterns: [
+                `ctc${UK_LEVEL_BEFORE}`,
+                String.raw`${UK_LEVEL_AFTER}ctc(?=\))`,
+                String.raw`ctc(?=\s+check)`,
+                String.raw`counter[\s-]+terrorist\s+check`,
+              ],
+            },
+            {
+              name: "SC",
+              patterns: [
+                `sc${UK_LEVEL_BEFORE}`,
+                String.raw`${UK_LEVEL_AFTER}sc(?=\))`,
+                String.raw`security\s+check`,
+              ],
+            },
+            {
+              name: "DV",
+              patterns: [
+                `dv${UK_LEVEL_BEFORE}`,
+                String.raw`${UK_LEVEL_AFTER}dv(?=\))`,
+                String.raw`developed\s+vetting`,
+              ],
+            },
             { name: "Confidential", patterns: ["confidential"] },
             { name: "Secret", patterns: ["secret"] },
             {
@@ -505,6 +569,35 @@ export const keywordMatchSchema = z
       "perks",
       "equity",
       String.raw`stock\s+options`,
+    ]),
+    /**
+     * The last labels of a web address written without "https://" or "www." (lower case): a
+     * host of three labels or more ending in one ("jobs.example.com/rust", "careers.acme.co.uk")
+     * is a link, not a keyword. A dotted name ending in another ("System.Text.Json",
+     * "org.springframework.boot") stays a keyword.
+     */
+    linkDomains: z._default(wordList("linkDomains"), [
+      "com",
+      "org",
+      "co",
+      "dev",
+      // Also the last word of a package's name ("Microsoft.Graph.Net", "akka.stream.io",
+      // "com.example.app", and before a slash: "akka.stream.io/Kafka"): a link only with a path
+      // of two parts or more after it ("boards.greenhouse.io/acme/jobs").
+      String.raw`(?:net|io|ai|app)(?=/[^\s/]+/)`,
+      "edu",
+      "gov",
+      "info",
+      "jobs",
+      "us",
+      "uk",
+      "ca",
+      "de",
+      "fr",
+      "in",
+      "au",
+      "eu",
+      "nl",
     ]),
     /**
      * Labels of a line that states a nationality, never a language: "Nationality: German",

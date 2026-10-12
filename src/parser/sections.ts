@@ -232,6 +232,13 @@ const UNBOUNDED = new Date(Date.UTC(9000, 0, 1));
 
 const UNKNOWN = { kind: "other", rest: "", tail: "" } as const;
 
+/** Headings never read as a line of a role for how they are set. */
+const SECTIONS_OF_THEIR_OWN = new Set<ResumeSectionKind>([
+  "experience",
+  "education",
+  "certifications",
+]);
+
 /** One to four words of letters, joined by spaces or "&", "/", "-": "VOLUNTEER WORK". */
 const HEADING_WORDS = /^\p{L}+(?:[ &/-]+\p{L}+){0,3}$/u;
 
@@ -379,6 +386,25 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
     }
     return dated[at];
   };
+  // A list under a role, then the next role: a heading of two words or more, bullets right
+  // under it, and a job title on the lines from the first one that is not a bullet to its dates,
+  // before any heading, known or not ("Key Projects" over "- Ledger rewrite" over "Engineer,
+  // Globex Inc⇥2016 - 2019"). A projects section opens on a project ("Ledger Rewrite⇥2018"), or
+  // names none with a job title; a bare "PROJECTS" or "SKILLS" opens its section, whatever is
+  // dated in it ("Lead Maintainer, Kubernetes SIG"), as one does over "LEADERSHIP".
+  const roleAfterList = (at: number) => {
+    if (!/\S\s+\S/u.test(lines[at]!.trim()) || !BULLET.test(lines[at + 1] ?? "")) return false;
+    for (
+      let line = at + 2;
+      line < lines.length && !headings[line] && !unknown.has(line);
+      line += 1
+    ) {
+      if (BULLET.test(lines[line]!)) continue;
+      if (matchers.titleWords.test(lines[line]!)) return true;
+      if (findDateRange(lines[line]!, policy.resumeParse, UNBOUNDED)) return false;
+    }
+    return false;
+  };
 
   const sections: ResumeSection[] = [];
   let current: ResumeSection = { kind: "other", lines: [], headed: false };
@@ -401,15 +427,19 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
       (!gutters(at) || (heading.kind !== "experience" && heading.kind !== "education"));
     // Inside the work history or the projects, with a dated line after it before the next
     // heading, a heading is a line of the role when it names skills with content after it
-    // ("Technologies: React" over the next role) or is not set as the page's headings are: "Key
+    // ("Technologies: React" over the next role), is not set as the page's headings are ("Key
     // Projects:", "Tech Stack" or "Accomplishments" under a role, on a page of headings in
-    // capitals.
+    // capitals), or heads a list of skills or projects over the next role ("KEY PROJECTS", "TECH
+    // STACK"). The work history, education and certifications are never a role's lines, however
+    // they are set: "Education" on a page of headings in capitals opens Education.
     const inRole =
       headings[at] &&
       !gutters(at) &&
       (current.kind === "experience" || current.kind === "projects") &&
       datedAfter(at) &&
-      ((heading!.kind === "skills" && heading!.rest !== "") || !styled(line));
+      ((heading!.kind === "skills" && heading!.rest !== "") ||
+        (!styled(line) && !SECTIONS_OF_THEIR_OWN.has(heading!.kind)) ||
+        ((heading!.kind === "skills" || heading!.kind === "projects") && roleAfterList(at)));
     if (!heading || category || inRole) {
       current.lines.push(line);
       continue;

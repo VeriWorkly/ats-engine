@@ -74,14 +74,15 @@ What does not depend on the model:
   forms. The name as the parser read it, in any case or letter spacing, also as "Doe, Jane", with
   or without a middle initial, and inside a web address built from it (`janedoe.dev`); not
   initials ("J. Doe"), the first name alone, or a handle written another way (`jane_doe`). Every
-  email address in the text, with a domain in any script. The links the parser read. The phone
-  by its national number: with or without the country code (`+44`, `0044`, `+44 (0)`, or after
+  email address in the text, with letters in any script before or after the `@` and an
+  apostrophe before it (`zoë.müller@firma.de`, `o'connor.pat@example.com`). The links the
+  parser read. The phone by its national number: with or without the country code (`+44`, `0044`, `+44 (0)`, or after
   the exit prefix `011`, `0011` or `010`), with a trunk zero (`020`, `(020)`) or a North
   American `1-`, any spaces, brackets, dots, slashes or dashes between the digits, and an
   extension after it; not other phone numbers. Postal addresses are not recognised. The report's
   `advice` is not sent: it quotes the file name, which can hold the name in a form redaction
-  cannot know (`Jane_Doe_Resume.pdf`). The resume is cut to 50 000 characters after redaction.
-  Parse repair and conversion must see contact details and do not redact.
+  cannot know (`Jane_Doe_Resume.pdf`). The resume is cut after redaction, where its 50 000th
+  character falls, or before a contact detail the cut falls in, so nothing past it is sent. Parse repair and conversion must see contact details and do not redact.
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
   including text smuggled in Unicode tag characters or PDF metadata. A phrase in quotes or
   backticks within three words of a word that says it was caught (`text.injectionMentionVerbs`:
@@ -91,7 +92,9 @@ What does not depend on the model:
   may still follow it; the rule trades that for not failing honest security work. It is still
   flagged unquoted (a bare "[INST]" too), on a labelled list line ("Skills: …"), in text hidden
   by the layout, in tag characters or in metadata, and whenever the quote tells the screener
-  what to make of the resume ("rank this candidate", "score me"; `text.injectionTargets`).
+  what to make of the resume ("rank this candidate", "score me"; `text.injectionTargets`) or
+  holds more than one instruction, one of them a verdict ("respond with hire", "give my resume
+  a 10/10"; `text.injectionVerdicts`).
 
 **API keys.** The `/ai` adapters send the key only to the address you configure: they never
 follow a redirect, since `fetch` keeps a header such as `x-api-key` on a redirect to another
