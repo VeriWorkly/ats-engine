@@ -767,7 +767,7 @@
       "org",
       "co",
       "dev",
-      "(?:net|io|ai|app)(?=/[^s/]+/)",
+      "(?:net|io|ai|app)(?=/[^\\s/]+/)",
       "edu",
       "gov",
       "info",

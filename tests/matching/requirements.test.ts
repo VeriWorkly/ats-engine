@@ -183,6 +183,8 @@ describe("skills", () => {
     expect(report.missingKeywords).not.toContain("careers.acme.co.uk");
     const io = listing("Python", "Python\n- Apply at boards.greenhouse.io/acme/jobs/123");
     expect(io.missingKeywords.join(" ")).not.toMatch(/greenhouse|acme|jobs/);
+    const careers = listing("Python", "Python\n- Apply at boards.greenhouse.io/careers/rust");
+    expect(careers.missingKeywords.join(" ")).not.toMatch(/greenhouse|careers|rust/);
   });
 
   it.each([
