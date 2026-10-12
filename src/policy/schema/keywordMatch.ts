@@ -579,12 +579,11 @@ export const keywordMatchSchema = z
     linkDomains: z._default(wordList("linkDomains"), [
       "com",
       "org",
-      "net",
-      "io",
       "co",
       "dev",
-      "ai",
-      "app",
+      // Also the last word of a package's name ("Microsoft.Graph.Net", "akka.stream.io",
+      // "com.example.app"): a link only with a path after it ("boards.greenhouse.io/acme").
+      "(?:net|io|ai|app)(?=/)",
       "edu",
       "gov",
       "info",

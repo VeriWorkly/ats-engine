@@ -1525,12 +1525,9 @@
     "linkDomains": [
       "com",
       "org",
-      "net",
-      "io",
       "co",
       "dev",
-      "ai",
-      "app",
+      "(?:net|io|ai|app)(?=/)",
       "edu",
       "gov",
       "info",

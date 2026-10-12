@@ -166,6 +166,10 @@ describe("skills", () => {
     ["org.springframework.boot", "org.springframework.boot"],
     ["java.util.concurrent", "java.util.concurrent"],
     ["Microsoft.Extensions.Logging/Serilog", "serilog"],
+    ["Microsoft.Graph.Net", "microsoft.graph.net"],
+    ["Microsoft.Bot.Builder.AI", "microsoft.bot.builder.ai"],
+    ["akka.stream.io", "akka.stream.io"],
+    ["com.example.app", "com.example.app"],
   ])("reads a dotted name, %s, as a keyword, not a web address", (ask, term) => {
     expect(listing("Python", `Python, ${ask}`).missingKeywords).toContain(term);
   });
