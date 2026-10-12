@@ -708,6 +708,19 @@ export function judgeRequirements(
     ].filter((part) => part.text.length > 0);
   });
 
+  // The clearances each resume line holds, and their levels, read once for every clearance ask.
+  const heldOn = new WeakMap<object, number[] | null>();
+  const heldLevels = (entry: { line: string }) => {
+    if (!heldOn.has(entry)) {
+      const held = heldClearances(entry.line, matchers);
+      heldOn.set(
+        entry,
+        held.length ? held.flatMap((about) => clearanceRanks(about, matchers)) : null,
+      );
+    }
+    return heldOn.get(entry)!;
+  };
+
   return lines.map(({ text, importance: heading }) => {
     // What the line asks for, without the clauses it calls a plus.
     const { asked: ask, optional } = withoutOptional(text, matchers);
@@ -727,16 +740,11 @@ export function judgeRequirements(
       } satisfies AtsRequirement;
     }
     if (matchers.clearance.test(text)) {
-      const holds = (entry: { line: string }) => heldClearances(entry.line, matchers).length > 0;
+      const holds = (entry: { line: string }) => heldLevels(entry) !== null;
       const evidence = evidenceFor(holds);
       // A level asked is met by it or one above; the lowest the ask names is the bar.
       const asked = Math.min(...askedClearanceRanks(ask, matchers));
-      const held = Math.max(
-        -1,
-        ...resumeLines.flatMap((entry) =>
-          heldClearances(entry.line, matchers).flatMap((about) => clearanceRanks(about, matchers)),
-        ),
-      );
+      const held = Math.max(-1, ...resumeLines.flatMap((entry) => heldLevels(entry) ?? []));
       const levels = km.requirements.clearanceLevels;
       const short = evidence.length > 0 && Number.isFinite(asked) && held < asked;
       return {
