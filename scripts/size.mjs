@@ -26,8 +26,9 @@ const BUDGETS = {
   // quoted prompt, the web domains that end a link, a clearance not held past a semicolon) took
   // it to 99.67, mostly policy data (`linkDomains`, `sponsorshipOffered`, `injectionVerdicts`).
   // 99.9: UK levels read in a list and in brackets, the offer of sponsorship read in its clause,
-  // and each line's clearances read once, to 99.86.
-  ".": 99.9,
+  // and each line's clearances read once, to 99.86. 100.0: the asked level read over a longer
+  // list of levels ("BPSS, CTC, SC or DV clearance"), to 99.93.
+  ".": 100.0,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
