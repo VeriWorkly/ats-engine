@@ -185,11 +185,11 @@ function headerParts(header: string, policy: AtsEnginePolicy) {
  * kind ("Hospital", "University"): without one, "Software Engineer, Acme | Berlin" is a title,
  * an employer and where.
  *
- * A city of one or two words and its state's code ("Austin, TX") is where, unless "at" parts it
- * from the title ("Analyst at Deloitte, NY") or a bar or a dash parts the code from it
- * ("Engineer | Intel | OR"): then its first part is the employer. With commas only, "Software
- * Engineer, Google, CA" is not told from "Senior Engineer, Austin, TX" without a list of cities,
- * so neither has an employer; nor does "Senior Engineer | Austin, TX".
+ * A city of one or two words and its state's code ("Austin, TX") is where, unless "at" or "@"
+ * parts it from the title ("Analyst at Deloitte, NY"): then its first part is the employer.
+ * Otherwise "Software Engineer, Google, CA" is not told from "Senior Engineer, Austin, TX"
+ * without a list of cities, nor "Engineer | Intel | OR" from "Engineer | Seattle | WA", so none
+ * has an employer.
  */
 export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
   const { titleWords, organisation, organisations, strong, department, joined } =
@@ -202,7 +202,7 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
     .map((segment) => headerParts(segment, policy))
     .filter((segment) => segment.length);
   const parts = segments.flat();
-  const sure = joined.test(header) || (segments.length > 2 && segments.at(-1)!.length === 1);
+  const sure = joined.test(header);
 
   if (parts.length === 0) return { title: "", employer: "" };
   if (parts.length === 1) return { title: parts[0], employer: "" };
@@ -285,7 +285,9 @@ function withoutPlace(parts: string[], policy: AtsEnginePolicy, sure: boolean): 
     parts[0]!.split(/\s+/).length <= 2 &&
     !company.test(parts[0]!)
   )
-    return sure && !workplace.test(parts[0]!) ? parts[0]! : "";
+    return sure && !workplace.test(parts[0]!) && !matchersOf(policy).titleWords.test(parts[0]!)
+      ? parts[0]!
+      : "";
   let end = parts.length;
   while (end > 1 && workplace.test(parts[end - 1]!)) end -= 1;
   const named = end;

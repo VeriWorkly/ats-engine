@@ -152,17 +152,24 @@ describe("an employer with its state's code", () => {
     [["Analyst at Deloitte, NY\tJan 2020 - Present"], "Analyst", "Deloitte"],
     [["Nurse at Kaiser, CA\tJan 2020 - Present"], "Nurse", "Kaiser"],
     [["Engineer @ Intel, OR\tJan 2020 - Present"], "Engineer", "Intel"],
-    [["Engineer | Intel | OR\tJan 2020 - Present"], "Engineer", "Intel"],
-    [["Engineer – Intel – OR\tJan 2020 - Present"], "Engineer", "Intel"],
+    // An organisation's name keeps its place between bars, as it did.
+    [["Nurse | Mercy Hospital | CA\tJan 2020 - Present"], "Nurse", "Mercy Hospital"],
   ])("keeps the title and the employer of %j", (block, title, employer) => {
     expect(rolesIn(...block)).toEqual([{ title, employer }]);
   });
 
-  // Known limit: with commas only, or on a line of its own, "Google, CA" is not told from
-  // "Austin, TX" without a list of cities, and a blank employer is safer than a city.
+  // Known limit: with commas only, between bars or dashes, or on a line of its own, "Google, CA"
+  // is not told from "Austin, TX" without a list of cities, nor "Intel | OR" from "Seattle |
+  // WA", and a blank employer is safer than a city.
   it.each([
     [["Software Engineer, Google, CA\tJan 2020 - Present"]],
     [["Software Engineer", "Google, CA", "Jan 2020 - Present"]],
+    [["Software Engineer | Intel | OR\tJan 2020 - Present"]],
+    [["Software Engineer – Intel – OR\tJan 2020 - Present"]],
+    [["Software Engineer | Seattle | WA\tJan 2020 - Present"]],
+    [["Software Engineer – Seattle – WA\tJan 2020 - Present"]],
+    [["Software Engineer | Full-time | TX\tJan 2020 - Present"]],
+    [["Software Engineer | Payments Team | CA\tJan 2020 - Present"]],
   ])("takes no employer from %j", (block) => {
     expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer: "" }]);
   });
