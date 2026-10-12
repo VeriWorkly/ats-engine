@@ -249,9 +249,32 @@ function askedClearanceRanks(text: string, matchers: Matchers) {
   );
 }
 
-/** A clearance the line says is held: not negated, not pending or past. */
-const holdsClearance = (line: string, matchers: Matchers) =>
-  matchers.clearance.test(line) && !matchers.negation.test(line) && !matchers.notHeld.test(line);
+/**
+ * The clearances a resume line says are held, each as the text about it: from the clearance
+ * named before it, or a semicolon, to the one named after it, or a semicolon. A negation or a
+ * word saying it is not held yet or any more, anywhere in that text, says this one is not held:
+ * "Top Secret clearance (TS/SCI eligible)" holds Top Secret, "Active Secret clearance; no
+ * incidents" holds Secret, and "Secret clearance, expired 2021" holds none.
+ */
+function heldClearances(line: string, matchers: Matchers) {
+  const named = [...line.matchAll(matchers.clearanceAll)];
+  const semicolons = [...line.matchAll(/;/gu)].map((semicolon) => semicolon.index);
+  let next = 0;
+  return named.flatMap((match, at) => {
+    const end = match.index + match[0].length;
+    const before = named[at - 1];
+    while (next < semicolons.length && semicolons[next]! < match.index) next += 1;
+    let after = next;
+    while (after < semicolons.length && semicolons[after]! < end) after += 1;
+    const from = Math.max(
+      before ? before.index + before[0].length : 0,
+      next > 0 ? semicolons[next - 1]! + 1 : 0,
+    );
+    const to = Math.min(named[at + 1]?.index ?? line.length, semicolons[after] ?? line.length);
+    const about = line.slice(from, to);
+    return matchers.negation.test(about) || matchers.notHeld.test(about) ? [] : [about];
+  });
+}
 
 /**
  * The right to work: met by a statement of it, never by one that says the opposite. A line is
@@ -276,20 +299,36 @@ function judgeAuthorization(
     )
       return [];
     const rest = line.replace(matchers.noSponsorshipAll, " ");
-    if (matchers.needsSponsorship.test(rest)) return [{ entry, needs: true }];
-    return matchers.negation.test(rest) ? [] : [{ entry, needs: false }];
+    if (matchers.needsSponsorship.test(rest)) return [{ entry, says: line, needs: true }];
+    // Read clause by clause, so a negation about something else ("Authorized to work in the US
+    // (no visa needed)", "…, not open to relocation") does not negate the statement.
+    const clauses = rest
+      .split(/[;,()]/u)
+      .filter(
+        (clause) =>
+          matchers.authorization.test(clause) ||
+          matchers.citizenship.test(clause) ||
+          matchers.residence.test(clause),
+      );
+    const held = (clauses.length ? clauses : [rest]).filter(
+      (clause) => !matchers.negation.test(clause),
+    );
+    return held.length ? [{ entry, says: held.join(";"), needs: false }] : [];
   });
-  const shown = stated.filter(({ needs }) => !needs).map(({ entry }) => entry);
+  const shown = stated.filter(({ needs }) => !needs);
   const needing = stated.filter(({ needs }) => needs).map(({ entry }) => entry);
   if (matchers.citizenship.test(ask) && !matchers.residence.test(ask)) {
     const citizen = shown.filter(
-      ({ line }) =>
-        matchers.citizenship.test(line) &&
-        !matchers.residence.test(line) &&
-        !matchers.notHeld.test(line),
+      ({ says }) =>
+        matchers.citizenship.test(says) &&
+        !matchers.residence.test(says) &&
+        !matchers.notHeld.test(says),
     );
-    if (citizen.length) return { status: "met", lines: citizen };
-    const against = [...shown.filter(({ line }) => matchers.residence.test(line)), ...needing];
+    if (citizen.length) return { status: "met", lines: citizen.map(({ entry }) => entry) };
+    const against = [
+      ...shown.filter(({ says }) => matchers.residence.test(says)).map(({ entry }) => entry),
+      ...needing,
+    ];
     return { status: against.length ? "missing" : "unverifiable", lines: against };
   }
   // A posting rules sponsorship out ("without sponsorship"), or turns away who needs it
@@ -299,7 +338,10 @@ function judgeAuthorization(
     matchers.noSponsorship.test(ask) ||
     (matchers.needsSponsorship.test(ask) && matchers.negation.test(ask));
   if (excludes && needing.length) return { status: "missing", lines: needing };
-  return { status: shown.length ? "met" : "unverifiable", lines: shown };
+  return {
+    status: shown.length ? "met" : "unverifiable",
+    lines: shown.map(({ entry }) => entry),
+  };
 }
 
 /** The word after a position, when only spaces stand before it. */
@@ -687,13 +729,15 @@ export function judgeRequirements(
       } satisfies AtsRequirement;
     }
     if (matchers.clearance.test(text)) {
-      const holds = (entry: { line: string }) => holdsClearance(entry.line, matchers);
+      const holds = (entry: { line: string }) => heldClearances(entry.line, matchers).length > 0;
       const evidence = evidenceFor(holds);
       // A level asked is met by it or one above; the lowest the ask names is the bar.
       const asked = Math.min(...askedClearanceRanks(ask, matchers));
       const held = Math.max(
         -1,
-        ...resumeLines.filter(holds).flatMap((entry) => clearanceRanks(entry.line, matchers)),
+        ...resumeLines.flatMap((entry) =>
+          heldClearances(entry.line, matchers).flatMap((about) => clearanceRanks(about, matchers)),
+        ),
       );
       const levels = km.requirements.clearanceLevels;
       const short = evidence.length > 0 && Number.isFinite(asked) && held < asked;

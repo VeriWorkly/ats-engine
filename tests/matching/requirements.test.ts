@@ -277,6 +277,9 @@ describe("the right to work, read for what the statement says", () => {
     "U.S. citizen, does not require visa sponsorship",
     "Authorized to work in the US without sponsorship",
     "US Citizen; not requiring sponsorship",
+    // A negation about something else, in a clause of its own.
+    "Authorized to work in the US (no visa needed)",
+    "Authorized to work in the US, not open to relocation",
   ])("is met by a line that needs no sponsorship: %s", (statement) => {
     expect(authorized(statement, WITHOUT_SPONSORSHIP)).toMatchObject({
       status: "met",
@@ -367,8 +370,18 @@ describe("a clearance, compared by its level", () => {
     ["Active TS clearance", "Top Secret clearance required"],
     ["Active Secret clearance", "Active security clearance required"],
     ["Active Secret clearance", "Secret or Top Secret clearance"],
+    // A negation or a level not held yet that is about something else.
+    ["Active Secret clearance; no incidents", "Active Secret clearance required"],
+    ["Top Secret clearance (TS/SCI eligible)", "Active Top Secret clearance required"],
+    ["Inactive Confidential clearance, active Secret clearance", "Secret clearance required"],
   ])("is met by the level asked or one above: %s for %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("met");
+  });
+
+  it("does not read a level only eligible for as held", () => {
+    expect(
+      cleared("Top Secret clearance (TS/SCI eligible)", "TS/SCI clearance required"),
+    ).toMatchObject({ status: "partial", detail: "Top Secret read, TS/SCI asked" });
   });
 
   it.each([
