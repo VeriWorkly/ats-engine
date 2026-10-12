@@ -202,17 +202,19 @@ function patternLanguages(text: string, matchers: Matchers) {
 }
 
 /**
- * The clearance levels a line names, by rank. Read from the highest down, each match blanked
- * before the next level is looked for, so "Top Secret" is not also "Secret".
+ * The clearance levels a line names, by rank. Read from the highest down, each on the whole
+ * line, a match within one of a higher level left out, so "Top Secret" is not also "Secret" and
+ * "SC or DV clearance" names both.
  */
 function clearanceRanks(text: string, matchers: Matchers) {
   const ranks: number[] = [];
-  let rest = text;
-  for (const { rank, pattern } of matchers.clearanceLevels) {
-    const blanked = rest.replace(pattern, (found) => " ".repeat(found.length));
-    if (blanked !== rest) ranks.push(rank);
-    rest = blanked;
-  }
+  const taken = new Uint8Array(text.length);
+  for (const { rank, pattern } of matchers.clearanceLevels)
+    for (const { index, 0: found } of text.matchAll(pattern)) {
+      if (taken.subarray(index, index + found.length).includes(1)) continue;
+      taken.fill(1, index, index + found.length);
+      if (!ranks.includes(rank)) ranks.push(rank);
+    }
   return ranks;
 }
 

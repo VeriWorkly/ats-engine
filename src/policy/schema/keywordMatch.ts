@@ -3,6 +3,15 @@ import * as z from "zod/mini";
 import { regexString, term, wordList } from "../primitives.js";
 
 /**
+ * What follows a UK clearance level that names one: "clearance", "vetting" or "cleared", after at
+ * most three more levels in a list ("SC or DV clearance", "SC/DV clearance"). Bounded, so a
+ * run of levels costs a few steps from each.
+ */
+const UK_LEVEL_BEFORE = String.raw`(?=(?:\s*(?:/|,|or|and)\s*(?:bpss|ctc|sc|dv)){0,3}\s+(?:clearance|vetting|cleared))`;
+/** A UK level in brackets after the clearance it names: "security clearance (SC)". */
+const UK_LEVEL_AFTER = String.raw`(?<=(?:clearance|vetting)\s{0,3}\()`;
+
+/**
  * Heading patterns used to split a posting into blocks. Each block runs to the next heading, so
  * these replace the old fixed-length windows, which overshot the requirements list and promoted
  * nice-to-haves to the required weight. `excluded` blocks (about-us, benefits, EEO boilerplate)
@@ -357,26 +366,31 @@ export const keywordMatchSchema = z
               name: "BPSS",
               patterns: ["bpss", String.raw`baseline\s+personnel\s+security\s+standard`],
             },
-            // "CTC", "SC" and "DV" only before what they name: not "CTC up to 30 LPA" (pay),
-            // "Charleston, SC" or a "Diversity Visa (DV)".
+            // "CTC", "SC" and "DV" only beside what they name, alone or in a list ("SC or DV
+            // clearance", "security clearance (SC)"): not "CTC up to 30 LPA" (pay), "Charleston,
+            // SC" or a "Diversity Visa (DV)".
             {
               name: "CTC",
               patterns: [
-                String.raw`ctc(?=\s+(?:clearance|vetting|cleared|check))`,
+                `ctc${UK_LEVEL_BEFORE}`,
+                String.raw`${UK_LEVEL_AFTER}ctc(?=\))`,
+                String.raw`ctc(?=\s+check)`,
                 String.raw`counter[\s-]+terrorist\s+check`,
               ],
             },
             {
               name: "SC",
               patterns: [
-                String.raw`sc(?=\s+(?:clearance|vetting|cleared))`,
+                `sc${UK_LEVEL_BEFORE}`,
+                String.raw`${UK_LEVEL_AFTER}sc(?=\))`,
                 String.raw`security\s+check`,
               ],
             },
             {
               name: "DV",
               patterns: [
-                String.raw`dv(?=\s+(?:clearance|vetting|cleared))`,
+                `dv${UK_LEVEL_BEFORE}`,
+                String.raw`${UK_LEVEL_AFTER}dv(?=\))`,
                 String.raw`developed\s+vetting`,
               ],
             },

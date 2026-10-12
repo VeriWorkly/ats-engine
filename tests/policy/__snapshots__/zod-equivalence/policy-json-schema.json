@@ -1251,21 +1251,25 @@
                   {
                     "name": "CTC",
                     "patterns": [
-                      "ctc(?=\\s+(?:clearance|vetting|cleared|check))",
+                      "ctc(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+                      "(?<=(?:clearance|vetting)\\s{0,3}\\()ctc(?=\\))",
+                      "ctc(?=\\s+check)",
                       "counter[\\s-]+terrorist\\s+check"
                     ]
                   },
                   {
                     "name": "SC",
                     "patterns": [
-                      "sc(?=\\s+(?:clearance|vetting|cleared))",
+                      "sc(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+                      "(?<=(?:clearance|vetting)\\s{0,3}\\()sc(?=\\))",
                       "security\\s+check"
                     ]
                   },
                   {
                     "name": "DV",
                     "patterns": [
-                      "dv(?=\\s+(?:clearance|vetting|cleared))",
+                      "dv(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+                      "(?<=(?:clearance|vetting)\\s{0,3}\\()dv(?=\\))",
                       "developed\\s+vetting"
                     ]
                   },
@@ -6207,21 +6211,25 @@
                   {
                     "name": "CTC",
                     "patterns": [
-                      "ctc(?=\\s+(?:clearance|vetting|cleared|check))",
+                      "ctc(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+                      "(?<=(?:clearance|vetting)\\s{0,3}\\()ctc(?=\\))",
+                      "ctc(?=\\s+check)",
                       "counter[\\s-]+terrorist\\s+check"
                     ]
                   },
                   {
                     "name": "SC",
                     "patterns": [
-                      "sc(?=\\s+(?:clearance|vetting|cleared))",
+                      "sc(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+                      "(?<=(?:clearance|vetting)\\s{0,3}\\()sc(?=\\))",
                       "security\\s+check"
                     ]
                   },
                   {
                     "name": "DV",
                     "patterns": [
-                      "dv(?=\\s+(?:clearance|vetting|cleared))",
+                      "dv(?=(?:\\s*(?:/|,|or|and)\\s*(?:bpss|ctc|sc|dv)){0,3}\\s+(?:clearance|vetting|cleared))",
+                      "(?<=(?:clearance|vetting)\\s{0,3}\\()dv(?=\\))",
                       "developed\\s+vetting"
                     ]
                   },

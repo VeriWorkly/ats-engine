@@ -480,6 +480,25 @@ describe("a clearance, compared by its level", () => {
   });
 
   it.each([
+    "Must hold SC or DV clearance",
+    "SC/DV clearance required",
+    "SC / DV clearance required",
+    "SC, DV clearance required",
+  ])("reads each of a list of UK levels before the clearance: %s", (ask) => {
+    expect(cleared("Active SC clearance", ask).status).toBe("met");
+    expect(cleared("Active BPSS clearance", ask)).toMatchObject({
+      status: "partial",
+      detail: "BPSS read, SC asked",
+    });
+  });
+
+  it("reads a UK level in brackets after the clearance", () => {
+    expect(
+      cleared("Active BPSS clearance", "Must hold active UK security clearance (SC)"),
+    ).toMatchObject({ status: "partial", detail: "BPSS read, SC asked" });
+  });
+
+  it.each([
     ["TS/SCI (inactive since 2022)", "Active TS/SCI clearance"],
     ["Secret clearance, expired 2021", "Secret clearance"],
     ["Eligible for Secret clearance", "Secret clearance"],
