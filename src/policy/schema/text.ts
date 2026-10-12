@@ -395,7 +395,7 @@ export const engineTextSchema = z.prefault(
      * of these (function words aside, no comma or colon between) is an example an AI security
      * engineer quotes, and is not counted. Not on a labelled line ("Skills: …"), not unquoted
      * (a bare "[INST]" too), not in text hidden in tag characters or by the layout, and never a
-     * quote naming one of `injectionTargets`.
+     * quote naming one of `injectionTargets` or holding more than one injection phrase.
      */
     injectionMentionVerbs: z._default(wordList("text.injectionMentionVerbs"), [
       // Each with its "-s", "-ed" and "-ing": "flags", "flagged", "scanning", "red-teamed".
@@ -405,8 +405,10 @@ export const engineTextSchema = z.prefault(
     ]),
     /** What a quote that tells the screener what to make of this resume names: never an example. */
     injectionTargets: z._default(wordList("text.injectionTargets"), [
-      String.raw`this\s+(?:candidate|applicant|resume|cv|profile|application)`,
+      String.raw`(?:this|my)\s+(?:candidate|applicant|resume|cv|profile|application)`,
       String.raw`(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\s+me`,
+      // A verdict dictated: "respond with hire".
+      String.raw`(?:respond|reply|answer|output)\s+(?:only\s+)?with\s+["'“]?(?:yes|hire|qualified)`,
     ]),
     /**
      * Headings of a list of works, read where a section heading opens one: its lines shaped as

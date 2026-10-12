@@ -32,11 +32,12 @@ const NEAR = 60;
 /**
  * The quotes on a visible line that are an example of an attack: within three words of a word
  * saying it was caught, function words aside and no comma, semicolon or colon between, on a line
- * that is no "Label: …" list, and naming nothing the screener is told to do with this resume.
+ * that is no "Label: …" list, naming nothing the screener is told to do with this resume, and
+ * holding one instruction: a quote of several is a screener's prompt.
  */
 function examples(line: string, policy: AtsEnginePolicy): Array<[number, number]> {
   if (LABELLED.test(line.replace(BULLET_PREFIX, ""))) return [];
-  const { caught, target } = injectionPattern(policy.text);
+  const { caught, target, phrase } = injectionPattern(policy.text);
   const stop = new Set(policy.keywordMatch.stopwords);
   const verbs = [...line.matchAll(caught)].map((verb) => verb.index + verb[0].length);
   const spans: Array<[number, number]> = [];
@@ -45,6 +46,7 @@ function examples(line: string, policy: AtsEnginePolicy): Array<[number, number]
     while (verb + 1 < verbs.length && verbs[verb + 1]! <= index) verb += 1;
     const gap = verb < 0 || index - verbs[verb]! > NEAR ? null : line.slice(verbs[verb], index);
     if (gap === null || /[,;:]/u.test(gap) || target.test(quoted)) continue;
+    if ([...quoted.matchAll(phrase)].length > 1) continue;
     const words = gap.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
     if (words.filter((word) => !stop.has(word)).length <= 3)
       spans.push([index, index + quoted.length]);
