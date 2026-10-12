@@ -5,7 +5,7 @@ import { EMAIL, LINK, findName } from "./contact.js";
 import { findDateRange, readingDatesAt } from "./dates.js";
 import { degreeLevel, parseEducation } from "./education.js";
 import { BULLET, BULLET_PREFIX } from "../text/text.js";
-import { opensWithVerb, parseRoles, titleWordsOf } from "./experience.js";
+import { isPlace, opensWithVerb, parseRoles, titleWordsOf } from "./experience.js";
 import { parseSpokenLanguages, readLanguages } from "./languages.js";
 import { finalizeParsed } from "./record.js";
 import { readResumeLines } from "./lines.js";
@@ -164,6 +164,12 @@ export function parseReadLines(
     sections.filter((section) => section.kind === kind).flatMap((section) => section.lines);
 
   const experienceLines = take("experience");
+  // Where the candidate is, from the contact details above the first heading ("Austin, TX"):
+  // written beside a role, it is where the role is worked, never its employer.
+  const home = (sections[0]?.headed ? [] : (sections[0]?.lines ?? []))
+    .flatMap((line) => line.split(/[|·•]|\s{2,}/u))
+    .filter((part) => part.includes(",") && isPlace(part, policy, false))
+    .map((part) => part.trim().toLowerCase().replace(/\s+/gu, " "));
   // A resume with no recognisable Experience heading still has a work history somewhere, so the
   // fallback reads every block except the ones known not to hold jobs: a degree's "2010 - 2014"
   // read as a role once added four years of experience nobody worked, and a licence's dates
@@ -181,6 +187,7 @@ export function parseReadLines(
           .flatMap((section) => section.lines),
     policy,
     now,
+    home,
   );
   // Without an Education heading, every block that can hold a degree is read, never a bullet:
   // "Ran a PhD intern program" is not a doctorate, nor "Partnered with Stanford University" a

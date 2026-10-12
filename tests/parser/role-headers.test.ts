@@ -97,6 +97,9 @@ describe("a city and state beside the dates", () => {
   it.each([
     [["Senior Engineer\tJan 2020 - Present", "Austin, TX"]],
     [["Senior Engineer, Remote\tJan 2020 - Present"]],
+    // A workplace word with a state's code is where, never an employer.
+    [["Senior Engineer, Hybrid, CA\tJan 2020 - Present"]],
+    [["Senior Engineer", "Remote, TX", "Jan 2020 - Present"]],
   ])("is not taken for the employer when none is named, in %j", (block) => {
     expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer: "" }]);
   });
@@ -110,6 +113,50 @@ describe("a city and state beside the dates", () => {
     [["Acme Corp", "Senior Engineer", "Austin, TX", "Jan 2020 - Present"], "Acme Corp"],
   ])("is not told from an employer with its state's code in %j", (block, employer) => {
     expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer }]);
+  });
+
+  it.each([
+    [
+      [
+        "Acme Corp",
+        "Senior Engineer, Austin, TX\tJan 2020 - Present",
+        "- Led the ledger team",
+        "Engineer, Dallas, TX\tJan 2017 - Dec 2019",
+      ],
+    ],
+    [
+      [
+        "Acme Corp",
+        "Senior Engineer",
+        "Austin, TX",
+        "Jan 2020 - Present",
+        "- Led the ledger team",
+        "Engineer",
+        "Dallas, TX",
+        "Jan 2017 - Dec 2019",
+      ],
+    ],
+  ])("is where for every role under one employer in %j", (block) => {
+    expect(rolesIn(...block)).toEqual([
+      { title: "Senior Engineer", employer: "Acme Corp" },
+      { title: "Engineer", employer: "Acme Corp" },
+    ]);
+  });
+
+  it.each([
+    "Senior Engineer, Austin, TX\tJan 2020 - Present",
+    "Senior Engineer\nAustin, TX\nJan 2020 - Present",
+  ])("is where when the contact details name it: %j", (block) => {
+    const { roles } = parseResume(
+      `Jane Doe\njane@example.com | +1 512 555 0100 | Austin, TX\nExperience\n${block}\n- Built the ledger`.split(
+        "\n",
+      ),
+      DEFAULT_POLICY,
+      now,
+    );
+    expect(roles.map(({ title, employer }) => ({ title, employer }))).toEqual([
+      { title: "Senior Engineer", employer: "" },
+    ]);
   });
 
   it.each([

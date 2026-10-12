@@ -280,7 +280,7 @@ function withoutPlace(parts: string[], policy: AtsEnginePolicy, sure: boolean): 
     parts[0]!.split(/\s+/).length <= 2 &&
     !company.test(parts[0]!)
   )
-    return sure ? parts[0]! : "";
+    return sure && !workplace.test(parts[0]!) ? parts[0]! : "";
   let end = parts.length;
   while (end > 1 && workplace.test(parts[end - 1]!)) end -= 1;
   const named = end;
@@ -316,6 +316,8 @@ export function parseRoles(
   given: string[],
   policy: AtsEnginePolicy,
   now: Date = new Date(),
+  /** Where the candidate is, from the contact details, lower case: "austin, tx". */
+  home: readonly string[] = [],
 ): AtsParsedRole[] {
   const roles: AtsParsedRole[] = [];
 
@@ -324,6 +326,10 @@ export function parseRoles(
   const { verbOpener: opensWithVerb, titleWords, duration } = matchersOf(policy);
   // The employer the last employer line named, for the roles under it that name none.
   let group = "";
+  // The employer an employer line named over the first role of a group, read as the half its
+  // dated line lacked: the later roles' instead of a city taken for theirs ("Engineer, Dallas,
+  // TX").
+  let under = "";
   // A header is a short, unbulleted line with no dates of its own. A trailing full stop does not
   // make "Senior Engineer, Acme Corp." a sentence.
   // A header in parts — "Engineer, Acme — San Francisco, CA", "Engineer | Acme | Remote" — runs
@@ -358,6 +364,11 @@ export function parseRoles(
     !findDateRange(line, rp, now);
   const isSingle = (line: string) => splitTitleAndEmployer(line, policy).employer === "";
   const lettersIn = (text: string) => text.match(/\p{L}/gu)?.length ?? 0;
+  // Where the candidate lives, written beside a role, is where the role is worked.
+  const atHome = (text: string) => {
+    const lower = text.toLowerCase().replace(/\s+/gu, " ");
+    return home.some((place) => lower.includes(place));
+  };
 
   // Every dated line, with the header text it carries itself. Where the role is worked, beside
   // its dates ("Jan 2020 - Present | Austin, TX"), is none: the header is elsewhere.
@@ -417,6 +428,9 @@ export function parseRoles(
 
   for (const { index, found, own } of anchors) {
     let header = own;
+    // The employer line over the first role of a group ("Acme Corp" over "Senior Engineer,
+    // Austin, TX⇥2020 - Present"), read as the half the dated line lacks.
+    let opens = false;
     if (own && isSingle(own)) {
       // "Founder & Developer - VeriWorkly" over "2025-01 - Present | Remote": the neighbour is
       // the header, and what the dated line carries besides its dates is where, not who.
@@ -424,8 +438,11 @@ export function parseRoles(
       const side = full ?? sides.find((offset) => halfAt(index + offset, index));
       // Its title is all it carries that is not where: "Acme Corp | Austin, TX" is Acme Corp.
       if (full !== undefined) header = take(index + full);
-      else if (side !== undefined)
+      else if (side !== undefined) {
+        opens =
+          side < 0 && !titled(index - 1) && (index === 1 || BULLET.test(lines[index - 2] ?? ""));
         header = `${splitTitleAndEmployer(own, policy).title} | ${headerParts(take(index + side), policy)[0]}`;
+      }
     } else if (own && !titled(index)) {
       // No title word beside the dates ("Acme Corp, Berlin"), and a title alone beside them
       // ("Software Engineer"): the dated line is the employer and where, not a title and its
@@ -479,8 +496,7 @@ export function parseRoles(
     // employer when no other line names one.
     let near = "";
     if (!header && free(dates - 1) && free(dates - 2) && where(dates - 1)) {
-      if (titled(dates - 2) && isSingle(lines[dates - 2]!))
-        near = withoutPlace(headerParts(lines[dates - 1]!, policy), policy, true);
+      if (titled(dates - 2) && isSingle(lines[dates - 2]!)) near = lines[dates - 1]!;
       take(dates - 1);
       dates -= 1;
     }
@@ -522,10 +538,16 @@ export function parseRoles(
       ) {
         employer = headerParts(take(above), policy)[0] ?? "";
         group = employer;
-      } else employer = group || near || splitTitleAndEmployer(header, policy, true).employer;
+      } else {
+        const guess = near
+          ? withoutPlace(headerParts(near, policy), policy, true)
+          : splitTitleAndEmployer(header, policy, true).employer;
+        employer = group || (guess && (under || (atHome(near || header) ? "" : guess)));
+      }
     } else if (employer) {
       // Stacked with the employer over the title, it heads a group too.
-      group = top === index - 2 && employer === headerParts(lines[top], policy)[0] ? employer : "";
+      group = top === dates - 2 && employer === headerParts(lines[top], policy)[0] ? employer : "";
+      under = opens ? employer : "";
     }
     roles.push({ ...found.range, title: split.title, employer });
   }
