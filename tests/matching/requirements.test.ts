@@ -170,6 +170,10 @@ describe("skills", () => {
     ["Microsoft.Bot.Builder.AI", "microsoft.bot.builder.ai"],
     ["akka.stream.io", "akka.stream.io"],
     ["com.example.app", "com.example.app"],
+    ["Microsoft.Extensions.AI/Ollama", "ollama"],
+    ["akka.stream.io/Pekko", "pekko"],
+    ["com.example.app/Kotlin", "kotlin"],
+    ["Microsoft.Graph.Net/Azure", "azure"],
   ])("reads a dotted name, %s, as a keyword, not a web address", (ask, term) => {
     expect(listing("Python", `Python, ${ask}`).missingKeywords).toContain(term);
   });
@@ -177,6 +181,8 @@ describe("skills", () => {
   it("reads no keyword inside a host whose last label is a country's", () => {
     const report = listing("Python", "Python\n- Apply at careers.acme.co.uk");
     expect(report.missingKeywords).not.toContain("careers.acme.co.uk");
+    const io = listing("Python", "Python\n- Apply at boards.greenhouse.io/acme/jobs/123");
+    expect(io.missingKeywords.join(" ")).not.toMatch(/greenhouse|acme|jobs/);
   });
 
   it.each([

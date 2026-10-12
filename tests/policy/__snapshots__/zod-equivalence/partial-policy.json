@@ -463,7 +463,7 @@
       "org",
       "co",
       "dev",
-      "(?:net|io|ai|app)(?=/)",
+      "(?:net|io|ai|app)(?=/[^s/]+/)",
       "edu",
       "gov",
       "info",

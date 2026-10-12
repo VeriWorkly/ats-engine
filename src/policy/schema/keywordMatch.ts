@@ -582,8 +582,9 @@ export const keywordMatchSchema = z
       "co",
       "dev",
       // Also the last word of a package's name ("Microsoft.Graph.Net", "akka.stream.io",
-      // "com.example.app"): a link only with a path after it ("boards.greenhouse.io/acme").
-      "(?:net|io|ai|app)(?=/)",
+      // "com.example.app", and before a slash: "akka.stream.io/Kafka"): a link only with a path
+      // of two parts or more after it ("boards.greenhouse.io/acme/jobs").
+      "(?:net|io|ai|app)(?=/[^\s/]+/)",
       "edu",
       "gov",
       "info",
