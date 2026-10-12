@@ -216,10 +216,11 @@ function clearanceRanks(text: string, matchers: Matchers) {
  * The levels a posting asks a clearance at: those named within three words of a clearance
  * ("Secret or Top Secret clearance", "Security clearance (Secret or above)"), not a word further
  * on ("Top Secret clearance required to handle confidential information" asks for Top Secret).
+ * With none beside it, any the line names: "a security clearance at the Top Secret level".
  */
 function askedClearanceRanks(text: string, matchers: Matchers) {
   // A requirement is at most 300 characters: cutting it at each clearance stays cheap.
-  return [...text.matchAll(matchers.clearanceAll)].flatMap(({ index, 0: found }) =>
+  const near = [...text.matchAll(matchers.clearanceAll)].flatMap(({ index, 0: found }) =>
     clearanceRanks(
       [
         ...text.slice(0, index).split(/\s+/u).slice(-4),
@@ -232,6 +233,7 @@ function askedClearanceRanks(text: string, matchers: Matchers) {
       matchers,
     ),
   );
+  return near.length ? near : clearanceRanks(text, matchers);
 }
 
 /**
