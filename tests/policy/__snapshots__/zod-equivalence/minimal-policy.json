@@ -561,10 +561,38 @@
         "(?:lawful\\s+)?permanent\\s+residen(?:t|cy|ce)"
       ],
       "clearance": [
-        "(?:security|confidential|secret|top\\s+secret|ts/sci|ts|sci|dv|sc|government|federal)\\s+clearance",
+        "(?:security|confidential|secret|top\\s+secret|ts/sci|ts|sci|dv|sc|ctc|bpss|government|federal)\\s+clearance",
         "ts(?:\\s*/\\s*|-)sci"
       ],
       "clearanceLevels": [
+        {
+          "name": "BPSS",
+          "patterns": [
+            "bpss",
+            "baseline\\s+personnel\\s+security\\s+standard"
+          ]
+        },
+        {
+          "name": "CTC",
+          "patterns": [
+            "ctc",
+            "counter[\\s-]+terrorist\\s+check"
+          ]
+        },
+        {
+          "name": "SC",
+          "patterns": [
+            "(?<!\\.)sc",
+            "security\\s+check"
+          ]
+        },
+        {
+          "name": "DV",
+          "patterns": [
+            "dv",
+            "developed\\s+vetting"
+          ]
+        },
         {
           "name": "Confidential",
           "patterns": [

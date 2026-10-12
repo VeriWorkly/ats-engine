@@ -315,14 +315,16 @@ export const keywordMatchSchema = z
         ]),
         // Qualified, never bare: "customs clearance" is logistics, not a security vetting.
         clearance: z._default(wordList("requirements.clearance"), [
-          String.raw`(?:security|confidential|secret|top\s+secret|ts/sci|ts|sci|dv|sc|government|federal)\s+clearance`,
+          String.raw`(?:security|confidential|secret|top\s+secret|ts/sci|ts|sci|dv|sc|ctc|bpss|government|federal)\s+clearance`,
           String.raw`ts(?:\s*/\s*|-)sci`,
         ]),
         /**
          * Clearance levels, lowest first. A level asked is met by it or any above it; the lowest
          * a posting names is its bar ("Secret or Top Secret"). The first pattern list that
          * matches, from the highest down, names a line's level: "Top Secret" is not also
-         * "Secret". "TS" is Top Secret only beside "clearance".
+         * "Secret". "TS" is Top Secret only beside "clearance". The UK's levels come before the
+         * US ones, a ladder of their own: a US level asked is not met by a UK one, and a UK level
+         * asked is met by a US one, as an ask that names no level is.
          */
         clearanceLevels: z._default(
           z.array(
@@ -332,6 +334,14 @@ export const keywordMatchSchema = z
             }),
           ),
           [
+            {
+              name: "BPSS",
+              patterns: ["bpss", String.raw`baseline\s+personnel\s+security\s+standard`],
+            },
+            { name: "CTC", patterns: ["ctc", String.raw`counter[\s-]+terrorist\s+check`] },
+            // Not the "Sc" of a degree ("M.Sc").
+            { name: "SC", patterns: [String.raw`(?<!\.)sc`, String.raw`security\s+check`] },
+            { name: "DV", patterns: ["dv", String.raw`developed\s+vetting`] },
             { name: "Confidential", patterns: ["confidential"] },
             { name: "Secret", patterns: ["secret"] },
             {

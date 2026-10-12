@@ -384,6 +384,22 @@ describe("a clearance, compared by its level", () => {
     ).toMatchObject({ status: "partial", detail: "Top Secret read, TS/SCI asked" });
   });
 
+  it("compares the UK's levels", () => {
+    expect(cleared("Active SC clearance", "Active DV clearance required")).toMatchObject({
+      status: "partial",
+      detail: "SC read, DV asked",
+    });
+    expect(cleared("Active CTC clearance", "SC clearance required").status).toBe("partial");
+    expect(cleared("Active DV clearance", "SC clearance required").status).toBe("met");
+    // Across the two, no worse than when the UK's were not known.
+    expect(cleared("Active SC clearance", "Secret clearance required").status).toBe("partial");
+    expect(cleared("Active Secret clearance", "SC clearance required").status).toBe("met");
+    // A degree's "Sc" is not SC.
+    expect(
+      cleared("Active Confidential clearance", "Secret clearance, M.Sc preferred").status,
+    ).toBe("partial");
+  });
+
   it.each([
     ["TS/SCI (inactive since 2022)", "Active TS/SCI clearance"],
     ["Secret clearance, expired 2021", "Secret clearance"],
