@@ -14,3 +14,7 @@ package and gets no changeset of its own.
 fields for the same input and policy is **breaking**. For the MCP server, so is a change to the
 shape of a tool's result, or to the score it returns for the same file. While a package is 0.x a
 breaking change is a minor bump, and its entry starts with **Breaking:**; from 1.0 it is a major.
+
+An engine change that alters the score or the recovered fields for the same input alters what the
+MCP server returns for the same file, so it gets a changeset for `@veriworkly/ats-engine-mcp` too,
+at the same level: the patch the server gets for its new engine dependency alone is not enough.
