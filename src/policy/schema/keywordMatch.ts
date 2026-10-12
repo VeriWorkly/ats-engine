@@ -291,12 +291,16 @@ export const keywordMatchSchema = z
         ]),
         /**
          * Words that say a clearance or a citizenship is not held yet, or any more: "eligible
-         * for", "pending", "able to obtain", "former". Not for the right to work itself:
-         * "eligible to work in the US" states it.
+         * for", "pending", "able to obtain", "former", "expired". Not for the right to work
+         * itself: "eligible to work in the US" states it. Read past a semicolon about a clearance
+         * ("Secret clearance; expired 2021"), where a `negation` is not ("…; no incidents").
          */
         notHeld: z._default(wordList("requirements.notHeld"), [
           "eligible",
           "pending",
+          "inactive",
+          "expired",
+          "lapsed",
           String.raw`able\s+to\s+obtain`,
           String.raw`former(?:ly)?`,
         ]),

@@ -427,6 +427,11 @@ describe("a clearance, compared by its level", () => {
     ["Eligible for Secret clearance", "Secret clearance"],
     ["Top Secret clearance pending", "Secret clearance"],
     ["Able to obtain a security clearance", "Active security clearance required"],
+    // Past a semicolon, a word saying it is not held any more still is about it.
+    ["Secret clearance; expired 2021", "Active Secret clearance required"],
+    ["Secret clearance; inactive since 2020", "Active Secret clearance required"],
+    ["Secret clearance; currently inactive", "Active Secret clearance required"],
+    ["Secret clearance; eligible for reinstatement", "Active Secret clearance required"],
   ])("takes no clearance from one not held: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("unverifiable");
   });

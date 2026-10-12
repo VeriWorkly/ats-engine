@@ -1175,6 +1175,9 @@
                 "default": [
                   "eligible",
                   "pending",
+                  "inactive",
+                  "expired",
+                  "lapsed",
                   "able\\s+to\\s+obtain",
                   "former(?:ly)?"
                 ],
@@ -6082,6 +6085,9 @@
                 "default": [
                   "eligible",
                   "pending",
+                  "inactive",
+                  "expired",
+                  "lapsed",
                   "able\\s+to\\s+obtain",
                   "former(?:ly)?"
                 ],

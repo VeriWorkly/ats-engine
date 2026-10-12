@@ -236,22 +236,19 @@ function askedClearanceRanks(text: string, matchers: Matchers) {
 
 /**
  * The clearances a resume line says are held, each as the text about it: from the clearance
- * named before it, or a semicolon, to the one named after it, or a semicolon. A negation or a
- * word saying it is not held yet or any more, anywhere in that text, says this one is not held:
- * "Top Secret clearance (TS/SCI eligible)" holds Top Secret, "Active Secret clearance; no
- * incidents" holds Secret, and "Secret clearance, expired 2021" holds none.
+ * named before it to the one named after it. A word saying it is not held yet or any more
+ * anywhere in that text ("Top Secret clearance pending", "Secret clearance; expired 2021"), or a
+ * negation in it short of a semicolon, says this one is not held: "Top Secret clearance (TS/SCI
+ * eligible)" holds Top Secret, and "Active Secret clearance; no incidents" holds Secret.
  */
 function heldClearances(line: string, matchers: Matchers) {
-  return line.split(";").flatMap((part) => {
-    const named = [...part.matchAll(matchers.clearanceAll)];
-    return named.flatMap((match, at) => {
-      const before = named[at - 1];
-      const about = part.slice(
-        before ? before.index + before[0].length : 0,
-        named[at + 1]?.index ?? part.length,
-      );
-      return matchers.negation.test(about) || matchers.notHeld.test(about) ? [] : [about];
-    });
+  const named = [...line.matchAll(matchers.clearanceAll)];
+  return named.flatMap((match, at) => {
+    const before = named[at - 1];
+    const from = before ? before.index + before[0].length : 0;
+    const about = line.slice(from, named[at + 1]?.index ?? line.length);
+    const clause = about.slice(about.lastIndexOf(";", match.index - from) + 1).split(";", 1)[0]!;
+    return matchers.notHeld.test(about) || matchers.negation.test(clause) ? [] : [about];
   });
 }
 
