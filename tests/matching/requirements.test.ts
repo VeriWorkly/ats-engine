@@ -161,6 +161,21 @@ describe("skills", () => {
   });
 
   it.each([
+    ["System.Text.Json", "system.text.json"],
+    ["Microsoft.Extensions.DependencyInjection", "microsoft.extensions.dependencyinjection"],
+    ["org.springframework.boot", "org.springframework.boot"],
+    ["java.util.concurrent", "java.util.concurrent"],
+    ["Microsoft.Extensions.Logging/Serilog", "serilog"],
+  ])("reads a dotted name, %s, as a keyword, not a web address", (ask, term) => {
+    expect(listing("Python", `Python, ${ask}`).missingKeywords).toContain(term);
+  });
+
+  it("reads no keyword inside a host whose last label is a country's", () => {
+    const report = listing("Python", "Python\n- Apply at careers.acme.co.uk");
+    expect(report.missingKeywords).not.toContain("careers.acme.co.uk");
+  });
+
+  it.each([
     ["SAP S/4HANA", ["s", "4hana"]],
     ["z/OS mainframes", ["z", "os"]],
     ["Pub/Sub messaging", ["pub", "sub"]],

@@ -555,6 +555,35 @@ export const keywordMatchSchema = z
       String.raw`stock\s+options`,
     ]),
     /**
+     * The last labels of a web address written without "https://" or "www." (lower case): a
+     * host of three labels or more ending in one ("jobs.example.com/rust", "careers.acme.co.uk")
+     * is a link, not a keyword. A dotted name ending in another ("System.Text.Json",
+     * "org.springframework.boot") stays a keyword.
+     */
+    linkDomains: z._default(wordList("linkDomains"), [
+      "com",
+      "org",
+      "net",
+      "io",
+      "co",
+      "dev",
+      "ai",
+      "app",
+      "edu",
+      "gov",
+      "info",
+      "jobs",
+      "us",
+      "uk",
+      "ca",
+      "de",
+      "fr",
+      "in",
+      "au",
+      "eu",
+      "nl",
+    ]),
+    /**
      * Labels of a line that states a nationality, never a language: "Nationality: German",
      * "Staatsangehörigkeit: deutsch". Such a line is no evidence of speaking the language.
      */
