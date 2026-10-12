@@ -261,7 +261,9 @@ export const keywordMatchSchema = z
          * read without those words first, so their "no" and "not" are not its negation. What is
          * left `needsSponsorship` ("will require H-1B sponsorship") never shows the right to
          * work, and shows its absence where the posting rules sponsorship out (a line of the
-         * posting either list matches); what is left with a `negation` shows nothing.
+         * posting `noSponsorship` matches, or `needsSponsorship` with a `negation`: "Candidates
+         * requiring sponsorship will not be considered"); what is left with a `negation` shows
+         * nothing.
          */
         needsSponsorship: z._default(wordList("requirements.needsSponsorship"), [
           String.raw`(?:requires?|requiring|needs?|needing|will\s+(?:require|need))\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\s+){0,3}sponsorship`,

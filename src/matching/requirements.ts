@@ -252,7 +252,12 @@ function judgeAuthorization(
     const against = [...shown.filter(({ line }) => matchers.residence.test(line)), ...needing];
     return { status: against.length ? "missing" : "unverifiable", lines: against };
   }
-  const excludes = matchers.noSponsorship.test(ask) || matchers.needsSponsorship.test(ask);
+  // A posting rules sponsorship out ("without sponsorship"), or turns away who needs it
+  // ("Candidates requiring sponsorship will not be considered"); one offering it to who needs it
+  // ("We welcome applicants who require sponsorship") does not.
+  const excludes =
+    matchers.noSponsorship.test(ask) ||
+    (matchers.needsSponsorship.test(ask) && matchers.negation.test(ask));
   if (excludes && needing.length) return { status: "missing", lines: needing };
   return { status: shown.length ? "met" : "unverifiable", lines: shown };
 }

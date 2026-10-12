@@ -235,6 +235,22 @@ describe("the right to work, read for what the statement says", () => {
       authorized("Will require visa sponsorship", "This role is not eligible for work sponsorship")
         .status,
     ).toBe("missing");
+    expect(
+      authorized(
+        "Will require H-1B visa sponsorship",
+        "Candidates requiring sponsorship will not be considered",
+      ).status,
+    ).toBe("missing");
+  });
+
+  it.each([
+    "Visa sponsorship is available for candidates who need sponsorship",
+    "We welcome applicants who require sponsorship",
+  ])("is not missing where the posting offers sponsorship: %s", (ask) => {
+    expect(authorized("Will require H-1B visa sponsorship", ask)).toMatchObject({
+      kind: "authorization",
+      status: "unverifiable",
+    });
   });
 
   it.each([
