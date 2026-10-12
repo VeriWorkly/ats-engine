@@ -2941,9 +2941,22 @@
           },
           "injectionTargets": {
             "default": [
-              "(?:this|my)\\s+(?:candidate|applicant|resume|cv|profile|application)",
-              "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me",
-              "(?:respond|reply|answer|output)\\s+(?:only\\s+)?with\\s+[\"'“]?(?:yes|hire|qualified)"
+              "this\\s+(?:candidate|applicant|resume|cv|profile|application)",
+              "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "injectionVerdicts": {
+            "default": [
+              "(?:respond|reply|answer|output)\\s+(?:only\\s+)?with",
+              "\\d+\\s*/\\s*\\d+",
+              "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)",
+              "(?:this|my)\\s+(?:candidate|applicant|resume|cv|profile|application)"
             ],
             "minItems": 1,
             "type": "array",
@@ -7909,9 +7922,22 @@
           },
           "injectionTargets": {
             "default": [
-              "(?:this|my)\\s+(?:candidate|applicant|resume|cv|profile|application)",
-              "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me",
-              "(?:respond|reply|answer|output)\\s+(?:only\\s+)?with\\s+[\"'“]?(?:yes|hire|qualified)"
+              "this\\s+(?:candidate|applicant|resume|cv|profile|application)",
+              "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)\\s+me"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "injectionVerdicts": {
+            "default": [
+              "(?:respond|reply|answer|output)\\s+(?:only\\s+)?with",
+              "\\d+\\s*/\\s*\\d+",
+              "(?:rank|rate|score|grade|hire|shortlist|approve|select|advance|recommend)",
+              "(?:this|my)\\s+(?:candidate|applicant|resume|cv|profile|application)"
             ],
             "minItems": 1,
             "type": "array",
@@ -7946,6 +7972,7 @@
           "injectionPhrases",
           "injectionMentionVerbs",
           "injectionTargets",
+          "injectionVerdicts",
           "citationHeadings"
         ],
         "additionalProperties": false
