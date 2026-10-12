@@ -22,8 +22,11 @@ const BUDGETS = {
   // 99.4: the readings 0.4.0 got right restored (an employer with its state's code, a list under
   // a role, the name over its email, a duration over the dates), requirements read clause by
   // clause with the UK's clearance levels, and stricter injection and citation checks, took it to
-  // 99.32.
-  ".": 99.4,
+  // 99.32. 99.9: guards a review found those fixes needed (a city named in the contact
+  // details, an employer line over the roles, a sponsorship offered, a verdict in a quoted
+  // prompt, the web domains that end a link, a clearance not held past a semicolon) took it to
+  // 99.89, mostly policy data (`linkDomains`, `sponsorshipOffered`, `injectionVerdicts`).
+  ".": 99.9,
   "./document": 3,
   "./format": 1.5,
   // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
@@ -32,10 +35,12 @@ const BUDGETS = {
   // 70: zod/mini in place of zod took it from 141.1 to 67.5.
   // 70.9: the place names (see "."), and the German pack's for Germany, Austria, Switzerland and
   // the German states, took it from 68.5 to 70.8.
-  "./locales": 70.9,
+  // 71.1: the policy data this round's fixes added (see ".") took it to 71.00.
+  "./locales": 71.1,
   // 70: zod/mini in place of zod took it from 141.0 to 67.5.
   // 71.6: the policy's place names (see "."), with what else "." gained, took it from 69.3 to 71.5.
-  "./ai": 71.6,
+  // 71.8: the policy data and parsing this round's fixes added (see ".") took it to 71.75.
+  "./ai": 71.8,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,
