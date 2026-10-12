@@ -280,14 +280,16 @@ export const keywordMatchSchema = z
         /**
          * Words saying a posting offers sponsorship to who needs it ("Visa sponsorship is
          * available for candidates who need sponsorship", "We welcome applicants who require
-         * sponsorship"). Without one, a posting naming a need for sponsorship turns it away
-         * ("Candidates requiring sponsorship are ineligible").
+         * sponsorship"), read in the clause naming the need. Without one there, or with a
+         * `negation` in the line, a posting naming a need for sponsorship turns it away
+         * ("Candidates requiring sponsorship are ineligible; benefits available").
          */
         sponsorshipOffered: z._default(wordList("requirements.sponsorshipOffered"), [
           "available",
           "welcome",
           String.raw`provid(?:e|es|ed|ing)`,
-          String.raw`offer(?:s|ed|ing)?`,
+          // Not "offer" alone: "ineligible for offer".
+          String.raw`offer(?:s|ed|ing)`,
           String.raw`(?:will|can|may|do|does)\s+sponsor`,
         ]),
         /** Words that say a statement is not so: "Not authorized to work", "no active clearance". */

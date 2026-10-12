@@ -284,6 +284,16 @@ describe("the right to work, read for what the statement says", () => {
     "Applicants who require sponsorship will be disqualified",
     "Candidates needing sponsorship are excluded",
     "Applications requiring sponsorship will be rejected",
+    // An offer word elsewhere in the line is about something else.
+    "Candidates requiring sponsorship cannot be offered a position",
+    "Applicants requiring sponsorship will not be offered employment",
+    "Candidates requiring sponsorship are ineligible for offer",
+    "Candidates requiring sponsorship are ineligible; benefits available",
+    "Candidates requiring sponsorship are not eligible; relocation offered",
+    "Applicants requiring sponsorship need not apply; remote work available",
+    "Candidates requiring sponsorship are ineligible. Competitive salary offered",
+    "Candidates requiring sponsorship are not eligible (no exceptions available)",
+    "Candidates requiring sponsorship: we will not provide it",
   ])("is missing where the posting turns away who needs sponsorship: %s", (ask) => {
     expect(authorized("Will require H-1B visa sponsorship", ask).status).toBe("missing");
   });

@@ -320,12 +320,19 @@ function judgeAuthorization(
     ];
     return { status: against.length ? "missing" : "unverifiable", lines: against };
   }
-  // A posting rules sponsorship out ("without sponsorship"), or turns away who needs it
-  // ("Candidates requiring sponsorship are ineligible"); one offering it to who needs it ("We
-  // welcome applicants who require sponsorship") does not.
+  // A posting rules sponsorship out ("without sponsorship"), or turns away who needs it, with a
+  // negation ("will not be considered") or without offering it in the clause naming the need
+  // ("Candidates requiring sponsorship are ineligible; benefits available"); one offering it
+  // there ("We welcome applicants who require sponsorship") does not.
+  const offered = ask
+    .split(/[.;:,()]/u)
+    .some(
+      (clause) =>
+        matchers.needsSponsorship.test(clause) && matchers.sponsorshipOffered.test(clause),
+    );
   const excludes =
     matchers.noSponsorship.test(ask) ||
-    (matchers.needsSponsorship.test(ask) && !matchers.sponsorshipOffered.test(ask));
+    (matchers.needsSponsorship.test(ask) && (matchers.negation.test(ask) || !offered));
   if (excludes && needing.length) return { status: "missing", lines: needing };
   return {
     status: shown.length ? "met" : "unverifiable",

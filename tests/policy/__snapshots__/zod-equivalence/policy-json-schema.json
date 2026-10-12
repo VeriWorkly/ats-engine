@@ -1157,7 +1157,7 @@
                   "available",
                   "welcome",
                   "provid(?:e|es|ed|ing)",
-                  "offer(?:s|ed|ing)?",
+                  "offer(?:s|ed|ing)",
                   "(?:will|can|may|do|does)\\s+sponsor"
                 ],
                 "minItems": 1,
@@ -6113,7 +6113,7 @@
                   "available",
                   "welcome",
                   "provid(?:e|es|ed|ing)",
-                  "offer(?:s|ed|ing)?",
+                  "offer(?:s|ed|ing)",
                   "(?:will|can|may|do|does)\\s+sponsor"
                 ],
                 "minItems": 1,

@@ -539,7 +539,7 @@
         "available",
         "welcome",
         "provid(?:e|es|ed|ing)",
-        "offer(?:s|ed|ing)?",
+        "offer(?:s|ed|ing)",
         "(?:will|can|may|do|does)\\s+sponsor"
       ],
       "negation": [
