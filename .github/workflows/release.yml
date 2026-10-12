@@ -43,8 +43,10 @@ jobs:
           publish-script: npm run release
       # The same engine version on GitHub's registry, so it is listed under the repository's
       # Packages. With two packages in the workspace, changesets tags each release as
-      # "<name>@<version>", and a release may publish the MCP server alone.
-      - if: steps.changesets.outputs.published == 'true'
+      # "<name>@<version>", and a release may publish the MCP server alone. This step and the
+      # next run when the changesets step failed too: it sets its outputs and then fails when one
+      # package does not publish, and the other may already be on npm.
+      - if: ${{ !cancelled() && steps.changesets.outputs.published == 'true' }}
         run: |
           version=$(jq -r '.[] | select(.name == "@veriworkly/ats-engine") | .version' <<< "$PUBLISHED")
           if [ -n "$version" ]; then
@@ -58,7 +60,7 @@ jobs:
       # io.github.VeriWorkly/*, so no secret is needed. The publisher is pinned by version and hash.
       # npm can take minutes to serve a version it has just published, so the listing is tried
       # again, after a longer wait each time, before the step fails.
-      - if: steps.changesets.outputs.published == 'true'
+      - if: ${{ !cancelled() && steps.changesets.outputs.published == 'true' }}
         working-directory: packages/mcp
         run: |
           version=$(jq -r '.[] | select(.name == "@veriworkly/ats-engine-mcp") | .version' <<< "$PUBLISHED")
