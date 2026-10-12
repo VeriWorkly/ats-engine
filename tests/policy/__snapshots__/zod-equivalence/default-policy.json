@@ -1277,6 +1277,13 @@
         "(?:cannot|unable\\s+to)\\s+(?:(?:offer|provide)\\s+)?(?:visa\\s+)?sponsor(?:ship)?",
         "sponsorship\\s+(?:is\\s+)?not\\s+(?:required|needed|available|offered|provided)"
       ],
+      "sponsorshipOffered": [
+        "available",
+        "welcome",
+        "provid(?:e|es|ed|ing)",
+        "offer(?:s|ed|ing)?",
+        "(?:will|can|may|do|does)\\s+sponsor"
+      ],
       "negation": [
         "not",
         "no",

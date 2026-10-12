@@ -1152,6 +1152,21 @@
                   "minLength": 1
                 }
               },
+              "sponsorshipOffered": {
+                "default": [
+                  "available",
+                  "welcome",
+                  "provid(?:e|es|ed|ing)",
+                  "offer(?:s|ed|ing)?",
+                  "(?:will|can|may|do|does)\\s+sponsor"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
               "negation": {
                 "default": [
                   "not",
@@ -6062,6 +6077,21 @@
                   "minLength": 1
                 }
               },
+              "sponsorshipOffered": {
+                "default": [
+                  "available",
+                  "welcome",
+                  "provid(?:e|es|ed|ing)",
+                  "offer(?:s|ed|ing)?",
+                  "(?:will|can|may|do|does)\\s+sponsor"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
               "negation": {
                 "default": [
                   "not",
@@ -6293,6 +6323,7 @@
               "authorization",
               "needsSponsorship",
               "noSponsorship",
+              "sponsorshipOffered",
               "negation",
               "notHeld",
               "citizenship",

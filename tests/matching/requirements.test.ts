@@ -265,8 +265,19 @@ describe("the right to work, read for what the statement says", () => {
   });
 
   it.each([
+    "Candidates requiring sponsorship are ineligible",
+    "Applicants who require sponsorship will be disqualified",
+    "Candidates needing sponsorship are excluded",
+    "Applications requiring sponsorship will be rejected",
+  ])("is missing where the posting turns away who needs sponsorship: %s", (ask) => {
+    expect(authorized("Will require H-1B visa sponsorship", ask).status).toBe("missing");
+  });
+
+  it.each([
     "Visa sponsorship is available for candidates who need sponsorship",
     "We welcome applicants who require sponsorship",
+    "We will sponsor candidates who need sponsorship",
+    "Sponsorship provided for those who need sponsorship",
   ])("is not missing where the posting offers sponsorship: %s", (ask) => {
     expect(authorized("Will require H-1B visa sponsorship", ask)).toMatchObject({
       kind: "authorization",

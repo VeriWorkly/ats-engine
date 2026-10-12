@@ -261,9 +261,9 @@ export const keywordMatchSchema = z
          * read without those words first, so their "no" and "not" are not its negation. What is
          * left `needsSponsorship` ("will require H-1B sponsorship") never shows the right to
          * work, and shows its absence where the posting rules sponsorship out (a line of the
-         * posting `noSponsorship` matches, or `needsSponsorship` with a `negation`: "Candidates
-         * requiring sponsorship will not be considered"); what is left with a `negation` shows
-         * nothing.
+         * posting `noSponsorship` matches, or `needsSponsorship` without `sponsorshipOffered`:
+         * "Candidates requiring sponsorship are ineligible"); what is left with a `negation`
+         * shows nothing.
          */
         needsSponsorship: z._default(wordList("requirements.needsSponsorship"), [
           String.raw`(?:requires?|requiring|needs?|needing|will\s+(?:require|need))\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\s+){0,3}sponsorship`,
@@ -276,6 +276,19 @@ export const keywordMatchSchema = z
           String.raw`(?:not|never|\p{L}+n['’]t)\s+(?:(?:currently|presently|now|ever|be|been|eligible|for|offer\p{L}*|provid\p{L}*|requir\p{L}*|need\p{L}*|an?|any|h-?1b|visa|work|employment|immigration|future)\s+){0,4}sponsor(?:ship)?`,
           String.raw`(?:cannot|unable\s+to)\s+(?:(?:offer|provide)\s+)?(?:visa\s+)?sponsor(?:ship)?`,
           String.raw`sponsorship\s+(?:is\s+)?not\s+(?:required|needed|available|offered|provided)`,
+        ]),
+        /**
+         * Words saying a posting offers sponsorship to who needs it ("Visa sponsorship is
+         * available for candidates who need sponsorship", "We welcome applicants who require
+         * sponsorship"). Without one, a posting naming a need for sponsorship turns it away
+         * ("Candidates requiring sponsorship are ineligible").
+         */
+        sponsorshipOffered: z._default(wordList("requirements.sponsorshipOffered"), [
+          "available",
+          "welcome",
+          String.raw`provid(?:e|es|ed|ing)`,
+          String.raw`offer(?:s|ed|ing)?`,
+          String.raw`(?:will|can|may|do|does)\s+sponsor`,
         ]),
         /** Words that say a statement is not so: "Not authorized to work", "no active clearance". */
         negation: z._default(wordList("requirements.negation"), [

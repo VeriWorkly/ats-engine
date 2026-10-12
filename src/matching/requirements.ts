@@ -125,6 +125,7 @@ type Matchers = {
   authorization: RegExp;
   needsSponsorship: RegExp;
   noSponsorship: RegExp;
+  sponsorshipOffered: RegExp;
   /** The same, global: blanked out to read what else a line says. */
   noSponsorshipAll: RegExp;
   negation: RegExp;
@@ -165,6 +166,8 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     authorization: wordListRegex(r.authorization),
     needsSponsorship: wordListRegex(r.needsSponsorship),
     noSponsorship: wordListRegex(r.noSponsorship),
+    // Defaulted by the schema; a policy object built by hand, unparsed, may not have it.
+    sponsorshipOffered: wordListRegex(r.sponsorshipOffered ?? ["(?!)"]),
     noSponsorshipAll: wordListRegex(r.noSponsorship, "gi"),
     negation: wordListRegex(r.negation),
     notHeld: wordListRegex(r.notHeld),
@@ -310,11 +313,11 @@ function judgeAuthorization(
     return { status: against.length ? "missing" : "unverifiable", lines: against };
   }
   // A posting rules sponsorship out ("without sponsorship"), or turns away who needs it
-  // ("Candidates requiring sponsorship will not be considered"); one offering it to who needs it
-  // ("We welcome applicants who require sponsorship") does not.
+  // ("Candidates requiring sponsorship are ineligible"); one offering it to who needs it ("We
+  // welcome applicants who require sponsorship") does not.
   const excludes =
     matchers.noSponsorship.test(ask) ||
-    (matchers.needsSponsorship.test(ask) && matchers.negation.test(ask));
+    (matchers.needsSponsorship.test(ask) && !matchers.sponsorshipOffered.test(ask));
   if (excludes && needing.length) return { status: "missing", lines: needing };
   return {
     status: shown.length ? "met" : "unverifiable",
