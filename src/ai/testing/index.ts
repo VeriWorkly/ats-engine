@@ -113,7 +113,8 @@ function statedMonths(source: string): Set<string> {
     stated.add(`${year ?? yearAfter}-${Number(month ?? monthFirst)}`);
   const names = namesOfMonths();
   const named = new RegExp(
-    String.raw`(?<!\p{L})(${names.join("|")})\p{L}*\.?\s*,?\s*(\d{4})(?!\d)`,
+    // `\s*(?:,\s*)?`, not `\s*,?\s*`: two adjacent `\s*` split a run of spaces every way.
+    String.raw`(?<!\p{L})(${names.join("|")})\p{L}*\.?\s*(?:,\s*)?(\d{4})(?!\d)`,
     "giu",
   );
   for (const [, name, year] of source.matchAll(named))
