@@ -179,6 +179,22 @@ describe("the name when a sidebar is read first", () => {
     expect(parsed.skills).not.toContain("Jane Doe");
   });
 
+  it("does not take a reference over the reference's email for the name", () => {
+    const text = [
+      "SKILLS",
+      "Python",
+      "Go",
+      "REFERENCES",
+      "John Smith",
+      "john@acme.com",
+      "Jane Doe",
+      "Software Engineer",
+      "EXPERIENCE",
+      "Software Engineer, Acme Corp    2019 – 2022",
+    ].join("\n");
+    expect(name(text)).toBe("Jane Doe");
+  });
+
   it("keeps the certifications under the name's list heading", () => {
     const { parsed } = AtsScoringService.check(
       listFirst("SKILLS\nPython", "CERTIFICATIONS\nAWS Certified\nSolutions Architect"),

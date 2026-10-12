@@ -268,19 +268,24 @@ export function findName(
   let onlyHeadingsAbove = true;
   let place = "";
   let listed = false;
+  // The kind of the last heading: a name over an email is the name under a list ("SKILLS"), not
+  // under "REFERENCES", where it is a referee's.
+  let under: string | null = null;
   let row = "";
   for (const [index, line] of trimmed.slice(0, 6).entries()) {
     // The work history is never the header block, whatever is missing above it.
     const kind = sectionKind(line, policy);
     if (kind === "experience") break;
     listed ||= kind !== null && kind !== "other";
+    under = kind ?? under;
     const firstLine = onlyHeadingsAbove;
     onlyHeadingsAbove &&= titles.test(line) || isSectionHeading(line, policy);
     const found = nameIn(line, index, firstLine);
     if (!found) continue;
     if (found.place) place ||= found.name;
     else if (!listed) return { name: found.name, headlined: false };
-    else if (EMAIL.test(trimmed[index + 1] ?? "")) return { name: found.name, headlined: true };
+    else if (under !== "other" && EMAIL.test(trimmed[index + 1] ?? ""))
+      return { name: found.name, headlined: true };
     else row ||= found.name;
   }
   const over = headlined();
