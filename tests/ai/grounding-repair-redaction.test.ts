@@ -199,6 +199,28 @@ describe("redaction variants", () => {
     );
   });
 
+  it.each([
+    "zoë.müller@firma.de",
+    "josé.garcía@empresa.es",
+    "o'connor.pat@example.com",
+    "o’connor.pat@example.com",
+  ])("redacts an email with letters beyond ASCII or an apostrophe whole: %s", (email) => {
+    const redaction = createRedaction(parsed("Jane Doe"), `Mail ${email} today`);
+    expect(redaction.apply(`Mail ${email} today`)).toBe("Mail [EMAIL_2] today");
+  });
+
+  it("redacts the candidate's own email whole when it holds the name's letters", () => {
+    const source = "José García\njosé.garcía@correo.es | +34 612 345 678";
+    const { parsed: read } = AtsScoringService.check(source, DEFAULT_POLICY);
+    expect(read.email).toBe("josé.garcía@correo.es");
+    expect(createRedaction(read, source).apply(source)).not.toContain("correo");
+  });
+
+  it("leaves a quote before an email outside it", () => {
+    const redaction = createRedaction(parsed("Jane Doe"), "Mail 'pat@example.com'");
+    expect(redaction.apply("Mail 'pat@example.com'")).toBe("Mail '[EMAIL_2]'");
+  });
+
   it("reads a country code from where it is written, so part of the number is not a number", () => {
     const redaction = createRedaction(parsed("Jane Doe", "+1 415 555 0132"), "");
     expect(redaction.apply("Order 55550132 and 155550132")).toBe("Order 55550132 and 155550132");

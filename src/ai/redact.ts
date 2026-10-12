@@ -31,10 +31,12 @@ export type Redaction = {
 
 /**
  * Any email address: the parser's own grammar (`EMAIL`), with a domain in any script
- * ("jane@exämple.de"), which an ATS need not read but a provider would. Bounded as `EMAIL` is.
+ * ("jane@exämple.de"), which an ATS need not read but a provider would. Bounded as `EMAIL` is,
+ * and with its local part: letters in any script and an apostrophe ("zoë.müller@firma.de",
+ * "o'connor.pat@example.com"), so no part of one is sent.
  */
 const EMAILS =
-  /(?<![A-Z0-9._%+-])[A-Z0-9._%+-]{1,64}@[\p{L}\p{N}-]{1,63}(?:\.[\p{L}\p{N}-]{1,63}){0,8}\.\p{L}{2,24}(?![\p{L}\p{N}_])/giu;
+  /(?<![\p{L}\p{M}\p{N}._%+-]|[\p{L}\p{M}\p{N}]['’])[\p{L}\p{M}\p{N}._%+-][\p{L}\p{M}\p{N}._%+'’-]{0,63}@[\p{L}\p{N}-]{1,63}(?:\.[\p{L}\p{N}-]{1,63}){0,8}\.\p{L}{2,24}(?![\p{L}\p{N}_])/giu;
 
 /**
  * A web address with or without a scheme: "janedoe.dev", "x.com/janedoe", "https://…".

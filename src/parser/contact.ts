@@ -24,9 +24,14 @@ import { memo } from "../util/memo.js";
  * every position of a long run like "a.a.a.…", which is quadratic: a 50k-character input took
  * over a second per call, and a scan evaluates this pattern about nine times. The lookbehind
  * anchors a match to the start of a local-part run, and the lengths are RFC 5321's own limits.
+ *
+ * The local part may hold letters in any script and an apostrophe ("josé.garcía@correo.es",
+ * "o'connor.pat@example.com"), as mail servers take them; not an apostrophe first, which is a
+ * quote ("'pat@example.com'"). One after a letter belongs to the run, so a match never starts
+ * inside it.
  */
 export const EMAIL =
-  /(?<![A-Z0-9._%+-])[A-Z0-9._%+-]{1,64}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/i;
+  /(?<![\p{L}\p{M}\p{N}._%+-]|[\p{L}\p{M}\p{N}]['’])[\p{L}\p{M}\p{N}._%+-][\p{L}\p{M}\p{N}._%+'’-]{0,63}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/iu;
 /**
  * A web address: with a scheme or "www.", a profile on a site resumes link to without either
  * ("dribbble.com/jane", "orcid.org/0000-…"), or a personal site on `.dev`, a top-level domain
