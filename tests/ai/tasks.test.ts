@@ -146,6 +146,21 @@ describe("analyze", () => {
     expect(sent).not.toMatch(half);
     expect(sent).not.toMatch(/\[[A-Z_0-9]*$/); // nor half a placeholder
   });
+
+  it("sends nothing from past the cut that redaction pulled in", async () => {
+    // Redaction shrinks every long email to "[EMAIL_n]", over a thousand characters in all, so
+    // the 50,000 characters sent reached past the 51,000th of the resume, where the phone starts.
+    const email = "jane.doe.portfolio.contact@janedoe-consulting.example.com";
+    const head = `${RESUME}\n${`Reach me at ${email}\n`.repeat(25)}`;
+    const text = `${head}${"x".repeat(51_000 - head.length - 7)} (415) 555-0199 and more`;
+    const provider = scriptedProvider(insights());
+    const ai = createAtsAi({ provider, routes });
+    await ai.analyze({ resumeText: text, report: report() });
+    const sent = userMessage(provider).resume;
+    expect(sent.length).toBeLessThanOrEqual(50_000);
+    expect(sent).not.toMatch(/415|555/);
+    expect(sent).not.toContain("and more");
+  });
 });
 
 describe("redaction", () => {

@@ -121,14 +121,16 @@ export function analyzeSpec(
   const job = input.jobDescription?.trim().slice(0, MAX_JOB_CHARS) ?? "";
   // Redacted before it is cut, with room past the cut, so a phone or an email the cut falls in
   // is replaced whole rather than sent in part ("+1 (415) 555-01"); a placeholder the cut falls
-  // in goes.
+  // in goes. Cut where the resume's own cut falls once redacted: redaction shrinks the text, and
+  // 50,000 characters of it reached past that, to the end of the room, where a phone cut in two
+  // was not redacted.
   const read = input.resumeText.slice(0, MAX_RESUME_CHARS + CUT_MARGIN);
   const resume = read.slice(0, MAX_RESUME_CHARS);
   const redaction = redact ? createRedaction(input.report.parsed, read) : null;
   const hide = <T>(value: T) => (redaction ? redaction.apply(value) : value);
   const sent = redaction
     ? hide(read)
-        .slice(0, MAX_RESUME_CHARS)
+        .slice(0, Math.min(MAX_RESUME_CHARS, hide(resume).length))
         .replace(/\[[A-Z_0-9]*$/, "")
     : resume;
 
