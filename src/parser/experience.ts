@@ -13,6 +13,8 @@ type HeaderMatchers = {
   strong: RegExp;
   /** A separator that is one of the words joining a title to its employer ("at", "bei"). */
   employerWord: RegExp;
+  /** The same word, or "@", anywhere between words: "Analyst at Deloitte". */
+  joined: RegExp;
   /** A school's word: "University", "College", "Institute". */
   school: RegExp;
   /** A word naming an organisation: a school's, a legal form ("Inc"), a kind ("Hospital"). */
@@ -43,6 +45,7 @@ const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatc
     separators: new RegExp(String.raw`${strong}|,\s+`, "giu"),
     strong: new RegExp(strong, "giu"),
     employerWord: new RegExp(String.raw`^\s+${wordListPattern(rp.employerWords)}\s+$`, "iu"),
+    joined: new RegExp(String.raw`\s(?:${wordListPattern(rp.employerWords)}|@)\s`, "iu"),
     school: wordListRegex(rp.schoolWords),
     organisation: wordListRegex(organisations),
     organisations: wordListRegex(organisations, "gi"),
@@ -88,13 +91,15 @@ export function isPlace(line: string, policy: AtsEnginePolicy, named = true) {
   if (parts.length === 0) return false;
   if (parts.every(where)) return true;
   // "City, ST", "City, State" or "City, Country", then perhaps more of where. A first part
-  // ending in a legal form is an employer ("Acme Corp, TX"), and one naming an organisation or
-  // holding a job title before a name is not a city ("Software Engineer, India").
-  const { titleWords, organisation } = matchersOf(policy);
+  // ending in a legal form is an employer ("Acme Corp, TX"), one holding a job title or the
+  // word joining a title to its employer is not a city ("Software Engineer, India", "Analyst at
+  // Deloitte, NY"), and one naming an organisation is not a city before a name.
+  const { titleWords, organisation, joined } = matchersOf(policy);
   return (
     parts.length >= 2 &&
-    (code.test(parts[1]) ||
-      (isName(parts[1]) && !titleWords.test(parts[0]) && !organisation.test(parts[0]))) &&
+    !titleWords.test(parts[0]) &&
+    !joined.test(parts[0]) &&
+    (code.test(parts[1]) || (isName(parts[1]) && !organisation.test(parts[0]))) &&
     parts.slice(2).every(where) &&
     parts[0].split(/\s+/).length <= 3 &&
     !company.test(parts[0])
@@ -171,9 +176,16 @@ function headerParts(header: string, policy: AtsEnginePolicy) {
  * Engineering, Acme Corp"). An organisation is named by its legal form ("Inc", "GmbH") or its
  * kind ("Hospital", "University"): without one, "Software Engineer, Acme | Berlin" is a title,
  * an employer and where.
+ *
+ * A city of one or two words and its state's code ("Austin, TX") is where, unless "at" parts it
+ * from the title ("Analyst at Deloitte, NY") or a bar parts the code from it ("Engineer | Intel |
+ * OR"): then its first part is the employer. With commas only, "Software Engineer, Google, CA"
+ * is not told from "Senior Engineer, Austin, TX"; `guess` takes the first part then too. A bar
+ * or a dash before it ("Senior Engineer | Austin, TX") still makes it where.
  */
-export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
-  const { titleWords, organisation, organisations, strong, department } = matchersOf(policy);
+export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy, guess = false) {
+  const { titleWords, organisation, organisations, strong, department, joined } =
+    matchersOf(policy);
   const connector = headingConnector(policy.resumeParse);
   const isDepartment = (part: string) =>
     part.split(" ").every((word) => department.test(word) || connector.test(word));
@@ -182,6 +194,10 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
     .map((segment) => headerParts(segment, policy))
     .filter((segment) => segment.length);
   const parts = segments.flat();
+  const sure =
+    joined.test(header) ||
+    (segments.length > 2 && segments.at(-1)!.length === 1) ||
+    (guess && segments.length === 1);
 
   if (parts.length === 0) return { title: "", employer: "" };
   if (parts.length === 1) return { title: parts[0], employer: "" };
@@ -228,12 +244,13 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
   if (end !== -1)
     return {
       title: parts.slice(titleIndex, end).join(", "),
-      employer: withoutPlace([...parts.slice(0, titleIndex), ...parts.slice(end)], policy),
+      employer: withoutPlace([...parts.slice(0, titleIndex), ...parts.slice(end)], policy, sure),
     };
 
   const employer = withoutPlace(
     parts.filter((_, index) => index !== titleIndex),
     policy,
+    sure,
   );
   return { title: parts[titleIndex], employer };
 }
@@ -242,26 +259,28 @@ export function splitTitleAndEmployer(header: string, policy: AtsEnginePolicy) {
  * The employer's parts, joined, without where the role is worked after them: "Acme, San
  * Francisco, CA" is Acme, "Acme, Remote" is Acme, and so are "Acme, Berlin, Germany" and "Acme,
  * Bengaluru, Karnataka, India". Only "City, ST", the policy's countries and states, and workplace
- * words are places (see `isPlace`); "Acme, Berlin" keeps its city. A workplace word alone
- * ("Remote") or a city of one or two words and its state's code ("Austin, TX") names no
- * employer, so there is none; a longer one may be an employer run into its city ("Oakmont Foods
- * Portland, OR"), and is kept, as is one ending in a legal form ("Acme Corp, TX" is Acme Corp).
+ * words are places (see `isPlace`); "Acme, Berlin" keeps its city. A workplace word or a state's
+ * code alone ("Remote") names no employer, so there is none. Nor, unless `sure`, does a city of
+ * one or two words and its state's code ("Austin, TX"); when sure, it is an employer and where
+ * ("Deloitte, NY" after "Analyst at"), and the employer is kept. A longer one may be an employer
+ * run into its city ("Oakmont Foods Portland, OR"), and is kept, as is one ending in a legal form
+ * ("Acme Corp, TX" is Acme Corp).
  * A country or a state named in full goes, and the city before it when a part is left before
  * that: "Infosys, India" is Infosys. A place in brackets after the name ("Netflix (Remote)")
  * goes too.
  */
-function withoutPlace(parts: string[], policy: AtsEnginePolicy): string {
+function withoutPlace(parts: string[], policy: AtsEnginePolicy, sure: boolean): string {
   const { code, workplace, name, company } = placesOf(policy.resumeParse);
   const coded = (part: string) => code.test(part.replace(/\s\d{5}(?:-\d{4})?$/u, ""));
   const short = (part: string) => part.split(/\s+/).length <= 3 && !company.test(part);
+  if (parts.length === 1 && (workplace.test(parts[0]!) || coded(parts[0]!))) return "";
   if (
-    (parts.length === 1 && workplace.test(parts[0]!)) ||
-    (parts.length === 2 &&
-      coded(parts[1]!) &&
-      parts[0]!.split(/\s+/).length <= 2 &&
-      !company.test(parts[0]!))
+    parts.length === 2 &&
+    coded(parts[1]!) &&
+    parts[0]!.split(/\s+/).length <= 2 &&
+    !company.test(parts[0]!)
   )
-    return "";
+    return sure ? parts[0]! : "";
   let end = parts.length;
   while (end > 1 && workplace.test(parts[end - 1]!)) end -= 1;
   const named = end;
@@ -439,7 +458,12 @@ export function parseRoles(
       isPlace(lines[at]!, policy, false) ||
       (isPlace(lines[at]!, policy) && (!isSingle(lines[at - 1]!) || stacked(at - 1)));
     let dates = index;
+    // Under a title alone, "Austin, TX" is not told from "Google, CA": its first part is the
+    // employer when no other line names one.
+    let near = "";
     if (!header && free(index - 1) && free(index - 2) && where(index - 1)) {
+      if (titled(index - 2) && isSingle(lines[index - 2]!))
+        near = withoutPlace(headerParts(lines[index - 1]!, policy), policy, true);
       take(index - 1);
       dates = index - 1;
     }
@@ -481,7 +505,7 @@ export function parseRoles(
       ) {
         employer = headerParts(take(above), policy)[0] ?? "";
         group = employer;
-      } else employer = group;
+      } else employer = group || near || splitTitleAndEmployer(header, policy, true).employer;
     } else if (employer) {
       // Stacked with the employer over the title, it heads a group too.
       group = top === index - 2 && employer === headerParts(lines[top], policy)[0] ? employer : "";

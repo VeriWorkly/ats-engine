@@ -95,12 +95,21 @@ describe("a city and state beside the dates", () => {
   });
 
   it.each([
-    [["Senior Engineer", "Austin, TX", "Jan 2020 - Present"]],
     [["Senior Engineer\tJan 2020 - Present", "Austin, TX"]],
-    [["Senior Engineer, Austin, TX\tJan 2020 - Present"]],
     [["Senior Engineer, Remote\tJan 2020 - Present"]],
   ])("is not taken for the employer when none is named, in %j", (block) => {
     expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer: "" }]);
+  });
+
+  // "Austin, TX" over the dates, or after the title's comma, has the shape of "Google, CA": with
+  // no employer named elsewhere, its first part is the employer, as "Infosys, India"'s is.
+  it.each([
+    [["Senior Engineer", "Austin, TX", "Jan 2020 - Present"], "Austin"],
+    [["Senior Engineer, Austin, TX\tJan 2020 - Present"], "Austin"],
+    [["Acme Corp", "Senior Engineer, Austin, TX\tJan 2020 - Present"], "Acme Corp"],
+    [["Acme Corp", "Senior Engineer", "Austin, TX", "Jan 2020 - Present"], "Acme Corp"],
+  ])("is not told from an employer with its state's code in %j", (block, employer) => {
+    expect(rolesIn(...block)).toEqual([{ title: "Senior Engineer", employer }]);
   });
 
   it.each([
@@ -116,6 +125,19 @@ describe("a city and state beside the dates", () => {
   ])("still leaves the employer of %j", (header, employer) => {
     const line = header.includes("2020") ? header : `${header}\tJan 2020 - Present`;
     expect(rolesIn(line)[0]?.employer).toBe(employer);
+  });
+});
+
+describe("an employer with its state's code", () => {
+  it.each([
+    [["Analyst at Deloitte, NY\tJan 2020 - Present"], "Analyst", "Deloitte"],
+    [["Nurse at Kaiser, CA\tJan 2020 - Present"], "Nurse", "Kaiser"],
+    [["Engineer | Intel | OR\tJan 2020 - Present"], "Engineer", "Intel"],
+    [["Software Engineer, Google, CA\tJan 2020 - Present"], "Software Engineer", "Google"],
+    [["Data Analyst, Capital One, VA\tJan 2020 - Present"], "Data Analyst", "Capital One"],
+    [["Software Engineer", "Google, CA", "Jan 2020 - Present"], "Software Engineer", "Google"],
+  ])("keeps the title and the employer of %j", (block, title, employer) => {
+    expect(rolesIn(...block)).toEqual([{ title, employer }]);
   });
 });
 
