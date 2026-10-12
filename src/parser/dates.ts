@@ -118,7 +118,7 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
  * back as those two digits, for `findDateRange` to place; on its own it is no plausible year.
  * A season is read as its first month at the start of a range and its last at the end.
  */
-export function parseDate(
+function parseDate(
   raw: string,
   rp: AtsEnginePolicy["resumeParse"],
   edge: "start" | "end" = "start",

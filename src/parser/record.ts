@@ -8,7 +8,7 @@ export type ParsedCore = Omit<
   "monthsOfExperience" | "highestIsced" | "highestDegree" | "provenance"
 >;
 
-export const PARSED_FIELDS: readonly AtsParsedField[] = [
+const PARSED_FIELDS: readonly AtsParsedField[] = [
   "name",
   "email",
   "phone",

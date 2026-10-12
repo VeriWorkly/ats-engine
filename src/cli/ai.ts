@@ -54,7 +54,7 @@ export const PROVIDERS: Readonly<Record<string, Preset>> = {
   "openai-compatible": { adapter: "openai-compatible" },
 };
 
-export const PROVIDER_NAMES = Object.keys(PROVIDERS);
+const PROVIDER_NAMES = Object.keys(PROVIDERS);
 
 /** Output budget when none is given. Thinking models spend part of it before they answer. */
 export const DEFAULT_MAX_TOKENS = 8_000;
@@ -177,7 +177,7 @@ export function resolveAiConfig(flags: AiFlags, env: Env): AiConfig {
   };
 }
 
-export function createProvider(config: AiConfig, fetch?: FetchLike): LlmProvider {
+function createProvider(config: AiConfig, fetch?: FetchLike): LlmProvider {
   const options = {
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
