@@ -173,6 +173,26 @@ describe("experience and skills headings beyond software's", () => {
   it("still opens a section at a heading set as the page's others are, over dated lines", () => {
     const parsed = underRole("PROJECTS\nLedger Rewrite\tJan 2018 - Dec 2018");
     expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+    // Over bullets, then a dated project with no job title.
+    const listed = underRole("SIDE PROJECTS\n- Built a chat bot\nChat Bot\tJan 2018 - Dec 2018");
+    expect(listed.roles.map((role) => role.employer)).toEqual(["Acme Corp"]);
+  });
+
+  it.each([
+    "KEY PROJECTS\n- Ledger rewrite",
+    "SELECTED PROJECTS\n- Ledger rewrite",
+    "TECH STACK\n- Python, AWS",
+  ])("keeps %j, set as the page's headings, inside the role over the next role", (sub) => {
+    const parsed = underRole(sub);
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp", "Globex Inc"]);
+    expect(parsed.skills.join(" ")).not.toContain("Globex");
+  });
+
+  it("keeps Key Projects inside the role on a page of headings in title case", () => {
+    const parsed = parse(
+      "Jane Doe\nExperience\nSenior Engineer, Acme Corp\tJan 2020 - Present\n- Led platform work\nKey Projects\n- Payment gateway\nSoftware Engineer, Globex Inc\tJan 2017 - Dec 2019\n- Built APIs\nEducation\nBSc Computer Science, MIT\t2013 - 2017\nSkills\nPython, Go",
+    );
+    expect(parsed.roles.map((role) => role.employer)).toEqual(["Acme Corp", "Globex Inc"]);
   });
 
   const skillsOf = (lines: string) =>
