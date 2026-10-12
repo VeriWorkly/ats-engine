@@ -185,9 +185,9 @@ function listItems(line: string): string[] | null {
  *   Not on a sentence — words in lower case and a stopword among them — that names other things
  *   more: a data engineer says "data" in most bullets, often twice in one, and on a 200-word
  *   resume that is still the job. A bare run of terms ("Kubernetes Terraform Kafka …") is no
- *   sentence. Nor on a list of works' citations (`cited`), and never for a word of the
- *   candidate's `name`, which an academic's publications repeat by right. The checks below
- *   still read both.
+ *   sentence. Nor on a list of works' citations (`cited`: two signs of one, not a year alone),
+ *   and never for a word of the candidate's `name`, which an academic's publications repeat by
+ *   right. The checks below still read both.
  * - A line that is not a list and repeats one term five times or more, as 30% of its words.
  * - A list item named three times or more within one line, or across the undated, unlabelled
  *   lists of a skills section, as a skills block padded with the same skills is. Each role
@@ -206,7 +206,7 @@ export function stuffedTerms(
   policy: AtsEnginePolicy,
   now: Date,
   name = "",
-  /** The resume's citations (`citationLines`). */
+  /** The resume's citations (`fullCitations` of `citationLines`). */
   cited: ReadonlySet<string> = new Set(),
 ): Finding {
   const stopwords = new Set(policy.keywordMatch.stopwords);

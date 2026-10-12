@@ -319,6 +319,28 @@ ${Array.from(
     expect(stuffing(`${SALES}\n${heading}\n${lines}`)).toMatchObject({ passed: false });
   });
 
+  it("still flags a term on line after line under a publications heading, each with a year", () => {
+    const words = ["alpha", "beta", "gamma", "delta", "omega", "sigma"];
+    const lines = Array.from(
+      { length: 40 },
+      (_, i) => `Kubernetes ${words[i % 6]} project ${2000 + (i % 25)}`,
+    );
+    const found = stuffing(`${SALES}\nPublications\n${lines.join("\n")}`);
+    expect(found).toMatchObject({ passed: false });
+    expect(found?.evidence).toContain("kubernetes ×40");
+  });
+
+  it("does not flag the journal an academic's publications name, written in the APA style", () => {
+    const apa = Array.from(
+      { length: 30 },
+      (_, i) =>
+        `- Kovalenko, O., & ${["Marsh, T.", "Iyer, P.", "Becker, L."][i % 3]} (${2008 + (i % 17)}). ${topics[i % 3]} ${objects[(i + 1) % 3]}. Inorganic Chemistry, ${20 + i}, ${100 + i * 13}.`,
+    );
+    const resume = ACADEMIC.replace(/Publications[\s\S]*$/, `Publications\n${apa.join("\n")}`);
+    expect(stuffing(resume)).toMatchObject({ passed: true });
+    expect(rule(check(resume), "content.verbs")).toMatchObject({ passed: true });
+  });
+
   it("still flags a line repeating a word of the candidate's name", () => {
     const resume = SALES.replace("Priya Raman", "Priya Kubernetes");
     expect(stuffing(`${resume}\n${"Kubernetes ".repeat(6)}`)).toMatchObject({ passed: false });
