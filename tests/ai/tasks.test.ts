@@ -161,6 +161,18 @@ describe("analyze", () => {
     expect(sent).not.toMatch(/415|555/);
     expect(sent).not.toContain("and more");
   });
+
+  it("sends nothing past the cut when a long email the cut falls in shrinks to its placeholder", async () => {
+    const email = "jane.doe.portfolio.contact@janedoe-consulting.example.com";
+    const head = `${RESUME}\n${"x".repeat(50_000 - RESUME.length - 1 - 40)} `;
+    const text = `${head}${email} past the cut`;
+    const provider = scriptedProvider(insights());
+    const ai = createAtsAi({ provider, routes });
+    await ai.analyze({ resumeText: text, report: report() });
+    const sent = userMessage(provider).resume;
+    expect(sent).not.toContain("past");
+    expect(sent).not.toMatch(/janedoe|\[[A-Z_0-9]*$/);
+  });
 });
 
 describe("redaction", () => {

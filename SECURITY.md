@@ -82,7 +82,7 @@ What does not depend on the model:
   extension after it; not other phone numbers. Postal addresses are not recognised. The report's
   `advice` is not sent: it quotes the file name, which can hold the name in a form redaction
   cannot know (`Jane_Doe_Resume.pdf`). The resume is cut after redaction, where its 50 000th
-  character falls, so nothing past it is sent. Parse repair and conversion must see contact details and do not redact.
+  character falls, or before a contact detail the cut falls in, so nothing past it is sent. Parse repair and conversion must see contact details and do not redact.
 - The deterministic integrity rules flag instructions aimed at an AI screener inside the resume,
   including text smuggled in Unicode tag characters or PDF metadata. A phrase in quotes or
   backticks within three words of a word that says it was caught (`text.injectionMentionVerbs`:
