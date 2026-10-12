@@ -92,14 +92,16 @@ export function isPlace(line: string, policy: AtsEnginePolicy, named = true) {
   if (parts.every(where)) return true;
   // "City, ST", "City, State" or "City, Country", then perhaps more of where. A first part
   // ending in a legal form is an employer ("Acme Corp, TX"), one holding a job title or the
-  // word joining a title to its employer is not a city ("Software Engineer, India", "Analyst at
-  // Deloitte, NY"), and one naming an organisation is not a city before a name.
+  // word joining a title to its employer is not a city ("Software Engineer, India", "Software
+  // Engineer, TX", "Analyst at Deloitte, NY"), and one naming an organisation is not a city
+  // before a name.
   const { titleWords, organisation, joined } = matchersOf(policy);
   return (
     parts.length >= 2 &&
-    !titleWords.test(parts[0]) &&
     !joined.test(parts[0]) &&
-    (code.test(parts[1]) || (isName(parts[1]) && !organisation.test(parts[0]))) &&
+    // A city of one word may be named like a title ("Engineer, TX"); a title of two is not one.
+    ((code.test(parts[1]) && !(titleWords.test(parts[0]) && /\s/u.test(parts[0]))) ||
+      (isName(parts[1]) && !titleWords.test(parts[0]) && !organisation.test(parts[0]))) &&
     parts.slice(2).every(where) &&
     parts[0].split(/\s+/).length <= 3 &&
     !company.test(parts[0])

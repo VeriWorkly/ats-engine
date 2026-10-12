@@ -186,6 +186,15 @@ describe("an employer with its state's code", () => {
   ])("keeps the title and the employer of %j", (block, title, employer) => {
     expect(rolesIn(...block)).toEqual([{ title, employer }]);
   });
+
+  it.each(["Engineer, TX", "Manager, TX", "Officer, TX"])(
+    "reads a one-word city named like a title, %j, as where",
+    (city) => {
+      expect(rolesIn("Acme Corp", "Software Engineer", city, "Jan 2020 - Present")).toEqual([
+        { title: "Software Engineer", employer: "Acme Corp" },
+      ]);
+    },
+  );
 });
 
 describe("a city with its state or country named in full", () => {
