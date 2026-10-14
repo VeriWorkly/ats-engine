@@ -54,7 +54,9 @@ const BUDGETS = {
   // 71.9: the same as "." at 99.9, to 71.84.
   // 72.1: the same loop as "./locales" at 71.3, to 72.01, and the freezing at 71.4, to 72.07.
   // 72.2: a loop refused at once and the localised policy frozen (see "./locales"), to 72.11.
-  "./ai": 72.2,
+  // 72.4: redacting a phone the parser did not read (a local number, a second North American
+  // one) and a two-character Chinese or Korean name took it to 72.36.
+  "./ai": 72.4,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,
@@ -80,7 +82,10 @@ const BUDGETS = {
   // 20.9: a running header or footer told from body text by the margin it sits in, all of it
   // repeated, and a page number by matching its page (dates opening each page, bullets differing
   // in their figures and a skills line at the foot of two pages were dropped), took it to 20.89.
-  "./node": 20.9,
+  // 21.1: a job posting read only from the types a posting comes in, PDF reading stopped after
+  // 100 pages, a text file's stray bytes decoded in one pass, and one budget for a DOCX's headers
+  // and footers took it to 21.08.
+  "./node": 21.1,
 };
 
 /**
