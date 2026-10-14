@@ -44,7 +44,10 @@ export type LocaleFixture = {
   spokenLanguages?: ExpectedLanguage[];
 };
 
-export const LOCALE_FIXTURES: Record<"en" | "de" | "fr" | "hi" | "en-IN", LocaleFixture[]> = {
+export const LOCALE_FIXTURES: Record<
+  "en" | "en-GB" | "de" | "fr" | "hi" | "en-IN",
+  LocaleFixture[]
+> = {
   en: EN_FIXTURES,
   de: [
     {
@@ -520,6 +523,152 @@ Anglais : professionnel (B2) ; Arabe : bilingue`,
         { language: "Anglais", cefr: "B2" },
         { language: "Arabe", cefr: "C1" },
       ],
+    },
+  ],
+  "en-GB": [
+    {
+      id: "en-gb-first-class",
+      text: `Charlotte Davies
+charlotte.davies@example.co.uk | +44 7400 123456 | Bristol
+Personal Statement
+Civil engineer with seven years on rail and highway schemes across the South West.
+Employment History
+Senior Civil Engineer, Severn Rail Partners Ltd    03/2021 – Present
+- Led the design of a 4 km rail realignment delivered £2m under budget
+- Managed a team of 6 engineers and 2 apprentices
+Graduate Civil Engineer, Avonmouth Consulting LLP    09/2017 – 02/2021
+- Produced drainage designs for 12 highway schemes
+Education
+University of Bath, MEng Civil Engineering, First-class honours, 2017
+Clifton Sixth Form College, A-levels: Maths (A*), Physics (A), Chemistry (A), 2013
+Skills
+AutoCAD, Civil 3D, Revit, Eurocodes`,
+      locale: { languages: [], region: "GB" },
+      name: "Charlotte Davies",
+      email: "charlotte.davies@example.co.uk",
+      phone: "+44 7400 123456",
+      roles: [
+        {
+          title: "Senior Civil Engineer",
+          employer: "Severn Rail Partners Ltd",
+          start: "2021-03",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Graduate Civil Engineer",
+          employer: "Avonmouth Consulting LLP",
+          start: "2017-09",
+          current: false,
+          end: "2021-02",
+        },
+      ],
+      education: [
+        { school: "University of Bath", isced: 7, credential: "MEng" },
+        { school: "Clifton Sixth Form College", isced: 3, credential: "A-levels" },
+      ],
+      skills: ["AutoCAD", "Civil 3D", "Revit", "Eurocodes"],
+    },
+    {
+      // Day-first dates no day over 12 settles: read in the UK's order, 01/09/2019 is September.
+      id: "en-gb-stacked-day-first",
+      text: `Rhys Morgan
+rhys.morgan@example.com
++44 20 7946 0123
+Cardiff
+Experience
+Network Engineer
+Dragon Telecom plc
+01/09/2019 - Present
+- Upgraded the core network across 40 sites with no unplanned downtime
+- Automated switch configuration with Python and Ansible
+IT Support Technician
+Valleys College
+04/07/2016 - 02/08/2019
+- Supported 900 staff and students across three campuses
+Education
+Cardiff Metropolitan University
+BSc (Hons) Computer Networks, 2:1, 2016
+HND Computing, Coleg Exemplar, 2014
+GCSEs: 9 subjects including English and Maths, Exemplar Academy, 2010
+Certifications
+Cisco Certified Network Associate (CCNA), Cisco, 2020
+Skills
+Cisco IOS, Python, Ansible, Linux`,
+      locale: { languages: [], region: "GB" },
+      name: "Rhys Morgan",
+      email: "rhys.morgan@example.com",
+      phone: "+44 20 7946 0123",
+      roles: [
+        {
+          title: "Network Engineer",
+          employer: "Dragon Telecom plc",
+          start: "2019-09",
+          current: true,
+          end: "",
+        },
+        {
+          title: "IT Support Technician",
+          employer: "Valleys College",
+          start: "2016-07",
+          current: false,
+          end: "2019-08",
+        },
+      ],
+      education: [
+        { school: "Cardiff Metropolitan University", isced: 6, credential: "BSc" },
+        { school: "Coleg Exemplar", isced: 5, credential: "HND" },
+        { school: "Exemplar Academy", isced: 2, credential: "GCSEs" },
+      ],
+      skills: ["Cisco IOS", "Python", "Ansible", "Linux"],
+      certifications: [
+        {
+          name: "Cisco Certified Network Associate (CCNA)",
+          issuer: "Cisco",
+          date: "2020",
+          expires: "",
+        },
+      ],
+    },
+    {
+      // Degree classes, on the degree's line and on a line of their own, are no credential.
+      id: "en-gb-degree-classes",
+      text: `Priya Patel
+priya.patel@example.co.uk | +44 117 496 0789 | Bristol
+Experience
+Teaching Assistant, Exemplar Primary School, 01/09/2019 - 31/07/2021
+Education
+BA (Hons) History, Upper Second Class Honours, University of York, 2015
+BSc Economics – 2:2 – University of Leeds – 2014
+First Class Honours
+PGCE Primary, University of Bristol, 2016
+HNC Engineering, Bristol College, 2012
+AS-levels: French, German, 2010
+Scottish Highers, Exemplar Academy, 2009
+Skills
+Safeguarding, Phonics`,
+      locale: { languages: [], region: "GB" },
+      name: "Priya Patel",
+      email: "priya.patel@example.co.uk",
+      phone: "+44 117 496 0789",
+      roles: [
+        {
+          title: "Teaching Assistant",
+          employer: "Exemplar Primary School",
+          start: "2019-09",
+          current: false,
+          end: "2021-07",
+        },
+      ],
+      education: [
+        { school: "University of York", isced: 6, credential: "BA" },
+        { school: "University of Leeds", isced: 6, credential: "BSc" },
+        { school: "University of Bristol", isced: 7, credential: "PGCE" },
+        { school: "Bristol College", isced: 5, credential: "HNC" },
+        { school: "", isced: 3, credential: "AS-levels" },
+        { school: "Exemplar Academy", isced: 3, credential: "Highers" },
+      ],
+      skills: ["Safeguarding", "Phonics"],
     },
   ],
   "en-IN": [

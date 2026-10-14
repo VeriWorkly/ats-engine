@@ -181,3 +181,30 @@ export const FR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "8": word(String.raw`bac\s*\+\s*8`),
   },
 });
+
+/**
+ * The United Kingdom: day-first dates, UK credentials; a date of birth or a photo is a warning,
+ * as in the US: a UK CV carries neither, and the Equality Act 2010 makes age and appearance
+ * protected characteristics. A-levels are the policy's own (level 3). The degree classes ("2:1",
+ * "First-class honours") need nothing: a class is read as part of the degree line, not as one.
+ */
+export const GB: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "GB",
+  name: "United Kingdom",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "GB",
+  dateOrder: "DMY",
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 6, severity: "warning" },
+    "ats-v2.format.photo": { weight: 6, severity: "warning" },
+  },
+  // Wales's further-education colleges are "Coleg".
+  schoolWords: ["coleg"],
+  degrees: {
+    "2": word(String.raw`i?gcses?|o[\s-]levels?`),
+    "3": word(String.raw`as[\s-]levels?|(?:advanced\s+)?highers`),
+    "5": word(String.raw`hnd|hnc|higher\s+national\s+(?:diploma|certificate)|foundation\s+degree`),
+    "7": word(String.raw`pgce|pg\s?dip|postgraduate\s+(?:diploma|certificate)`),
+  },
+});

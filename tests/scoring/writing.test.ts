@@ -377,8 +377,10 @@ const BEFORE_WRITING: Record<string, string> = {
     "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "en-us-stacked":
     "parse:100/0/53/4/4 contact:100/0/20/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
+  // Read in the GB region since it was added, which weighs a stated date of birth as the US does
+  // (contact 24, not 20); the writing rules still move none of it.
   "en-uk-pipes":
-    "parse:100/0/53/4/4 contact:100/0/20/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "en-us-at-and-since":
     "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "en-us-employer-first":
@@ -400,7 +402,13 @@ const BEFORE_WRITING: Record<string, string> = {
   "en-us-certified-cloud":
     "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
   "en-uk-languages-in-skills":
-    "parse:100/0/53/4/4 contact:100/0/20/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+  "en-gb-first-class":
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+  "en-gb-stacked-day-first":
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
+  "en-gb-degree-classes":
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:69/8/26/3/4 integrity:100/0/60/4/4",
   "de-zertifikate":
     "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
   "fr-accents":

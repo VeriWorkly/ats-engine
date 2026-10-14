@@ -3968,6 +3968,509 @@
       },
       {
         "sections": {
+          "experience": "^(?:exp[eéèê]riences?(?:\\s+(?:professionnelles?|pertinentes?))?|parcours\\s+professionnel|historique\\s+professionnel|emplois?\\s+occup[eéèê]s|stages?(?:\\s+et\\s+alternances?)?|alternances?)",
+          "education": "^(?:formations?(?:\\s+(?:acad[eéèê]miques?|universitaires?|initiales?|et\\s+dipl[ôo]mes))?|[eéèê]tudes(?:\\s+sup[eéèê]rieures)?|cursus(?:\\s+(?:universitaire|scolaire|acad[eéèê]mique))?|dipl[ôo]mes(?:\\s+et\\s+formations?)?|parcours\\s+(?:acad[eéèê]mique|scolaire|universitaire))",
+          "skills": "^(?:comp[eéèê]tences(?!\\s+linguistiques)(?:\\s+(?:techniques|informatiques|cl[eéèê]s|professionnelles))?|savoir[\\s-]faire|outils(?:\\s+et\\s+technologies)?|connaissances\\s+(?:techniques|informatiques)|informatique)",
+          "projects": "^(?:projets(?:\\s+(?:personnels|professionnels|acad[eéèê]miques|r[eéèê]alis[eéèê]s))?|r[eéèê]alisations)",
+          "certifications": "^(?:certifications?|certificats?|habilitations)",
+          "languages": "^(?:langues(?:\\s+[eéèê]trang[eè]res)?|comp[eéèê]tences\\s+linguistiques)",
+          "other": "^(?:profil(?:\\s+professionnel)?|r[eéèê]sum[eéèê](?:\\s+professionnel)?|[àa]\\s+propos(?:\\s+de\\s+moi)?|objectif(?:\\s+professionnel)?|centres?\\s+d['’]int[eéèê]r[eê]ts?|loisirs|int[eéèê]r[eê]ts|activit[eéèê]s(?:\\s+extra[\\s-]?professionnelles)?|b[eéèê]n[eéèê]volat|engagements?(?:\\s+associatifs)?|publications|r[eéèê]f[eéèê]rences|distinctions|prix(?:\\s+et\\s+distinctions)?|informations\\s+personnelles|coordonn[eéèê]es|divers)"
+        },
+        "languageLevels": {
+          "langue\\s+maternelle|maternelle": "C2",
+          "bilingue": "C1",
+          "courant(?:e)?|lu,?\\s+[eéèê]crit,?\\s+parl[eéèê]": "C1",
+          "(?:tr[eè]s\\s+)?bon\\s+niveau|professionnel(?:le)?": "B2",
+          "interm[eéèê]diaire": "B1",
+          "scolaire|notions|[eéèê]l[eéèê]mentaire": "A2",
+          "d[eéèê]butant(?:e)?": "A1"
+        },
+        "credentialWords": {
+          "issued": [
+            "d[eéèê]livr[eéèê]e?(?:\\s+le)?",
+            "obtenue?(?:\\s+(?:le|en))?"
+          ],
+          "expires": [
+            "valable\\s+jusqu['’]au?",
+            "expire\\s+(?:le|en)",
+            "expiration"
+          ],
+          "issuer": [
+            "d[eéèê]livr[eéèê]e?\\s+par",
+            "par"
+          ],
+          "id": [
+            "n°",
+            "num[eéèê]ro(?:\\s+de\\s+(?:certificat|licence))?"
+          ]
+        },
+        "months": {
+          "janvier": 1,
+          "janv": 1,
+          "février": 2,
+          "fevrier": 2,
+          "févr": 2,
+          "fevr": 2,
+          "fév": 2,
+          "fev": 2,
+          "mars": 3,
+          "avril": 4,
+          "avr": 4,
+          "mai": 5,
+          "juin": 6,
+          "juillet": 7,
+          "juil": 7,
+          "août": 8,
+          "aout": 8,
+          "septembre": 9,
+          "octobre": 10,
+          "novembre": 11,
+          "décembre": 12,
+          "decembre": 12,
+          "déc": 12
+        },
+        "seasons": {
+          "printemps": [
+            3,
+            5
+          ],
+          "été": [
+            6,
+            8
+          ],
+          "automne": [
+            9,
+            11
+          ]
+        },
+        "durationUnits": [
+          "an",
+          "ans",
+          "année",
+          "années",
+          "mois"
+        ],
+        "nameLabels": [
+          "nom",
+          "nom\\s+et\\s+pr[eéèê]nom",
+          "pr[eéèê]nom\\s+et\\s+nom"
+        ],
+        "placeNames": [
+          "france",
+          "belgique",
+          "suisse",
+          "luxembourg",
+          "québec",
+          "canada",
+          "maroc",
+          "tunisie",
+          "algérie",
+          "sénégal",
+          "île-de-france",
+          "auvergne-rhône-alpes",
+          "bourgogne-franche-comté",
+          "bretagne",
+          "centre-val de loire",
+          "corse",
+          "grand est",
+          "hauts-de-france",
+          "normandie",
+          "nouvelle-aquitaine",
+          "occitanie",
+          "pays de la loire",
+          "provence-alpes-côte d'azur"
+        ],
+        "workplaceWords": [
+          "t[eéèê]l[eéèê]travail",
+          "hybride",
+          "[àa]\\s+distance"
+        ],
+        "organisationWords": [
+          "sas",
+          "sasu",
+          "sarl",
+          "eurl",
+          "s\\.a\\.",
+          "sca",
+          "snc"
+        ],
+        "openEnded": [
+          "aujourd'hui",
+          "aujourd’hui",
+          "à ce jour",
+          "a ce jour",
+          "à présent",
+          "présent",
+          "present",
+          "actuellement",
+          "actuel",
+          "en cours",
+          "maintenant"
+        ],
+        "rangeWords": [
+          "à",
+          "au",
+          "jusqu['’]\\s?(?:à|au|en)"
+        ],
+        "sinceWords": [
+          "depuis"
+        ],
+        "employerWords": [
+          "chez"
+        ],
+        "titleWords": [
+          "ing[eéèê]nieure?",
+          "d[eéèê]veloppeu(?:r|se)",
+          "programmeu(?:r|se)",
+          "chef(?:fe)?\\s+de\\s+(?:projet|produit|[eéèê]quipe|service|rayon)",
+          "responsable",
+          "directeur",
+          "directrice",
+          "administrat(?:eur|rice)",
+          "architecte",
+          "analyste",
+          "consultante?",
+          "technicien(?:ne)?",
+          "stagiaire",
+          "alternante?",
+          "apprentie?",
+          "charg[eéèê]e?\\s+(?:de|d['’])",
+          "assistante?",
+          "coordinat(?:eur|rice)",
+          "gestionnaire",
+          "comptable",
+          "conseill(?:er|ère)",
+          "commercial(?:e)?",
+          "infirmi(?:er|ère)",
+          "enseignante?",
+          "fondat(?:eur|rice)",
+          "g[eéèê]rante?",
+          "op[eéèê]rat(?:eur|rice)",
+          "sp[eéèê]cialiste",
+          "expert(?:e)?"
+        ],
+        "schoolWords": [
+          "universit[eéèê]",
+          "[eéèê]cole",
+          "lycée",
+          "lycee",
+          "collège",
+          "iut",
+          "institut",
+          "insa",
+          "conservatoire",
+          "facult[eéèê]"
+        ],
+        "documentTitles": [
+          "curriculum\\s+vit[aæ]e"
+        ],
+        "dateOfBirthLabels": [
+          "date\\s+de\\s+naissance",
+          "n[eéèê]e?\\s+le"
+        ],
+        "headingConnectors": [
+          "et",
+          "de",
+          "des",
+          "du",
+          "d['’]\\p{L}+"
+        ],
+        "degrees": {
+          "6": "(?<![\\p{L}\\p{M}])(?:licence(?:\\s+professionnelle)?)(?![\\p{L}\\p{M}])",
+          "7": "(?<![\\p{L}\\p{M}])(?:dipl[ôo]me\\s+d['’]ing[eéèê]nieur|ing[eéèê]nieur\\s+dipl[ôo]m[eéèê]|mast[eè]re(?:\\s+sp[eéèê]cialis[eéèê])?)(?![\\p{L}\\p{M}])",
+          "8": "(?<![\\p{L}\\p{M}])(?:doctorat|th[eè]se\\s+de\\s+doctorat)(?![\\p{L}\\p{M}])"
+        },
+        "contentLineVerbs": [
+          "développé",
+          "conçu",
+          "dirigé",
+          "géré",
+          "réalisé",
+          "mis en place",
+          "piloté",
+          "encadré",
+          "optimisé",
+          "créé"
+        ],
+        "actionVerbs": [
+          "développé",
+          "conçu",
+          "dirigé",
+          "géré",
+          "réalisé",
+          "piloté",
+          "encadré",
+          "optimisé",
+          "créé",
+          "lancé",
+          "automatisé",
+          "amélioré",
+          "réduit",
+          "augmenté",
+          "mis",
+          "migré",
+          "déployé",
+          "développement",
+          "conception",
+          "gestion",
+          "pilotage",
+          "encadrement",
+          "réalisation",
+          "mise",
+          "création",
+          "migration",
+          "optimisation",
+          "automatisation",
+          "refonte",
+          "animation",
+          "coordination",
+          "déploiement",
+          "supervision",
+          "management",
+          "direction",
+          "analyse"
+        ],
+        "injectionPhrases": [
+          "ignore[sz]?\\s+(?:toutes\\s+)?(?:les\\s+)?(?:instructions|consignes|directives)\\s+(?:pr[eéèê]c[eéèê]dentes|ant[eéèê]rieures|ci-dessus)",
+          "(?:classe[sz]?|note[sz]?|[eéèê]value[sz]?)\\s+(?:ce|cette)\\s+(?:candidat(?:e)?|cv|profil)\\s+(?:comme\\s+)?(?:(?:le|la)\\s+)?(?:meilleure?|premi(?:er|ère)|excellent(?:e)?)",
+          "(?:ce|cette)\\s+candidat(?:e)?\\s+est\\s+(?:le|la)\\s+(?:meilleure?|plus\\s+qualifi[eéèê]e?|id[eéèê]ale?|parfaite?)",
+          "si\\s+(?:tu\\s+es|vous\\s+[eéèê]tes)\\s+(?:une?\\s+)?(?:ia|intelligence\\s+artificielle|mod[eè]le\\s+de\\s+langage)"
+        ],
+        "requirements": {
+          "yearsPatterns": [
+            "(?<!\\d)(\\d{1,2})\\s*(?:\\+\\s*)?(?:(?:[-–]|[àa]\\s)\\s*\\d{1,2}\\s*)?(?:ans|ann[eéèê]es)(?!\\p{L})"
+          ],
+          "equivalence": [
+            "ou\\s+[eéèê]quivalent(?:e)?",
+            "ou\\s+exp[eéèê]rience\\s+[eéèê]quivalente"
+          ],
+          "authorization": [
+            "autorisation\\s+de\\s+travail",
+            "permis\\s+de\\s+travail",
+            "titre\\s+de\\s+s[eéèê]jour"
+          ],
+          "clearance": [
+            "habilitation\\s+(?:secret|confidentiel)(?:\\s+d[eéèê]fense)?"
+          ],
+          "languagePatterns": [
+            "(?<![\\p{L}\\p{M}])(\\p{L}+)\\s+(?:courant|bilingue|professionnel|lu,?\\s+[eéèê]crit)",
+            "(?:ma[iî]trise|pratique)\\s+(?:de\\s+l['’]|du\\s+|de\\s+)(\\p{L}+)",
+            "bilingue\\s+(\\p{L}+)"
+          ],
+          "languageNames": {
+            "français": "french",
+            "francais": "french",
+            "anglais": "english",
+            "allemand": "german",
+            "espagnol": "spanish",
+            "italien": "italian",
+            "portugais": "portuguese",
+            "néerlandais": "dutch",
+            "arabe": "arabic",
+            "chinois": "chinese",
+            "mandarin": "chinese",
+            "japonais": "japanese",
+            "russe": "russian",
+            "polonais": "polish",
+            "turc": "turkish"
+          }
+        },
+        "jobSections": {
+          "required": "^(?:profil\\s+recherch[eéèê]|votre\\s+profil|comp[eéèê]tences\\s+requises|pr[eéèê]requis|qualifications\\s+requises|ce\\s+que\\s+nous\\s+recherchons|exigences)",
+          "preferred": "^(?:(?:les\\s+)?plus|atouts|comp[eéèê]tences\\s+souhait[eéèê]es|souhait[eéèê])",
+          "responsibilities": "^(?:missions|vos\\s+missions|description\\s+du\\s+poste|responsabilit[eéèê]s|le\\s+poste|vos\\s+responsabilit[eéèê]s)",
+          "excluded": "^(?:avantages|nous\\s+offrons|ce\\s+que\\s+nous\\s+offrons|pourquoi\\s+nous\\s+rejoindre|qui\\s+sommes[\\s-]nous|[àa]\\s+propos\\s+de\\s+nous|l['’]entreprise)"
+        },
+        "alternationWords": [
+          "ou"
+        ],
+        "stopwords": [
+          "le",
+          "la",
+          "les",
+          "un",
+          "une",
+          "des",
+          "du",
+          "de",
+          "d",
+          "l",
+          "et",
+          "ou",
+          "à",
+          "au",
+          "aux",
+          "en",
+          "pour",
+          "avec",
+          "dans",
+          "sur",
+          "par",
+          "chez",
+          "est",
+          "sont",
+          "être",
+          "nous",
+          "vous",
+          "votre",
+          "vos",
+          "notre",
+          "nos",
+          "leur",
+          "leurs",
+          "ce",
+          "cette",
+          "ces",
+          "qui",
+          "que",
+          "dont",
+          "ainsi",
+          "plus",
+          "très",
+          "bonne",
+          "bonnes",
+          "bon",
+          "minimum",
+          "idéalement",
+          "connaissance",
+          "connaissances",
+          "maîtrise",
+          "expérience",
+          "expériences",
+          "compétences",
+          "ans",
+          "années",
+          "équipe",
+          "poste",
+          "requis",
+          "requise",
+          "requises",
+          "souhaité",
+          "souhaitée",
+          "souhaités",
+          "souhaitées",
+          "obligatoire",
+          "apprécié",
+          "appréciée",
+          "atout",
+          "diplôme",
+          "formation",
+          "niveau",
+          "type",
+          "équivalent",
+          "équivalente",
+          "courant",
+          "profil",
+          "missions",
+          "mission",
+          "domaine",
+          "première",
+          "solide",
+          "solides",
+          "concevoir",
+          "développer",
+          "participer",
+          "assurer",
+          "gérer",
+          "travailler",
+          "contribuer",
+          "accompagner",
+          "piloter",
+          "garantir",
+          "maintenir",
+          "rejoindre",
+          "mettre",
+          "h/f",
+          "f/h"
+        ],
+        "softSkills": [
+          "esprit d'équipe",
+          "travail en équipe",
+          "autonomie",
+          "autonome",
+          "rigueur",
+          "rigoureux",
+          "rigoureuse",
+          "curiosité",
+          "curieux",
+          "curieuse",
+          "organisation",
+          "organisé",
+          "organisée",
+          "adaptabilité",
+          "créativité",
+          "leadership",
+          "communication",
+          "esprit d'analyse",
+          "esprit de synthèse",
+          "sens du service",
+          "sens de l'organisation",
+          "proactivité",
+          "proactif",
+          "proactive",
+          "réactivité",
+          "dynamisme",
+          "dynamique",
+          "polyvalence",
+          "polyvalent",
+          "polyvalente",
+          "empathie",
+          "bienveillance"
+        ],
+        "buzzwords": [
+          "dynamique",
+          "motivé",
+          "motivée",
+          "passionné",
+          "passionnée",
+          "force de proposition"
+        ],
+        "id": "fr",
+        "name": "Français",
+        "status": "community",
+        "maintainers": [],
+        "detectionWords": [
+          "et",
+          "les",
+          "des",
+          "du",
+          "une",
+          "pour",
+          "avec",
+          "dans",
+          "sur",
+          "chez",
+          "au",
+          "aux",
+          "est",
+          "sont",
+          "nous",
+          "vous",
+          "notre",
+          "votre",
+          "nos",
+          "leur",
+          "cette",
+          "ces",
+          "dont",
+          "été",
+          "ainsi",
+          "auprès",
+          "également",
+          "depuis",
+          "afin",
+          "sein",
+          "être",
+          "mise",
+          "équipe",
+          "développement",
+          "expérience",
+          "ans"
+        ],
+        "defaultRegion": "FR"
+      },
+      {
+        "sections": {
           "experience": "^(?:कार्य\\s*अनुभव|व्यावसायिक\\s+अनुभव|कार्यानुभव|रोज़गार\\s+इतिहास|अनुभव)",
           "education": "^(?:शैक्षिक\\s+योग्यता|शैक्षणिक\\s+योग्यता|शिक्षा|योग्यता)",
           "skills": "^(?:तकनीकी\\s+कौशल|कौशल|दक्षताएँ|दक्षता|विशेषज्ञता)",
@@ -4244,6 +4747,57 @@
           },
           "ats-v2.format.photo": {
             "weight": 0
+          }
+        }
+      },
+      {
+        "degrees": {
+          "2": "(?<![\\p{L}\\p{M}])(?:brevet(?:\\s+des\\s+coll[èe]ges)?|dnb)(?![\\p{L}\\p{M}])",
+          "3": "(?<![\\p{L}\\p{M}])(?:baccalaur[ée]at(?:\\s+(?:g[ée]n[ée]ral|technologique|professionnel|s|es|l|stmg|sti2d))?|bac(?!\\s*\\+)(?:\\s+(?:g[ée]n[ée]ral|technologique|pro(?:fessionnel)?|s|es|l|stmg|sti2d))?|cap|bep)(?![\\p{L}\\p{M}])",
+          "5": "(?<![\\p{L}\\p{M}])(?:bts|dut|deug|bac\\s*\\+\\s*2)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:b\\.u\\.t\\.|but\\s+(?:informatique|gea|tc|mmi|geii|gmp|r&t|rt|qlio|chimie|g[ée]nie\\s+\\p{L}+|techniques\\s+de\\s+commercialisation|gestion\\s+des\\s+entreprises)|bac\\s*\\+\\s*3)(?![\\p{L}\\p{M}])",
+          "7": "(?<![\\p{L}\\p{M}])(?:bac\\s*\\+\\s*5|dea|dess|grande\\s+[ée]cole)(?![\\p{L}\\p{M}])",
+          "8": "(?<![\\p{L}\\p{M}])(?:bac\\s*\\+\\s*8)(?![\\p{L}\\p{M}])"
+        },
+        "id": "FR",
+        "name": "France",
+        "status": "community",
+        "maintainers": [],
+        "phoneCountry": "FR",
+        "dateOrder": "DMY",
+        "rules": {
+          "ats-v2.privacy.dateOfBirth": {
+            "weight": 0
+          },
+          "ats-v2.format.photo": {
+            "weight": 0
+          }
+        }
+      },
+      {
+        "schoolWords": [
+          "coleg"
+        ],
+        "degrees": {
+          "2": "(?<![\\p{L}\\p{M}])(?:i?gcses?|o[\\s-]levels?)(?![\\p{L}\\p{M}])",
+          "3": "(?<![\\p{L}\\p{M}])(?:as[\\s-]levels?|(?:advanced\\s+)?highers)(?![\\p{L}\\p{M}])",
+          "5": "(?<![\\p{L}\\p{M}])(?:hnd|hnc|higher\\s+national\\s+(?:diploma|certificate)|foundation\\s+degree)(?![\\p{L}\\p{M}])",
+          "7": "(?<![\\p{L}\\p{M}])(?:pgce|pg\\s?dip|postgraduate\\s+(?:diploma|certificate))(?![\\p{L}\\p{M}])"
+        },
+        "id": "GB",
+        "name": "United Kingdom",
+        "status": "community",
+        "maintainers": [],
+        "phoneCountry": "GB",
+        "dateOrder": "DMY",
+        "rules": {
+          "ats-v2.privacy.dateOfBirth": {
+            "weight": 6,
+            "severity": "warning"
+          },
+          "ats-v2.format.photo": {
+            "weight": 6,
+            "severity": "warning"
           }
         }
       },

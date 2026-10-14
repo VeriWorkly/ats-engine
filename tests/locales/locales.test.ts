@@ -119,6 +119,33 @@ describe("region conventions", () => {
     expect(unknown).toMatchObject({ passed: false, severity: "info", scoreImpact: 2 });
   });
 
+  it("warns about it in the UK too, and reads the UK's credentials only there", () => {
+    const text = [
+      "Jane Doe",
+      "jane@example.com | +44 20 7946 0123",
+      "Experience",
+      "Engineer, Acme 01/09/2020 - 01/03/2022",
+      "Education",
+      "HND Computing, Exemplar College, 2014",
+      "Date of birth: 04/05/1990",
+    ].join("\n");
+    const report = check(text);
+    expect(report.locale).toEqual({ languages: [], region: "GB" });
+    expect(report.rules.find((rule) => rule.id === "ats-v2.privacy.dateOfBirth")).toMatchObject({
+      passed: false,
+      severity: "warning",
+      scoreImpact: 6,
+    });
+    expect(report.parsed.roles[0]).toMatchObject({
+      start: { year: 2020, month: 9 },
+      end: { year: 2022, month: 3 },
+    });
+    expect(report.parsed.education[0]).toMatchObject({ credential: "HND", isced: 5 });
+    const us = check(text, { region: "US" });
+    expect(us.parsed.roles[0].start).toEqual({ year: 2020, month: 1 });
+    expect(us.parsed.education[0]?.isced ?? null).toBeNull();
+  });
+
   it("weighs a photo by region, and only when the file was measured", () => {
     const layout = { columnRatio: 0, tableCount: 0, pageCount: 1, imageCount: 1 };
     const photo = (text: string, withLayout = true) =>

@@ -139,6 +139,9 @@ const SHAPES: Record<string, string> = {
   "apostrophe run": rep("d'"),
   "bac plus run": rep("bac + "),
   "but run": rep("BUT "),
+  // The GB region's credentials.
+  "as level run": rep("AS level "),
+  "pg dip run": rep("pg "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
