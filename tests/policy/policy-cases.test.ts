@@ -9,7 +9,8 @@ import {
 
 describe("policy fingerprint", () => {
   it("fingerprints the policy's current content after mutation", () => {
-    const policy = parseAtsPolicy(DEFAULT_POLICY);
+    // A parsed policy is frozen; a copy of one is not, and is hashed as it is now.
+    const policy = structuredClone(parseAtsPolicy(DEFAULT_POLICY));
     const before = policyFingerprint(policy);
 
     policy.version = "mutated";

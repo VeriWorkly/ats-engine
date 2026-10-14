@@ -1,3 +1,4 @@
+import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
 /**
@@ -12,7 +13,7 @@ import type { AtsLanguagePackInput } from "../schema.js";
 const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 
 /** The Hindi language pack: recognised by Devanagari script; region IN by default. */
-export const hi: AtsLanguagePackInput = {
+export const hi: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   id: "hi",
   name: "हिन्दी",
   status: "community",
@@ -217,4 +218,4 @@ export const hi: AtsLanguagePackInput = {
     "रचनात्मकता",
     "सहानुभूति",
   ],
-};
+});

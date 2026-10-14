@@ -8,7 +8,7 @@ export type AtsVerdict = "strong" | "needs-work" | "weak";
  * set of thresholds a report is judged by: anything that colours or labels a score (the CLI, a
  * host's UI) should read these, or `computeVerdict` itself, rather than keep bands of its own.
  */
-export const VERDICT_BANDS = { strong: 75, needsWork: 45 } as const;
+export const VERDICT_BANDS = /* @__PURE__ */ Object.freeze({ strong: 75, needsWork: 45 } as const);
 
 /**
  * Job match matters more than raw formatting once a target role is on the table — unless the

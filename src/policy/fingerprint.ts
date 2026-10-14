@@ -8,8 +8,9 @@ import type { AtsEnginePolicy } from "./schema.js";
  * changed score is traced to a changed policy rather than to the resume.
  *
  * Taken of the policy as applied, after locale packs, so a resume read as German says so here
- * too. Not memoised: a policy object can be changed after it is parsed, and a cached hash would
- * then name a policy that no longer exists. Hashing costs well under a millisecond.
+ * too. Not memoised: a parsed policy is frozen, but a copy of one is not and can change after it
+ * is first hashed, and a cached hash would then name a policy that no longer exists. Hashing
+ * costs well under a millisecond.
  *
  * The attached packs themselves are left out: what a pack contributes to a report is already in
  * the vocabulary and rules it was merged into, so packs that never applied, or the order they

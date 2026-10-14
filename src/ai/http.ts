@@ -17,9 +17,9 @@ export type FetchResponseLike = {
   status: number;
   text(): Promise<string>;
   /** True when `fetch` followed a redirect to get this response: it is refused. */
-  redirected?: boolean;
+  redirected?: boolean | undefined;
   /** `"opaqueredirect"` is a browser's redirect handed back unfollowed: it is refused. */
-  type?: string;
+  type?: string | undefined;
 };
 
 /** Just enough of `fetch` for the adapters: one POST. Pass your own to proxy or record calls. */
@@ -51,11 +51,11 @@ const platform = globalThis as unknown as {
 /** Options every HTTP adapter accepts. */
 export type HttpOptions = {
   /** Per-attempt timeout. Defaults to 120 s. */
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
   /** Extra headers sent with every request. */
-  headers?: Record<string, string>;
+  headers?: Record<string, string> | undefined;
   /** Defaults to the global `fetch`. */
-  fetch?: FetchLike;
+  fetch?: FetchLike | undefined;
 };
 
 /** Thrown when the caller's own signal aborted the call. Never retried. */

@@ -62,7 +62,7 @@ export type MergeOptions = {
   /** Classifies repaired credentials into degree levels. */
   policy: AtsEnginePolicy;
   /** Reference date for tenure and date plausibility. Defaults to the current time. */
-  now?: Date;
+  now?: Date | undefined;
 };
 
 /** The merged record, and the model's values that were dropped for not occurring in the source. */

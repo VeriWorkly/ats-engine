@@ -19,19 +19,22 @@ export type AtsAiTask = "analyze" | "repairParse" | "convertResume";
 export type TaskRoute = {
   model: string;
   maxTokens: number;
-  temperature?: number;
+  temperature?: number | undefined;
   /** Extra attempts after the first. A refusal or a 4xx rejection is never retried. */
-  retries?: number;
+  retries?: number | undefined;
   /** Ask for `json_schema` output. Off by default: not every model and endpoint supports it. */
-  structuredOutputs?: boolean;
+  structuredOutputs?: boolean | undefined;
   /** Merged into the request body, e.g. a gateway's routing preferences. */
-  providerOptions?: Record<string, unknown>;
+  providerOptions?: Record<string, unknown> | undefined;
   /** Replaces the task's system prompt for this call. */
-  system?: string;
+  system?: string | undefined;
 };
 
+/** A task's route with every setting optional, as `createAtsAi` and a call set it. */
+export type RouteSettings = { [Key in keyof TaskRoute]?: TaskRoute[Key] | undefined };
+
 /** One call's overrides of its task's route, and a signal that aborts the call. */
-export type AtsAiCallOptions = Partial<TaskRoute> & { signal?: AbortSignalLike };
+export type AtsAiCallOptions = RouteSettings & { signal?: AbortSignalLike | undefined };
 
 /** What every task returns: its result, the values dropped from it, and what the call cost. */
 export type AtsAiResult<T> = {
@@ -71,7 +74,12 @@ export class AtsAiError extends Error {
   constructor(
     code: AtsAiErrorCode,
     message: string,
-    options: { status?: number; usage?: LlmUsage; attempts?: number; cause?: unknown } = {},
+    options: {
+      status?: number | undefined;
+      usage?: LlmUsage | undefined;
+      attempts?: number | undefined;
+      cause?: unknown;
+    } = {},
   ) {
     super(message, { cause: options.cause });
     this.name = "AtsAiError";
@@ -87,9 +95,9 @@ export type AtsAiRetryEvent = { task: AtsAiTask; attempt: number; error: AtsAiEr
 
 export type RunContext = {
   provider: LlmProvider;
-  routes: Partial<Record<AtsAiTask, Partial<TaskRoute>>>;
-  prompts: Partial<Record<AtsAiTask, string>>;
-  onRetry?: (event: AtsAiRetryEvent) => void;
+  routes: { [Task in AtsAiTask]?: RouteSettings | undefined };
+  prompts: { [Task in AtsAiTask]?: string | undefined };
+  onRetry?: ((event: AtsAiRetryEvent) => void) | undefined;
 };
 
 /** One task's fixed parts. `user` is the already-built user message. */

@@ -26,7 +26,7 @@ export type AtsScoreTone = "good" | "warn" | "bad";
  * score labelled "good" here is one the verdict calls "strong". Copied rather than imported to keep
  * `/format` free of dependencies; `tests/format/format.test.ts` holds the two equal.
  */
-export const SCORE_BANDS = { good: 75, warn: 45 } as const;
+export const SCORE_BANDS = /* @__PURE__ */ Object.freeze({ good: 75, warn: 45 } as const);
 
 /** "good" from 75, "warn" from 45, "bad" below: the bands of `SCORE_BANDS`. */
 export function scoreTone(score: number): AtsScoreTone {
@@ -40,7 +40,7 @@ export function scoreTone(score: number): AtsScoreTone {
  * believed, and then how well it reads. Integrity leads because a finding there outweighs
  * everything below it; writing style comes last because no ATS filters on it.
  */
-export const CATEGORY_ORDER = [
+export const CATEGORY_ORDER = /* @__PURE__ */ Object.freeze([
   "integrity",
   "parse",
   "contact",
@@ -48,10 +48,10 @@ export const CATEGORY_ORDER = [
   "content",
   "format",
   "writing",
-] as const;
+] as const);
 
 /** What each category id is called on a report: "content" is "Evidence", "format" "Format risk". */
-export const CATEGORY_LABELS: Readonly<Record<string, string>> = {
+export const CATEGORY_LABELS: Readonly<Record<string, string>> = /* @__PURE__ */ Object.freeze({
   parse: "Parsing",
   contact: "Contact & links",
   structure: "Structure",
@@ -59,7 +59,7 @@ export const CATEGORY_LABELS: Readonly<Record<string, string>> = {
   format: "Format risk",
   integrity: "Integrity",
   writing: "Writing",
-};
+});
 
 /** A policy may define categories this list does not know; they are title-cased, not hidden. */
 export function categoryLabel(category: string) {
@@ -76,11 +76,12 @@ export function sortByCategoryOrder<T extends { category: string }>(items: reado
 }
 
 /** Labels of the kinds of advice (`report.advice`), which is shown apart from the score. */
-export const ADVICE_LABELS: Readonly<Record<AtsAdvice["kind"], string>> = {
-  file: "File",
-  age: "Age",
-  ats: "ATS",
-};
+export const ADVICE_LABELS: Readonly<Record<AtsAdvice["kind"], string>> =
+  /* @__PURE__ */ Object.freeze({
+    file: "File",
+    age: "Age",
+    ats: "ATS",
+  });
 
 /** The label of an advice kind ("File", "Age", "ATS"); an unknown kind as it is. */
 export function adviceLabel(kind: AtsAdvice["kind"]) {
@@ -150,19 +151,20 @@ export function roleSpanMonths(
  *
  * @deprecated Use `ISCED_LABELS`; removed in 1.0.
  */
-export const DEGREE_LABELS: Readonly<Record<AtsDegreeLevel, string>> = {
-  diploma: "Diploma",
-  associate: "Associate",
-  bachelor: "Bachelor's",
-  master: "Master's",
-  doctorate: "Doctorate",
-};
+export const DEGREE_LABELS: Readonly<Record<AtsDegreeLevel, string>> =
+  /* @__PURE__ */ Object.freeze({
+    diploma: "Diploma",
+    associate: "Associate",
+    bachelor: "Bachelor's",
+    master: "Master's",
+    doctorate: "Doctorate",
+  });
 
 /**
  * What each ISCED 2011 level is called on a report. Short and international: "Bachelor's or
  * equivalent" is true of a B.Tech, a Licence and a Bachelor alike.
  */
-export const ISCED_LABELS: Readonly<Record<AtsIscedLevel, string>> = {
+export const ISCED_LABELS: Readonly<Record<AtsIscedLevel, string>> = /* @__PURE__ */ Object.freeze({
   2: "Lower secondary",
   3: "Upper secondary",
   4: "Post-secondary",
@@ -170,7 +172,7 @@ export const ISCED_LABELS: Readonly<Record<AtsIscedLevel, string>> = {
   6: "Bachelor's or equivalent",
   7: "Master's or equivalent",
   8: "Doctorate",
-};
+});
 
 /**
  * Control characters, which text from a resume, a posting or a model can carry: an escape

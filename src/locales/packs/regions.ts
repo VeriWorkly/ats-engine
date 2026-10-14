@@ -1,3 +1,4 @@
+import { deepFreeze } from "../../util/memo.js";
 import type { AtsRegionPackInput } from "../schema.js";
 
 /**
@@ -25,7 +26,7 @@ const LAW = String.raw`(?<!\p{L})(?:laws?|universit(?:y|ies)|college|school|facu
 const LLM = String.raw`llm(?=\s*[,()]|\s+in\s|\s+(?:19|20)\d{2}(?!\d)|\s*$)(?:(?=[^\n]{0,80}?${LAW})|(?<=${LAW}[^\n]{0,80}llm))`;
 
 /** The United States: month-first dates; a date of birth or a photo is a warning; age advice on. */
-export const US: AtsRegionPackInput = {
+export const US: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   id: "US",
   name: "United States",
   status: "verified",
@@ -39,10 +40,10 @@ export const US: AtsRegionPackInput = {
   // US recruiters expect no age on a resume (the ADEA protects applicants 40 and over), and
   // career advice there commonly drops graduation years and roles older than 15–20 years.
   ageAdvice: { graduationYears: 20, experienceYears: 20 },
-};
+});
 
 /** Germany: day-first dates, German credentials; a date of birth or a photo is not judged. */
-export const DE: AtsRegionPackInput = {
+export const DE: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   id: "DE",
   name: "Deutschland",
   status: "community",
@@ -75,10 +76,10 @@ export const DE: AtsRegionPackInput = {
       String.raw`promotion\s+(?:zum|zur|in)|promoviert|doktorarbeit|doktorgrad|dr\.[\s-]?(?:rer|phil|ing|med)\.`,
     ),
   },
-};
+});
 
 /** India: day-first dates, Indian credentials and state codes; date of birth and photo not judged. */
-export const IN: AtsRegionPackInput = {
+export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   id: "IN",
   name: "India",
   status: "community",
@@ -145,4 +146,4 @@ export const IN: AtsRegionPackInput = {
       String.raw`m\.?\s?com\.?|m\.?c\.?a\.?|m\.\s?e\.?|pgdm|pgdba|post[\s-]?graduate\s+diploma|m\.?b\.?b\.?s\.?|ll\.m\.?|${LLM}`,
     ),
   },
-};
+});

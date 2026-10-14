@@ -2,7 +2,7 @@ import { AtsPolicyError } from "../policy/errors.js";
 import { parseAtsPolicy } from "../policy/parse.js";
 import type { AtsEnginePolicy, AtsEnginePolicyInput, AtsEngineRule } from "../policy/schema.js";
 import { phoneCountry } from "../parser/phone.js";
-import { memo } from "../util/memo.js";
+import { deepFreeze, memo } from "../util/memo.js";
 import { own } from "../util/own.js";
 import { applyVocabulary, DETECTION_SAMPLE, isWrittenIn, sampleOf, union } from "./languages.js";
 import type { AtsLanguagePackInput, AtsRegionPack, AtsRegionPackInput } from "./schema.js";
@@ -14,7 +14,10 @@ import type { AtsLanguagePackInput, AtsRegionPack, AtsRegionPackInput } from "./
  */
 export function withLocales(
   policy: AtsEnginePolicyInput,
-  packs: { languages?: AtsLanguagePackInput[]; regions?: AtsRegionPackInput[] },
+  packs: {
+    languages?: AtsLanguagePackInput[] | undefined;
+    regions?: AtsRegionPackInput[] | undefined;
+  },
 ): AtsEnginePolicy {
   const byId = <T extends { id: string }>(existing: T[] = [], added: T[] = []) => [
     ...new Map([...existing, ...added].map((pack) => [pack.id, pack])).values(),
@@ -105,9 +108,9 @@ export type AtsLocale = { languages: string[]; region: string | null };
 /** Set the languages and the region a resume is read in, instead of detecting them. */
 export type AtsLocaleOptions = {
   /** Language pack ids to read with, instead of detecting them. `[]` reads with the base only. */
-  languages?: string[];
+  languages?: string[] | undefined;
   /** The region pack id to apply (any case), instead of inferring one; unknown ids throw. */
-  region?: string;
+  region?: string | undefined;
 };
 
 /** Per base policy: every language, region and date-order combination it has been localised to. */
@@ -223,7 +226,8 @@ export function localizePolicy(
       };
     if (dateOrder)
       localized = { ...localized, resumeParse: { ...localized.resumeParse, dateOrder } };
-    cached.set(key, localized);
+    // Shared by every resume read this way, so frozen as the policy it came from is.
+    cached.set(key, deepFreeze(localized));
   }
   const resumeLanguages = (options.languages ? languages : inResume).map((pack) => pack.id);
   return { policy: localized, locale, resumeLanguages };

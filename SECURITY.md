@@ -28,7 +28,9 @@ review a policy's patterns as you would code — `tests/integration/regressions.
 adversarial suite against a private policy when one is present.
 
 **Size.** Resume text is cut at 50 000 characters, postings at 20 000, a structured document is
-bounded in depth, array length and node count before it is validated, a DOCX may expand to at most
+bounded in depth, array length and node count before it is validated, a policy or a locale pack
+nested deeper than 5 000 levels (or one that contains itself) is refused as invalid with
+`AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
 64 MB and hold at most 2 MB of the XML `mammoth` parses, and PDF text reading stops at the cap. A
 file name is read to its first 255 characters. The CLI and the MCP server read only a regular file
 on this computer: a file over 20 MB is refused before it is opened, and is read through one handle

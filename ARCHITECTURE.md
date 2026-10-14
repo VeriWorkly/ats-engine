@@ -10,8 +10,12 @@ These hold everywhere, and each has a test:
 - **Pure.** A report is a function of (input, policy, options incl. `now`), stamped with
   `report.engine = { version, policy fingerprint }`. `ENGINE_VERSION` equals package.json.
 - **No I/O, no global state in the core** (`src/` minus `node/`, `cli/`). Caches are `memo` — a
-  WeakMap on the object the value is derived from. `/document`, `/format` and `/job` have no
-  dependencies; zod (`zod/mini`) is internal and never exported as a value.
+  WeakMap on the object the value is derived from. What they are keyed on cannot change after the
+  fact: `parseAtsPolicy`, `withLocales` and `localizePolicy` return a deep-frozen policy
+  (`deepFreeze` in `util/memo.ts`), and every exported object (`DEFAULT_POLICY`, the packs, their JSON Schemas,
+  `CONVERT_GROUNDING_SKIP`, the labels and limits) is frozen too, so a change throws in strict mode
+  rather than being read with patterns compiled before it. `/document`, `/format` and `/job` have
+  no dependencies; zod (`zod/mini`) is internal and never exported as a value.
 - **Language is data.** Month names, headings, degrees, title and school words, stopwords, verbs
   and injection phrases live in the policy or a locale pack. Policy patterns compile in Unicode
   mode (`policyRegex`); word lists use `wordListPattern` (JS `\b` is ASCII-only). Text is
@@ -129,11 +133,15 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 Counted with esbuild's metafile, every bare import left external. "zod/mini" includes its
 English locale (`zod/v4/locales/en.js`, see `util/issues.ts`). Bundle budgets per subpath are
-enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 97 KB for `.`, 70 KB
-each for `/locales` and `/ai`, 20.9 KB for `/node`, under 4 KB for every other; the script
-prints each entry's size against its budget, with the reason for each budget beside it);
-`npm run smoke` bundles every runtime-agnostic subpath for the browser and runs the core in a
-bare V8 context (edge).
+enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 103 KB for `.`, 71.4 KB
+for `/locales`, 72.2 KB for `/ai`, 20.9 KB for `/node`, under 4 KB for every other; the script
+prints each entry's size against its budget, with the reason for each budget beside it). Two more
+budgets hold what a host importing only some names bundles: `withLocales` alone (48.2 KB) and
+`/ai`'s prompts and error alone (9.5 KB). The packs' and the tasks' JSON Schemas are built at
+load, so those calls are marked `/* @__PURE__ */` and drop out when not imported;
+`npm run smoke` bundles every runtime-agnostic subpath for the browser, runs the core in a bare
+V8 context (edge), and compiles the TypeScript samples in README.md and LOCALES.md against the
+built `.d.ts` with `exactOptionalPropertyTypes` on.
 
 ## Decisions worth knowing
 

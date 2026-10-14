@@ -178,6 +178,8 @@ Outputs: `score`, `job-match`, `failed-checks` (JSON) and `report` (the path of 
 
 `check` takes resume text and returns a report. It scores with `DEFAULT_POLICY` unless you pass a policy of your own as the second argument.
 
+A policy from `parseAtsPolicy` or `withLocales` is frozen, as are `DEFAULT_POLICY` and every other object the package exports: changing one throws a `TypeError` in strict mode. To change a policy, copy it (`structuredClone`), edit the copy and parse it again.
+
 ```ts
 import { check } from "@veriworkly/ats-engine";
 

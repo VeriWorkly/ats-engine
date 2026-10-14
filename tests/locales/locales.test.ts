@@ -10,6 +10,7 @@ import {
   BUILT_IN_LOCALES,
   atsLanguagePackJsonSchema,
   de,
+  localizePolicy,
   withLocales,
 } from "../../src/locales/index.js";
 import { fieldChecks } from "../fixtures/accuracy.js";
@@ -145,6 +146,22 @@ describe("packs", () => {
     expect(() =>
       withLocales(DEFAULT_POLICY, { languages: [{ id: "xx", name: "X", status: "community" }] }),
     ).toThrow(AtsPolicyError);
+  });
+
+  it("attach to a frozen policy, as parseAtsPolicy returns one", () => {
+    expect(Object.isFrozen(POLICY)).toBe(true);
+    expect(Object.isFrozen(POLICY.locales.languages[0])).toBe(true);
+    expect(() => POLICY.locales.regions.pop()).toThrow(TypeError);
+    // And the policy a resume is read with, which is cached and shared by every resume like it.
+    const localized = localizePolicy(POLICY, "Berufserfahrung", { region: "DE" }).policy;
+    expect(localized).not.toBe(POLICY);
+    expect(Object.isFrozen(localized)).toBe(true);
+    expect(Object.isFrozen(localized.resumeParse)).toBe(true);
+    expect(Object.isFrozen(localized.rules)).toBe(true);
+    // The packs a host passes in are left as they were: the policy holds parsed copies.
+    const pack = structuredClone(de);
+    withLocales(DEFAULT_POLICY, { languages: [pack] });
+    expect(Object.isFrozen(pack)).toBe(false);
   });
 
   it("replace an attached pack with the same id", () => {

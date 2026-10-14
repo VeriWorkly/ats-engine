@@ -20,19 +20,19 @@ import {
 export type OpenAiCompatibleOptions = HttpOptions & {
   apiKey: string;
   /** Defaults to `https://api.openai.com/v1`. */
-  baseUrl?: string;
+  baseUrl?: string | undefined;
   /**
    * OpenRouter only: with a `json_schema` request, also send `provider.require_parameters`, so
    * the gateway routes only to upstreams that honour the schema instead of one that ignores it
    * and returns prose. Other endpoints reject the unknown `provider` field, so it is opt-in.
    */
-  requireParameters?: boolean;
+  requireParameters?: boolean | undefined;
   /**
    * The name the output budget is sent under. OpenAI's current models take only
    * `max_completion_tokens` and reject `max_tokens`; most compatible servers (Ollama, vLLM, Groq,
    * OpenRouter) still read `max_tokens`. Defaults to the first for api.openai.com, else the second.
    */
-  maxTokensParameter?: "max_tokens" | "max_completion_tokens";
+  maxTokensParameter?: "max_tokens" | "max_completion_tokens" | undefined;
 };
 
 type ChatCompletion = {

@@ -20,7 +20,7 @@ import {
   type AtsAiResult,
   type AtsAiRetryEvent,
   type AtsAiTask,
-  type TaskRoute,
+  type RouteSettings,
 } from "./run.js";
 import { analyzeSpec, type AnalyzeInput, type AtsAiInsights } from "./tasks/analyze.js";
 import {
@@ -34,18 +34,22 @@ import { repairParseSpec, type RepairParseInput } from "./tasks/repairParse.js";
 export type AtsAiOptions = {
   provider: LlmProvider;
   /** Default model and settings per task. Each call can override any of them. */
-  routes?: Partial<Record<AtsAiTask, Partial<TaskRoute>>>;
+  routes?: { [Task in AtsAiTask]?: RouteSettings | undefined } | undefined;
   /** System prompt overrides per task. */
-  prompts?: Partial<Record<AtsAiTask, string>>;
+  prompts?: { [Task in AtsAiTask]?: string | undefined } | undefined;
   /**
    * Contact-detail redaction per task. Defaults to on for `analyze`, which does not need to
    * know who the candidate is. `repairParse` and `convertResume` exist to recover those details
    * and ignore this setting.
    */
-  redact?: { analyze?: boolean };
+  redact?: { analyze?: boolean | undefined } | undefined;
   /** Engine policy used to classify repaired credentials. Defaults to `DEFAULT_POLICY`. */
-  enginePolicy?: AtsEnginePolicy;
-  hooks?: { onRetry?(event: AtsAiRetryEvent): void };
+  enginePolicy?: AtsEnginePolicy | undefined;
+  /**
+   * `onRetry` is checked as a method is (its event either way), so a handler written for one
+   * task fits, and it may also be set to `undefined`.
+   */
+  hooks?: { onRetry?: { method(event: AtsAiRetryEvent): void }["method"] | undefined } | undefined;
 };
 
 /** The three tasks, bound to one provider. Each call can override its task's route. */
