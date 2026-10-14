@@ -135,8 +135,13 @@ export function sampleOf(text: string): Sample {
  * detection words — at least three different ones, and at least 3% of all words, so a German
  * company name in an English resume ("Müller und Söhne") does not make the resume German, and
  * neither does a surname that is one of the words ("Das") however often it is repeated.
+ *
+ * Measured against `base`, the policy's own language, a Latin-script language must also have
+ * more of its words in the text than the base has of its own: an English resume naming "Banque
+ * Nationale du Canada" and "Caisse de dépôt et placement du Québec" has as many French words as
+ * a short French CV, and more English ones.
  */
-export function isWrittenIn({ text, words }: Sample, pack: Detection) {
+export function isWrittenIn({ text, words }: Sample, pack: Detection, base?: Detection) {
   const detection = detectionOf(pack);
   if (detection.script) {
     const letters = text.match(/[\p{L}\p{M}]/gu)?.length ?? 0;
@@ -144,7 +149,12 @@ export function isWrittenIn({ text, words }: Sample, pack: Detection) {
     return inScript >= 20 && inScript / Math.max(letters, 1) >= 0.15;
   }
   const hits = words.filter((word) => detection.words.has(word));
-  return new Set(hits).size >= 3 && hits.length / Math.max(words.length, 1) >= 0.03;
+  const own = base ? detectionOf(base).words : undefined;
+  return (
+    new Set(hits).size >= 3 &&
+    hits.length / Math.max(words.length, 1) >= 0.03 &&
+    (!own || hits.length > words.filter((word) => own.has(word)).length)
+  );
 }
 
 /**
@@ -162,7 +172,7 @@ export const UNDETERMINED = "und";
 export function baseLanguageOf(policy: AtsEnginePolicy, sample: Sample) {
   const { text } = policy;
   return !isWrittenIn(sample, text) &&
-    text.otherLanguages.some((other) => isWrittenIn(sample, other))
+    text.otherLanguages.some((other) => isWrittenIn(sample, other, text))
     ? UNDETERMINED
     : text.language;
 }
@@ -178,7 +188,7 @@ export function inLanguagesOf(policy: AtsEnginePolicy, text: string): AtsEngineP
   const packs = policy.locales.languages;
   if (!packs.length) return policy;
   const sample = sampleOf(text);
-  const languages = packs.filter((pack) => isWrittenIn(sample, pack));
+  const languages = packs.filter((pack) => isWrittenIn(sample, pack, policy.text));
   if (!languages.length) return policy;
   const key = languages.map((pack) => pack.id).join("+");
   const cache = inLanguagesCache(policy);

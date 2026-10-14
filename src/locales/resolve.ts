@@ -194,13 +194,13 @@ export function localizePolicy(
   const posting =
     text === resumeText ? "" : text.startsWith(resumeText) ? text.slice(resumeText.length) : text;
   const postingSample = posting ? sampleOf(posting) : undefined;
-  const inResume = packs.filter((pack) => isWrittenIn(resumeSample, pack));
+  const inResume = packs.filter((pack) => isWrittenIn(resumeSample, pack, policy.text));
   const languages = options.languages
     ? packs.filter((pack) => options.languages!.includes(pack.id))
     : packs.filter(
         (pack) =>
           inResume.includes(pack) ||
-          (postingSample !== undefined && isWrittenIn(postingSample, pack)),
+          (postingSample !== undefined && isWrittenIn(postingSample, pack, policy.text)),
       );
 
   // A language only the posting is written in says where the job is, not how the resume writes

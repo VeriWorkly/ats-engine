@@ -73,6 +73,56 @@ describe("detection", () => {
     expect(report.locale.languages).toEqual([]);
   });
 
+  // Invented people. French names of employers and schools ("du", "et", "des") are as many
+  // French words as a short French CV has, but fewer than the English around them.
+  it.each([
+    [
+      "New York",
+      [
+        "Sarah Cohen",
+        "sarah@example.com | (212) 555-0199 | New York, NY",
+        "Experience",
+        "Associate, Banque Nationale du Canada — New York, NY",
+        "03/04/2021 – Present",
+        "- Managed a $40M loan book",
+        "Analyst, Crédit Agricole Corporate et Investment Bank — New York, NY",
+        "07/01/2018 – 03/01/2021",
+        "- Built credit models",
+        "Education",
+        "MBA, Institut Européen d'Administration des Affaires (INSEAD), 2018",
+        "BA Economics, Columbia University, 2016",
+        "Skills",
+        "Excel, Bloomberg, Python",
+      ],
+      { year: 2021, month: 3 },
+    ],
+    [
+      "Montreal",
+      [
+        "Marc Tremblay",
+        "marc@example.com | (514) 555-0123 | Montreal, QC",
+        "Experience",
+        "Data Analyst, Caisse de dépôt et placement du Québec — Montreal",
+        "04/05/2021 – Present",
+        "- Built risk dashboards in Power BI",
+        "Analyst, Société des alcools du Québec — Montreal",
+        "09/01/2018 – 03/01/2021",
+        "- Automated sales reports with Python",
+        "Education",
+        "MSc Finance, HEC Montréal, 2018",
+        "BCom, Université du Québec à Montréal, 2016",
+        "Skills",
+        "Python, SQL, Power BI",
+      ],
+      { year: 2021, month: 4 },
+    ],
+  ])("reads an English resume from %s naming French institutions as English", (_, lines, start) => {
+    const report = check(lines.join("\n"));
+    expect(report.locale).toEqual({ languages: [], region: null });
+    expect(report.parsed.roles[0].start).toEqual(start);
+    expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
+  });
+
   it("takes the region from a +CC phone number over the language's default", () => {
     expect(
       check(LOCALE_FIXTURES.de[0].text.replace("+49 30 12345678", "+91 98765 43210")).locale,
