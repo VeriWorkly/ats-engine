@@ -30,7 +30,7 @@ export type AnalyzeInput = {
   /** The flattened resume the report was computed from. */
   resumeText: string;
   report: AtsReport;
-  jobDescription?: string;
+  jobDescription?: string | undefined;
 };
 
 /** Job text beyond this adds cost, not signal. */

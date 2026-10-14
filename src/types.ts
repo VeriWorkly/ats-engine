@@ -97,14 +97,14 @@ export type AtsAdvice = {
  */
 export type AtsFileInfo = {
   /** The file's name as uploaded, with its extension: "Resume_final_v3 (2).pdf". */
-  name?: string;
-  bytes?: number;
-  format?: "pdf" | "docx" | "html" | "text";
+  name?: string | undefined;
+  bytes?: number | undefined;
+  format?: "pdf" | "docx" | "html" | "text" | undefined;
   /** The file needs a password to open, or carries one restricting it. */
-  passwordProtected?: boolean;
+  passwordProtected?: boolean | undefined;
   /** A Word document still holding tracked changes, or comments. */
-  trackedChanges?: boolean;
-  comments?: boolean;
+  trackedChanges?: boolean | undefined;
+  comments?: boolean | undefined;
 };
 
 /**

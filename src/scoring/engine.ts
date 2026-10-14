@@ -49,42 +49,42 @@ function visibleLine(layout: AtsLayoutSignals | undefined) {
 /** Everything `check` reads besides the resume and the policy. */
 export type AtsCheckOptions = {
   /** Enables job match scoring. Read up to its first 20 000 characters. */
-  jobDescription?: string;
+  jobDescription?: string | undefined;
   /**
    * The employer that posted the job, when the host knows it (the `company` of `/job`'s
    * `extractJobPosting`). Every word of it is left out of the job-match keywords.
    */
-  jobCompany?: string;
+  jobCompany?: string | undefined;
   /**
    * Layout signals from a file upload (`extractResume`): page geometry, hidden text, and what the
    * file advice reads (an encrypted PDF, a Word document's tracked changes and comments). Absent
    * for pasted text and structured documents; the layout rules then drop out.
    */
-  layout?: AtsLayoutSignals;
+  layout?: AtsLayoutSignals | undefined;
   /**
    * The reference date for the tenure of a current role and for the plausible-year ceiling.
    * Defaults to the current time; pass a fixed value wherever a result must be reproducible.
    */
-  now?: Date;
+  now?: Date | undefined;
   /**
    * Return the text as the engine read it, one entry per line (`report.lines`). Off by default:
    * it is the resume's full text. Worth showing a candidate, because reading order — not columns
    * as such — is what breaks a multi-column layout, and it is visible only here.
    */
-  includeLines?: boolean;
+  includeLines?: boolean | undefined;
   /**
    * What the host knows of the uploaded file — its name, size, format, a password, tracked
    * changes, comments — for the file advice in `report.advice`. Never scored. Absent for pasted
    * text.
    */
-  file?: AtsFileInfo;
+  file?: AtsFileInfo | undefined;
   /**
    * An applicant tracking system the resume is headed for, by its id in the policy
    * (`advice.targets`: "greenhouse", "lever", "taleo" in the community policy). Adds that
    * vendor's documented notes to `report.advice`, each with its source; never scored. Throws
    * `AtsPolicyError` for an id the policy has no notes on.
    */
-  targetAts?: string;
+  targetAts?: string | undefined;
 } & AtsLocaleOptions;
 
 /** The scorer behind `check`. `AtsScoringService.check` gives the same report, until 1.0. */

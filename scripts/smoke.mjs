@@ -2,10 +2,13 @@
 //
 // Browser: every runtime-agnostic subpath must bundle for `platform: "browser"`, which fails on
 // any Node built-in. Edge: the core, bundled, must score a resume inside a bare V8 context —
-// no `process`, `Buffer`, `require` or file system, as in a Workers/Edge runtime.
+// no `process`, `Buffer`, `require` or file system, as in a Workers/Edge runtime. Types: the
+// TypeScript samples in the README and LOCALES.md must compile against the built `.d.ts` under
+// the strictest options a host may set, `exactOptionalPropertyTypes` among them.
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { build } from "esbuild";
+import ts from "typescript";
 
 const { exports } = JSON.parse(readFileSync("package.json", "utf8"));
 const BROWSER = [
@@ -52,3 +55,45 @@ const sandbox = { TextEncoder, TextDecoder, URL, console };
 runInNewContext(core.outputFiles[0].text, sandbox);
 if (typeof sandbox.report?.readinessScore !== "number") throw new Error("edge smoke: no report");
 console.log(`edge     . (readiness ${sandbox.report.readinessScore})`);
+
+// Each sample is its own module beside package.json, so `@veriworkly/ats-engine` resolves to this
+// package's exports. The names a sample uses without defining are declared for it.
+const DECLARED = ["resume", "resumeText", "postingHtml", "jobDescription"]
+  .map((name) => `declare const ${name}: string;`)
+  .join(" ");
+const root = process.cwd().replaceAll("\\", "/"); // TypeScript's form of a path
+const samples = new Map();
+for (const doc of ["README.md", "LOCALES.md"]) {
+  const blocks = readFileSync(doc, "utf8").matchAll(/^```ts\r?\n([\s\S]*?)^```/gm);
+  for (const [index, [, code]] of [...blocks].entries())
+    samples.set(`${root}/${doc}.sample-${index + 1}.ts`, `${DECLARED}\n${code}`);
+}
+const options = {
+  target: ts.ScriptTarget.ES2022,
+  module: ts.ModuleKind.NodeNext,
+  moduleResolution: ts.ModuleResolutionKind.NodeNext,
+  lib: ["lib.es2022.d.ts", "lib.dom.d.ts"],
+  types: ["node"],
+  strict: true,
+  exactOptionalPropertyTypes: true,
+  noUncheckedIndexedAccess: true,
+  noEmit: true,
+};
+const host = ts.createCompilerHost(options);
+const { fileExists, readFile, getSourceFile } = host;
+host.fileExists = (name) => samples.has(name) || fileExists(name);
+host.readFile = (name) => samples.get(name) ?? readFile(name);
+host.getSourceFile = (name, language, ...rest) =>
+  samples.has(name)
+    ? ts.createSourceFile(name, samples.get(name), language)
+    : getSourceFile(name, language, ...rest);
+const errors = ts.getPreEmitDiagnostics(ts.createProgram([...samples.keys()], options, host));
+if (errors.length > 0)
+  throw new Error(
+    `types: the samples do not compile\n${ts.formatDiagnostics(errors, {
+      getCanonicalFileName: (name) => name,
+      getCurrentDirectory: () => process.cwd(),
+      getNewLine: () => "\n",
+    })}`,
+  );
+console.log(`types    ${samples.size} samples in README.md and LOCALES.md`);

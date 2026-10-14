@@ -37,48 +37,48 @@ export const DOCUMENT_LIMITS = {
 export type AtsDocumentRole = {
   title: string;
   employer: string;
-  location?: string;
-  start?: string;
-  end?: string;
-  current?: boolean;
-  summary?: string;
-  highlights?: string[];
+  location?: string | undefined;
+  start?: string | undefined;
+  end?: string | undefined;
+  current?: boolean | undefined;
+  summary?: string | undefined;
+  highlights?: string[] | undefined;
 };
 
 /** A row of an `education` section. `credential` is the degree as written ("B.Sc."). */
 export type AtsDocumentEducation = {
   school: string;
-  credential?: string;
-  field?: string;
-  start?: string;
-  end?: string;
-  current?: boolean;
-  summary?: string;
+  credential?: string | undefined;
+  field?: string | undefined;
+  start?: string | undefined;
+  end?: string | undefined;
+  current?: boolean | undefined;
+  summary?: string | undefined;
 };
 
 /** A row of a `projects` section. */
 export type AtsDocumentProject = {
   name: string;
-  role?: string;
-  url?: string;
-  summary?: string;
-  highlights?: string[];
-  skills?: string[];
+  role?: string | undefined;
+  url?: string | undefined;
+  summary?: string | undefined;
+  highlights?: string[] | undefined;
+  skills?: string[] | undefined;
 };
 
 /** A group of a `skills` section: its keywords, under an optional name ("Languages"). */
 export type AtsDocumentSkillGroup = {
-  name?: string;
+  name?: string | undefined;
   keywords: string[];
 };
 
 /** A certification or licence. `date` when it was earned, `expires` when it lapses. */
 export type AtsDocumentCertification = {
   name: string;
-  issuer?: string;
-  date?: string;
-  expires?: string;
-  url?: string;
+  issuer?: string | undefined;
+  date?: string | undefined;
+  expires?: string | undefined;
+  url?: string | undefined;
 };
 
 /**
@@ -87,13 +87,13 @@ export type AtsDocumentCertification = {
  */
 export type AtsDocumentLanguage = {
   language: string;
-  level?: string;
+  level?: string | undefined;
 };
 
 /** A row in any section without a dedicated shape: awards, publications, interests, … */
 export type AtsDocumentEntry = {
-  heading?: string;
-  lines?: string[];
+  heading?: string | undefined;
+  lines?: string[] | undefined;
 };
 
 /**
@@ -113,11 +113,11 @@ export type AtsDocumentSection =
 /** The header of the resume: the name and the contact details. */
 export type AtsDocumentBasics = {
   name: string;
-  headline?: string;
-  email?: string;
-  phone?: string;
-  location?: string;
-  links?: string[];
+  headline?: string | undefined;
+  email?: string | undefined;
+  phone?: string | undefined;
+  location?: string | undefined;
+  links?: string[] | undefined;
 };
 
 /**

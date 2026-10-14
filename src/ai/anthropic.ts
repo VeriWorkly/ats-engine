@@ -23,9 +23,9 @@ import {
 export type AnthropicOptions = HttpOptions & {
   apiKey: string;
   /** Defaults to `https://api.anthropic.com`. */
-  baseUrl?: string;
+  baseUrl?: string | undefined;
   /** The `anthropic-version` header. Defaults to `2023-06-01`. */
-  version?: string;
+  version?: string | undefined;
 };
 
 type MessagesResponse = {

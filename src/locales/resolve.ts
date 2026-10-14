@@ -14,7 +14,10 @@ import type { AtsLanguagePackInput, AtsRegionPack, AtsRegionPackInput } from "./
  */
 export function withLocales(
   policy: AtsEnginePolicyInput,
-  packs: { languages?: AtsLanguagePackInput[]; regions?: AtsRegionPackInput[] },
+  packs: {
+    languages?: AtsLanguagePackInput[] | undefined;
+    regions?: AtsRegionPackInput[] | undefined;
+  },
 ): AtsEnginePolicy {
   const byId = <T extends { id: string }>(existing: T[] = [], added: T[] = []) => [
     ...new Map([...existing, ...added].map((pack) => [pack.id, pack])).values(),
@@ -105,9 +108,9 @@ export type AtsLocale = { languages: string[]; region: string | null };
 /** Set the languages and the region a resume is read in, instead of detecting them. */
 export type AtsLocaleOptions = {
   /** Language pack ids to read with, instead of detecting them. `[]` reads with the base only. */
-  languages?: string[];
+  languages?: string[] | undefined;
   /** The region pack id to apply (any case), instead of inferring one; unknown ids throw. */
-  region?: string;
+  region?: string | undefined;
 };
 
 /** Per base policy: every language, region and date-order combination it has been localised to. */

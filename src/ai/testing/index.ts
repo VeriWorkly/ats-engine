@@ -57,7 +57,7 @@ export type AiEvalCase = {
    */
   source: string;
   /** Values that must never appear in the output, e.g. an employer a resume tries to inject. */
-  forbidden?: string[];
+  forbidden?: string[] | undefined;
 };
 
 /** The rates an eval measured over every run of every case, with each failure and dropped value. */
@@ -148,7 +148,7 @@ const rate = (count: number, total: number) => (total ? count / total : 0);
 export async function runAiEval(
   ai: AtsAi,
   cases: AiEvalCase[],
-  { runs = 1 }: { runs?: number } = {},
+  { runs = 1 }: { runs?: number | undefined } = {},
 ): Promise<AiEvalReport> {
   let attempted = 0;
   let succeeded = 0;

@@ -135,8 +135,9 @@ prints each entry's size against its budget, with the reason for each budget bes
 budgets hold what a host importing only some names bundles: `withLocales` alone (48.2 KB) and
 `/ai`'s prompts and error alone (9.5 KB). The packs' and the tasks' JSON Schemas are built at
 load, so those calls are marked `/* @__PURE__ */` and drop out when not imported;
-`npm run smoke` bundles every runtime-agnostic subpath for the browser and runs the core in a
-bare V8 context (edge).
+`npm run smoke` bundles every runtime-agnostic subpath for the browser, runs the core in a bare
+V8 context (edge), and compiles the TypeScript samples in README.md and LOCALES.md against the
+built `.d.ts` with `exactOptionalPropertyTypes` on.
 
 ## Decisions worth knowing
 

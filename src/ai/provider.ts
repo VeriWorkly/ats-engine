@@ -52,15 +52,15 @@ export type LlmRequest = {
 export type LlmUsage = {
   inputTokens: number;
   outputTokens: number;
-  cacheReadTokens?: number;
-  cacheWriteTokens?: number;
+  cacheReadTokens?: number | undefined;
+  cacheWriteTokens?: number | undefined;
 };
 
 /** What an adapter reports back: the text, the provider's response id, usage, why it stopped. */
 export type LlmResponse = {
   text: string;
-  id?: string;
-  usage?: LlmUsage;
+  id?: string | undefined;
+  usage?: LlmUsage | undefined;
   /** `length` means the output hit `maxTokens`; `refusal` means the model declined. */
   finish: "stop" | "length" | "refusal" | "other";
 };
@@ -84,7 +84,10 @@ export class LlmProviderError extends Error {
   readonly status?: number;
   readonly retryable: boolean;
 
-  constructor(message: string, options: { status?: number; retryable: boolean; cause?: unknown }) {
+  constructor(
+    message: string,
+    options: { status?: number | undefined; retryable: boolean; cause?: unknown },
+  ) {
     super(message, { cause: options.cause });
     this.name = "LlmProviderError";
     this.status = options.status;
