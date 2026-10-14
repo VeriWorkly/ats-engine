@@ -101,7 +101,7 @@ The resource `rubric://default` is the whole rubric as JSON.
 - Files over 20 MB are refused, and so are folders, pipes, devices and network paths
   (`\\host\share\…`). So is a PDF with no text layer: an ATS
   cannot read a scan either.
-- `region` is `US`, `DE` or `IN`. Without it, the region is inferred from the resume.
+- `region` is `US`, `GB`, `DE`, `FR` or `IN`. Without it, the region is inferred from the resume.
 - `target_ats` is `greenhouse`, `lever` or `taleo`. It adds what that vendor documents publicly,
   each note with a link to the vendor's page. It never changes the score.
 

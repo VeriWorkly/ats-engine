@@ -15,10 +15,10 @@ Only the latest minor release receives security fixes while the package is 0.x.
 The engine is built to take input from anyone: a resume, a posting, a web page, an uploaded
 file. These are the guarantees, each held by a test.
 
-**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 100
-shapes, 95 written on one line or under one heading (letter runs, digit runs, unclosed tags,
-comma lists, mixed scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each), placed in the name
-line, a bullet and the posting at once, and again under the certification and language headings,
+**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 110
+shapes, 105 written on one line or under one heading (letter runs, digit runs, unclosed tags,
+comma lists, mixed scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each),
+placed in the name line, a bullet and the posting at once, and again under the certification and language headings,
 scores under the community policy with every locale pack applied in tens of milliseconds for most
 one-line shapes and a few hundred at most, short lines included, on a developer machine
 (`tests/integration/adversarial.test.ts`, which fails any shape past 1.5 s). The analysis's
