@@ -22,7 +22,7 @@ export const ATS_DOCUMENT_FORMAT = "ats-resume@1";
  * Set at or above what the Studio editor itself allows, so a resume a user can build is never
  * refused for its size.
  */
-export const DOCUMENT_LIMITS = {
+export const DOCUMENT_LIMITS = /* @__PURE__ */ Object.freeze({
   sections: 40,
   items: 200,
   lines: 100,
@@ -31,7 +31,7 @@ export const DOCUMENT_LIMITS = {
   field: 500,
   line: 5_000,
   text: 10_000,
-} as const;
+} as const);
 
 /** A role in an `experience` section. Dates are `YYYY-MM` or `YYYY`. */
 export type AtsDocumentRole = {

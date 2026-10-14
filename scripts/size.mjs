@@ -43,12 +43,14 @@ const BUDGETS = {
   // 71.1: the policy data this round's fixes added (see ".") took it to 71.08.
   // 71.3: reading a policy with a loop rather than recursion, so one nested past 5,000 levels is
   // refused as invalid instead of overflowing the stack, took it to 71.24.
-  "./locales": 71.3,
+  // 71.4: freezing a parsed policy, the packs, their JSON Schemas and the exported constants, so a
+  // host that changes one throws instead of being read with what was compiled before, to 71.31.
+  "./locales": 71.4,
   // 70: zod/mini in place of zod took it from 141.0 to 67.5.
   // 71.6: the policy's place names (see "."), with what else "." gained, took it from 69.3 to 71.5.
   // 71.8: the policy data and parsing this round's fixes added (see ".") took it to 71.75.
   // 71.9: the same as "." at 99.9, to 71.84.
-  // 72.1: the same loop as "./locales" at 71.3, to 72.01.
+  // 72.1: the same loop as "./locales" at 71.3, to 72.01, and the freezing at 71.4, to 72.07.
   "./ai": 72.1,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,

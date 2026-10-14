@@ -147,6 +147,16 @@ describe("packs", () => {
     ).toThrow(AtsPolicyError);
   });
 
+  it("attach to a frozen policy, as parseAtsPolicy returns one", () => {
+    expect(Object.isFrozen(POLICY)).toBe(true);
+    expect(Object.isFrozen(POLICY.locales.languages[0])).toBe(true);
+    expect(() => POLICY.locales.regions.pop()).toThrow(TypeError);
+    // The packs a host passes in are left as they were: the policy holds parsed copies.
+    const pack = structuredClone(de);
+    withLocales(DEFAULT_POLICY, { languages: [pack] });
+    expect(Object.isFrozen(pack)).toBe(false);
+  });
+
   it("replace an attached pack with the same id", () => {
     const twice = withLocales(withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), { languages: [de] });
     expect(twice.locales.languages.map((pack) => pack.id)).toEqual(["de", "hi"]);

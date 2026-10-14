@@ -36,7 +36,9 @@ labelled.
    to the adversarial suites if it is new. No nested quantifiers over the same characters; bound
    repetition; prefer a scan to a clever pattern.
 4. **No I/O, no globals in the core.** Caches are `memo` (a WeakMap on the object the value comes
-   from), never module-level maps keyed by strings.
+   from), never module-level maps keyed by strings. A parsed policy is frozen, and so is every
+   object a module exports (`deepFreeze`, or `Object.freeze` for a flat one, marked
+   `/* @__PURE__ */`): the engine never changes either, and builds a new object instead.
 5. **Pure reports.** A report is a function of (input, policy, options incl. `now`). Anything that
    reads the clock takes `now`.
 6. **Rules without evidence are dropped**, never passed or failed. Integrity rules are penalties

@@ -14,6 +14,7 @@ import * as z from "zod/mini";
 import { de } from "./packs/de.js";
 import { hi } from "./packs/hi.js";
 import { DE, IN, US } from "./packs/regions.js";
+import { deepFreeze } from "../util/memo.js";
 import { languagePackSchema, regionPackSchema } from "./schema.js";
 
 export { localizePolicy, withLocales, type AtsLocale, type AtsLocaleOptions } from "./resolve.js";
@@ -26,13 +27,16 @@ export type {
 export { de, hi, DE, IN, US };
 
 /** Every pack this package ships. English is the policy's own base vocabulary, not a pack. */
-export const BUILT_IN_LOCALES = { languages: [de, hi], regions: [US, DE, IN] };
+export const BUILT_IN_LOCALES = /* @__PURE__ */ deepFreeze({
+  languages: [de, hi],
+  regions: [US, DE, IN],
+});
 
 /** JSON Schema for a language pack written as JSON. Patterns are checked when it is attached. */
-export const atsLanguagePackJsonSchema = /* @__PURE__ */ z.toJSONSchema(languagePackSchema, {
-  io: "input",
-});
+export const atsLanguagePackJsonSchema = /* @__PURE__ */ deepFreeze(
+  /* @__PURE__ */ z.toJSONSchema(languagePackSchema, { io: "input" }),
+);
 /** JSON Schema for a region pack written as JSON. Patterns are checked when it is attached. */
-export const atsRegionPackJsonSchema = /* @__PURE__ */ z.toJSONSchema(regionPackSchema, {
-  io: "input",
-});
+export const atsRegionPackJsonSchema = /* @__PURE__ */ deepFreeze(
+  /* @__PURE__ */ z.toJSONSchema(regionPackSchema, { io: "input" }),
+);

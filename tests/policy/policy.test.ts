@@ -7,6 +7,19 @@ import {
   computeVerdict,
   parseAtsPolicy,
 } from "../../src/index.js";
+import * as ai from "../../src/ai/index.js";
+import * as document from "../../src/document/index.js";
+import * as format from "../../src/format/index.js";
+import * as main from "../../src/index.js";
+import * as job from "../../src/job/index.js";
+import * as locales from "../../src/locales/index.js";
+
+/** Whether `value`, and every object and array it holds, is frozen. */
+const isDeepFrozen = (value: unknown, seen = new Set<unknown>()): boolean => {
+  if (!value || typeof value !== "object" || seen.has(value)) return true;
+  seen.add(value);
+  return Object.isFrozen(value) && Object.values(value).every((item) => isDeepFrozen(item, seen));
+};
 
 /**
  * The policy contract, from the package's side.
@@ -73,6 +86,30 @@ describe("parseAtsPolicy", () => {
     const policy = parseAtsPolicy(MINIMAL);
     expect(policy.version).toBe("ats-v2");
     expect(policy.rules).toHaveLength(1);
+  });
+
+  /**
+   * The engine caches what it compiles from a policy against the policy object itself, so a
+   * policy changed after it was parsed would be read with patterns compiled before the change.
+   * Frozen, the change throws (test files are modules, so strict) instead of going unread.
+   */
+  it("returns a frozen policy, so a host that changes it throws", () => {
+    const policy = parseAtsPolicy(MINIMAL);
+    expect(isDeepFrozen(policy)).toBe(true);
+    expect(() => {
+      (policy as { version: string }).version = "changed";
+    }).toThrow(TypeError);
+    expect(() => policy.rules.push(policy.rules[0])).toThrow(TypeError);
+    expect(() => {
+      (policy.rules[0] as { weight: number }).weight = 1;
+    }).toThrow(TypeError);
+    expect(() => {
+      (policy.resumeParse.months as Record<string, number>).jan = 2;
+    }).toThrow(TypeError);
+    // A copy is the host's own to change, and still reads as a policy.
+    const copy = structuredClone(policy);
+    copy.version = "changed";
+    expect(parseAtsPolicy(copy).version).toBe("changed");
   });
 
   it("is pure — parsing twice yields equal, independent results", () => {
@@ -260,6 +297,20 @@ describe("regex fields are validated at parse time, not at match time", () => {
 describe("DEFAULT_POLICY", () => {
   it("validates against the schema it is published beside", () => {
     expect(() => parseAtsPolicy(DEFAULT_POLICY)).not.toThrow();
+  });
+
+  it("is frozen, as every exported object is, so no host can change it under another", () => {
+    expect(isDeepFrozen(DEFAULT_POLICY)).toBe(true);
+    const modules = { main, document, format, job, locales, ai };
+    const objects = Object.entries(modules).flatMap(([entry, module]) =>
+      Object.entries(module)
+        .filter(([, value]) => value && typeof value === "object")
+        .map(([name, value]) => [`${entry}.${name}`, value] as const),
+    );
+    expect(objects.map(([name]) => name)).toEqual(
+      expect.arrayContaining(["main.DEFAULT_POLICY", "locales.de", "ai.CONVERT_GROUNDING_SKIP"]),
+    );
+    for (const [name, value] of objects) expect(isDeepFrozen(value), name).toBe(true);
   });
 
   it("exercises every rule kind, so the default is a real demonstration", () => {

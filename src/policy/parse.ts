@@ -1,5 +1,6 @@
 import { normalizeText } from "../text/text.js";
 import { ENGLISH_ISSUES } from "../util/issues.js";
+import { deepFreeze } from "../util/memo.js";
 import { AtsPolicyError, type AtsPolicyIssue } from "./errors.js";
 import { atsEngineSchema, type AtsEnginePolicy } from "./schema.js";
 
@@ -59,7 +60,7 @@ const invalid = (issues: AtsPolicyIssue[]) =>
  */
 export function parseAtsPolicy(json: unknown): AtsEnginePolicy {
   const result = atsEngineSchema.safeParse(normalizeStrings(json), ENGLISH_ISSUES);
-  if (result.success) return result.data;
+  if (result.success) return deepFreeze(result.data);
 
   throw invalid(
     result.error.issues.map((issue) => ({

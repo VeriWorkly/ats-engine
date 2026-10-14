@@ -1,3 +1,4 @@
+import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
 /**
@@ -15,7 +16,7 @@ import type { AtsLanguagePackInput } from "../schema.js";
 const compound = (stem: string) => String.raw`\p{L}{0,30}${stem}`;
 
 /** The German language pack: recognised by its function words; region DE by default. */
-export const de: AtsLanguagePackInput = {
+export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   id: "de",
   name: "Deutsch",
   status: "community",
@@ -409,4 +410,4 @@ export const de: AtsLanguagePackInput = {
     "hohe einsatzbereitschaft",
   ],
   nounsCapitalized: true,
-};
+});

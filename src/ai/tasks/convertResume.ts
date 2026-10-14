@@ -4,6 +4,7 @@ import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { findGroundingViolations, type GroundingViolation } from "../../repair/grounding.js";
 import { ongoingIn, writtenYears } from "../../repair/merge.js";
 import { normalizeText } from "../../text/text.js";
+import { deepFreeze } from "../../util/memo.js";
 import type { TaskSpec } from "../run.js";
 import { toStrictJsonSchema } from "../schema.js";
 import { flag, list, text, textList } from "./fields.js";
@@ -78,7 +79,7 @@ const MAX_CONVERT_CHARS = 50_000;
  * every skill, the values a model must not invent on someone's resume. Skills used to be exempt
  * as a whole subtree, which let a model add ones the resume never names.
  */
-export const CONVERT_GROUNDING_SKIP = [
+export const CONVERT_GROUNDING_SKIP = /* @__PURE__ */ deepFreeze([
   "startDate",
   "endDate",
   "summary",
@@ -88,7 +89,7 @@ export const CONVERT_GROUNDING_SKIP = [
   "label",
   "skills[].name",
   "phone",
-];
+]);
 
 /** The system prompt `convertResume` uses unless `prompts.convertResume` or a call replaces it. */
 export const DEFAULT_CONVERT_PROMPT = [

@@ -508,8 +508,10 @@ describe("reproducibility", () => {
     const { parseAtsPolicy, policyFingerprint } = await import("../../src/index.js");
     const changed = parseAtsPolicy({ ...structuredClone(DEFAULT_POLICY), version: "ats-v2" });
     expect(policyFingerprint(changed)).toBe(policyFingerprint(DEFAULT_POLICY));
-    changed.rules[0] = { ...changed.rules[0], fix: "Something else." };
-    expect(policyFingerprint(parseAtsPolicy(changed))).not.toBe(policyFingerprint(DEFAULT_POLICY));
+    // A parsed policy is frozen, so the change is made to a copy.
+    const edited = structuredClone(changed);
+    edited.rules[0] = { ...edited.rules[0], fix: "Something else." };
+    expect(policyFingerprint(parseAtsPolicy(edited))).not.toBe(policyFingerprint(DEFAULT_POLICY));
   });
 
   it("returns the lines as read only when asked", () => {
