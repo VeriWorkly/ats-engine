@@ -5,9 +5,9 @@ import { AtsPolicyError, type AtsPolicyIssue } from "./errors.js";
 import { atsEngineSchema, type AtsEnginePolicy } from "./schema.js";
 
 /**
- * How deep a policy may nest. The schema nests six levels; this is far past that, and past where
- * the recursive walk this replaced ran out of stack (2,000 to 7,000 levels, by runtime and
- * warm-up), so a policy refused here could not have been read before either.
+ * How deep a policy may nest. The schema nests six levels; this is far past that. The recursive
+ * walk this replaced ran out of stack at a depth that varied by machine, runtime and warm-up
+ * (2,000 to about 7,000 levels on Node), so some policies deeper than this were read before.
  */
 const MAX_POLICY_DEPTH = 5_000;
 
@@ -16,24 +16,37 @@ const MAX_POLICY_DEPTH = 5_000;
  * word written with a precomposed character — Hindi "ज़" — matches the decomposed text it will
  * be compared with. Object keys too: month names are keys.
  *
- * A loop over a stack rather than recursion, so a policy nested deeper than `MAX_POLICY_DEPTH`
- * (or one that contains itself) is refused as invalid instead of overflowing the stack. It
- * visits values in the order the recursion did, and two keys that normalise to one still keep
- * the first one's place and the last one's value.
+ * A loop over a stack rather than recursion, so a policy nested deeper than `MAX_POLICY_DEPTH`,
+ * or one that contains itself, is refused as invalid instead of overflowing the stack. An object
+ * met again inside itself is refused at once; one used in two places is read in both. It visits
+ * values in the order the recursion did, and two keys that normalise to one still keep the
+ * first one's place and the last one's value.
  */
 function normalizeStrings(json: unknown): unknown {
   const root: Record<PropertyKey, unknown> = {};
-  // Where a value's normalised form goes, the value, and how many objects and arrays hold it.
-  const stack: [Record<PropertyKey, unknown>, PropertyKey, unknown, number][] = [
+  // Where a value's normalised form goes, the value, and how many objects and arrays hold it; a
+  // task with no target marks where the walk leaves an object, so it is off the path again.
+  const stack: [Record<PropertyKey, unknown> | null, PropertyKey, unknown, number][] = [
     [root, 0, json, 0],
   ];
+  const path = new Set<unknown>();
   for (let task; (task = stack.pop());) {
     const [target, key, value, depth] = task;
-    if (!value || typeof value !== "object")
+    if (!target) path.delete(value);
+    else if (!value || typeof value !== "object")
       target[key] = typeof value === "string" ? normalizeText(value) : value;
     else {
-      if (depth === MAX_POLICY_DEPTH)
-        throw invalid([{ path: "", message: `Nested deeper than ${MAX_POLICY_DEPTH} levels.` }]);
+      if (depth === MAX_POLICY_DEPTH || path.has(value))
+        throw invalid([
+          {
+            path: "",
+            message: path.has(value)
+              ? "Contains itself."
+              : `Nested deeper than ${MAX_POLICY_DEPTH} levels.`,
+          },
+        ]);
+      path.add(value);
+      stack.push([null, 0, value, 0]);
       const array = Array.isArray(value);
       // An array's entries skip its holes, as `map` did; an object's keys are normalised.
       const entries: [PropertyKey, unknown][] = array

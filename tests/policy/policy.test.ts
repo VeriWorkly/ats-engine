@@ -13,6 +13,7 @@ import * as format from "../../src/format/index.js";
 import * as main from "../../src/index.js";
 import * as job from "../../src/job/index.js";
 import * as locales from "../../src/locales/index.js";
+import { expectFast } from "../fixtures/timing.js";
 
 /** Whether `value`, and every object and array it holds, is frozen. */
 const isDeepFrozen = (value: unknown, seen = new Set<unknown>()): boolean => {
@@ -167,10 +168,24 @@ describe("parseAtsPolicy", () => {
     }
   });
 
-  it("refuses a policy that contains itself with AtsPolicyError", () => {
-    const policy: Record<string, unknown> = { ...MINIMAL };
-    policy.extra = policy;
-    expect(() => parseAtsPolicy(policy)).toThrow(AtsPolicyError);
+  it("refuses a policy that contains itself with AtsPolicyError, at once", () => {
+    // The loop is read last, after the whole of a full policy, on every lap.
+    const policy: Record<string, unknown> = structuredClone(DEFAULT_POLICY);
+    policy.extra = { list: [policy] };
+    // Not after walking the loop to the depth limit, which took seconds.
+    expectFast(() => expect(() => parseAtsPolicy(policy)).toThrow(AtsPolicyError), 200);
+  });
+
+  it("reads an object or a list a policy uses twice, which is no loop", () => {
+    const words = ["engineer"];
+    const shared = { a: "x" };
+    const policy = parseAtsPolicy({
+      ...MINIMAL,
+      resumeParse: { ...MINIMAL.resumeParse, titleWords: words, schoolWords: words },
+      extra: { a: shared, b: [shared, { c: shared }] },
+    });
+    expect(policy.resumeParse.titleWords).toEqual(["engineer"]);
+    expect(policy.resumeParse.schoolWords).toEqual(["engineer"]);
   });
 
   it("reads a policy nested deep in a key it drops, as it always has", () => {
