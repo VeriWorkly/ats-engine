@@ -18,7 +18,13 @@ import {
 } from "../../src/node/docx.js";
 import { measureVisibility, seeThroughImages, type Box } from "../../src/node/hidden.js";
 import { extractResume } from "../../src/node/index.js";
-import { buildDocxBody, documentXml, relationshipsXml } from "../fixtures/buildDocx.js";
+import {
+  buildDocxBody,
+  buildRichDocx,
+  documentXml,
+  marginXml,
+  relationshipsXml,
+} from "../fixtures/buildDocx.js";
 import { buildPdf, buildPdfPages, stream } from "../fixtures/buildPdf.js";
 import { expectFast, expectFastAsync } from "../fixtures/timing.js";
 
@@ -266,6 +272,25 @@ describe("PDF reading stops at a page cap", () => {
     expect(text).toContain("Jane Doe Senior Engineer");
     expect(layout?.pageCount).toBe(5_000);
   }, 60_000);
+});
+
+describe("DOCX headers and footers share one budget", () => {
+  // Each header was read up to 8 MB, and as many as the archive held, twice: seven of 7.5 MB
+  // from a 163 KB file took nine seconds, past the two the parse budget keeps a document near.
+  it("reads a document padded with large headers in the time of a resume", async () => {
+    const filler = marginXml("hdr", "<w:p><w:r><w:t>a</w:t></w:r></w:p>".repeat(220_000));
+    const headers: Array<[string, string]> = [
+      ["word/header1.xml", marginXml("hdr", "<w:p><w:r><w:t>jane@example.com</w:t></w:r></w:p>")],
+    ];
+    for (let n = 2; n <= 8; n += 1) headers.push([`word/header${n}.xml`, filler]);
+    const docx = buildRichDocx(
+      "<w:p><w:r><w:t>Jane Doe, Senior Engineer at Acme</w:t></w:r></w:p>",
+      headers,
+    );
+    const { text } = await expectFastAsync(() => extractResume(docx, "docx"), 2_000);
+    expect(text).toContain("jane@example.com");
+    expect(text).toContain("Jane Doe, Senior Engineer at Acme");
+  }, 120_000);
 });
 
 describe("single-quoted attributes in a DOCX", () => {
