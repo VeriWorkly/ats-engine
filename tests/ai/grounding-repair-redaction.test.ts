@@ -250,6 +250,14 @@ describe("redaction variants", () => {
     expect(redaction.restore("Call [PHONE_1]")).toBe(`Call ${written}`);
   });
 
+  it("catches a second phone, and gives each number its own placeholder", () => {
+    const redaction = createRedaction(parsed("Jane Doe", "(415) 555-0132"), "");
+    const line = "Mobile: (415) 555-0132  Home: (415) 555-0199  Work: 415.555.0177";
+    const hidden = redaction.apply(line);
+    expect(hidden).toBe("Mobile: [PHONE]  Home: [PHONE_1]  Work: [PHONE_2]");
+    expect(redaction.restore(hidden)).toBe(line);
+  });
+
   it.each([
     "Acme, 2019 - 2023",
     "Acme, 01/2020 - 12/2023",
@@ -263,6 +271,9 @@ describe("redaction variants", () => {
     "Room 011, ext 0958",
     "Order 55550132 and 155550132",
     "https://example.com/id/0412345678",
+    "Raised 1.200.000 in 2019-2020-2021",
+    "Case 123-45-6789, filed 2019.05.12",
+    "Served 415-555 users",
   ])("leaves figures that are not phones alone: %s", (text) => {
     const redaction = createRedaction(parsed("Jane Doe", ""), text);
     expect(redaction.apply(text)).toBe(text);

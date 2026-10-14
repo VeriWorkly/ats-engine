@@ -88,8 +88,10 @@ What does not depend on the model:
   extension after it. Any other run of 9 to 15 digits on one line that opens with `+` or a trunk
   `0` (`07912 345678`, `(02) 9876 5432`), whether the parser read it or not, so a local number
   is replaced under a policy without its country's region too; a month and its year that open
-  with 0 (`01/2020 - 12/2023`) are not. Not other phone numbers: a number with neither, such as
-  India's `98765 43210`, is sent unless the parser read it (its region pack reads it). Postal
+  with 0 (`01/2020 - 12/2023`) are not. A North American number written as one, a second one
+  included (`Home: (415) 555-0199`, `415-555-0199`, `415.555.0199`). Not other phone numbers: one
+  with none of these shapes, such as India's `98765 43210` or `415 555 0199` spaced, is sent
+  unless the parser read it (the region pack reads India's). Postal
   addresses are not recognised. The report's
   `advice` is not sent: it quotes the file name, which can hold the name in a form redaction
   cannot know (`Jane_Doe_Resume.pdf`). The resume is cut after redaction, where its 50 000th

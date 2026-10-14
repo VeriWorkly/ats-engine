@@ -58,11 +58,13 @@ const PHONE_GAP = String.raw`[\s().\-/‐‑‒–—]*`;
  * A phone number the parser did not read, as one under a policy without its country's region:
  * 9 to 15 digits on one line that open with "+" or a trunk "0" ("020 7946 0958", "(02) 9876
  * 5432"), up to three of `PHONE_GAP`'s characters between two. A year never opens with either,
- * so "2019 - 2023" is not one. Linear: a gap never holds a digit and is bounded, and a match
- * starts only where a run does.
+ * so "2019 - 2023" is not one. And a North American number, a second one the parser did not
+ * take ("Home: (415) 555-0199"), by its own shape: the area code in brackets, or set off as the
+ * other groups are ("415-555-0199", "415.555.0199"). Linear: a gap never holds a digit and is
+ * bounded, and each alternative reads at most a fixed stretch from where it starts.
  */
 const OTHER_PHONES =
-  /(?<![\p{L}\p{N}+_@#=/.,-])(?:\+|(?=\(?0))\(?\d(?:[ \t().\-/‐‑‒–—]{0,3}\d){8,14}(?!\p{N})/gu;
+  /(?<![\p{L}\p{N}+_@#=/.,-])(?:(?:\+|(?=\(?0))\(?\d(?:[ \t().\-/‐‑‒–—]{0,3}\d){8,14}|(?:1[-. ])?(?:\(\d{3}\)[ \t]?\d{3}[-. \t]|\d{3}([-.])\d{3}\1)\d{4})(?!\p{N})/gu;
 
 /** A month and its year ("01/2020", "05.2019", "01 2019"): a date range that opens with 0. */
 const MONTH_YEAR = /(?:^|\D)(?:0?[1-9]|1[0-2])[ \t]*[./\-–—]?[ \t]*(?:19|20)\d\d(?!\d)/u;

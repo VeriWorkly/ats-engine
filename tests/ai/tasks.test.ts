@@ -230,6 +230,9 @@ describe("redaction", () => {
     "01/2020 - ",
     "0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 ",
     "+" + "1".repeat(20),
+    "(415) 555-",
+    "415-555-",
+    "1-415.555.",
   ])(
     "finds a phone the parser did not read in linear time in 150,000 characters of %j",
     (shape) => {
