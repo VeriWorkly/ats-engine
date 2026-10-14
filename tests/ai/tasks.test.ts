@@ -222,6 +222,22 @@ describe("redaction", () => {
       expectFast(() => createRedaction(international, hostile).apply(hostile), 1_000, shape);
     },
   );
+
+  it.each([
+    "+1 ",
+    "(0",
+    "0-",
+    "01/2020 - ",
+    "0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 ",
+    "+" + "1".repeat(20),
+  ])(
+    "finds a phone the parser did not read in linear time in 150,000 characters of %j",
+    (shape) => {
+      const hostile = shape.repeat(Math.ceil(150_000 / shape.length));
+      const redaction = createRedaction({ ...parsed, phone: "" }, hostile);
+      expectFast(() => redaction.restore(redaction.apply(hostile)), 1_000, shape);
+    },
+  );
 });
 
 describe("repairParse", () => {

@@ -85,7 +85,12 @@ What does not depend on the model:
   parser read. The phone by its national number: with or without the country code (`+44`, `0044`, `+44 (0)`, or after
   the exit prefix `011`, `0011` or `010`), with a trunk zero (`020`, `(020)`) or a North
   American `1-`, any spaces, brackets, dots, slashes or dashes between the digits, and an
-  extension after it; not other phone numbers. Postal addresses are not recognised. The report's
+  extension after it. Any other run of 9 to 15 digits on one line that opens with `+` or a trunk
+  `0` (`07912 345678`, `(02) 9876 5432`), whether the parser read it or not, so a local number
+  is replaced under a policy without its country's region too; a month and its year that open
+  with 0 (`01/2020 - 12/2023`) are not. Not other phone numbers: a number with neither, such as
+  India's `98765 43210`, is sent unless the parser read it (its region pack reads it). Postal
+  addresses are not recognised. The report's
   `advice` is not sent: it quotes the file name, which can hold the name in a form redaction
   cannot know (`Jane_Doe_Resume.pdf`). The resume is cut after redaction, where its 50 000th
   character falls, or before a contact detail the cut falls in, so nothing past it is sent. Parse repair and conversion must see contact details and do not redact.

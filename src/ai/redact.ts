@@ -15,8 +15,10 @@ import type { AtsParsedResume } from "../types.js";
  * with anything else. The name is also caught as "Doe, Jane", with or without a middle initial,
  * and inside a web address built from it ("janedoe.dev", "x.com/janedoe"), where the whole address
  * is replaced. The phone number is caught by its national number whatever separates its digits,
- * dialled as "+44 20…", "0044 20…", "011 44 20…" or "020…", but phone-shaped digit runs in general are *not*
- * swept — "2019 - 2023" has the shape of a phone number. Not caught: a first name used on its own,
+ * dialled as "+44 20…", "0044 20…", "011 44 20…" or "020…". Any other run of 9 to 15 digits that
+ * opens with "+" or a trunk "0" is a phone too, read by the parser or not; digit runs in general
+ * are *not* swept — "2019 - 2023" has the shape of a phone number, and so has "01/2020 - 12/2023",
+ * which is left alone as a month and its year. Not caught: a first name used on its own,
  * initials ("J. Doe"), a handle written another way ("jane_doe"). Replacement is whole-word, so a
  * three-letter name does not rewrite the inside of another word, and a "name" the parser also read
  * as a job title is left alone — swapping a title for [NAME] would cost the analysis more than it
@@ -51,6 +53,19 @@ const ADDRESS =
 
 /** What may stand between the digits of a phone number: spaces, brackets, dots, any dash. */
 const PHONE_GAP = String.raw`[\s().\-/‐‑‒–—]*`;
+
+/**
+ * A phone number the parser did not read, as one under a policy without its country's region:
+ * 9 to 15 digits on one line that open with "+" or a trunk "0" ("020 7946 0958", "(02) 9876
+ * 5432"), up to three of `PHONE_GAP`'s characters between two. A year never opens with either,
+ * so "2019 - 2023" is not one. Linear: a gap never holds a digit and is bounded, and a match
+ * starts only where a run does.
+ */
+const OTHER_PHONES =
+  /(?<![\p{L}\p{N}+_@#=/.,-])(?:\+|(?=\(?0))\(?\d(?:[ \t().\-/‐‑‒–—]{0,3}\d){8,14}(?!\p{N})/gu;
+
+/** A month and its year ("01/2020", "05.2019", "01 2019"): a date range that opens with 0. */
+const MONTH_YEAR = /(?:^|\D)(?:0?[1-9]|1[0-2])[ \t]*[./\-–—]?[ \t]*(?:19|20)\d\d(?!\d)/u;
 
 /**
  * The digits that may name the line wherever it is dialled from (its national number), longest
@@ -197,11 +212,29 @@ export function createRedaction(
     return <T>(value: T) => walk(value) as T;
   };
 
+  // Every other phone number, each with its own placeholder, numbered as first met.
+  const others = new Map<string, string>();
+  const phones = new Map<string, string>();
+  const other = (phone: string) => {
+    if (MONTH_YEAR.test(phone)) return phone;
+    if (!others.has(phone)) {
+      others.set(phone, `[PHONE_${others.size + 1}]`);
+      phones.set(others.get(phone)!, phone);
+    }
+    return others.get(phone)!;
+  };
+
   return {
     apply: deep((text) =>
-      forward.reduce((out, [pattern, to]) => out.replace(pattern, to), normalizeText(text)),
+      forward
+        .reduce((out, [pattern, to]) => out.replace(pattern, to), normalizeText(text))
+        .replace(OTHER_PHONES, other),
     ),
     // Placeholders are unique bracketed tokens, so restoring them needs no boundaries.
-    restore: deep((text) => backward.reduce((out, [from, to]) => out.split(from).join(to), text)),
+    restore: deep((text) =>
+      backward
+        .reduce((out, [from, to]) => out.split(from).join(to), text)
+        .replace(/\[PHONE_\d+\]/g, (placeholder) => phones.get(placeholder) ?? placeholder),
+    ),
   };
 }

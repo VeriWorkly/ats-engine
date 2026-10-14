@@ -318,13 +318,17 @@ Each call returns the result together with the values that were dropped for not 
 import { check, DEFAULT_POLICY } from "@veriworkly/ats-engine";
 import { createAtsAi } from "@veriworkly/ats-engine/ai";
 import { anthropic } from "@veriworkly/ats-engine/ai/anthropic";
+import { BUILT_IN_LOCALES, withLocales } from "@veriworkly/ats-engine/locales";
 
+// With the locale packs the parser reads a local phone number ("07912 345678"), which redaction
+// then replaces with the rest of the contact details.
+const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 const ai = createAtsAi({
   provider: anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }),
   routes: { analyze: { model: "claude-sonnet-5-5", maxTokens: 4000 } },
 });
 
-const report = check(resumeText, DEFAULT_POLICY, { jobDescription });
+const report = check(resumeText, policy, { jobDescription });
 const { result, usage } = await ai.analyze({ resumeText, report, jobDescription });
 ```
 

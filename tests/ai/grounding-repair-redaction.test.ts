@@ -232,6 +232,51 @@ describe("redaction variants", () => {
     expect(redaction.apply("Jane Doe-Smith")).toBe("Jane Doe-Smith");
     expect(redaction.apply("2019 - 2023")).toBe("2019 - 2023");
   });
+
+  // Under a policy without the country's region the parser reads no phone, and a number it did
+  // not read was sent as written.
+  it.each([
+    "07912 345678",
+    "020 7946 0958",
+    "0412 345 678",
+    "0151 23456789",
+    "0151/23456789",
+    "(02) 9876 5432",
+    "+44 7912 345678",
+    "+33 6 12 34 56 78",
+  ])("catches a phone the parser did not read: %s", (written) => {
+    const redaction = createRedaction(parsed("Jane Doe", ""), "");
+    expect(redaction.apply(`Call ${written} today`)).toBe("Call [PHONE_1] today");
+    expect(redaction.restore("Call [PHONE_1]")).toBe(`Call ${written}`);
+  });
+
+  it.each([
+    "Acme, 2019 - 2023",
+    "Acme, 01/2020 - 12/2023",
+    "Acme, 05.2019 – 03.2023",
+    "Acme, 01 2019 - 12 2023",
+    "Acme, 2019-05 – 2023-03",
+    "Grew users from 120,000 to 2,400,000 (+1900%)",
+    "ISBN 978-0-306-40615-7",
+    "Release v0.12.3, build 20230115",
+    "Ranked 0.92 AUC on 1,200,000 rows",
+    "Room 011, ext 0958",
+    "Order 55550132 and 155550132",
+    "https://example.com/id/0412345678",
+  ])("leaves figures that are not phones alone: %s", (text) => {
+    const redaction = createRedaction(parsed("Jane Doe", ""), text);
+    expect(redaction.apply(text)).toBe(text);
+  });
+
+  it("does not send a local phone the parser read none of", () => {
+    const source =
+      "Jane Doe\njane@example.com | 07912 345678\nExperience\nEngineer, Acme, 2019 - 2023";
+    const { parsed: read } = AtsScoringService.check(source, DEFAULT_POLICY);
+    expect(read.phone).toBe("");
+    const hidden = createRedaction(read, source).apply(source);
+    expect(hidden).not.toContain("345678");
+    expect(hidden).toContain("2019 - 2023");
+  });
 });
 
 describe("analyze: keyword suggestions and the request", () => {
