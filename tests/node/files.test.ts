@@ -157,6 +157,30 @@ describe("readResumeFile and readJobFile", () => {
     ).toContain("Go required");
   });
 
+  // A posting's words come back as missing keywords: any other file read as a posting (a
+  // credentials file, a key) would be echoed to whoever asked, the MCP server's model included.
+  it("read a posting only from the file types a posting comes in", async () => {
+    const secret = file("credentials", "[default]\naws_secret_access_key = wJalrXUtnFEMIK7MDENG");
+    const message =
+      /^Unsupported job posting file type .*Use \.txt, \.md, \.html, \.pdf or \.docx\.$/;
+    await expect(readJobFile(secret)).rejects.toBeInstanceOf(AtsFileError);
+    await expect(readJobFile(secret)).rejects.toThrow(message);
+    const json = file("job.json", '{"key":"wJalrXUtnFEMIK7MDENG"}');
+    await expect(readJobFile(json)).rejects.toThrow(message);
+    vi.mocked(open).mockClear();
+    await expect(readJobFile(join(dir, "id_rsa"))).rejects.toThrow(message);
+    expect(open).not.toHaveBeenCalled();
+    for (const name of ["job.md", "job.HTM", "Job.TXT"])
+      expect((await readJobFile(file(name, "Platform Engineer, Go required"))).text).toContain(
+        "Go required",
+      );
+  });
+
+  it("never quote a file's content in a JSON error", async () => {
+    const refused = readResumeFile(file("secret.json", "wJalrXUtnFEMIK7MDENG"));
+    await expect(refused).rejects.toThrow(/secret\.json is not valid JSON\.$/);
+  });
+
   it("are public on /node", () => {
     expect(node.readResumeFile).toBe(readResumeFile);
     expect(node.readJobFile).toBe(readJobFile);

@@ -39,7 +39,10 @@ pipe or a device (which reports no size and can stream without end) is refused b
 and so is a network path (`\\host\share\…`, `//host/share/…`, `\\?\UNC\…`) or a device path
 (`\\.\…`); of the paths that start with two slashes, only the local long form `\\?\C:\…` is read.
 Only the path's form is checked: a mapped drive letter, a `subst` drive, a link or junction to a
-share, or an SMB or NFS mount looks local and is read over the network. The MCP server refuses
+share, or an SMB or NFS mount looks local and is read over the network. A job posting is read only
+from a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file, before it is opened: its words come back as
+missing keywords, so any other file (a credentials file, a key) would be echoed to whoever named
+it. A JSON file that does not parse is refused without the parser's message, which quotes it. The MCP server refuses
 pasted text over 200 000 characters. A host should still bound request bodies.
 
 **Crashes.** Words from the input are never used as plain-object keys, JSON-LD is read to a fixed
@@ -121,7 +124,8 @@ if the core, `/document`, `/format`, `/job`, `/locales` or `/node` bundles a net
 
 **The MCP server.** `@veriworkly/ats-engine-mcp` talks over stdio only, makes no network requests
 and calls no model. It reads the files a tool call names, with the rights of the user running it,
-and nothing else; folders, pipes, devices, network paths and files over 20 MB are refused. Its
+and nothing else; folders, pipes, devices, network paths and files over 20 MB are refused, and so
+is a `job_path` that is not a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file. Its
 stdout carries only the protocol. Its answers include text from the resume, which the assistant
 sends to its own model provider.
 

@@ -97,8 +97,9 @@ function size(bytes: number): string {
 export function parseJsonFile(data: Buffer, path: string): unknown {
   try {
     return JSON.parse(data.toString("utf8"));
-  } catch (error) {
-    throw new AtsFileError(`${path} is not valid JSON (${(error as Error).message}).`);
+  } catch {
+    // Not the parser's message: it quotes the text near the error, which can be a secret.
+    throw new AtsFileError(`${path} is not valid JSON.`);
   }
 }
 
@@ -148,10 +149,16 @@ export type AtsJobFile = { text: string; company?: string };
 
 /**
  * A job posting file's text, normalised as a fetched posting is: a saved `.html` page is read for
- * its posting, a PDF or a Word file the way a resume is, anything else as text. A saved page's
- * JSON-LD names the employer, which `check`'s `jobCompany` leaves out of the keywords.
+ * its posting, a PDF or a Word file the way a resume is, a `.txt` or `.md` file as text. A saved
+ * page's JSON-LD names the employer, which `check`'s `jobCompany` leaves out of the keywords.
  */
 export async function readJobFile(path: string, options?: AtsReadFileOptions): Promise<AtsJobFile> {
+  // A posting's words come back as missing keywords, so any other file (a credentials file, a
+  // key) would be echoed to whoever named it: only the types a posting comes in are read.
+  if (!/\.(txt|md|html?|pdf|docx)$/i.test(path))
+    throw new AtsFileError(
+      `Unsupported job posting file type "${extname(path) || path}". Use .txt, .md, .html, .pdf or .docx.`,
+    );
   const data = await readFileBytes(path, options);
   if (/\.html?$/i.test(path)) {
     const html = data.toString("utf8");

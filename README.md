@@ -93,17 +93,17 @@ Advice (not scored):
       Fix: Name it Mei-Lin-Chen-Resume.pdf.
 ```
 
-| Option            | What it does                                                                                       |
-| ----------------- | -------------------------------------------------------------------------------------------------- |
-| `--job <file>`    | Match against a job posting (`.txt`, `.pdf`, `.docx` or a saved `.html`) and list each requirement |
-| `--policy <file>` | Use your own scoring policy JSON instead of the bundled one                                        |
-| `--json`          | Print the full report as JSON, `advice` included                                                   |
-| `--min-score <n>` | Exit with code 2 when the readiness score is below `n`, for CI checks                              |
-| `--region <code>` | Read the resume as from `US`, `DE` or `IN` instead of guessing                                     |
-| `--text`          | Also print the text in the order an ATS reads it (with `--json`, as the report's `lines`)          |
-| `--ats <name>`    | Add the documented notes on one ATS (`greenhouse`, `lever`, `taleo`), each with its source         |
-| `-h`, `--help`    | Print the options                                                                                  |
-| `-v`, `--version` | Print the engine version, for bug reports                                                          |
+| Option            | What it does                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------- |
+| `--job <file>`    | Match against a job posting (`.txt`, `.md`, `.pdf`, `.docx` or a saved `.html`) and list each requirement |
+| `--policy <file>` | Use your own scoring policy JSON instead of the bundled one                                               |
+| `--json`          | Print the full report as JSON, `advice` included                                                          |
+| `--min-score <n>` | Exit with code 2 when the readiness score is below `n`, for CI checks                                     |
+| `--region <code>` | Read the resume as from `US`, `DE` or `IN` instead of guessing                                            |
+| `--text`          | Also print the text in the order an ATS reads it (with `--json`, as the report's `lines`)                 |
+| `--ats <name>`    | Add the documented notes on one ATS (`greenhouse`, `lever`, `taleo`), each with its source                |
+| `-h`, `--help`    | Print the options                                                                                         |
+| `-v`, `--version` | Print the engine version, for bug reports                                                                 |
 
 The resume can be a `.pdf`, `.docx`, `.html`, `.txt` or `.md` file, or a `.json` [JSON Resume](https://jsonresume.org) or `ats-resume@1` document. The exit code is 0 when the check ran, 1 on an error, and 2 when the score is below `--min-score`.
 
@@ -214,7 +214,7 @@ const report = check(text, DEFAULT_POLICY, {
 });
 ```
 
-In a web server, pass the uploaded file's name and MIME type to `detectResumeFormat(fileName, mimeType)` and its bytes to `extractResume`, preferably in the forkable `/node/child` process (see [SECURITY.md](./SECURITY.md)). For a file on disk, `readResumeFile(path)` does all of this and returns `{ input, layout, file }`, ready for `check`; `readJobFile(path)` reads a posting the same way and returns `{ text, company? }`.
+In a web server, pass the uploaded file's name and MIME type to `detectResumeFormat(fileName, mimeType)` and its bytes to `extractResume`, preferably in the forkable `/node/child` process (see [SECURITY.md](./SECURITY.md)). For a file on disk, `readResumeFile(path)` does all of this and returns `{ input, layout, file }`, ready for `check`; `readJobFile(path)` reads a posting the same way (`.txt`, `.md`, `.html`, `.pdf` or `.docx` only) and returns `{ text, company? }`.
 
 The `file` option (`name`, `bytes`, `format`, and `passwordProtected`, `trackedChanges` or `comments` when your host knows them) and `targetAts` are read only for `report.advice` and never change a score. The layout already carries what extraction measured for the advice: a PDF that is encrypted, and a Word document's tracked changes and comments. An unknown `targetAts` or `region` throws `AtsPolicyError`.
 

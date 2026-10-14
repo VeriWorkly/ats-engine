@@ -76,7 +76,7 @@ const USAGE = `Usage: ats-engine check <resume> [options]
 Scores a resume (.pdf, .docx, .html, .txt, .md, or a .json resume document).
 
 Options:
-  --job <file>        Job posting to match against (.txt, .pdf, .docx, or a saved .html page,
+  --job <file>        Job posting to match against (.txt, .md, .pdf, .docx, or a saved .html page,
                       whose employer is left out of the keywords)
   --policy <file>     Engine policy JSON (default: the bundled default policy)
   --json              Print the full report as JSON, advice included
