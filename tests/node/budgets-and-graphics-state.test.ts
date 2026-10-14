@@ -19,7 +19,7 @@ import {
 import { measureVisibility, seeThroughImages, type Box } from "../../src/node/hidden.js";
 import { extractResume } from "../../src/node/index.js";
 import { buildDocxBody, documentXml, relationshipsXml } from "../fixtures/buildDocx.js";
-import { buildPdf, stream } from "../fixtures/buildPdf.js";
+import { buildPdf, buildPdfPages, stream } from "../fixtures/buildPdf.js";
 import { expectFast, expectFastAsync } from "../fixtures/timing.js";
 
 /**
@@ -253,6 +253,19 @@ describe("table detection reads only the measured pages", () => {
     expect(layout?.tableCount).toBeGreaterThan(0);
     expect(layout?.tableCount).toBeLessThanOrEqual(6);
   }, 30_000);
+});
+
+describe("PDF reading stops at a page cap", () => {
+  // Reading stopped only at the character cap, which empty pages never reach: 5 000 of them held
+  // extraction for 11 seconds, 50 000 for nine minutes, from a file of a few hundred kilobytes.
+  it("reads a few thousand empty pages in the time of a resume, and still counts them", async () => {
+    const pages = [line(700, "Jane Doe Senior Engineer at Acme Corporation since 2019")];
+    for (let page = 1; page < 5_000; page += 1) pages.push("");
+    const pdf = buildPdfPages(pages);
+    const { text, layout } = await expectFastAsync(() => extractResume(pdf, "pdf"), 2_000);
+    expect(text).toContain("Jane Doe Senior Engineer");
+    expect(layout?.pageCount).toBe(5_000);
+  }, 60_000);
 });
 
 describe("single-quoted attributes in a DOCX", () => {

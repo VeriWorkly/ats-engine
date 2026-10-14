@@ -31,7 +31,8 @@ adversarial suite against a private policy when one is present.
 bounded in depth, array length and node count before it is validated, a policy or a locale pack
 nested deeper than 5 000 levels (or one that contains itself) is refused as invalid with
 `AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
-64 MB and hold at most 2 MB of the XML `mammoth` parses, and PDF text reading stops at the cap. A
+64 MB and hold at most 2 MB of the XML `mammoth` parses, and PDF text reading stops at the cap or
+after the first 100 pages, whichever comes first (the page count still counts every page). A
 file name is read to its first 255 characters. The CLI and the MCP server read only a regular file
 on this computer: a file over 20 MB is refused before it is opened, and is read through one handle
 no further than one byte past the limit, so a file that grows meanwhile is refused too; a folder, a
