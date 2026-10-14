@@ -96,6 +96,7 @@ Advice (not scored):
 | Option            | What it does                                                                                              |
 | ----------------- | --------------------------------------------------------------------------------------------------------- |
 | `--job <file>`    | Match against a job posting (`.txt`, `.md`, `.pdf`, `.docx` or a saved `.html`) and list each requirement |
+| `--job-url <url>` | Match against a Greenhouse, Lever or Ashby posting, read from the board's public API                      |
 | `--policy <file>` | Use your own scoring policy JSON instead of the bundled one                                               |
 | `--json`          | Print the full report as JSON, `advice` included                                                          |
 | `--min-score <n>` | Exit with code 2 when the readiness score is below `n`, for CI checks                                     |
@@ -105,9 +106,9 @@ Advice (not scored):
 | `-h`, `--help`    | Print the options                                                                                         |
 | `-v`, `--version` | Print the engine version, for bug reports                                                                 |
 
-The resume can be a `.pdf`, `.docx`, `.html`, `.txt` or `.md` file, or a `.json` [JSON Resume](https://jsonresume.org) or `ats-resume@1` document. The exit code is 0 when the check ran, 1 on an error, and 2 when the score is below `--min-score`.
+The resume can be a `.pdf`, `.docx`, `.html`, `.txt` or `.md` file, or a `.json` [JSON Resume](https://jsonresume.org) or `ats-resume@1` document. `--job-url` takes an `https` posting address on those three boards only and asks the board's public API, never the page; for any other site, save the page and pass it with `--job`. The exit code is 0 when the check ran, 1 on an error, and 2 when the score is below `--min-score`.
 
-After the failed checks the CLI prints any **advice** under its own heading, "Advice (not scored)". Advice never changes a score. It covers the file itself: a name like `Resume_final_v3 (2).pdf` or `resume.pdf` (with a suggested `Firstname-Lastname-Resume.pdf`), a file over 2 MB (a common upload limit, not a universal one), a PDF that is encrypted, and tracked changes or comments left in a Word document. It also flags details that can invite age bias, such as a graduation year more than 20 years back or "30+ years of experience", where the region calls for it (the US; not Germany or India, where an age on a resume is customary). With `--ats` it adds what that vendor documents publicly, with a link to the page. The engine does not simulate any vendor's parser.
+After the failed checks the CLI prints any **advice** under its own heading, "Advice (not scored)". Advice never changes a score. It covers the file itself: a name like `Resume_final_v3 (2).pdf` or `resume.pdf` (with a suggested `Firstname-Lastname-Resume.pdf`), a file over 2 MB (a common upload limit, not a universal one), a PDF that is encrypted, and tracked changes or comments left in a Word document. It also flags details that can invite age bias, such as a graduation year more than 20 years back or "30+ years of experience", where the region calls for it (the US; not Germany or India, where an age on a resume is customary). With `--ats` (or a `--job-url` posting on Greenhouse or Lever, unless `--ats` names another) it adds what that vendor documents publicly, with a link to the page. The engine does not simulate any vendor's parser.
 
 In a terminal the output is coloured and opens with a VeriWorkly banner. Output sent to a pipe, a file or a CI log is plain text, and `NO_COLOR=1` turns colour off everywhere.
 
