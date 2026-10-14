@@ -512,6 +512,43 @@ describe("one stray byte does not turn a UTF-8 file into Windows-1252", () => {
     ]);
     expect((await extractResume(bytes, "text")).text).toBe("José Müller – Engineer");
   });
+
+  // Each stray byte was decoded on its own: 20 MB of them took 37 seconds. The text must not change.
+  it("reads every kind of stray byte as before", async () => {
+    const bytes = Buffer.concat([
+      Buffer.from(`Zoë Müller – “QA” ${"é".repeat(40)} `),
+      // A byte-order mark after a stray byte is dropped, as it always was.
+      Buffer.from([0x92, 0xef, 0xbb, 0xbf]),
+      Buffer.from("s "),
+      // C1 and unassigned codes, a lead byte with no tail, an overlong form, a surrogate, and a
+      // code point past U+10FFFF.
+      Buffer.from([0x80, 0x81, 0x9f, 0xa0, 0xff, 0xc0, 0xaf, 0xe2, 0x82, 0x20]),
+      Buffer.from([0xed, 0xa0, 0x80, 0xf4, 0x90, 0x80, 0x80]),
+      Buffer.from("€ 😀 end"),
+      Buffer.from([0xe9, 0xef, 0xbb, 0xbf, 0xef, 0xbb, 0xbf]),
+      Buffer.from("x"),
+      Buffer.from([0xe2, 0x82]),
+    ]);
+    expect((await extractResume(bytes, "text")).text).toBe(
+      `Zoë Müller – “QA” ${"é".repeat(40)} ’s €\u0081Ÿ\u00a0ÿÀ¯â‚ í\u00a0€ô\u0090€€€ 😀 endé\ufeffxâ‚`,
+    );
+  });
+
+  it.each([
+    ["all stray bytes", Buffer.alloc(20 * 1024 * 1024, 0xff), "ÿÿÿ"],
+    [
+      "as many stray bytes as letters",
+      Buffer.from("\xc3\xa9\xffA".repeat(5_000_000), "latin1"),
+      "éÿA",
+    ],
+  ])(
+    "reads 20 MB of %s in the time of a resume",
+    async (_, bytes, start) => {
+      const { text } = await expectFastAsync(() => extractResume(bytes, "text"), 3_000);
+      expect(text.startsWith(start)).toBe(true);
+    },
+    300_000,
+  );
 });
 
 describe("glyphs inside a soft mask are a visible copy only where the mask shows them", () => {

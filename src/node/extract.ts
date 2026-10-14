@@ -85,26 +85,41 @@ function decodeText(data: Uint8Array): string {
   const [first, second] = data;
   if (first === 0xff && second === 0xfe) return new TextDecoder("utf-16le").decode(data);
   if (first === 0xfe && second === 0xff) return new TextDecoder("utf-16be").decode(data);
-  const utf8 = new TextDecoder();
+  // A file with fewer valid multibyte characters than stray bytes is Windows-1252 throughout.
+  let [multibyte, stray] = [0, 0];
+  for (let at = 0, length = 0; at < data.length; at += length || 1) {
+    length = sequence(data, at);
+    if (length > 1) multibyte += 1;
+    if (!length) stray += 1;
+  }
+  if (stray > multibyte) return cp1252(data);
   // Bytes that are not UTF-8 among many that are — one stray byte pasted into a UTF-8 file — are
-  // read one at a time; a file with fewer valid multibyte characters than stray bytes is
-  // Windows-1252 throughout.
-  const parts: string[] = [];
-  let [start, multibyte, stray] = [0, 0, 0];
+  // each written as their Windows-1252 character in UTF-8, and the whole decoded once: a decode
+  // per stray byte took 37 seconds on 20 MB of them.
+  const out = new Uint8Array(data.length + stray * 2);
+  const encoded = [...cp1252(Uint8Array.from({ length: 128 }, (_, i) => 0x80 + i))].map((char) =>
+    new TextEncoder().encode(char),
+  );
+  let [start, written] = [0, 0];
+  const copy = (end: number) => {
+    out.set(data.subarray(start, end), written);
+    written += end - start;
+  };
   for (let at = 0; at < data.length;) {
     const length = sequence(data, at);
-    if (length > 1) multibyte += 1;
     if (length) {
       at += length;
       continue;
     }
-    parts.push(utf8.decode(data.subarray(start, at)), cp1252(data.subarray(at, at + 1)));
-    stray += 1;
+    copy(at);
+    out.set(encoded[data[at]! - 0x80]!, written);
+    written += encoded[data[at]! - 0x80]!.length;
     start = at += 1;
+    // Each run after a stray byte was decoded on its own, which drops a byte-order mark at its start.
+    if (data[at] === 0xef && data[at + 1] === 0xbb && data[at + 2] === 0xbf) start = at += 3;
   }
-  if (stray > multibyte) return cp1252(data);
-  parts.push(utf8.decode(data.subarray(start)));
-  return parts.join("");
+  copy(data.length);
+  return new TextDecoder().decode(out.subarray(0, written));
 }
 
 /** Node decodes "windows-1252" as Latin-1, leaving 0x80-0x9F as control characters: those are
