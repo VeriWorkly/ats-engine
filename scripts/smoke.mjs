@@ -68,6 +68,44 @@ for (const doc of ["README.md", "LOCALES.md"]) {
   for (const [index, [, code]] of [...blocks].entries())
     samples.set(`${root}/${doc}.sample-${index + 1}.ts`, `${DECLARED}\n${code}`);
 }
+// What a host writes beyond the docs, which must keep compiling: its own exact-optional types
+// filled from what the package returns (so a returned type never gains `| undefined`), and a
+// retry hook typed for one task, or left out with `undefined`.
+samples.set(
+  `${root}/host.sample.ts`,
+  `import { DEFAULT_POLICY, check, fromJsonResume, prepareResume } from "@veriworkly/ats-engine";
+import { AtsAiError, createAtsAi } from "@veriworkly/ats-engine/ai";
+import { anthropic } from "@veriworkly/ats-engine/ai/anthropic";
+import { scriptedProvider } from "@veriworkly/ats-engine/ai/testing";
+import { extractResume, readResumeFile } from "@veriworkly/ats-engine/node";
+
+type Basics = { name: string; headline?: string; email?: string; links?: string[] };
+type Usage = { inputTokens: number; outputTokens: number; cacheReadTokens?: number };
+type Layout = { tableCount: number; pageCount: number; imageCount?: number; encrypted?: boolean };
+type File = { name?: string; bytes?: number; passwordProtected?: boolean };
+type Reply = { text: string; id?: string; usage?: Usage };
+
+export const basics: Basics = fromJsonResume({}).basics;
+export const prepared: Basics | undefined = prepareResume("text").document?.basics;
+
+const onlyAnalyze = (event: { task: "analyze"; attempt: number; error: AtsAiError }) => event.task;
+const provider = scriptedProvider("{}");
+export const ai = createAtsAi({ provider, hooks: { onRetry: onlyAnalyze } });
+export const quiet = createAtsAi({ provider, hooks: { onRetry: undefined } });
+const { usage } = await ai.analyze({ resumeText: "text", report: check("text", DEFAULT_POLICY) });
+export const used: Usage | undefined = usage;
+export const failed = (error: AtsAiError): Usage | undefined => error.usage;
+
+export const measured: Layout | undefined = (await extractResume(new Uint8Array(), "pdf")).layout;
+export const info: File = (await readResumeFile("resume.pdf")).file;
+export const reply: Reply = await anthropic({ apiKey: "key" }).complete({
+  model: "model",
+  system: "",
+  messages: [],
+  maxTokens: 1,
+});
+`,
+);
 const options = {
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.NodeNext,
@@ -96,4 +134,4 @@ if (errors.length > 0)
       getNewLine: () => "\n",
     })}`,
   );
-console.log(`types    ${samples.size} samples in README.md and LOCALES.md`);
+console.log(`types    ${samples.size} samples: README.md, LOCALES.md and a host's own types`);

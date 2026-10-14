@@ -16,36 +16,36 @@ export type AtsLayoutSignals = {
   tableCount: number;
   pageCount: number;
   /** Images at least 80px a side — a photo, rarely a logo. Absent when it was not measured. */
-  imageCount?: number | undefined;
+  imageCount?: number;
   /**
    * Characters drawn so a reader cannot see them while an ATS still reads them: in the page's
    * own colour or near it, too small to read, off the page, invisible, or under an image.
    */
-  hiddenTextChars?: number | undefined;
+  hiddenTextChars?: number;
   /** The start of that hidden text, so the report can quote it back. */
-  hiddenTextSample?: string | undefined;
+  hiddenTextSample?: string;
   /**
    * All of that hidden text, whitespace collapsed to single spaces, its runs joined in reading
    * order, and cut to the first 5,000 characters. Present whenever `hiddenTextChars` is; "" when
    * nothing is hidden.
    */
-  hiddenText?: string | undefined;
+  hiddenText?: string;
   /** Pages with no text layer at all: a scan, or a page exported as a picture. */
-  imageOnlyPages?: number | undefined;
+  imageOnlyPages?: number;
   /**
    * The file's title, subject, keywords and author fields. Never scored as resume text — an ATS
    * does not index them — but read for instructions aimed at an AI, which hide there.
    */
-  metadataText?: string | undefined;
+  metadataText?: string;
   /**
    * A PDF that opened without a password but is encrypted: an owner password restricts copying,
    * printing or editing. Absent when it is not. Advice, never scored.
    */
-  encrypted?: boolean | undefined;
+  encrypted?: boolean;
   /**
    * A Word document's tracked changes (insertions, deletions, moves, formatting changes) and
    * comments still in the file. Measured for DOCX only; advice, never scored.
    */
-  trackedChanges?: number | undefined;
-  comments?: number | undefined;
+  trackedChanges?: number;
+  comments?: number;
 };

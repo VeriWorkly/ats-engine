@@ -52,15 +52,15 @@ export type LlmRequest = {
 export type LlmUsage = {
   inputTokens: number;
   outputTokens: number;
-  cacheReadTokens?: number | undefined;
-  cacheWriteTokens?: number | undefined;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
 };
 
 /** What an adapter reports back: the text, the provider's response id, usage, why it stopped. */
 export type LlmResponse = {
   text: string;
-  id?: string | undefined;
-  usage?: LlmUsage | undefined;
+  id?: string;
+  usage?: LlmUsage;
   /** `length` means the output hit `maxTokens`; `refusal` means the model declined. */
   finish: "stop" | "length" | "refusal" | "other";
 };

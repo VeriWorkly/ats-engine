@@ -45,7 +45,11 @@ export type AtsAiOptions = {
   redact?: { analyze?: boolean | undefined } | undefined;
   /** Engine policy used to classify repaired credentials. Defaults to `DEFAULT_POLICY`. */
   enginePolicy?: AtsEnginePolicy | undefined;
-  hooks?: { onRetry?: ((event: AtsAiRetryEvent) => void) | undefined } | undefined;
+  /**
+   * `onRetry` is checked as a method is (its event either way), so a handler written for one
+   * task fits, and it may also be set to `undefined`.
+   */
+  hooks?: { onRetry?: { method(event: AtsAiRetryEvent): void }["method"] | undefined } | undefined;
 };
 
 /** The three tasks, bound to one provider. Each call can override its task's route. */
