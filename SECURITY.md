@@ -113,7 +113,8 @@ and refuses to send a key over plain `http` to any host but this machine (`local
 or from a `.env` file, which is never committed.
 
 **State.** The core holds no global state, does no I/O and makes no network calls; only `/ai`
-calls the provider you configure, and only `/node` reads files you pass it.
+calls the provider you configure, and only `/node` reads files you pass it. `npm run smoke` fails
+if the core, `/document`, `/format`, `/job`, `/locales` or `/node` bundles a network call.
 
 ## Around the engine
 
