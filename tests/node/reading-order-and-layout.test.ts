@@ -13,6 +13,7 @@ import {
   relationshipsXml,
 } from "../fixtures/buildDocx.js";
 import { buildPdf, buildPdfPages, stream } from "../fixtures/buildPdf.js";
+import { expectFast } from "../fixtures/timing.js";
 
 /**
  * Regressions for the file-extraction audit: each block names the finding it protects. Invented
@@ -276,11 +277,9 @@ describe("a PDF's running header and footer are read once, and its page numbers 
       lines: ["Jordan Ellery - Resume", "x", "y", "z", `Page ${page + 1}`],
       ys: [10, 40, 52, 64, 94],
     }));
-    const started = performance.now();
-    const joined = joinPages(pages);
+    const joined = expectFast(() => joinPages(pages), 1_000);
     expect(joined.startsWith("Jordan Ellery - Resume\n\nx\ny\nz\n\n")).toBe(true);
     expect(joined).not.toContain("Page");
-    expect(performance.now() - started).toBeLessThan(1_000);
   });
 
   // Pages of a role each: "Senior Engineer, Hooli" ends a page and its dates open the next.
@@ -834,16 +833,6 @@ describe("hiddenText carries all of the hidden text", () => {
 });
 
 describe("the new scans stay linear on hostile input", () => {
-  /** The fastest of three runs, so a busy machine cannot fail the test; a quadratic scan still does. */
-  const fastest = (run: () => unknown) =>
-    Math.min(
-      ...[0, 1, 2].map(() => {
-        const started = performance.now();
-        run();
-        return performance.now() - started;
-      }),
-    );
-
   it.each([
     ["nested hidden elements", '<div hidden><div class="x">'.repeat(100_000)],
     [
@@ -859,7 +848,7 @@ describe("the new scans stay linear on hostile input", () => {
     ["main opened and never closed", "<main>".repeat(300_000)],
     ["entities", "&eacute;&Scaron;&euro;&bogus;".repeat(70_000)],
   ])("reads a 2 MB page of %s as a job page quickly", (_, html) => {
-    expect(fastest(() => jobHtmlToText(html))).toBeLessThan(2_000);
+    expectFast(() => jobHtmlToText(html), 2_000);
   });
 });
 

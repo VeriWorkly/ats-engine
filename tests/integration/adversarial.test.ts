@@ -171,13 +171,15 @@ describe("50 KB adversarial input", () => {
   it.each(Object.entries(SHAPES))(
     "%s as an English posting's prose, in bounded time",
     (_, input) => {
-      const started = performance.now();
-      AtsScoringService.check("Jane Doe\njane@example.com", POLICY, {
-        now: NOW,
-        jobDescription: `We ship from ${input}\n- Kafka\n- Go\n- SQL`,
-        languages: [],
-      });
-      expect(performance.now() - started).toBeLessThan(1_500);
+      expectFast(
+        () =>
+          AtsScoringService.check("Jane Doe\njane@example.com", POLICY, {
+            now: NOW,
+            jobDescription: `We ship from ${input}\n- Kafka\n- Go\n- SQL`,
+            languages: [],
+          }),
+        1_500,
+      );
     },
   );
 });
