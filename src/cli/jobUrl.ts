@@ -41,6 +41,7 @@ type Board = {
  */
 const NAME = /^[A-Za-z\d][\w.-]{0,99}$/;
 const NUMBER = /^\d{1,20}$/;
+// Any case in a link; Lever and Ashby list their ids in lowercase, so it is asked for so.
 const UUID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
@@ -86,7 +87,7 @@ const BOARDS: readonly Board[] = Object.freeze<Board[]>([
       UUID.test(job) &&
       (form ?? "apply") === "apply" &&
       !rest.length
-        ? [site, job]
+        ? [site, job.toLowerCase()]
         : null,
     api: (host, site, job) => `https://${host}/v0/postings/${site}/${job}`,
     // No employer: the API names none. The bullets are in `lists`, each under its heading.
@@ -116,7 +117,7 @@ const BOARDS: readonly Board[] = Object.freeze<Board[]>([
       UUID.test(job) &&
       (form ?? "application") === "application" &&
       !rest.length
-        ? [org, job]
+        ? [org, job.toLowerCase()]
         : null,
     // The API lists the board's jobs, descriptions included; it has no address for one job.
     api: (host, org) => `https://${host}/posting-api/job-board/${org}`,
@@ -203,10 +204,13 @@ export async function fetchJob(
     raw = await readCapped(response, host);
   } catch (error) {
     if (error instanceof JobUrlError) throw error;
+    // Node says only "fetch failed"; what failed (DNS, TLS, a refused connection) is its cause.
+    const failed = error as Error & { cause?: { code?: unknown } };
+    const reason = typeof failed.cause?.code === "string" ? failed.cause.code : failed.message;
     throw new JobUrlError(
       signal.aborted
         ? `${host} did not answer within ${TIMEOUT_MS / 1000} s.`
-        : `Could not reach ${host} (${(error as Error).message}).`,
+        : `Could not reach ${host} (${reason}).`,
     );
   }
 

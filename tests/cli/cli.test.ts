@@ -256,6 +256,13 @@ describe("ats-engine check --job-url", () => {
     expect(atsNotes(report, "")).toBe(false);
   });
 
+  it("finds an Ashby job from a link that spells its id in capitals", async () => {
+    const { context } = board(() => json(ASHBY_BOARD));
+    const url = `https://jobs.ashbyhq.com/fernbrook/${ASHBY_JOB_ID.toUpperCase()}`;
+    expect(await main(["check", file("ashby3.txt", RESUME), "--job-url", url], context)).toBe(0);
+    expect(out.join("\n")).toContain("pytorch");
+  });
+
   it("keeps the --ats given over the board's", async () => {
     const { context } = board(() => json(GREENHOUSE_JOB));
     const url = `https://job-boards.greenhouse.io/fernbrook/jobs/${GREENHOUSE_JOB_ID}`;
@@ -270,6 +277,11 @@ describe("ats-engine check --job-url", () => {
     [`http://boards.greenhouse.io/fernbrook/jobs/${GREENHOUSE_JOB_ID}`, /only https:/],
     ["not a url", /not a web address/],
     ["https://careers.fernbrook.example/jobs/42", /save the page .*--job/i],
+    // The board's name before an `@` is a user name; the host is the one after it.
+    [
+      `https://boards.greenhouse.io@fernbrook.example/x/jobs/${GREENHOUSE_JOB_ID}`,
+      /save the page/i,
+    ],
     [`https://fernbrook.example/careers?gh_jid=${GREENHOUSE_JOB_ID}`, /save the page/i],
     // Greenhouse's embed names the board only in the query.
     ["https://boards.greenhouse.io/embed/job_app?for=fernbrook&token=1", /not a job posting/],
@@ -312,7 +324,11 @@ describe("ats-engine check --job-url", () => {
     ["a server error", () => json({}, 503), /api\.lever\.co answered HTTP 503/],
     ["a body that is not JSON", () => new Response("<html>down</html>"), /not JSON/],
     ["JSON that is not a posting", () => json({ ok: true }), /not a Lever posting/],
-    ["no answer", () => Promise.reject(new TypeError("fetch failed")), /could not reach/i],
+    [
+      "no answer",
+      () => Promise.reject(new TypeError("fetch failed", { cause: { code: "ENOTFOUND" } })),
+      /could not reach api\.lever\.co \(ENOTFOUND\)/i,
+    ],
   ])("fails with one line on %s", async (_name, answer, message) => {
     const { context } = board(answer);
     const argv = ["check", file("fail.txt", RESUME), "--job-url", LEVER_URL];
