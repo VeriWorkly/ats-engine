@@ -147,3 +147,37 @@ export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     ),
   },
 });
+
+/**
+ * France: day-first dates, French credentials; a date of birth or a photo is not judged, as a
+ * French CV commonly carries both (or an age) and no recruiter there reads them as a fault.
+ */
+export const FR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "FR",
+  name: "France",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "FR",
+  dateOrder: "DMY",
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 0 },
+    "ats-v2.format.photo": { weight: 0 },
+  },
+  // The French system, by years after the baccalauréat: "Bac+2" (BTS, DUT) is short-cycle
+  // tertiary, "Bac+3" (licence, BUT) a bachelor's, "Bac+5" (master, diplôme d'ingénieur) a
+  // master's, "Bac+8" a doctorate. Levels are tried highest first, so "Bac+5" is never read as
+  // the baccalauréat itself. "BUT" only with its speciality, since "but" is a French and an
+  // English word.
+  degrees: {
+    "2": word(String.raw`brevet(?:\s+des\s+coll[èe]ges)?|dnb`),
+    "3": word(
+      String.raw`baccalaur[ée]at(?:\s+(?:g[ée]n[ée]ral|technologique|professionnel|s|es|l|stmg|sti2d))?|bac(?!\s*\+)(?:\s+(?:g[ée]n[ée]ral|technologique|pro(?:fessionnel)?|s|es|l|stmg|sti2d))?|cap|bep`,
+    ),
+    "5": word(String.raw`bts|dut|deug|bac\s*\+\s*2`),
+    "6": word(
+      String.raw`b\.u\.t\.|but\s+(?:informatique|gea|tc|mmi|geii|gmp|r&t|rt|qlio|chimie|g[ée]nie\s+\p{L}+|techniques\s+de\s+commercialisation|gestion\s+des\s+entreprises)|bac\s*\+\s*3`,
+    ),
+    "7": word(String.raw`bac\s*\+\s*5|dea|dess|grande\s+[ée]cole`),
+    "8": word(String.raw`bac\s*\+\s*8`),
+  },
+});

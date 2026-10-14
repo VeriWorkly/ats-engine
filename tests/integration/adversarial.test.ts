@@ -129,6 +129,16 @@ const SHAPES: Record<string, string> = {
   "dated place run": `Jan 2020 - Present | ${rep("Austin, Texas, ", N - 40)}`,
   "legal form run": rep("Acme Corp, "),
   "co run": rep("Co "),
+  // The French pack: a range by "à", a start by "depuis", a level after the language, a degree
+  // counted in years after the baccalauréat, a word joined by an apostrophe.
+  "à range run": rep("2019 à "),
+  "depuis run": rep("depuis "),
+  "years range run": rep("3 à 5 "),
+  "courant run": rep("anglais courant "),
+  "maîtrise run": rep("maîtrise de l’"),
+  "apostrophe run": rep("d'"),
+  "bac plus run": rep("bac + "),
+  "but run": rep("BUT "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -143,7 +153,7 @@ describe("50 KB adversarial input", () => {
       AtsScoringService.check(resume, POLICY, {
         now: NOW,
         jobDescription,
-        languages: ["de", "hi"],
+        languages: ["de", "fr", "hi"],
         region: "DE",
       });
       jobTextFromHtml(html);
@@ -160,7 +170,7 @@ describe("50 KB adversarial input", () => {
           AtsScoringService.check(resume, POLICY, {
             now: NOW,
             jobDescription: `Requirements\n- Fluent ${input}\n- ${input} certification`,
-            languages: ["de", "hi"],
+            languages: ["de", "fr", "hi"],
           }),
         1_500,
       );

@@ -292,15 +292,17 @@ Engineer, Globex    03/2017 – 12/2019
 });
 
 describe("when the writing rules stand down", () => {
-  it.each([...LOCALE_FIXTURES.de, ...LOCALE_FIXTURES.hi].map((f) => [f.id, f.text]))(
-    "drops every writing rule for %s, read in its own language",
-    (_, text) => {
-      const report = check(text, LOCALIZED);
-      expect(report.locale.languages.length).toBeGreaterThan(0);
-      expect(writingRules(report)).toEqual([]);
-      expect(report.categories.find((c) => c.category === "writing")).toBeUndefined();
-    },
-  );
+  it.each(
+    [...LOCALE_FIXTURES.de, ...LOCALE_FIXTURES.fr, ...LOCALE_FIXTURES.hi].map((f) => [
+      f.id,
+      f.text,
+    ]),
+  )("drops every writing rule for %s, read in its own language", (_, text) => {
+    const report = check(text, LOCALIZED);
+    expect(report.locale.languages.length).toBeGreaterThan(0);
+    expect(writingRules(report)).toEqual([]);
+    expect(report.categories.find((c) => c.category === "writing")).toBeUndefined();
+  });
 
   it("still judges an English resume sent to a German posting", () => {
     const posting =
@@ -400,6 +402,12 @@ const BEFORE_WRITING: Record<string, string> = {
   "en-uk-languages-in-skills":
     "parse:100/0/53/4/4 contact:100/0/20/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "de-zertifikate":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
+  "fr-accents":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:55/13/29/3/5 integrity:100/0/60/4/4",
+  "fr-ingenieur":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
+  "fr-plain":
     "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
   "hi-certified":
     "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",

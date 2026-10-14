@@ -4,6 +4,7 @@ import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { applyVocabulary } from "../../src/locales/languages.js";
 import { languagePackSchema } from "../../src/locales/schema.js";
+import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
 
 /**
  * A language pack adds the soft skills its postings ask for, so a German or Hindi posting's
@@ -43,6 +44,26 @@ describe("soft skills from a language pack", () => {
       ]),
     );
     expect(report.matchedKeywordGroups.hard).toContain("java");
+  });
+
+  it("names a French posting's soft skills apart, and its missions' verbs not at all", () => {
+    const report = AtsScoringService.check(LOCALE_FIXTURES.fr[0].text, POLICY, {
+      jobDescription: [
+        "Vos missions",
+        "- Concevoir les services de paiement",
+        "Profil recherché",
+        "- Expérience en Java et Kubernetes",
+        "- Autonomie, rigueur et esprit d'équipe",
+      ].join("\n"),
+      now: NOW,
+    });
+    expect(report.locale.languages).toEqual(["fr"]);
+    const { hard, soft } = report.missingKeywordGroups;
+    expect(soft).toEqual(expect.arrayContaining(["autonomie", "rigueur", "esprit d'équipe"]));
+    expect(hard).not.toContain("concevoir");
+    expect(report.matchedKeywordGroups.hard).toEqual(
+      expect.arrayContaining(["java", "kubernetes"]),
+    );
   });
 
   it("names a Hindi posting's soft skills apart, and reads संचार कौशल as संचार", () => {

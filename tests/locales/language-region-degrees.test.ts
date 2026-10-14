@@ -399,6 +399,58 @@ describe("a German range of years reads its lower end, as English does", () => {
   });
 });
 
+describe("French credentials, by name and by years after the baccalauréat", () => {
+  const FR_POLICY = localized(["fr"], "FR");
+
+  it.each([
+    ["Brevet des collèges", 2],
+    ["Baccalauréat S, Lycée Exemple", 3],
+    ["Bac pro commerce", 3],
+    ["BTS SIO, Lycée Exemple", 5],
+    ["DUT GEA", 5],
+    ["Bac+2 en informatique", 5],
+    ["BUT Informatique, IUT de Lyon", 6],
+    ["Licence professionnelle", 6],
+    ["Bac + 3", 6],
+    ["Diplôme d'ingénieur, École Centrale d'Exemple", 7],
+    ["Bac+5, École de commerce", 7],
+    ["Master 2 Informatique", 7],
+    ["Doctorat en physique", 8],
+  ])("reads %j at level %i", (line, level) => {
+    expect(isced(line, FR_POLICY)).toBe(level);
+  });
+
+  it('keeps the national ones to France, and an English "but" out of them', () => {
+    expect(isced("BTS SIO, Lycée Exemple", localized(["fr"], "DE"))).toBeNull();
+    expect(isced("but the team grew", FR_POLICY)).toBeNull();
+  });
+});
+
+describe("a French posting's requirements", () => {
+  const report = AtsScoringService.check(DE_RESUME, P, {
+    jobDescription: [
+      "Profil recherché",
+      "- 3 à 5 ans d'expérience en Java",
+      "- Anglais courant",
+      "Les plus",
+      "- Une connaissance de Terraform est un plus",
+      "Avantages",
+      "- Tickets restaurant",
+    ].join("\n"),
+    now: NOW,
+  });
+
+  it("reads the years, the language and how much each is asked for", () => {
+    expect(report.locale.languages).toContain("fr");
+    expect(report.requirements.map(({ kind, importance }) => [kind, importance])).toEqual([
+      ["experience", "required"],
+      ["language", "required"],
+      ["skills", "preferred"],
+    ]);
+    expect(report.missingKeywords).not.toContain("restaurant");
+  });
+});
+
 describe("an inflected German adjective before a bare language name", () => {
   it.each(["Verhandlungssicheres Englisch in Wort und Schrift", "Fließendes Französisch"])(
     "reads %j as a language requirement",

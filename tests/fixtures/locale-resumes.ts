@@ -44,7 +44,7 @@ export type LocaleFixture = {
   spokenLanguages?: ExpectedLanguage[];
 };
 
-export const LOCALE_FIXTURES: Record<"en" | "de" | "hi" | "en-IN", LocaleFixture[]> = {
+export const LOCALE_FIXTURES: Record<"en" | "de" | "fr" | "hi" | "en-IN", LocaleFixture[]> = {
   en: EN_FIXTURES,
   de: [
     {
@@ -364,6 +364,161 @@ AWS, Linux, Python
         { language: "हिंदी", cefr: "C2" },
         { language: "अंग्रेज़ी", cefr: "C1" },
         { language: "मराठी", cefr: "A2" },
+      ],
+    },
+  ],
+  fr: [
+    {
+      id: "fr-accents",
+      text: `Élodie Lefèvre
+elodie.lefevre@example.fr | +33 6 12 34 56 78 | Lyon
+Profil
+Ingénieure logiciel spécialisée dans les plateformes de paiement, avec huit ans d'expérience.
+Expérience professionnelle
+Ingénieure logiciel senior chez Exemple Paiements SAS    janv. 2021 – aujourd’hui
+• Conception d'une plateforme de paiement pour deux millions de clients
+• Encadrement d'une équipe de cinq développeurs et mise en place de l'intégration continue
+Développeuse back-end, Démo Technologies SARL    03/2017 – 12/2020
+• Développement des services de facturation en Java et Spring Boot
+Formation
+Master Informatique, Université de Lyon    2015 – 2017
+Licence Informatique, Université de Lyon    2012 – 2015
+Compétences
+Java, Go, Kubernetes, PostgreSQL
+Langues
+Français (langue maternelle), Anglais (courant, C1), Espagnol (notions)`,
+      locale: { languages: ["fr"], region: "FR" },
+      name: "Élodie Lefèvre",
+      email: "elodie.lefevre@example.fr",
+      phone: "+33 6 12 34 56 78",
+      roles: [
+        {
+          title: "Ingénieure logiciel senior",
+          employer: "Exemple Paiements SAS",
+          start: "2021-01",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Développeuse back-end",
+          employer: "Démo Technologies SARL",
+          start: "2017-03",
+          current: false,
+          end: "2020-12",
+        },
+      ],
+      education: [
+        { school: "Université de Lyon", isced: 7, credential: "Master" },
+        { school: "Université de Lyon", isced: 6, credential: "Licence" },
+      ],
+      skills: ["Java", "Go", "Kubernetes", "PostgreSQL"],
+      spokenLanguages: [
+        { language: "Français", cefr: "C2" },
+        { language: "Anglais", cefr: "C1" },
+        { language: "Espagnol", cefr: "A2" },
+      ],
+    },
+    {
+      id: "fr-ingenieur",
+      text: `Thomas Girard
+thomas.girard@example.fr
++33 1 23 45 67 89
+Expérience professionnelle
+Exemple Énergie SA
+Ingénieur données
+Depuis mars 2022
+• Mise en place d'un entrepôt de données sur Snowflake pour 40 équipes
+• Réduction de 30 % du coût des traitements nocturnes
+Modèle Conseil
+Consultant data
+Septembre 2018 à février 2022
+• Développement de tableaux de bord sous Power BI pour des clients industriels
+Formation
+Diplôme d'ingénieur (Bac+5), École Centrale d'Exemple    2015 – 2018
+Baccalauréat S, Lycée Victor Exemple    2013
+Certifications
+AWS Certified Solutions Architect – Associate, Amazon Web Services, 2023
+Compétences
+Python, SQL, Snowflake, Power BI`,
+      locale: { languages: ["fr"], region: "FR" },
+      name: "Thomas Girard",
+      email: "thomas.girard@example.fr",
+      phone: "+33 1 23 45 67 89",
+      roles: [
+        {
+          title: "Ingénieur données",
+          employer: "Exemple Énergie SA",
+          start: "2022-03",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Consultant data",
+          employer: "Modèle Conseil",
+          start: "2018-09",
+          current: false,
+          end: "2022-02",
+        },
+      ],
+      education: [
+        { school: "École Centrale d'Exemple", isced: 7, credential: "Diplôme d'ingénieur" },
+        { school: "Lycée Victor Exemple", isced: 3, credential: "Baccalauréat S" },
+      ],
+      skills: ["Python", "SQL", "Snowflake", "Power BI"],
+      certifications: [
+        {
+          name: "AWS Certified Solutions Architect – Associate",
+          issuer: "Amazon Web Services",
+          date: "2023",
+          expires: "",
+        },
+      ],
+    },
+    {
+      id: "fr-plain",
+      text: `Karim Benali
+karim.benali@example.com | 06 12 34 56 78 | Toulouse
+Competences
+Linux, Ansible, Docker, Bash
+Experience professionnelle
+Administrateur systemes et reseaux, Exemple Hebergement SARL    fevr. 2019 - present
+- Gestion d'un parc de 300 serveurs Linux pour les clients de l'entreprise
+- Automatisation des deploiements avec Ansible
+Technicien support chez Demo Services    2016 - 2019
+- Assistance aux utilisateurs et gestion des incidents
+Formation
+DUT Reseaux et Telecommunications, IUT de Toulouse    2014 - 2016
+BTS SIO, Lycee Jean Exemple    2012 - 2014
+Langues
+Anglais : professionnel (B2) ; Arabe : bilingue`,
+      locale: { languages: ["fr"], region: "FR" },
+      name: "Karim Benali",
+      email: "karim.benali@example.com",
+      phone: "06 12 34 56 78",
+      roles: [
+        {
+          title: "Administrateur systemes et reseaux",
+          employer: "Exemple Hebergement SARL",
+          start: "2019-02",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Technicien support",
+          employer: "Demo Services",
+          start: "2016",
+          current: false,
+          end: "2019",
+        },
+      ],
+      education: [
+        { school: "IUT de Toulouse", isced: 5, credential: "DUT" },
+        { school: "Lycee Jean Exemple", isced: 5, credential: "BTS" },
+      ],
+      skills: ["Linux", "Ansible", "Docker", "Bash"],
+      spokenLanguages: [
+        { language: "Anglais", cefr: "B2" },
+        { language: "Arabe", cefr: "C1" },
       ],
     },
   ],

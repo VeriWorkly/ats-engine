@@ -166,7 +166,7 @@ describe("packs", () => {
 
   it("replace an attached pack with the same id", () => {
     const twice = withLocales(withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), { languages: [de] });
-    expect(twice.locales.languages.map((pack) => pack.id)).toEqual(["de", "hi"]);
+    expect(twice.locales.languages.map((pack) => pack.id)).toEqual(["de", "fr", "hi"]);
   });
 
   it("publish a JSON Schema for contributors", () => {
