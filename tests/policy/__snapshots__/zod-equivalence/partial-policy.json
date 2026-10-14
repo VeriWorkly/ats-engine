@@ -1098,6 +1098,247 @@
   },
   "text": {
     "language": "de",
+    "detectionWords": [
+      "the",
+      "and",
+      "of",
+      "with",
+      "for",
+      "to",
+      "from",
+      "by",
+      "at",
+      "are",
+      "were",
+      "our",
+      "you",
+      "your",
+      "this",
+      "that",
+      "which",
+      "have",
+      "has",
+      "into",
+      "across",
+      "than",
+      "using",
+      "including",
+      "while",
+      "led",
+      "built",
+      "managed",
+      "designed",
+      "developed",
+      "reduced",
+      "improved",
+      "created",
+      "launched",
+      "delivered",
+      "years",
+      "skills",
+      "experience",
+      "education",
+      "summary",
+      "university",
+      "work"
+    ],
+    "otherLanguages": [
+      {
+        "detectionWords": [
+          "y",
+          "con",
+          "para",
+          "por",
+          "una",
+          "el",
+          "en",
+          "desde",
+          "como",
+          "sus",
+          "más",
+          "también",
+          "años",
+          "que",
+          "experiencia",
+          "gestión",
+          "equipo",
+          "desarrollo"
+        ]
+      },
+      {
+        "detectionWords": [
+          "em",
+          "uma",
+          "não",
+          "são",
+          "dos",
+          "das",
+          "pelo",
+          "pela",
+          "também",
+          "anos",
+          "ao",
+          "experiência",
+          "gestão",
+          "equipe",
+          "desenvolvimento"
+        ]
+      },
+      {
+        "detectionWords": [
+          "di",
+          "della",
+          "delle",
+          "dei",
+          "nel",
+          "nella",
+          "con",
+          "sono",
+          "anni",
+          "esperienza",
+          "che",
+          "degli",
+          "alla",
+          "sviluppo",
+          "gestione"
+        ]
+      },
+      {
+        "detectionWords": [
+          "une",
+          "pour",
+          "avec",
+          "dans",
+          "sur",
+          "chez",
+          "des",
+          "du",
+          "au",
+          "aux",
+          "les",
+          "été",
+          "expérience",
+          "équipe",
+          "développement",
+          "depuis",
+          "nous"
+        ]
+      },
+      {
+        "detectionWords": [
+          "und",
+          "der",
+          "für",
+          "mit",
+          "bei",
+          "von",
+          "eine",
+          "sowie",
+          "durch",
+          "zur",
+          "zum",
+          "auf",
+          "werden",
+          "nicht",
+          "berufserfahrung"
+        ]
+      },
+      {
+        "detectionWords": [
+          "het",
+          "een",
+          "voor",
+          "naar",
+          "zijn",
+          "ook",
+          "bij",
+          "werkervaring",
+          "jaar",
+          "ervaring",
+          "en"
+        ]
+      },
+      {
+        "detectionWords": [
+          "oraz",
+          "dla",
+          "jest",
+          "się",
+          "doświadczenie",
+          "pracy",
+          "przez",
+          "jako",
+          "lat",
+          "zespołu"
+        ]
+      },
+      {
+        "detectionWords": [
+          "och",
+          "för",
+          "att",
+          "som",
+          "inom",
+          "samt",
+          "erfarenhet",
+          "utveckling",
+          "arbetat",
+          "ansvarig"
+        ]
+      },
+      {
+        "script": "Cyrillic",
+        "detectionWords": []
+      },
+      {
+        "script": "Greek",
+        "detectionWords": []
+      },
+      {
+        "script": "Arabic",
+        "detectionWords": []
+      },
+      {
+        "script": "Hebrew",
+        "detectionWords": []
+      },
+      {
+        "script": "Han",
+        "detectionWords": []
+      },
+      {
+        "script": "Hangul",
+        "detectionWords": []
+      },
+      {
+        "script": "Hiragana",
+        "detectionWords": []
+      },
+      {
+        "script": "Katakana",
+        "detectionWords": []
+      },
+      {
+        "script": "Thai",
+        "detectionWords": []
+      },
+      {
+        "script": "Devanagari",
+        "detectionWords": []
+      },
+      {
+        "script": "Bengali",
+        "detectionWords": []
+      },
+      {
+        "script": "Tamil",
+        "detectionWords": []
+      },
+      {
+        "script": "Telugu",
+        "detectionWords": []
+      }
+    ],
     "contentLineVerbs": [
       "managed",
       "led",

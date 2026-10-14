@@ -112,6 +112,17 @@ export const wordList = (label: string) =>
     }),
   );
 
+/** A Unicode script name, as `\p{Script=…}` reads it: "Devanagari", "Cyrillic". */
+export const scriptName = z.string().check(
+  z.superRefine((script, ctx) => {
+    try {
+      new RegExp(`\\p{Script=${script}}`, "u");
+    } catch {
+      ctx.addIssue({ code: "custom", message: `"${script}" is not a Unicode script name` });
+    }
+  }),
+);
+
 /**
  * A word the matcher compares with lower-cased text: lower-cased here, so "Event Sourcing" in a
  * policy matches as written, and never empty, since "" matches everywhere.

@@ -1,7 +1,14 @@
 import { isSupportedCountry, type CountryCode } from "libphonenumber-js/min";
 import * as z from "zod/mini";
 
-import { cefrLevels, iscedDegrees, regexString, term, wordList } from "../policy/primitives.js";
+import {
+  cefrLevels,
+  iscedDegrees,
+  regexString,
+  scriptName,
+  term,
+  wordList,
+} from "../policy/primitives.js";
 
 /**
  * Locale packs: the vocabulary a resume in one language, or from one country, is written in.
@@ -132,16 +139,6 @@ const vocabularyShape = {
  * accuracy target on its fixture set. `community`: contributed and tested, not yet signed off.
  */
 const status = z.enum(["verified", "community"]);
-
-const scriptName = z.string().check(
-  z.superRefine((script, ctx) => {
-    try {
-      new RegExp(`\\p{Script=${script}}`, "u");
-    } catch {
-      ctx.addIssue({ code: "custom", message: `"${script}" is not a Unicode script name` });
-    }
-  }),
-);
 
 export const languagePackSchema = z
   .object({

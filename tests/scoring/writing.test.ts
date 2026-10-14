@@ -310,6 +310,48 @@ describe("when the writing rules stand down", () => {
     expect(writingRules(report)).toHaveLength(IDS.length);
   });
 
+  // An invented person, in a language no pack reads: judged by English rules, every bullet
+  // "opens with no action verb" and the dates "are written two ways".
+  const SPANISH = `Lucía Fernández Ruiz
+lucia.fernandez@example.es | +34 612 345 678 | Madrid
+Perfil
+Ingeniera de software con siete años de experiencia en sistemas de pago y en la nube.
+Experiencia profesional
+Ingeniera de software sénior, Ejemplo Tecnología S.L.    enero 2021 – actualidad
+• Diseño de una plataforma de pagos para dos millones de clientes en España
+• Responsable de un equipo de seis personas y de la integración continua
+• Reducción del tiempo de despliegue de dos horas a diez minutos
+Ingeniera de software, Muestra Sistemas S.A.    03/2017 – 12/2020
+• Desarrollo de servicios REST en Java para la gestión de pedidos
+• Migración de la base de datos a PostgreSQL sin pérdida de servicio
+Formación
+Grado en Ingeniería Informática, Universidad de Ejemplo, 2017
+Habilidades
+Go, Java, Kubernetes, PostgreSQL`;
+
+  it.each([
+    ["the base policy", DEFAULT_POLICY],
+    ["the packs attached", LOCALIZED],
+  ])("drops every writing rule for a language nothing reads, with %s", (_, policy) => {
+    const report = check(SPANISH, policy);
+    expect(report.locale.languages).toEqual([]);
+    expect(writingRules(report)).toEqual([]);
+    // Only the rules that read English words: the rest still judge it.
+    expect(report.rules.length).toBeGreaterThan(10);
+  });
+
+  it.each([LOCALE_FIXTURES.de[0], LOCALE_FIXTURES.hi[0]].map((f) => [f.id, f.text]))(
+    "drops every writing rule for %s with no pack attached to read it",
+    (_, text) => expect(writingRules(check(text))).toEqual([]),
+  );
+
+  it("still judges a short English resume, too short to tell its language by", () => {
+    const report = check(
+      `${HEAD}Engineer, Acme Corp    Jan 2020 – Present\n• I own the checkout flow`,
+    );
+    expect(rule(report, "firstPerson")).toMatchObject({ passed: false });
+  });
+
   it("drops every writing rule when there is nothing to judge", () => {
     expect(writingRules(check("Jane Doe\njane@example.com\n+1 415 555 0142"))).toEqual([]);
   });

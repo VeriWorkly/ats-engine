@@ -15,8 +15,9 @@ export type RuleContext = {
   contentLines: string[];
   /**
    * The languages the resume is read in: the attached language packs it is written in, or the
-   * policy's own `text.language` when it is written in none. A rule with `languages` applies only
-   * when each of these is among them.
+   * policy's own `text.language` when it is written in none, or "und" (undetermined) when it is
+   * written in one of `text.otherLanguages` instead. A rule with `languages` applies only when
+   * each of these is among them.
    */
   languages: readonly string[];
   /** Lines that extracted letter-spaced ("E X P E R I E N C E") and were read back as words. */

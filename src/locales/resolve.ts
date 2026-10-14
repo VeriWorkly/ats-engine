@@ -4,7 +4,15 @@ import type { AtsEnginePolicy, AtsEnginePolicyInput, AtsEngineRule } from "../po
 import { phoneCountry } from "../parser/phone.js";
 import { deepFreeze, memo } from "../util/memo.js";
 import { own } from "../util/own.js";
-import { applyVocabulary, DETECTION_SAMPLE, isWrittenIn, sampleOf, union } from "./languages.js";
+import {
+  applyVocabulary,
+  baseLanguageOf,
+  DETECTION_SAMPLE,
+  isWrittenIn,
+  sampleOf,
+  union,
+  UNDETERMINED,
+} from "./languages.js";
 import type { AtsLanguagePackInput, AtsRegionPack, AtsRegionPackInput } from "./schema.js";
 
 /**
@@ -153,7 +161,8 @@ export function localizePolicy(
   locale: AtsLocale;
   /**
    * The language packs the resume itself is read in — those asked for, else those it is detected
-   * as written in — leaving out a language only the posting is written in. Empty for the base.
+   * as written in — leaving out a language only the posting is written in. Empty for the base;
+   * `["und"]` when the resume is written neither in the base's language nor in a pack's.
    */
   resumeLanguages: string[];
 } {
@@ -171,14 +180,19 @@ export function localizePolicy(
     );
   }
   const dateOrder = dateOrderIn(resumeText.slice(0, DETECTION_SAMPLE));
+  const resumeSample = sampleOf(resumeText);
+  // In no pack's language: the base's, or, when the resume says it is not that either, none.
+  const orBase = (ids: string[]) =>
+    ids.length || options.languages || baseLanguageOf(policy, resumeSample) !== UNDETERMINED
+      ? ids
+      : [UNDETERMINED];
   if (packs.length === 0 && regions.length === 0 && dateOrder === undefined)
-    return { policy, locale: { languages: [], region: null }, resumeLanguages: [] };
+    return { policy, locale: { languages: [], region: null }, resumeLanguages: orBase([]) };
 
   // The resume and the posting are detected apart, each in its own language: measured together,
   // a long English posting dilutes a German resume below the share that recognises it.
   const posting =
     text === resumeText ? "" : text.startsWith(resumeText) ? text.slice(resumeText.length) : text;
-  const resumeSample = sampleOf(resumeText);
   const postingSample = posting ? sampleOf(posting) : undefined;
   const inResume = packs.filter((pack) => isWrittenIn(resumeSample, pack));
   const languages = options.languages
@@ -229,6 +243,6 @@ export function localizePolicy(
     // Shared by every resume read this way, so frozen as the policy it came from is.
     cached.set(key, deepFreeze(localized));
   }
-  const resumeLanguages = (options.languages ? languages : inResume).map((pack) => pack.id);
+  const resumeLanguages = orBase((options.languages ? languages : inResume).map((pack) => pack.id));
   return { policy: localized, locale, resumeLanguages };
 }

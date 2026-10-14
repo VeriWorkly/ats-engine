@@ -100,7 +100,11 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
 }
 
 export const DETECTION_SAMPLE = 20_000;
-const detectionOf = memo((pack: AtsLanguagePack) => ({
+
+/** What a language is recognised by: a pack, or a policy's own `text` (no script). */
+type Detection = Pick<AtsLanguagePack, "detectionWords"> & { script?: string | undefined };
+
+const detectionOf = memo((pack: Detection) => ({
   words: new Set(pack.detectionWords.map((word) => word.toLowerCase())),
   script: pack.script ? new RegExp(`\\p{Script=${pack.script}}`, "gu") : undefined,
 }));
@@ -132,7 +136,7 @@ export function sampleOf(text: string): Sample {
  * company name in an English resume ("Müller und Söhne") does not make the resume German, and
  * neither does a surname that is one of the words ("Das") however often it is repeated.
  */
-export function isWrittenIn({ text, words }: Sample, pack: AtsLanguagePack) {
+export function isWrittenIn({ text, words }: Sample, pack: Detection) {
   const detection = detectionOf(pack);
   if (detection.script) {
     const letters = text.match(/[\p{L}\p{M}]/gu)?.length ?? 0;
@@ -141,6 +145,26 @@ export function isWrittenIn({ text, words }: Sample, pack: AtsLanguagePack) {
   }
   const hits = words.filter((word) => detection.words.has(word));
   return new Set(hits).size >= 3 && hits.length / Math.max(words.length, 1) >= 0.03;
+}
+
+/**
+ * ISO 639-2 "undetermined": what a resume is read in when it is written neither in the policy's
+ * own language nor in an attached pack's. A rule limited to some `languages` is dropped for it.
+ */
+export const UNDETERMINED = "und";
+
+/**
+ * The language a resume no attached pack recognises is read in: the policy's own, unless it is
+ * recognised as written in one of `text.otherLanguages` and not in the policy's own as well. Only
+ * what a text has decides, never what it lacks: a short English resume, or one of terse bullets,
+ * holds few English function words, and none of another language's.
+ */
+export function baseLanguageOf(policy: AtsEnginePolicy, sample: Sample) {
+  const { text } = policy;
+  return !isWrittenIn(sample, text) &&
+    text.otherLanguages.some((other) => isWrittenIn(sample, other))
+    ? UNDETERMINED
+    : text.language;
 }
 
 const inLanguagesCache = memo<AtsEnginePolicy, Map<string, AtsEnginePolicy>>(() => new Map());

@@ -473,6 +473,16 @@ describe("the writing vocabulary and a rule's languages", () => {
       expect(() => parseAtsPolicy(withRule({ ...writingRule, languages }))).toThrow(AtsPolicyError);
   });
 
+  it("refuses another language with neither a script nor ten words to tell it by", () => {
+    for (const other of [{ script: "Klingon" }, { detectionWords: ["y", "con", "para"] }, {}])
+      expect(() => parseAtsPolicy({ ...MINIMAL, text: { otherLanguages: [other] } })).toThrow(
+        AtsPolicyError,
+      );
+    expect(
+      parseAtsPolicy({ ...MINIMAL, text: { otherLanguages: [] } }).text.otherLanguages,
+    ).toEqual([]);
+  });
+
   it("refuses a bullet range upside down and a word list that does not compile", () => {
     expect(() =>
       parseAtsPolicy({ ...MINIMAL, writing: { bulletsPerRole: { min: 9, max: 3 } } }),
