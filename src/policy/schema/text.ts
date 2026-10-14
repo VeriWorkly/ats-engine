@@ -102,11 +102,11 @@ export const engineTextSchema = z.prefault(
       [
         // Spanish, Portuguese, Italian, French, German, Dutch, Polish and Swedish: words none of
         // them shares with English, a place ("Los Angeles", "Chicago, IL") or a web domain.
-        "y con para por una el en desde como sus más también años que experiencia gestión equipo desarrollo",
-        "em uma não são dos das pelo pela também anos ao experiência gestão equipe desenvolvimento",
-        "di della delle dei nel nella con sono anni esperienza che degli alla sviluppo gestione",
-        "une pour avec dans sur chez des du au aux les été expérience équipe développement depuis nous",
-        "und der für mit bei von eine sowie durch zur zum auf werden nicht berufserfahrung",
+        "y con para por una el en desde como sus que más",
+        "em uma não são dos das pelo pela também ao para como",
+        "di della delle dei nel nella con sono che degli alla anni",
+        "une pour avec dans sur chez des du au aux les nous",
+        "und der für mit bei von eine sowie durch zur zum auf",
         "het een voor naar zijn ook bij werkervaring jaar ervaring en",
         "oraz dla jest się doświadczenie pracy przez jako lat zespołu",
         "och för att som inom samt erfarenhet utveckling arbetat ansvarig",
