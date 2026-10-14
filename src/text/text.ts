@@ -1,3 +1,4 @@
+import { memo } from "../util/memo.js";
 import { stripHiddenCharacters } from "./characters.js";
 
 /**
@@ -106,12 +107,18 @@ export function escapeRegex(value: string) {
 export type StemRule = { suffix: string; minLength: number; replacement: string; unless?: string };
 
 /**
+ * A policy's stemming rules as an array that is not frozen. A parsed policy is (`deepFreeze`),
+ * and V8 walks a frozen array about three times slower, which `stem`, run on every word, felt.
+ */
+const unfrozen = memo((rules: readonly StemRule[]) => [...rules]);
+
+/**
  * Conservative suffix stripper — good enough to fold "managed/manages/managing" together without
  * a stemmer dependency. The first rule that applies wins. The rules are the policy's
  * (`keywordMatch.stemming`), English by default.
  */
 export function stem(word: string, rules: readonly StemRule[]): string {
-  for (const { suffix, minLength, replacement, unless } of rules)
+  for (const { suffix, minLength, replacement, unless } of unfrozen(rules))
     if (word.length > minLength && word.endsWith(suffix) && !(unless && word.endsWith(unless)))
       return word.slice(0, -suffix.length) + replacement;
   return word;
