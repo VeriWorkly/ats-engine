@@ -44,7 +44,7 @@ export const repairedResumeSchema = z.object({
   skills: list(trimmedText(100), 60),
 }) satisfies z.ZodMiniType<AtsRepairCandidate, unknown>;
 
-const jsonSchema = toStrictJsonSchema(repairedResumeSchema);
+const jsonSchema = /* @__PURE__ */ toStrictJsonSchema(repairedResumeSchema);
 
 /** The resume and the parse to repair. */
 export type RepairParseInput = {

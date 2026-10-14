@@ -29,6 +29,10 @@ export { de, hi, DE, IN, US };
 export const BUILT_IN_LOCALES = { languages: [de, hi], regions: [US, DE, IN] };
 
 /** JSON Schema for a language pack written as JSON. Patterns are checked when it is attached. */
-export const atsLanguagePackJsonSchema = z.toJSONSchema(languagePackSchema, { io: "input" });
+export const atsLanguagePackJsonSchema = /* @__PURE__ */ z.toJSONSchema(languagePackSchema, {
+  io: "input",
+});
 /** JSON Schema for a region pack written as JSON. Patterns are checked when it is attached. */
-export const atsRegionPackJsonSchema = z.toJSONSchema(regionPackSchema, { io: "input" });
+export const atsRegionPackJsonSchema = /* @__PURE__ */ z.toJSONSchema(regionPackSchema, {
+  io: "input",
+});

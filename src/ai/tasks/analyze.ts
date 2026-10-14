@@ -23,7 +23,7 @@ export const insightsSchema = z.object({
 /** What `analyze` returns: the model's reading of the report, as lists of short texts. */
 export type AtsAiInsights = z.output<typeof insightsSchema>;
 
-const jsonSchema = toStrictJsonSchema(insightsSchema);
+const jsonSchema = /* @__PURE__ */ toStrictJsonSchema(insightsSchema);
 
 /** The resume, its report, and the posting if there was one. */
 export type AnalyzeInput = {

@@ -75,10 +75,39 @@ const BUDGETS = {
   "./node": 20.9,
 };
 
+/**
+ * A host importing only some names, against a budget of its own: what it does not import must
+ * drop out. The packs' and the tasks' JSON Schemas are built at load, so their calls are marked
+ * `@__PURE__`; without the marks a bundler keeps them, and zod's JSON Schema writer with them.
+ */
+const NAMED = [
+  // 48.2: 47.88 when set, 54.53 before the marks.
+  ["./locales", ["withLocales"], 48.2],
+  // 9.5: 9.21 when set, 16.29 before the marks.
+  [
+    "./ai",
+    ["AtsAiError", "DEFAULT_ANALYZE_PROMPT", "DEFAULT_CONVERT_PROMPT", "DEFAULT_REPAIR_PROMPT"],
+    9.5,
+  ],
+];
+
+const entries = [
+  ...Object.entries(BUDGETS).map(([subpath, budget]) => [subpath, subpath, "*", budget]),
+  ...NAMED.map(([subpath, names, budget]) => [
+    `${subpath} { ${names.length > 1 ? `${names[0]}, +${names.length - 1}` : names[0]} }`,
+    subpath,
+    `{ ${names.join(", ")} }`,
+    budget,
+  ]),
+];
+
 let failed = false;
-for (const [subpath, budget] of Object.entries(BUDGETS)) {
+for (const [label, subpath, names, budget] of entries) {
   const result = await build({
-    stdin: { contents: `export * from "${exports[subpath].import}";`, resolveDir: process.cwd() },
+    stdin: {
+      contents: `export ${names} from "${exports[subpath].import}";`,
+      resolveDir: process.cwd(),
+    },
     bundle: true,
     minify: true,
     format: "esm",
@@ -92,7 +121,7 @@ for (const [subpath, budget] of Object.entries(BUDGETS)) {
   const over = kb > budget;
   failed ||= over;
   console.log(
-    `${over ? "OVER" : "ok  "}  ${subpath.padEnd(24)} ${kb.toFixed(1).padStart(6)} KB gz / ${budget} KB`,
+    `${over ? "OVER" : "ok  "}  ${label.padEnd(30)} ${kb.toFixed(1).padStart(6)} KB gz / ${budget} KB`,
   );
 }
 process.exitCode = failed ? 1 : 0;

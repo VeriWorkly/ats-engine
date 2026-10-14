@@ -61,7 +61,7 @@ export const convertedResumeSchema = z.object({
 /** What `convertResume` returns: the resume as structured fields, identity values grounded. */
 export type AtsConvertedResume = z.output<typeof convertedResumeSchema>;
 
-const jsonSchema = toStrictJsonSchema(convertedResumeSchema);
+const jsonSchema = /* @__PURE__ */ toStrictJsonSchema(convertedResumeSchema);
 
 /** The free text to convert. */
 export type ConvertResumeInput = { resumeText: string };
