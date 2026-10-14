@@ -76,6 +76,13 @@ export const engineTextSchema = z.prefault(
       "summary",
       "university",
       "work",
+      // The words of a terse resume's headings and dates, so one naming Spanish places and
+      // employers ("El Paso", "Para Los Niños") still has more English than Spanish.
+      "present",
+      "employment",
+      "history",
+      "high",
+      "school",
     ]),
     /**
      * Languages this policy has no vocabulary for, each recognised as a language pack is: by its
@@ -101,13 +108,14 @@ export const engineTextSchema = z.prefault(
       ),
       [
         // Spanish, Portuguese, Italian, French, German, Dutch, Polish and Swedish: words none of
-        // them shares with English, a place ("Los Angeles", "Chicago, IL") or a web domain.
-        "y con para por una el en desde como sus que más",
+        // them shares with English, a place or a name ("Los Angeles", "El Paso", "Chicago, IL",
+        // "José Pérez y Martínez") or a web domain.
+        "con para por una desde como sus que más también años experiencia",
         "em uma não são dos das pelo pela também ao para como",
         "di della delle dei nel nella con sono che degli alla anni",
         "une pour avec dans sur chez des du au aux les nous",
         "und der für mit bei von eine sowie durch zur zum auf",
-        "het een voor naar zijn ook bij werkervaring jaar ervaring en",
+        "het een voor naar zijn ook bij werkervaring jaar ervaring",
         "oraz dla jest się doświadczenie pracy przez jako lat zespołu",
         "och för att som inom samt erfarenhet utveckling arbetat ansvarig",
       ]

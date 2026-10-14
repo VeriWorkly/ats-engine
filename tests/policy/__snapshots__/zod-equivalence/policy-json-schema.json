@@ -2659,7 +2659,12 @@
               "education",
               "summary",
               "university",
-              "work"
+              "work",
+              "present",
+              "employment",
+              "history",
+              "high",
+              "school"
             ],
             "type": "array",
             "items": {
@@ -2671,18 +2676,18 @@
             "default": [
               {
                 "detectionWords": [
-                  "y",
                   "con",
                   "para",
                   "por",
                   "una",
-                  "el",
-                  "en",
                   "desde",
                   "como",
                   "sus",
                   "que",
-                  "más"
+                  "más",
+                  "también",
+                  "años",
+                  "experiencia"
                 ]
               },
               {
@@ -2760,8 +2765,7 @@
                   "bij",
                   "werkervaring",
                   "jaar",
-                  "ervaring",
-                  "en"
+                  "ervaring"
                 ]
               },
               {
@@ -7939,7 +7943,12 @@
               "education",
               "summary",
               "university",
-              "work"
+              "work",
+              "present",
+              "employment",
+              "history",
+              "high",
+              "school"
             ],
             "type": "array",
             "items": {
@@ -7951,18 +7960,18 @@
             "default": [
               {
                 "detectionWords": [
-                  "y",
                   "con",
                   "para",
                   "por",
                   "una",
-                  "el",
-                  "en",
                   "desde",
                   "como",
                   "sus",
                   "que",
-                  "más"
+                  "más",
+                  "también",
+                  "años",
+                  "experiencia"
                 ]
               },
               {
@@ -8040,8 +8049,7 @@
                   "bij",
                   "werkervaring",
                   "jaar",
-                  "ervaring",
-                  "en"
+                  "ervaring"
                 ]
               },
               {

@@ -1532,23 +1532,28 @@
       "education",
       "summary",
       "university",
-      "work"
+      "work",
+      "present",
+      "employment",
+      "history",
+      "high",
+      "school"
     ],
     "otherLanguages": [
       {
         "detectionWords": [
-          "y",
           "con",
           "para",
           "por",
           "una",
-          "el",
-          "en",
           "desde",
           "como",
           "sus",
           "que",
-          "más"
+          "más",
+          "también",
+          "años",
+          "experiencia"
         ]
       },
       {
@@ -1626,8 +1631,7 @@
           "bij",
           "werkervaring",
           "jaar",
-          "ervaring",
-          "en"
+          "ervaring"
         ]
       },
       {

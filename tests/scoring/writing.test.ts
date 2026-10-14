@@ -347,6 +347,52 @@ Go, Java, Kubernetes, PostgreSQL`;
     (_, text) => expect(writingRules(check(text))).toEqual([]),
   );
 
+  // Invented people. Terse English bullets, with Spanish names of places, employers and schools.
+  it.each([
+    [
+      "El Paso",
+      [
+        "Ana Ruiz",
+        "ana@example.com | (915) 555-0100 | El Paso, TX",
+        "Employment",
+        "Teacher Aide, Para Los Niños — El Paso, TX",
+        "2019 – Present",
+        "- Bilingual tutoring, grades 1-3",
+        "- Parent outreach en español",
+        "Cashier, Supermercado El Rey y Más — El Paso, TX",
+        "2017 – 2019",
+        "- Cash handling, inventory",
+        "Volunteer, Iglesia San José — El Paso, TX",
+        "- Food drive con familias",
+        "Education",
+        "High School Diploma, Colegio Por Un Mundo Mejor, 2017",
+        "Skills",
+        "Spanish, Customer Service, Microsoft Office, CPR",
+      ],
+    ],
+    [
+      "Miami",
+      [
+        "Daniel Ortiz",
+        "daniel@example.com | (305) 555-0100 | Miami, FL",
+        "EMPLOYMENT",
+        "Line Cook — El Palacio de los Jugos, Miami, FL",
+        "2020 – Present",
+        "- Prep, grill, inventory",
+        "Server — Versailles Restaurant, Miami, FL",
+        "2017 – 2020",
+        "- Table service en inglés y español",
+        "EDUCATION",
+        "GED — Miami Dade College, 2017",
+        "SKILLS",
+        "Food safety, ServSafe, POS",
+      ],
+    ],
+  ])("still judges a terse English resume from %s naming Spanish places", (_, lines) => {
+    expect(writingRules(check(lines.join("\n"))).length).toBeGreaterThan(0);
+    expect(writingRules(check(lines.join("\n"), LOCALIZED)).length).toBeGreaterThan(0);
+  });
+
   it("still judges a short English resume, too short to tell its language by", () => {
     const report = check(
       `${HEAD}Engineer, Acme Corp    Jan 2020 – Present\n• I own the checkout flow`,
