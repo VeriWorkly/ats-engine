@@ -4,10 +4,19 @@ import { join } from "node:path";
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { main } from "../../src/cli/main.js";
+import { main, type CliContext } from "../../src/cli/main.js";
+import { PLAIN } from "../../src/cli/terminal.js";
 import { ENGINE_VERSION } from "../../src/version.js";
 import { buildDocx } from "../fixtures/buildDocx.js";
 import { buildPdf, LEFT_COLUMN, RIGHT_COLUMN, text } from "../fixtures/buildPdf.js";
+import {
+  ASHBY_BOARD,
+  ASHBY_JOB_ID,
+  GREENHOUSE_JOB,
+  GREENHOUSE_JOB_ID,
+  LEVER_JOB,
+  LEVER_JOB_ID,
+} from "../fixtures/jobBoards.js";
 
 const dir = mkdtempSync(join(tmpdir(), "ats-cli-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -167,5 +176,176 @@ describe("ats-engine check", () => {
     expect(await main(["--help"])).toBe(0);
     expect(await main(["check", "--help"])).toBe(0);
     expect(out.join("\n")).toContain("Usage: ats-engine check");
+  });
+});
+
+describe("ats-engine check --job-url", () => {
+  type Call = { url: string; init: RequestInit | undefined };
+
+  /** A board API that answers every request with `answer`, recording what was asked. */
+  function board(answer: () => Response | Promise<Response>) {
+    const calls: Call[] = [];
+    const fetchJob = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return answer();
+    }) as typeof fetch;
+    const context: CliContext = { terminal: PLAIN, env: {}, fetchJob };
+    return { calls, context };
+  }
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  const atsNotes = (report: { advice: { id: string }[] }, ats: string) =>
+    report.advice.some((item) => item.id.startsWith(`ats.${ats}`));
+
+  it("reads a Greenhouse posting from the board's API, with its employer and the Greenhouse notes", async () => {
+    const { calls, context } = board(() => json(GREENHOUSE_JOB));
+    const url = `https://job-boards.greenhouse.io/fernbrook/jobs/${GREENHOUSE_JOB_ID}`;
+    const argv = ["check", file("gh.txt", RESUME), "--job-url", url, "--json"];
+    expect(await main(argv, context)).toBe(0);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe(
+      `https://boards-api.greenhouse.io/v1/boards/fernbrook/jobs/${GREENHOUSE_JOB_ID}`,
+    );
+    expect(calls[0]!.init?.redirect).toBe("manual");
+    expect(calls[0]!.init?.signal).toBeInstanceOf(AbortSignal);
+    const report = JSON.parse(out.join("\n"));
+    expect(report.jobMatchScore).toEqual(expect.any(Number));
+    expect(report.missingKeywords).toEqual(expect.arrayContaining(["kubernetes", "terraform"]));
+    // The employer the API names is not a keyword the resume should add.
+    expect(report.missingKeywords.join(" ")).not.toMatch(/fernbrook/i);
+    expect(atsNotes(report, "greenhouse.")).toBe(true);
+  });
+
+  it("reads a Greenhouse link that names the job with gh_jid, on the old host", async () => {
+    const { calls, context } = board(() => json(GREENHOUSE_JOB));
+    const url = `https://boards.greenhouse.io/fernbrook?gh_jid=${GREENHOUSE_JOB_ID}`;
+    expect(await main(["check", file("gh2.txt", RESUME), "--job-url", url], context)).toBe(0);
+    expect(calls[0]!.url).toBe(
+      `https://boards-api.greenhouse.io/v1/boards/fernbrook/jobs/${GREENHOUSE_JOB_ID}`,
+    );
+    expect(out.join("\n")).toContain("Missing keywords: kubernetes");
+  });
+
+  it("reads a Lever posting, its lists included, from the API of the posting's region", async () => {
+    const { calls, context } = board(() => json(LEVER_JOB));
+    const url = `https://jobs.eu.lever.co/fernbrook/${LEVER_JOB_ID}/apply`;
+    const argv = ["check", file("lever.txt", RESUME), "--job-url", url, "--json"];
+    expect(await main(argv, context)).toBe(0);
+
+    expect(calls[0]!.url).toBe(`https://api.eu.lever.co/v0/postings/fernbrook/${LEVER_JOB_ID}`);
+    const report = JSON.parse(out.join("\n"));
+    expect(report.missingKeywords).toEqual(expect.arrayContaining(["airflow", "dbt"]));
+    expect(atsNotes(report, "lever.")).toBe(true);
+  });
+
+  it("reads an Ashby posting by its id from the board's list, with no notes to add", async () => {
+    const { calls, context } = board(() => json(ASHBY_BOARD));
+    const url = `https://jobs.ashbyhq.com/fernbrook/${ASHBY_JOB_ID}/application`;
+    const argv = ["check", file("ashby.txt", RESUME), "--job-url", url, "--json"];
+    expect(await main(argv, context)).toBe(0);
+
+    expect(calls[0]!.url).toBe("https://api.ashbyhq.com/posting-api/job-board/fernbrook");
+    const report = JSON.parse(out.join("\n"));
+    expect(report.missingKeywords).toEqual(expect.arrayContaining(["pytorch", "spark"]));
+    // The board's other job is not read.
+    expect(report.missingKeywords.join(" ")).not.toMatch(/vendor/);
+    expect(atsNotes(report, "")).toBe(false);
+  });
+
+  it("keeps the --ats given over the board's", async () => {
+    const { context } = board(() => json(GREENHOUSE_JOB));
+    const url = `https://job-boards.greenhouse.io/fernbrook/jobs/${GREENHOUSE_JOB_ID}`;
+    const argv = ["check", file("gh3.txt", RESUME), "--job-url", url, "--ats", "taleo", "--json"];
+    expect(await main(argv, context)).toBe(0);
+    const report = JSON.parse(out.join("\n"));
+    expect(atsNotes(report, "taleo.")).toBe(true);
+    expect(atsNotes(report, "greenhouse.")).toBe(false);
+  });
+
+  it.each([
+    [`http://boards.greenhouse.io/fernbrook/jobs/${GREENHOUSE_JOB_ID}`, /only https:/],
+    ["not a url", /not a web address/],
+    ["https://careers.fernbrook.example/jobs/42", /save the page .*--job/i],
+    [`https://fernbrook.example/careers?gh_jid=${GREENHOUSE_JOB_ID}`, /save the page/i],
+    // Greenhouse's embed names the board only in the query.
+    ["https://boards.greenhouse.io/embed/job_app?for=fernbrook&token=1", /not a job posting/],
+    ["https://boards.greenhouse.io/fernbrook", /not a job posting/],
+    [`https://jobs.lever.co/fern%2F..%2Fx/${LEVER_JOB_ID}`, /not a job posting/],
+    ["https://jobs.lever.co/fernbrook/not-an-id", /not a job posting/],
+    [`https://jobs.ashbyhq.com/fernbrook/${ASHBY_JOB_ID}/../../x`, /not a job posting/],
+  ])("refuses %s before asking anything", async (url, message) => {
+    const { calls, context } = board(() => json(GREENHOUSE_JOB));
+    expect(await main(["check", file("refused.txt", RESUME), "--job-url", url], context)).toBe(1);
+    expect(err.join("\n")).toMatch(message);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("refuses --job with --job-url", async () => {
+    const { calls, context } = board(() => json(GREENHOUSE_JOB));
+    const argv = [
+      "check",
+      file("both.txt", RESUME),
+      "--job",
+      file("both-job.txt", "Kubernetes"),
+      "--job-url",
+      `https://job-boards.greenhouse.io/fernbrook/jobs/${GREENHOUSE_JOB_ID}`,
+    ];
+    expect(await main(argv, context)).toBe(1);
+    expect(err.join("\n")).toMatch(/either --job or --job-url/);
+    expect(calls).toHaveLength(0);
+  });
+
+  const LEVER_URL = `https://jobs.lever.co/fernbrook/${LEVER_JOB_ID}`;
+
+  it.each([
+    [
+      "a redirect",
+      () =>
+        new Response(null, { status: 302, headers: { location: "https://elsewhere.example/" } }),
+      /api\.lever\.co answered with a redirect/,
+    ],
+    ["a job that is gone", () => json({ ok: false, error: "Document not found" }, 404), /no job/],
+    ["a server error", () => json({}, 503), /api\.lever\.co answered HTTP 503/],
+    ["a body that is not JSON", () => new Response("<html>down</html>"), /not JSON/],
+    ["JSON that is not a posting", () => json({ ok: true }), /not a Lever posting/],
+    ["no answer", () => Promise.reject(new TypeError("fetch failed")), /could not reach/i],
+  ])("fails with one line on %s", async (_name, answer, message) => {
+    const { context } = board(answer);
+    const argv = ["check", file("fail.txt", RESUME), "--job-url", LEVER_URL];
+    expect(await main(argv, context)).toBe(1);
+    expect(err).toHaveLength(1);
+    expect(err[0]).toMatch(message);
+    expect(out.join("\n")).not.toContain("Readiness");
+  });
+
+  it("says when an Ashby board does not list the job", async () => {
+    const { context } = board(() => json({ ...ASHBY_BOARD, jobs: ASHBY_BOARD.jobs.slice(0, 1) }));
+    const url = `https://jobs.ashbyhq.com/fernbrook/${ASHBY_JOB_ID}`;
+    expect(await main(["check", file("ashby2.txt", RESUME), "--job-url", url], context)).toBe(1);
+    expect(err.join("\n")).toMatch(/no job .*save the page/i);
+  });
+
+  it("stops reading an answer past the size limit", async () => {
+    // An answer without end: the read must stop at the limit, not when memory runs out.
+    let pulled = 0;
+    const chunk = new Uint8Array(1024 * 1024).fill(32);
+    const endless = () =>
+      new Response(
+        new ReadableStream({
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(chunk);
+          },
+        }),
+      );
+    const { context } = board(endless);
+    const argv = ["check", file("big.txt", RESUME), "--job-url", LEVER_URL];
+    expect(await main(argv, context)).toBe(1);
+    expect(err.join("\n")).toMatch(/over 20 MB/);
+    expect(pulled).toBeLessThan(30);
   });
 });
