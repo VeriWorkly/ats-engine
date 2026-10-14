@@ -30,8 +30,11 @@ report.locale; // { languages: ["de"], region: "DE" }
   pack. A resume no attached pack recognises, written in one of those and not in English, is
   read in "und" (undetermined): a rule limited to some `languages`, such as the English writing
   checks, is dropped for it rather than judging Spanish by English rules. `report.locale` is
-  unchanged (`{ languages: [], … }`). A language is told only by the words it has, never by the
-  English it lacks, so a short or terse English resume stays English.
+  unchanged (`{ languages: [], … }`). A language is told only by the words a resume has, never
+  by the English it lacks, and a Latin-script one, with or without a pack, only when the resume
+  has more of its words than of English's: an English resume naming "El Paso" or "Banque
+  Nationale du Canada" stays English. A resume with more words of another language than of
+  English, such as a long French summary over a few English bullets, is read in that language.
 - **One region applies**, chosen in this order:
   1. The `region` option (any case). A region that is not attached throws `AtsPolicyError`
      naming the attached ones, rather than being dropped; the CLI reports it as a usage error.

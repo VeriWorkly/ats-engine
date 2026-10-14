@@ -165,9 +165,10 @@ export const UNDETERMINED = "und";
 
 /**
  * The language a resume no attached pack recognises is read in: the policy's own, unless it is
- * recognised as written in one of `text.otherLanguages` and not in the policy's own as well. Only
- * what a text has decides, never what it lacks: a short English resume, or one of terse bullets,
- * holds few English function words, and none of another language's.
+ * recognised as written in one of `text.otherLanguages`, with more of its words than the policy's
+ * own has, and not in the policy's own as well. Only what a text has decides, never what it
+ * lacks: a short English resume, or one of terse bullets, holds few English function words, and
+ * fewer still of another language's, even naming "El Paso" or "Banque Nationale du Canada".
  */
 export function baseLanguageOf(policy: AtsEnginePolicy, sample: Sample) {
   const { text } = policy;

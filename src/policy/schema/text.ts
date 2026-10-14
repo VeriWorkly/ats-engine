@@ -89,8 +89,10 @@ export const engineTextSchema = z.prefault(
      * script, or by at least three different of its words making up 3% of the words. A resume
      * written in one of them, in no attached pack's language and not in `language` either, is
      * read in none (ISO 639 "und"): a rule limited to some `languages` is dropped for it rather
-     * than judging Spanish by English rules. Telling a language by what it has, never by what it
-     * lacks, keeps a short or terse English resume in English. Empty: every resume no pack
+     * than judging Spanish by English rules. A Latin-script one also needs more of its words in
+     * the resume than `detectionWords` find. Telling a language by what it has, never by what it
+     * lacks, keeps a short or terse English resume in English unless it holds more of another
+     * language's words than of English's. Empty: every resume no pack
      * recognises is read in `language`.
      */
     otherLanguages: z._default(

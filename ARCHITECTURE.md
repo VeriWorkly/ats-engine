@@ -156,7 +156,8 @@ built `.d.ts` with `exactOptionalPropertyTypes` on.
   `languages: ["en"]` and drops out for a resume read in another language rather than misjudge
   it, a language with no pack included: one the policy's `text.otherLanguages` recognise, and
   English (`text.detectionWords`) does not, is read in "und". Only the words a resume has decide
-  that, never the English it lacks, so a short English resume stays English. Tense is judged
+  that, never the English it lacks, and another Latin-script language needs more of its words
+  than English has, so a short English resume naming Spanish places stays English. Tense is judged
   only in a role already left: the current role may use either.
 - **Credentials and languages are rows.** A certification and a spoken language are parsed into
   `parsed.certifications` and `parsed.spokenLanguages`, and the requirements judge reads those
