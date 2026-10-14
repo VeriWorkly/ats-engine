@@ -41,12 +41,15 @@ const BUDGETS = {
   // 70.9: the place names (see "."), and the German pack's for Germany, Austria, Switzerland and
   // the German states, took it from 68.5 to 70.8.
   // 71.1: the policy data this round's fixes added (see ".") took it to 71.08.
-  "./locales": 71.1,
+  // 71.3: reading a policy with a loop rather than recursion, so one nested past 5,000 levels is
+  // refused as invalid instead of overflowing the stack, took it to 71.24.
+  "./locales": 71.3,
   // 70: zod/mini in place of zod took it from 141.0 to 67.5.
   // 71.6: the policy's place names (see "."), with what else "." gained, took it from 69.3 to 71.5.
   // 71.8: the policy data and parsing this round's fixes added (see ".") took it to 71.75.
   // 71.9: the same as "." at 99.9, to 71.84.
-  "./ai": 71.9,
+  // 72.1: the same loop as "./locales" at 71.3, to 72.01.
+  "./ai": 72.1,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,

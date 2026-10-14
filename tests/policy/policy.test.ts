@@ -106,6 +106,60 @@ describe("parseAtsPolicy", () => {
     }
   });
 
+  /**
+   * A policy can come from a host's JSON file, so its depth is not ours to choose. Nested past
+   * any real policy it is refused like any other bad policy, not with a stack overflow, both
+   * where the schema reads and in a key the schema drops.
+   */
+  it("refuses a policy nested 10,000 deep with AtsPolicyError", () => {
+    for (const make of [(inner: unknown) => ({ a: inner }), (inner: unknown) => [inner]]) {
+      let nested: unknown = "leaf";
+      for (let depth = 0; depth < 10_000; depth += 1) nested = make(nested);
+      for (const policy of [
+        { ...MINIMAL, rules: nested },
+        { ...MINIMAL, extra: nested },
+      ]) {
+        let thrown: unknown;
+        try {
+          parseAtsPolicy(policy);
+        } catch (error) {
+          thrown = error;
+        }
+        expect(thrown).toBeInstanceOf(AtsPolicyError);
+      }
+    }
+  });
+
+  it("refuses a policy that contains itself with AtsPolicyError", () => {
+    const policy: Record<string, unknown> = { ...MINIMAL };
+    policy.extra = policy;
+    expect(() => parseAtsPolicy(policy)).toThrow(AtsPolicyError);
+  });
+
+  it("reads a policy nested deep in a key it drops, as it always has", () => {
+    let nested: unknown = "leaf";
+    for (let depth = 0; depth < 1_000; depth += 1) nested = { a: nested };
+    expect(parseAtsPolicy({ ...MINIMAL, extra: nested })).toEqual(parseAtsPolicy(MINIMAL));
+  });
+
+  it("keeps a key's last value when two keys normalise to one, and a __proto__ key as data", () => {
+    const precomposed = "M\u00e4rz";
+    const decomposed = "Ma\u0308rz";
+    const policy = parseAtsPolicy({
+      ...MINIMAL,
+      ["__proto__"]: { polluted: true },
+      resumeParse: {
+        ...MINIMAL.resumeParse,
+        months: { [precomposed]: 3, jan: 1, [decomposed]: 4 },
+      },
+    });
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.entries(policy.resumeParse.months)).toEqual([
+      [precomposed, 4],
+      ["jan", 1],
+    ]);
+  });
+
   for (const bad of [null, undefined, "string", 42, [], true]) {
     it(`rejects ${JSON.stringify(bad) ?? "undefined"} without crashing`, () => {
       expect(() => parseAtsPolicy(bad)).toThrow(AtsPolicyError);
