@@ -125,8 +125,10 @@ export function createRedaction(
 
   const name = parsed.name.trim();
   const parts = name.split(/\s+/).filter(Boolean);
+  // Two characters are a whole Chinese or Korean name ("李明"), but in Latin script too short to
+  // replace safely ("Al" in "Algorithms").
   const named =
-    name.length >= 3 &&
+    (name.length >= 3 || (name.length === 2 && /[\p{sc=Han}\p{sc=Hangul}]/u.test(name))) &&
     !parsed.roles.some((role) => role.title.trim().toLowerCase() === name.toLowerCase());
 
   const links = new Set(parsed.links.map((link) => link.trim()).filter((link) => link.length >= 3));

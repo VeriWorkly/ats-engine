@@ -288,6 +288,14 @@ describe("redaction variants", () => {
     expect(hidden).not.toContain("345678");
     expect(hidden).toContain("2019 - 2023");
   });
+
+  // Two characters is a whole name in Chinese and Korean; in Latin script it is too short to
+  // replace safely ("Al" is inside "Algorithms").
+  it.each(["李明", "김민"])("redacts a two-character name: %s", (name) => {
+    expect(createRedaction(parsed(name), "").apply(`${name}\nSigned, ${name}`)).toBe(
+      "[NAME]\nSigned, [NAME]",
+    );
+  });
 });
 
 describe("analyze: keyword suggestions and the request", () => {

@@ -79,7 +79,9 @@ What does not depend on the model:
 - `analyze` redacts contact details before the request leaves, best effort and only these
   forms. The name as the parser read it, in any case or letter spacing, also as "Doe, Jane", with
   or without a middle initial, and inside a web address built from it (`janedoe.dev`); not
-  initials ("J. Doe"), the first name alone, or a handle written another way (`jane_doe`). Every
+  initials ("J. Doe"), the first name alone, or a handle written another way (`jane_doe`). A name
+  of two characters only in Chinese or Korean (`李明`); in Latin script it is too short to replace
+  safely. Every
   email address in the text, with letters in any script before or after the `@` and an
   apostrophe before it (`zoë.müller@firma.de`, `o'connor.pat@example.com`). The links the
   parser read. The phone by its national number: with or without the country code (`+44`, `0044`, `+44 (0)`, or after
