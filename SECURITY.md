@@ -15,9 +15,9 @@ Only the latest minor release receives security fixes while the package is 0.x.
 The engine is built to take input from anyone: a resume, a posting, a web page, an uploaded
 file. These are the guarantees, each held by a test.
 
-**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 81
-shapes, 76 written on one line (letter runs, digit runs, unclosed tags, comma lists, mixed
-scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each), placed in the name
+**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 100
+shapes, 95 written on one line or under one heading (letter runs, digit runs, unclosed tags,
+comma lists, mixed scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each), placed in the name
 line, a bullet and the posting at once, and again under the certification and language headings,
 scores under the community policy with every locale pack applied in tens of milliseconds for most
 one-line shapes and a few hundred at most, short lines included, on a developer machine
@@ -89,8 +89,9 @@ What does not depend on the model:
   including text smuggled in Unicode tag characters or PDF metadata. A phrase in quotes or
   backticks within three words of a word that says it was caught (`text.injectionMentionVerbs`:
   "flags", "blocked", "red-teamed"), with no comma or colon between, is an AI security
-  engineer's example and is not flagged: `Built a filter that flags "ignore previous
-  instructions"`. An attacker can dress an instruction so too, and a model reading the resume
+  engineer's example and is not flagged:
+  `Built a filter that flags "ignore previous instructions"`. An attacker can dress an
+  instruction so too, and a model reading the resume
   may still follow it; the rule trades that for not failing honest security work. It is still
   flagged unquoted (a bare "[INST]" too), on a labelled list line ("Skills: …"), in text hidden
   by the layout, in tag characters or in metadata, and whenever the quote tells the screener

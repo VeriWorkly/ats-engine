@@ -193,6 +193,6 @@ built `.d.ts` with `exactOptionalPropertyTypes` on.
 
 Keep: everything exported today. Remove in 1.0: `level`, `highestDegree`, `AtsDegreeLevel`,
 `DEGREE_LABELS`. Candidates to rename or make internal at 1.0, decided then rather than churned
-now: `AtsScoringService` (today an alias of the documented `check()` function), `TaskRoute` → `AtsAiRoute`,
+now: `AtsScoringService` (the class the documented `check()` function calls), `TaskRoute` → `AtsAiRoute`,
 `AiEvalCase`/`AiEvalReport` → `AtsAi…`, and the accidental exports `chatCompletionBody`,
 `messagesBody`, `localizePolicy`, `parseQuality`, the grounding helpers.
