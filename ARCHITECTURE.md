@@ -11,8 +11,8 @@ These hold everywhere, and each has a test:
   `report.engine = { version, policy fingerprint }`. `ENGINE_VERSION` equals package.json.
 - **No I/O, no global state in the core** (`src/` minus `node/`, `cli/`). Caches are `memo` — a
   WeakMap on the object the value is derived from. What they are keyed on cannot change after the
-  fact: `parseAtsPolicy` and `withLocales` return a deep-frozen policy (`deepFreeze` in
-  `util/memo.ts`), and every exported object (`DEFAULT_POLICY`, the packs, their JSON Schemas,
+  fact: `parseAtsPolicy`, `withLocales` and `localizePolicy` return a deep-frozen policy
+  (`deepFreeze` in `util/memo.ts`), and every exported object (`DEFAULT_POLICY`, the packs, their JSON Schemas,
   `CONVERT_GROUNDING_SKIP`, the labels and limits) is frozen too, so a change throws in strict mode
   rather than being read with patterns compiled before it. `/document`, `/format` and `/job` have
   no dependencies; zod (`zod/mini`) is internal and never exported as a value.
@@ -134,7 +134,7 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 Counted with esbuild's metafile, every bare import left external. "zod/mini" includes its
 English locale (`zod/v4/locales/en.js`, see `util/issues.ts`). Bundle budgets per subpath are
 enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 103 KB for `.`, 71.4 KB
-for `/locales`, 72.1 KB for `/ai`, 20.9 KB for `/node`, under 4 KB for every other; the script
+for `/locales`, 72.2 KB for `/ai`, 20.9 KB for `/node`, under 4 KB for every other; the script
 prints each entry's size against its budget, with the reason for each budget beside it). Two more
 budgets hold what a host importing only some names bundles: `withLocales` alone (48.2 KB) and
 `/ai`'s prompts and error alone (9.5 KB). The packs' and the tasks' JSON Schemas are built at

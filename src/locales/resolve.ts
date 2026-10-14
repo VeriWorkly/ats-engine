@@ -2,7 +2,7 @@ import { AtsPolicyError } from "../policy/errors.js";
 import { parseAtsPolicy } from "../policy/parse.js";
 import type { AtsEnginePolicy, AtsEnginePolicyInput, AtsEngineRule } from "../policy/schema.js";
 import { phoneCountry } from "../parser/phone.js";
-import { memo } from "../util/memo.js";
+import { deepFreeze, memo } from "../util/memo.js";
 import { own } from "../util/own.js";
 import { applyVocabulary, DETECTION_SAMPLE, isWrittenIn, sampleOf, union } from "./languages.js";
 import type { AtsLanguagePackInput, AtsRegionPack, AtsRegionPackInput } from "./schema.js";
@@ -226,7 +226,8 @@ export function localizePolicy(
       };
     if (dateOrder)
       localized = { ...localized, resumeParse: { ...localized.resumeParse, dateOrder } };
-    cached.set(key, localized);
+    // Shared by every resume read this way, so frozen as the policy it came from is.
+    cached.set(key, deepFreeze(localized));
   }
   const resumeLanguages = (options.languages ? languages : inResume).map((pack) => pack.id);
   return { policy: localized, locale, resumeLanguages };
