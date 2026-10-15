@@ -31,11 +31,16 @@ report.locale; // { languages: ["de"], region: "DE" }
   read in "und" (undetermined): a rule limited to some `languages`, such as the English writing
   checks, is dropped for it rather than judging Spanish by English rules. `report.locale` is
   unchanged (`{ languages: [], … }`). A language is told only by the words a resume has, never
-  by the English it lacks, and a Latin-script one, with or without a pack, only when the resume
-  has more of its words than of English's: an English resume naming "El Paso" or "Banque
-  Nationale du Canada" stays English. A resume with more words of a pack's language than of
-  English, yet clearly English too (a French summary over English roles), is read with the
-  pack's words but keeps the English rules, and the pack's country does not set its date order.
+  by the English it lacks, and one with no pack only when the resume has more of its words than
+  of English's: an English resume naming "El Paso" stays English.
+- **The bullets decide which language a resume is read in.** A pack's words are attached
+  whenever a resume holds three of them at 3% (they only add vocabulary). Its rules, and with no
+  +CC phone number its country's date order, follow the language of the resume's bullet lines:
+  German bullets under English headings or an English summary stay German; English bullets
+  under a French summary, or beside "Banque Nationale du Canada", stay English, with month-first
+  dates and the English writing checks (`locale` then lists `fr`, with `region: null`).
+  Bullets with as many of the pack's words as English's, or none, follow the pack. A script
+  pack (Hindi) is not weighed: English bullets under Hindi headings are usual.
 - **One region applies**, chosen in this order:
   1. The `region` option (any case). A region that is not attached throws `AtsPolicyError`
      naming the attached ones, rather than being dropped; the CLI reports it as a usage error.

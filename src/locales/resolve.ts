@@ -2,6 +2,7 @@ import { AtsPolicyError } from "../policy/errors.js";
 import { parseAtsPolicy } from "../policy/parse.js";
 import type { AtsEnginePolicy, AtsEnginePolicyInput, AtsEngineRule } from "../policy/schema.js";
 import { phoneCountry } from "../parser/phone.js";
+import { BULLET } from "../text/text.js";
 import { deepFreeze, memo } from "../util/memo.js";
 import { own } from "../util/own.js";
 import {
@@ -9,6 +10,7 @@ import {
   baseLanguageOf,
   DETECTION_SAMPLE,
   isWrittenIn,
+  outweighs,
   sampleOf,
   union,
   UNDETERMINED,
@@ -160,10 +162,10 @@ export function localizePolicy(
   policy: AtsEnginePolicy;
   locale: AtsLocale;
   /**
-   * The language packs the resume itself is read in — those asked for, else those it is detected
-   * as written in — leaving out a language only the posting is written in. Empty for the base;
-   * `["und"]` when the resume is written neither in the base's language nor in a pack's; the
-   * base's alone when it is written in the base's language as well as a pack's.
+   * The language packs the resume itself is read in — those asked for, else those its bullets are
+   * written in — leaving out a language only the posting is written in. Empty for the base;
+   * `["und"]` when the resume is written neither in the base's language nor in a pack's. A pack
+   * whose words its bullets hold fewer of than the base's adds its vocabulary but is not one.
    */
   resumeLanguages: string[];
 } {
@@ -195,20 +197,27 @@ export function localizePolicy(
   const posting =
     text === resumeText ? "" : text.startsWith(resumeText) ? text.slice(resumeText.length) : text;
   const postingSample = posting ? sampleOf(posting) : undefined;
-  const inResume = packs.filter((pack) => isWrittenIn(resumeSample, pack, policy.text));
+  const inResume = packs.filter((pack) => isWrittenIn(resumeSample, pack));
   const languages = options.languages
     ? packs.filter((pack) => options.languages!.includes(pack.id))
     : packs.filter(
         (pack) =>
           inResume.includes(pack) ||
-          (postingSample !== undefined && isWrittenIn(postingSample, pack, policy.text)),
+          (postingSample !== undefined && isWrittenIn(postingSample, pack)),
       );
-
-  // A resume written in the base's language as well as a pack's (a French summary over English
-  // roles) is read with the pack's words, but keeps the base's rules, and its dates are not read
-  // as the pack's country writes them. A German or French resume holds next to no English words.
-  const baseToo =
-    !options.languages && inResume.length > 0 && isWrittenIn(resumeSample, policy.text);
+  // Each pack the resume has words of adds its vocabulary; the language its bullets are written
+  // in decides its rules and its country's date order. English bullets under a French summary,
+  // or beside "Banque Nationale du Canada", stay English; German bullets under "Skills" do not.
+  const bullets = sampleOf(
+    resumeText
+      .slice(0, DETECTION_SAMPLE)
+      .split("\n")
+      .filter((line) => BULLET.test(line))
+      .join("\n"),
+  );
+  const leading = options.languages
+    ? languages
+    : inResume.filter((pack) => outweighs(bullets, pack, policy.text));
 
   // A language only the posting is written in says where the job is, not how the resume writes
   // its dates: a US resume applying to a German posting keeps month-first dates.
@@ -216,7 +225,7 @@ export function localizePolicy(
   const region =
     asked ??
     regions.find((pack) => pack.phoneCountry === country) ??
-    (baseToo ? [] : options.languages ? languages : inResume)
+    leading
       .map((pack) => regions.find((candidate) => candidate.id === pack.defaultRegion))
       .find(Boolean);
 
@@ -250,8 +259,6 @@ export function localizePolicy(
     // Shared by every resume read this way, so frozen as the policy it came from is.
     cached.set(key, deepFreeze(localized));
   }
-  const resumeLanguages = baseToo
-    ? [policy.text.language]
-    : orBase((options.languages ? languages : inResume).map((pack) => pack.id));
+  const resumeLanguages = orBase(leading.map((pack) => pack.id));
   return { policy: localized, locale, resumeLanguages };
 }

@@ -118,7 +118,8 @@ describe("detection", () => {
     ],
   ])("reads an English resume from %s naming French institutions as English", (_, lines, start) => {
     const report = check(lines.join("\n"));
-    expect(report.locale).toEqual({ languages: [], region: null });
+    // The French words add their vocabulary; the English bullets keep the dates and the rules.
+    expect(report.locale.region).toBeNull();
     expect(report.parsed.roles[0].start).toEqual(start);
     expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
   });
@@ -149,6 +150,63 @@ describe("detection", () => {
     expect(report.locale).toEqual({ languages: ["fr"], region: null });
     expect(report.parsed.roles[0].start).toEqual({ year: 2019, month: 4 });
     expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
+  });
+
+  // The other way round: German or Hindi bullets keep their country's dates and rules under English
+  // headings or an English summary, as before the base's own words were counted.
+  const BECKER = [
+    "Jonas Becker",
+    "jonas.becker@example.de | Berlin",
+    "Summary",
+    "Backend engineer with 8 years of experience. I have built and led teams across the payments and logistics domains, using Go and Kotlin, and I care about the developer experience of the platforms that our teams use every day.",
+    "Berufserfahrung",
+    "Senior Backend Engineer, Zalando SE — Berlin",
+    "01/03/2019 – heute",
+    "- Entwicklung einer Plattform mit Kafka für über 200 Teams",
+    "- Leitung eines Teams von 5 Entwicklern",
+    "Softwareentwickler, SAP SE — Walldorf",
+    "01/10/2015 – 01/02/2019",
+    "- Umsetzung von REST-APIs für die Cloud-Plattform",
+    "Ausbildung",
+    "M.Sc. Informatik, TU München, 2015",
+    "Skills",
+    "Go, Kotlin, Kafka",
+  ].join("\n");
+  it.each([
+    ["an English summary", BECKER, 2],
+    [
+      "English headings",
+      BECKER.replace(/Summary\n.*\n/, "")
+        .replace("Berufserfahrung", "Work Experience")
+        .replace("Ausbildung", "Education"),
+      2,
+    ],
+  ])("keeps a German CV with %s German", (_, text, roles) => {
+    const report = check(text);
+    expect(report.locale).toEqual({ languages: ["de"], region: "DE" });
+    expect(report.parsed.roles).toHaveLength(roles);
+    expect(report.parsed.roles[0].start).toEqual({ year: 2019, month: 3 });
+    expect(report.rules.map((rule) => rule.id)).not.toContain("ats-v2.writing.firstPerson");
+  });
+
+  it("keeps India for a resume with Hindi headings over English bullets", () => {
+    const report = check(
+      [
+        "राहुल शर्मा",
+        "rahul.sharma@gmail.com | नई दिल्ली",
+        "सारांश",
+        "सॉफ्टवेयर इंजीनियर, जावा और स्प्रिंग बूट में पाँच वर्षों का अनुभव। बैंकिंग क्षेत्र में काम किया है।",
+        "कार्य अनुभव",
+        "Software Engineer, Infosys — Bengaluru",
+        "05/03/2020 – Present",
+        "- Built REST APIs with Spring Boot for the payments team",
+        "- Reduced batch processing time by 30% using parallel streams",
+        "शिक्षा",
+        "B.Tech Computer Science, दिल्ली विश्वविद्यालय, 2017",
+      ].join("\n"),
+    );
+    expect(report.locale).toEqual({ languages: ["hi"], region: "IN" });
+    expect(report.parsed.roles[0].start).toEqual({ year: 2020, month: 3 });
   });
 
   it("takes the region from a +CC phone number over the language's default", () => {

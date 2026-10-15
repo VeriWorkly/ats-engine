@@ -137,9 +137,9 @@ export function sampleOf(text: string): Sample {
  * neither does a surname that is one of the words ("Das") however often it is repeated.
  *
  * Measured against `base`, the policy's own language, a Latin-script language must also have
- * more of its words in the text than the base has of its own: an English resume naming "Banque
- * Nationale du Canada" and "Caisse de dépôt et placement du Québec" has as many French words as
- * a short French CV, and more English ones.
+ * more of its words in the text than the base has of its own: how a resume in a language with no
+ * pack is told from an English one naming "El Paso". A pack's vocabulary is attached without it,
+ * since it only adds words; `outweighs` decides what the pack's language then governs.
  */
 export function isWrittenIn({ text, words }: Sample, pack: Detection, base?: Detection) {
   const detection = detectionOf(pack);
@@ -155,6 +155,20 @@ export function isWrittenIn({ text, words }: Sample, pack: Detection, base?: Det
     hits.length / Math.max(words.length, 1) >= 0.03 &&
     (!own || hits.length > words.filter((word) => own.has(word)).length)
   );
+}
+
+/**
+ * Whether a pack's language, rather than the policy's own, is what the text is written in: a
+ * script pack always is; a Latin-script one unless the text holds more of the base's detection
+ * words than of its own. Measured on a resume's bullets, where its dates and the writing rules
+ * are, not on headings or a summary: a German CV may head its sections "Skills" and "Experience",
+ * and an English one may open with a French summary or name "Banque Nationale du Canada".
+ */
+export function outweighs({ words }: Sample, pack: Detection, base: Detection) {
+  if (detectionOf(pack).script) return true;
+  const count = (detection: Detection) =>
+    words.filter((word) => detectionOf(detection).words.has(word)).length;
+  return count(base) <= count(pack);
 }
 
 /**
@@ -189,7 +203,7 @@ export function inLanguagesOf(policy: AtsEnginePolicy, text: string): AtsEngineP
   const packs = policy.locales.languages;
   if (!packs.length) return policy;
   const sample = sampleOf(text);
-  const languages = packs.filter((pack) => isWrittenIn(sample, pack, policy.text));
+  const languages = packs.filter((pack) => isWrittenIn(sample, pack));
   if (!languages.length) return policy;
   const key = languages.map((pack) => pack.id).join("+");
   const cache = inLanguagesCache(policy);
