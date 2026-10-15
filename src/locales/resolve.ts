@@ -162,7 +162,8 @@ export function localizePolicy(
   /**
    * The language packs the resume itself is read in — those asked for, else those it is detected
    * as written in — leaving out a language only the posting is written in. Empty for the base;
-   * `["und"]` when the resume is written neither in the base's language nor in a pack's.
+   * `["und"]` when the resume is written neither in the base's language nor in a pack's; the
+   * base's alone when it is written in the base's language as well as a pack's.
    */
   resumeLanguages: string[];
 } {
@@ -203,13 +204,19 @@ export function localizePolicy(
           (postingSample !== undefined && isWrittenIn(postingSample, pack, policy.text)),
       );
 
+  // A resume written in the base's language as well as a pack's (a French summary over English
+  // roles) is read with the pack's words, but keeps the base's rules, and its dates are not read
+  // as the pack's country writes them. A German or French resume holds next to no English words.
+  const baseToo =
+    !options.languages && inResume.length > 0 && isWrittenIn(resumeSample, policy.text);
+
   // A language only the posting is written in says where the job is, not how the resume writes
   // its dates: a US resume applying to a German posting keeps month-first dates.
   const country = asked ? undefined : phoneCountry(resumeText.slice(0, DETECTION_SAMPLE));
   const region =
     asked ??
     regions.find((pack) => pack.phoneCountry === country) ??
-    (options.languages ? languages : inResume)
+    (baseToo ? [] : options.languages ? languages : inResume)
       .map((pack) => regions.find((candidate) => candidate.id === pack.defaultRegion))
       .find(Boolean);
 
@@ -243,6 +250,8 @@ export function localizePolicy(
     // Shared by every resume read this way, so frozen as the policy it came from is.
     cached.set(key, deepFreeze(localized));
   }
-  const resumeLanguages = orBase((options.languages ? languages : inResume).map((pack) => pack.id));
+  const resumeLanguages = baseToo
+    ? [policy.text.language]
+    : orBase((options.languages ? languages : inResume).map((pack) => pack.id));
   return { policy: localized, locale, resumeLanguages };
 }

@@ -123,6 +123,34 @@ describe("detection", () => {
     expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
   });
 
+  // More French words than English, from one paragraph, yet English throughout the rest: read with
+  // the French pack's words, but not as French dates, and still judged as English writing.
+  it("reads a resume that is English too as English, whatever its French summary", () => {
+    const report = check(
+      [
+        "Camille Dubois",
+        "camille@example.com | (617) 555-0123 | Boston, MA",
+        "Summary",
+        "Ingénieure logiciel avec plus de 7 ans d'expérience dans le développement des applications web et mobiles. Passionnée par la qualité du code, je travaille au sein des équipes agiles pour livrer des produits fiables aux clients. Disponible pour un poste sur Boston ou à distance.",
+        "Experience",
+        "Software Engineer, Société Générale — New York, NY",
+        "04/05/2019 – Present",
+        "- Built a trading dashboard used by 300 traders",
+        "- Reduced latency by 35% by rewriting the pricing service",
+        "Software Engineer, Capgemini — Boston, MA",
+        "09/01/2016 – 04/01/2019",
+        "- Developed REST APIs in Java for 5 clients",
+        "Education",
+        "Diplôme d'ingénieur, École Polytechnique, 2016",
+        "Skills",
+        "Java, TypeScript, React, AWS",
+      ].join("\n"),
+    );
+    expect(report.locale).toEqual({ languages: ["fr"], region: null });
+    expect(report.parsed.roles[0].start).toEqual({ year: 2019, month: 4 });
+    expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
+  });
+
   it("takes the region from a +CC phone number over the language's default", () => {
     expect(
       check(LOCALE_FIXTURES.de[0].text.replace("+49 30 12345678", "+91 98765 43210")).locale,

@@ -33,8 +33,9 @@ report.locale; // { languages: ["de"], region: "DE" }
   unchanged (`{ languages: [], … }`). A language is told only by the words a resume has, never
   by the English it lacks, and a Latin-script one, with or without a pack, only when the resume
   has more of its words than of English's: an English resume naming "El Paso" or "Banque
-  Nationale du Canada" stays English. A resume with more words of another language than of
-  English, such as a long French summary over a few English bullets, is read in that language.
+  Nationale du Canada" stays English. A resume with more words of a pack's language than of
+  English, yet clearly English too (a French summary over English roles), is read with the
+  pack's words but keeps the English rules, and the pack's country does not set its date order.
 - **One region applies**, chosen in this order:
   1. The `region` option (any case). A region that is not attached throws `AtsPolicyError`
      naming the attached ones, rather than being dropped; the CLI reports it as a usage error.
