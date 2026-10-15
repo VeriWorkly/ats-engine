@@ -327,6 +327,15 @@ describe("redaction variants", () => {
       "[NAME]\nSigned, [NAME]",
     );
   });
+
+  // Replacement is whole-word, and Chinese and Korean write no space between words: a name
+  // inside a sentence, or before a Korean particle, is sent. SECURITY.md says so.
+  it("replaces a two-character name only where it stands apart", () => {
+    expect(createRedaction(parsed("李明"), "").apply("姓名: 李明\n李明是工程师")).toBe(
+      "姓名: [NAME]\n李明是工程师",
+    );
+    expect(createRedaction(parsed("김민"), "").apply("김민은 개발자")).toBe("김민은 개발자");
+  });
 });
 
 describe("analyze: keyword suggestions and the request", () => {

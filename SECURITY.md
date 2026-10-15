@@ -93,8 +93,10 @@ What does not depend on the model:
   forms. The name as the parser read it, in any case or letter spacing, also as "Doe, Jane", with
   or without a middle initial, and inside a web address built from it (`janedoe.dev`); not
   initials ("J. Doe"), the first name alone, or a handle written another way (`jane_doe`). A name
-  of two characters only in Chinese or Korean (`李明`); in Latin script it is too short to replace
-  safely. Every
+  of two characters only in Chinese or Korean (`李明`), and only where it stands apart (on its own
+  line, after a colon or a space): Chinese and Korean write no space between words, so inside a
+  sentence (`李明是工程师`) or before a Korean particle (`김민은`) it is sent. In Latin script two
+  letters are too short to replace safely. Every
   email address in the text, with letters in any script before or after the `@` and an
   apostrophe before it (`zoë.müller@firma.de`, `o'connor.pat@example.com`). The links the
   parser read. The phone by its national number: with or without the country code (`+44`, `0044`, `+44 (0)`, or after
