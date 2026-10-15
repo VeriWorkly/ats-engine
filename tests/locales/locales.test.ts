@@ -73,6 +73,142 @@ describe("detection", () => {
     expect(report.locale.languages).toEqual([]);
   });
 
+  // Invented people. French names of employers and schools ("du", "et", "des") are as many
+  // French words as a short French CV has, but fewer than the English around them.
+  it.each([
+    [
+      "New York",
+      [
+        "Sarah Cohen",
+        "sarah@example.com | (212) 555-0199 | New York, NY",
+        "Experience",
+        "Associate, Banque Nationale du Canada — New York, NY",
+        "03/04/2021 – Present",
+        "- Managed a $40M loan book",
+        "Analyst, Crédit Agricole Corporate et Investment Bank — New York, NY",
+        "07/01/2018 – 03/01/2021",
+        "- Built credit models",
+        "Education",
+        "MBA, Institut Européen d'Administration des Affaires (INSEAD), 2018",
+        "BA Economics, Columbia University, 2016",
+        "Skills",
+        "Excel, Bloomberg, Python",
+      ],
+      { year: 2021, month: 3 },
+    ],
+    [
+      "Montreal",
+      [
+        "Marc Tremblay",
+        "marc@example.com | (514) 555-0123 | Montreal, QC",
+        "Experience",
+        "Data Analyst, Caisse de dépôt et placement du Québec — Montreal",
+        "04/05/2021 – Present",
+        "- Built risk dashboards in Power BI",
+        "Analyst, Société des alcools du Québec — Montreal",
+        "09/01/2018 – 03/01/2021",
+        "- Automated sales reports with Python",
+        "Education",
+        "MSc Finance, HEC Montréal, 2018",
+        "BCom, Université du Québec à Montréal, 2016",
+        "Skills",
+        "Python, SQL, Power BI",
+      ],
+      { year: 2021, month: 4 },
+    ],
+  ])("reads an English resume from %s naming French institutions as English", (_, lines, start) => {
+    const report = check(lines.join("\n"));
+    // The French words add their vocabulary; the English bullets keep the dates and the rules.
+    expect(report.locale.region).toBeNull();
+    expect(report.parsed.roles[0].start).toEqual(start);
+    expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
+  });
+
+  // More French words than English, from one paragraph, yet English throughout the rest: read with
+  // the French pack's words, but not as French dates, and still judged as English writing.
+  it("reads a resume that is English too as English, whatever its French summary", () => {
+    const report = check(
+      [
+        "Camille Dubois",
+        "camille@example.com | (617) 555-0123 | Boston, MA",
+        "Summary",
+        "Ingénieure logiciel avec plus de 7 ans d'expérience dans le développement des applications web et mobiles. Passionnée par la qualité du code, je travaille au sein des équipes agiles pour livrer des produits fiables aux clients. Disponible pour un poste sur Boston ou à distance.",
+        "Experience",
+        "Software Engineer, Société Générale — New York, NY",
+        "04/05/2019 – Present",
+        "- Built a trading dashboard used by 300 traders",
+        "- Reduced latency by 35% by rewriting the pricing service",
+        "Software Engineer, Capgemini — Boston, MA",
+        "09/01/2016 – 04/01/2019",
+        "- Developed REST APIs in Java for 5 clients",
+        "Education",
+        "Diplôme d'ingénieur, École Polytechnique, 2016",
+        "Skills",
+        "Java, TypeScript, React, AWS",
+      ].join("\n"),
+    );
+    expect(report.locale).toEqual({ languages: ["fr"], region: null });
+    expect(report.parsed.roles[0].start).toEqual({ year: 2019, month: 4 });
+    expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
+  });
+
+  // The other way round: German or Hindi bullets keep their country's dates and rules under English
+  // headings or an English summary, as before the base's own words were counted.
+  const BECKER = [
+    "Jonas Becker",
+    "jonas.becker@example.de | Berlin",
+    "Summary",
+    "Backend engineer with 8 years of experience. I have built and led teams across the payments and logistics domains, using Go and Kotlin, and I care about the developer experience of the platforms that our teams use every day.",
+    "Berufserfahrung",
+    "Senior Backend Engineer, Zalando SE — Berlin",
+    "01/03/2019 – heute",
+    "- Entwicklung einer Plattform mit Kafka für über 200 Teams",
+    "- Leitung eines Teams von 5 Entwicklern",
+    "Softwareentwickler, SAP SE — Walldorf",
+    "01/10/2015 – 01/02/2019",
+    "- Umsetzung von REST-APIs für die Cloud-Plattform",
+    "Ausbildung",
+    "M.Sc. Informatik, TU München, 2015",
+    "Skills",
+    "Go, Kotlin, Kafka",
+  ].join("\n");
+  it.each([
+    ["an English summary", BECKER, 2],
+    [
+      "English headings",
+      BECKER.replace(/Summary\n.*\n/, "")
+        .replace("Berufserfahrung", "Work Experience")
+        .replace("Ausbildung", "Education"),
+      2,
+    ],
+  ])("keeps a German CV with %s German", (_, text, roles) => {
+    const report = check(text);
+    expect(report.locale).toEqual({ languages: ["de"], region: "DE" });
+    expect(report.parsed.roles).toHaveLength(roles);
+    expect(report.parsed.roles[0].start).toEqual({ year: 2019, month: 3 });
+    expect(report.rules.map((rule) => rule.id)).not.toContain("ats-v2.writing.firstPerson");
+  });
+
+  it("keeps India for a resume with Hindi headings over English bullets", () => {
+    const report = check(
+      [
+        "राहुल शर्मा",
+        "rahul.sharma@gmail.com | नई दिल्ली",
+        "सारांश",
+        "सॉफ्टवेयर इंजीनियर, जावा और स्प्रिंग बूट में पाँच वर्षों का अनुभव। बैंकिंग क्षेत्र में काम किया है।",
+        "कार्य अनुभव",
+        "Software Engineer, Infosys — Bengaluru",
+        "05/03/2020 – Present",
+        "- Built REST APIs with Spring Boot for the payments team",
+        "- Reduced batch processing time by 30% using parallel streams",
+        "शिक्षा",
+        "B.Tech Computer Science, दिल्ली विश्वविद्यालय, 2017",
+      ].join("\n"),
+    );
+    expect(report.locale).toEqual({ languages: ["hi"], region: "IN" });
+    expect(report.parsed.roles[0].start).toEqual({ year: 2020, month: 3 });
+  });
+
   it("takes the region from a +CC phone number over the language's default", () => {
     expect(
       check(LOCALE_FIXTURES.de[0].text.replace("+49 30 12345678", "+91 98765 43210")).locale,
@@ -117,6 +253,33 @@ describe("region conventions", () => {
       (rule) => rule.id === "ats-v2.privacy.dateOfBirth",
     );
     expect(unknown).toMatchObject({ passed: false, severity: "info", scoreImpact: 2 });
+  });
+
+  it("warns about it in the UK too, and reads the UK's credentials only there", () => {
+    const text = [
+      "Jane Doe",
+      "jane@example.com | +44 20 7946 0123",
+      "Experience",
+      "Engineer, Acme 01/09/2020 - 01/03/2022",
+      "Education",
+      "HND Computing, Exemplar College, 2014",
+      "Date of birth: 04/05/1990",
+    ].join("\n");
+    const report = check(text);
+    expect(report.locale).toEqual({ languages: [], region: "GB" });
+    expect(report.rules.find((rule) => rule.id === "ats-v2.privacy.dateOfBirth")).toMatchObject({
+      passed: false,
+      severity: "warning",
+      scoreImpact: 6,
+    });
+    expect(report.parsed.roles[0]).toMatchObject({
+      start: { year: 2020, month: 9 },
+      end: { year: 2022, month: 3 },
+    });
+    expect(report.parsed.education[0]).toMatchObject({ credential: "HND", isced: 5 });
+    const us = check(text, { region: "US" });
+    expect(us.parsed.roles[0].start).toEqual({ year: 2020, month: 1 });
+    expect(us.parsed.education[0]?.isced ?? null).toBeNull();
   });
 
   it("weighs a photo by region, and only when the file was measured", () => {
@@ -166,7 +329,7 @@ describe("packs", () => {
 
   it("replace an attached pack with the same id", () => {
     const twice = withLocales(withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), { languages: [de] });
-    expect(twice.locales.languages.map((pack) => pack.id)).toEqual(["de", "hi"]);
+    expect(twice.locales.languages.map((pack) => pack.id)).toEqual(["de", "fr", "hi"]);
   });
 
   it("publish a JSON Schema for contributors", () => {

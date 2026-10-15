@@ -84,13 +84,13 @@ describe("adversarial input", () => {
           AtsScoringService.check(text, localized, {
             jobDescription: text.slice(0, 20_000),
             now: NOW,
-            languages: ["de", "hi"],
+            languages: ["de", "fr", "hi"],
             region: "DE",
           }),
         1_500, // see `expectFastOn`
         label,
       );
-      expect(report.locale, label).toEqual({ languages: ["de", "hi"], region: "DE" });
+      expect(report.locale, label).toEqual({ languages: ["de", "fr", "hi"], region: "DE" });
     }
   });
 

@@ -75,7 +75,7 @@ seam is clear.
 | `checks/`                            | `integrity/text` (injection, homoglyphs, copied posting, stuffing), `timeline`, `skills`, `bullets` (role body lines when list markers were lost, a list of works' citations), `writing` (style of the bullets and role dates, English), `finding`                                                                                                                                                                                                                                                                             | internal               |
 | `scoring/`                           | `engine` (pipeline), `context` (what rules read), `score` (arithmetic), `rules` (per-kind evaluation and applicability, `languages` too), `categories` (`writing` apart), `rubric`, `verdict`                                                                                                                                                                                                                                                                                                                                  | `.`                    |
 | `matching/`                          | `vocabulary` (terms, synonyms, phrases, soft skills), `alternation` ("Go or Java"), `jobSections`, `proseNames`, `jobMatch` (weights, hard and soft groups), `requirements`                                                                                                                                                                                                                                                                                                                                                    | internal               |
-| `locales/`                           | `index` (`BUILT_IN_LOCALES`, the packs' JSON Schemas), `schema`, `languages` (language detection and vocabulary, no phone metadata), `resolve` (attach, region, date order, a region's rule changes and `ageAdvice`), `packs/` (`de`, `hi`, `regions`)                                                                                                                                                                                                                                                                         | `/locales`             |
+| `locales/`                           | `index` (`BUILT_IN_LOCALES`, the packs' JSON Schemas), `schema`, `languages` (language detection and vocabulary, no phone metadata), `resolve` (attach, region, date order, a region's rule changes and `ageAdvice`), `packs/` (`de`, `fr`, `hi`, `regions`)                                                                                                                                                                                                                                                                   | `/locales`             |
 | `document/`                          | structured input: `types`, `render`, `jsonResume` (public); `schema`, `parse` (internal)                                                                                                                                                                                                                                                                                                                                                                                                                                       | `/document`            |
 | `advice/`                            | `index` (`adviceFor`, the target ATS), `file` (name, size, password, tracked changes, comments), `age` (graduation year, years of experience)                                                                                                                                                                                                                                                                                                                                                                                  | internal               |
 | `report/`, `repair/`                 | `shape` (full / restricted); `grounding`, `merge` (AI repair acceptance)                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `.`                    |
@@ -133,10 +133,10 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 Counted with esbuild's metafile, every bare import left external. "zod/mini" includes its
 English locale (`zod/v4/locales/en.js`, see `util/issues.ts`). Bundle budgets per subpath are
-enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 103 KB for `.`, 71.4 KB
-for `/locales`, 72.5 KB for `/ai`, 21.2 KB for `/node`, under 4 KB for every other; the script
+enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 103 KB for `.`, 75.7 KB
+for `/locales`, 73.2 KB for `/ai`, 21.2 KB for `/node`, under 4 KB for every other; the script
 prints each entry's size against its budget, with the reason for each budget beside it). Two more
-budgets hold what a host importing only some names bundles: `withLocales` alone (48.2 KB) and
+budgets hold what a host importing only some names bundles: `withLocales` alone (49 KB) and
 `/ai`'s prompts and error alone (9.5 KB). The packs' and the tasks' JSON Schemas are built at
 load, so those calls are marked `/* @__PURE__ */` and drop out when not imported;
 `npm run smoke` bundles every runtime-agnostic subpath for the browser, runs the core in a bare
@@ -154,7 +154,11 @@ built `.d.ts` with `exactOptionalPropertyTypes` on.
   against 190 for the rest, so the score still mostly says whether an ATS can read the resume.
   Their words (pronouns, auxiliaries, verb tenses) are English, so each rule carries
   `languages: ["en"]` and drops out for a resume read in another language rather than misjudge
-  it. Tense is judged only in a role already left: the current role may use either.
+  it, a language with no pack included: one the policy's `text.otherLanguages` recognise, and
+  English (`text.detectionWords`) does not, is read in "und". Only the words a resume has decide
+  that, never the English it lacks, and another Latin-script language needs more of its words
+  than English has, so a short English resume naming Spanish places stays English. Tense is judged
+  only in a role already left: the current role may use either.
 - **Credentials and languages are rows.** A certification and a spoken language are parsed into
   `parsed.certifications` and `parsed.spokenLanguages`, and the requirements judge reads those
   rows before the resume's lines: "AWS certification" needs a certification naming AWS, and

@@ -18,7 +18,7 @@ inputs:
     required: false
     default: ""
   region:
-    description: Read the resume as from this country (for example US, DE, IN). Empty means inferred.
+    description: Read the resume as from this country (US, GB, DE, FR or IN). Empty means inferred.
     required: false
     default: ""
   version:

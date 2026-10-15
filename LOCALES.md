@@ -23,6 +23,24 @@ report.locale; // { languages: ["de"], region: "DE" }
   so a German company name in an English resume doesn't make the resume German, and neither
   does a surname like "Das". Words inside email addresses and URLs don't count. A blind union
   of every pack would let German stopwords like "die" and "am" eat English keywords.
+- **A language without a pack is read in none, not as English.** The policy names its own
+  language's common words (`text.detectionWords`) and those of languages it has no vocabulary
+  for (`text.otherLanguages`: Spanish, Portuguese, Italian, French, German, Dutch, Polish,
+  Swedish, and thirteen scripts from Cyrillic to Han), each told by the same thresholds as a
+  pack. A resume no attached pack recognises, written in one of those and not in English, is
+  read in "und" (undetermined): a rule limited to some `languages`, such as the English writing
+  checks, is dropped for it rather than judging Spanish by English rules. `report.locale` is
+  unchanged (`{ languages: [], … }`). A language is told only by the words a resume has, never
+  by the English it lacks, and one with no pack only when the resume has more of its words than
+  of English's: an English resume naming "El Paso" stays English.
+- **The bullets decide which language a resume is read in.** A pack's words are attached
+  whenever a resume holds three of them at 3% (they only add vocabulary). Its rules, and with no
+  +CC phone number its country's date order, follow the language of the resume's bullet lines:
+  German bullets under English headings or an English summary stay German; English bullets
+  under a French summary, or beside "Banque Nationale du Canada", stay English, with month-first
+  dates and the English writing checks (`locale` then lists `fr`, with `region: null`).
+  Bullets with as many of the pack's words as English's, or none, follow the pack. A script
+  pack (Hindi) is not weighed: English bullets under Hindi headings are usual.
 - **One region applies**, chosen in this order:
   1. The `region` option (any case). A region that is not attached throws `AtsPolicyError`
      naming the attached ones, rather than being dropped; the CLI reports it as a usage error.
@@ -35,22 +53,29 @@ report.locale; // { languages: ["de"], region: "DE" }
   it. The region is not _inferred_ from such a number, because nearly any 10-digit run is a
   valid German or Indian number.
 
+  A region is matched by the one country its `phoneCountry` names. A +44 number the phone
+  metadata places in Guernsey, Jersey or the Isle of Man ("+44 7911 123456" reads as Guernsey)
+  names no attached region, so such a resume is read in `GB` only when asked for.
+
 - Pass `languages` or `region` to `check` to override detection. A host that knows the user's
   country should pass it.
 
 ## Built-in packs
 
-| Pack | Kind     | Status    | Notes                                                                                                                                                                                                                                                               |
-| ---- | -------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `de` | language | community | Compounds ("Softwareentwickler"), noun-style bullets count as action verbs, capitals carry no proper-noun signal; "Zertifikate" and "Sprachen" headings, level words ("Muttersprache" C2, "fließend" and "verhandlungssicher" C1), 32 soft skills ("Teamfähigkeit") |
-| `hi` | language | community | Detected by Devanagari script; verb-final, so action verbs count anywhere in a line; "प्रमाणपत्र" and "भाषाएँ" headings, level words ("मातृभाषा" C2, "धाराप्रवाह" C1), 14 soft skills ("संचार", "नेतृत्व")                                                          |
-| `US` | region   | verified  | Date of birth and photo are warnings; age advice (`ageAdvice`: graduation year or experience past 20 years)                                                                                                                                                         |
-| `DE` | region   | community | `DD.MM.YYYY`; Abitur, Diplom (FH = 6, otherwise 7), Meister and staatlich geprüfter Techniker (6); date of birth and photo not judged                                                                                                                               |
-| `IN` | region   | community | `DD/MM/YYYY`; Class X/SSC (2), Class XII (3), B.Com, B.E., MCA, PGDM, MBBS; date of birth and photo not judged                                                                                                                                                      |
+| Pack | Kind     | Status    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---- | -------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `de` | language | community | Compounds ("Softwareentwickler"), noun-style bullets count as action verbs, capitals carry no proper-noun signal; "Zertifikate" and "Sprachen" headings, level words ("Muttersprache" C2, "fließend" and "verhandlungssicher" C1), 32 soft skills ("Teamfähigkeit")                                                                                                                                                                                                                      |
+| `fr` | language | community | Headings with and without accents ("Expérience professionnelle", "Competences"), months and their abbreviations ("janv.", "févr."), "depuis", "aujourd'hui" and "à ce jour", ranges by "à" and "au"; noun-style bullets count as action verbs; level words ("langue maternelle" C2, "courant" and "bilingue" C1, "notions" A2); licence and Québec's baccalauréat en … (6), diplôme d'ingénieur (7), doctorat (8), Bac+2/3/5/8 as in `FR`; 32 soft skills ("rigueur", "esprit d'équipe") |
+| `hi` | language | community | Detected by Devanagari script; verb-final, so action verbs count anywhere in a line; "प्रमाणपत्र" and "भाषाएँ" headings, level words ("मातृभाषा" C2, "धाराप्रवाह" C1), 14 soft skills ("संचार", "नेतृत्व")                                                                                                                                                                                                                                                                               |
+| `US` | region   | verified  | Date of birth and photo are warnings; age advice (`ageAdvice`: graduation year or experience past 20 years)                                                                                                                                                                                                                                                                                                                                                                              |
+| `GB` | region   | community | `DD/MM/YYYY`; GCSEs and O-levels (2), AS-levels and Highers (3, A-levels are the policy's own), HND, HNC and foundation degree (5), PGCE and postgraduate diploma (7); degree classes ("2:1", "First-class honours") read as part of the degree; date of birth and photo are warnings                                                                                                                                                                                                    |
+| `DE` | region   | community | `DD.MM.YYYY`; Abitur, Diplom (FH = 6, otherwise 7), Meister and staatlich geprüfter Techniker (6); date of birth and photo not judged                                                                                                                                                                                                                                                                                                                                                    |
+| `FR` | region   | community | `DD/MM/YYYY`; brevet (2), baccalauréat, CAP, BEP (3), BTS, DUT, Bac+2 (5), BUT, Bac+3 (6), Bac+5 (7), Bac+8 (8); date of birth and photo not judged                                                                                                                                                                                                                                                                                                                                      |
+| `IN` | region   | community | `DD/MM/YYYY`; Class X/SSC (2), Class XII (3), B.Com, B.E., MCA, PGDM, MBBS; date of birth and photo not judged                                                                                                                                                                                                                                                                                                                                                                           |
 
 **Status.** `verified` means two things: a named maintainer reads the language natively, and the
 pack meets the field-accuracy target (0.95) on its fixture set. `community` means it was
-contributed and tested but not signed off. A pack can't verify itself, so `de` and `hi` stay
+contributed and tested but not signed off. A pack can't verify itself, so `de`, `fr` and `hi` stay
 `community` until a native-speaking maintainer reviews them.
 
 ## Writing a pack
@@ -163,14 +188,19 @@ Things to know:
   `experienceYears` (more than this many years of experience, stated as in "30+ years of
   experience" or dated across the roles). Set it where an age on a resume invites bias and
   recruiters expect none; leave it out where a date of birth is customary. `US` sets both to 20.
-  `DE` and `IN` leave it out: a German Lebenslauf and an Indian resume customarily state a date
-  of birth, so advising to hide a graduation year would contradict the convention the pack
-  already keeps (date of birth and photo not judged).
+  `DE`, `FR` and `IN` leave it out: a German Lebenslauf, a French CV and an Indian resume
+  customarily state a date of birth (or an age), so advising to hide a graduation year would
+  contradict the convention the pack already keeps (date of birth and photo not judged). `GB`
+  warns about a date of birth and a photo as `US` does, but leaves the age advice out: no UK
+  convention drops graduation years or older roles.
 - **`headingConnectors`** lists the lowercase words a capitalised heading joins its words with
   ("Ausbildung und Weiterbildung"). Without them, any lowercase word after a heading word reads
   as prose, and the heading is missed. Scripts without case don't need them.
-- **Credentials are regional, not linguistic.** "Abitur" and "Class XII" go in the region pack,
-  because English resumes from those countries carry them too.
+- **Credentials are regional, not linguistic.** "Abitur", "Class XII", "Bac+5" and "GCSE" go in
+  the region pack, because English resumes from those countries carry them too, and the same
+  word can be another level elsewhere: a baccalauréat is a school-leaving exam in France and a
+  bachelor's degree in Québec. Words every country speaking the language uses for a degree
+  ("licence", "doctorat") go in the language pack.
 - **Certifications and spoken languages** have headings of their own (`sections.certifications`,
   `sections.languages`: "Zertifikate", "भाषाएँ"), read as rows. `languageLevels` maps the words
   a resume or a posting states a level with to a CEFR level: "fließend" to C1, "Muttersprache"

@@ -100,7 +100,11 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
 }
 
 export const DETECTION_SAMPLE = 20_000;
-const detectionOf = memo((pack: AtsLanguagePack) => ({
+
+/** What a language is recognised by: a pack, or a policy's own `text` (no script). */
+type Detection = Pick<AtsLanguagePack, "detectionWords"> & { script?: string | undefined };
+
+const detectionOf = memo((pack: Detection) => ({
   words: new Set(pack.detectionWords.map((word) => word.toLowerCase())),
   script: pack.script ? new RegExp(`\\p{Script=${pack.script}}`, "gu") : undefined,
 }));
@@ -131,8 +135,13 @@ export function sampleOf(text: string): Sample {
  * detection words — at least three different ones, and at least 3% of all words, so a German
  * company name in an English resume ("Müller und Söhne") does not make the resume German, and
  * neither does a surname that is one of the words ("Das") however often it is repeated.
+ *
+ * Measured against `base`, the policy's own language, a Latin-script language must also have
+ * more of its words in the text than the base has of its own: how a resume in a language with no
+ * pack is told from an English one naming "El Paso". A pack's vocabulary is attached without it,
+ * since it only adds words; `outweighs` decides what the pack's language then governs.
  */
-export function isWrittenIn({ text, words }: Sample, pack: AtsLanguagePack) {
+export function isWrittenIn({ text, words }: Sample, pack: Detection, base?: Detection) {
   const detection = detectionOf(pack);
   if (detection.script) {
     const letters = text.match(/[\p{L}\p{M}]/gu)?.length ?? 0;
@@ -140,7 +149,47 @@ export function isWrittenIn({ text, words }: Sample, pack: AtsLanguagePack) {
     return inScript >= 20 && inScript / Math.max(letters, 1) >= 0.15;
   }
   const hits = words.filter((word) => detection.words.has(word));
-  return new Set(hits).size >= 3 && hits.length / Math.max(words.length, 1) >= 0.03;
+  const own = base ? detectionOf(base).words : undefined;
+  return (
+    new Set(hits).size >= 3 &&
+    hits.length / Math.max(words.length, 1) >= 0.03 &&
+    (!own || hits.length > words.filter((word) => own.has(word)).length)
+  );
+}
+
+/**
+ * Whether a pack's language, rather than the policy's own, is what the text is written in: a
+ * script pack always is; a Latin-script one unless the text holds more of the base's detection
+ * words than of its own. Measured on a resume's bullets, where its dates and the writing rules
+ * are, not on headings or a summary: a German CV may head its sections "Skills" and "Experience",
+ * and an English one may open with a French summary or name "Banque Nationale du Canada".
+ */
+export function outweighs({ words }: Sample, pack: Detection, base: Detection) {
+  if (detectionOf(pack).script) return true;
+  const count = (detection: Detection) =>
+    words.filter((word) => detectionOf(detection).words.has(word)).length;
+  return count(base) <= count(pack);
+}
+
+/**
+ * ISO 639-2 "undetermined": what a resume is read in when it is written neither in the policy's
+ * own language nor in an attached pack's. A rule limited to some `languages` is dropped for it.
+ */
+export const UNDETERMINED = "und";
+
+/**
+ * The language a resume no attached pack recognises is read in: the policy's own, unless it is
+ * recognised as written in one of `text.otherLanguages`, with more of its words than the policy's
+ * own has, and not in the policy's own as well. Only what a text has decides, never what it
+ * lacks: a short English resume, or one of terse bullets, holds few English function words, and
+ * fewer still of another language's, even naming "El Paso" or "Banque Nationale du Canada".
+ */
+export function baseLanguageOf(policy: AtsEnginePolicy, sample: Sample) {
+  const { text } = policy;
+  return !isWrittenIn(sample, text) &&
+    text.otherLanguages.some((other) => isWrittenIn(sample, other, text))
+    ? UNDETERMINED
+    : text.language;
 }
 
 const inLanguagesCache = memo<AtsEnginePolicy, Map<string, AtsEnginePolicy>>(() => new Map());

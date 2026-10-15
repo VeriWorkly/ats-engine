@@ -2554,16 +2554,241 @@
       "seminary"
     ],
     "degrees": {
-      "3": "(?:\\b|^)((?:high\\s+school(?!\\s*\\(\\s*class\\s+(?:x|10)(?:th)?(?![a-z]))|secondary\\s+school(?!\\s+certificate))(?:\\s+(?:diploma|certificate))?|g\\.?e\\.?d\\.?|a[\\s-]levels?)(?![a-z])",
-      "4": "(?:\\b|^)((?<!(?:high|secondary)\\s+school\\s+)diploma|(?:graduate\\s+)?certificate\\s+(?:in|of)\\b)(?![a-z])",
-      "5": "(?:\\b|^)(associate(?:'?s)?\\s+(?:degree|of\\s+[a-z]+)|a\\.a\\.s?\\.?|(?<!,\\s*)aas?(?=\\s+(?:in|of)\\b))(?![a-z])",
-      "6": "(?:\\b|^)(bachelor(?:'?s)?(?:\\s+of\\s+[a-z]+)?|b\\.s\\.c?\\.?|b\\.?sc\\.?|b\\.a\\.|b\\.?eng\\.?|b\\.?tech\\.?|b\\.?b\\.?a\\.?|b\\.?f\\.?a\\.?|b\\.\\s?ed\\.?|ll\\.?b\\.?|b[as])(?![a-z])",
-      "7": "(?:\\b|^)(j\\.\\s?d\\.?(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)|j\\.d\\.?(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}j\\.d\\.?))|juris\\s+doctor|m\\.\\s?d\\.|m\\.\\s?ed\\.?|m\\.f\\.a\\.|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$|\\s+in\\s)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm))|(?<!scrum\\s)master(?!\\s+data(?![a-z]))(?:'?s)?(?:\\s+of\\s+[a-z]+)?|m\\.s\\.c?\\.?|m\\.?sc\\.?|m\\.a\\.|m\\.?eng\\.?|m\\.?b\\.?a\\.?|m\\.?tech\\.?|(?<=,\\s*)m[as](?=\\s+(?!(?:or|and|usa?)(?![a-z]))\\p{L}|\\s*\\()(?!\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b)|(?<!,\\s*|\\d\\s?)m[as](?!-|\\.\\s+\\p{L}|\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b))(?![a-z])",
-      "8": "(?:\\b|^)(doctorate|ph\\.?d\\.?|d\\.?phil\\.?)(?![a-z])"
+      "3": "(?:\\b|^)((?:high\\s+school(?!\\s*\\(\\s*class\\s+(?:x|10)(?:th)?(?![a-z]))|secondary\\s+school(?!\\s+certificate))(?:\\s+(?:diploma|certificate))?|g\\.?e\\.?d\\.?|a[\\s-]levels?)(?![\\p{L}\\p{M}])",
+      "4": "(?:\\b|^)((?<!(?:high|secondary)\\s+school\\s+)diploma|(?:graduate\\s+)?certificate\\s+(?:in|of)\\b)(?![\\p{L}\\p{M}])",
+      "5": "(?:\\b|^)(associate(?:'?s)?\\s+(?:degree|of\\s+[a-z]+)|a\\.a\\.s?\\.?|(?<!,\\s*)aas?(?=\\s+(?:in|of)\\b))(?![\\p{L}\\p{M}])",
+      "6": "(?:\\b|^)(bachelor(?:'?s)?(?:\\s+of\\s+[a-z]+)?|b\\.s\\.c?\\.?|b\\.?sc\\.?|b\\.a\\.|b\\.?eng\\.?|b\\.?tech\\.?|b\\.?b\\.?a\\.?|b\\.?f\\.?a\\.?|b\\.\\s?ed\\.?|ll\\.?b\\.?|b[as])(?![\\p{L}\\p{M}])",
+      "7": "(?:\\b|^)(j\\.\\s?d\\.?(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)|j\\.d\\.?(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}j\\.d\\.?))|juris\\s+doctor|m\\.\\s?d\\.|m\\.\\s?ed\\.?|m\\.f\\.a\\.|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$|\\s+in\\s)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm))|(?<!scrum\\s)master(?!\\s+data(?![a-z]))(?:'?s)?(?:\\s+of\\s+[a-z]+)?|m\\.s\\.c?\\.?|m\\.?sc\\.?|m\\.a\\.|m\\.?eng\\.?|m\\.?b\\.?a\\.?|m\\.?tech\\.?|(?<=,\\s*)m[as](?=\\s+(?!(?:or|and|usa?)(?![a-z]))\\p{L}|\\s*\\()(?!\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b)|(?<!,\\s*|\\d\\s?)m[as](?!-|\\.\\s+\\p{L}|\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b))(?![\\p{L}\\p{M}])",
+      "8": "(?:\\b|^)(doctorate|ph\\.?d\\.?|d\\.?phil\\.?)(?![\\p{L}\\p{M}])"
     }
   },
   "text": {
     "language": "en",
+    "detectionWords": [
+      "the",
+      "and",
+      "of",
+      "with",
+      "for",
+      "to",
+      "from",
+      "by",
+      "at",
+      "are",
+      "were",
+      "our",
+      "you",
+      "your",
+      "this",
+      "that",
+      "which",
+      "have",
+      "has",
+      "into",
+      "across",
+      "than",
+      "using",
+      "including",
+      "while",
+      "led",
+      "built",
+      "managed",
+      "designed",
+      "developed",
+      "reduced",
+      "improved",
+      "created",
+      "launched",
+      "delivered",
+      "years",
+      "skills",
+      "experience",
+      "education",
+      "summary",
+      "university",
+      "work",
+      "present",
+      "employment",
+      "history",
+      "high",
+      "school"
+    ],
+    "otherLanguages": [
+      {
+        "detectionWords": [
+          "con",
+          "para",
+          "por",
+          "una",
+          "desde",
+          "como",
+          "sus",
+          "que",
+          "más",
+          "también",
+          "años",
+          "experiencia"
+        ]
+      },
+      {
+        "detectionWords": [
+          "em",
+          "uma",
+          "não",
+          "são",
+          "dos",
+          "das",
+          "pelo",
+          "pela",
+          "também",
+          "ao",
+          "para",
+          "como"
+        ]
+      },
+      {
+        "detectionWords": [
+          "di",
+          "della",
+          "delle",
+          "dei",
+          "nel",
+          "nella",
+          "con",
+          "sono",
+          "che",
+          "degli",
+          "alla",
+          "anni"
+        ]
+      },
+      {
+        "detectionWords": [
+          "une",
+          "pour",
+          "avec",
+          "dans",
+          "sur",
+          "chez",
+          "des",
+          "du",
+          "au",
+          "aux",
+          "les",
+          "nous"
+        ]
+      },
+      {
+        "detectionWords": [
+          "und",
+          "der",
+          "für",
+          "mit",
+          "bei",
+          "von",
+          "eine",
+          "sowie",
+          "durch",
+          "zur",
+          "zum",
+          "auf"
+        ]
+      },
+      {
+        "detectionWords": [
+          "het",
+          "een",
+          "voor",
+          "naar",
+          "zijn",
+          "ook",
+          "bij",
+          "werkervaring",
+          "jaar",
+          "ervaring"
+        ]
+      },
+      {
+        "detectionWords": [
+          "oraz",
+          "dla",
+          "jest",
+          "się",
+          "doświadczenie",
+          "pracy",
+          "przez",
+          "jako",
+          "lat",
+          "zespołu"
+        ]
+      },
+      {
+        "detectionWords": [
+          "och",
+          "för",
+          "att",
+          "som",
+          "inom",
+          "samt",
+          "erfarenhet",
+          "utveckling",
+          "arbetat",
+          "ansvarig"
+        ]
+      },
+      {
+        "script": "Cyrillic",
+        "detectionWords": []
+      },
+      {
+        "script": "Greek",
+        "detectionWords": []
+      },
+      {
+        "script": "Arabic",
+        "detectionWords": []
+      },
+      {
+        "script": "Hebrew",
+        "detectionWords": []
+      },
+      {
+        "script": "Han",
+        "detectionWords": []
+      },
+      {
+        "script": "Hangul",
+        "detectionWords": []
+      },
+      {
+        "script": "Hiragana",
+        "detectionWords": []
+      },
+      {
+        "script": "Katakana",
+        "detectionWords": []
+      },
+      {
+        "script": "Thai",
+        "detectionWords": []
+      },
+      {
+        "script": "Devanagari",
+        "detectionWords": []
+      },
+      {
+        "script": "Bengali",
+        "detectionWords": []
+      },
+      {
+        "script": "Tamil",
+        "detectionWords": []
+      },
+      {
+        "script": "Telugu",
+        "detectionWords": []
+      }
+    ],
     "contentLineVerbs": [
       "managed",
       "led",

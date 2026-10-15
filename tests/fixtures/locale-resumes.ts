@@ -44,7 +44,10 @@ export type LocaleFixture = {
   spokenLanguages?: ExpectedLanguage[];
 };
 
-export const LOCALE_FIXTURES: Record<"en" | "de" | "hi" | "en-IN", LocaleFixture[]> = {
+export const LOCALE_FIXTURES: Record<
+  "en" | "en-GB" | "de" | "fr" | "hi" | "en-IN",
+  LocaleFixture[]
+> = {
   en: EN_FIXTURES,
   de: [
     {
@@ -365,6 +368,307 @@ AWS, Linux, Python
         { language: "अंग्रेज़ी", cefr: "C1" },
         { language: "मराठी", cefr: "A2" },
       ],
+    },
+  ],
+  fr: [
+    {
+      id: "fr-accents",
+      text: `Élodie Lefèvre
+elodie.lefevre@example.fr | +33 6 12 34 56 78 | Lyon
+Profil
+Ingénieure logiciel spécialisée dans les plateformes de paiement, avec huit ans d'expérience.
+Expérience professionnelle
+Ingénieure logiciel senior chez Exemple Paiements SAS    janv. 2021 – aujourd’hui
+• Conception d'une plateforme de paiement pour deux millions de clients
+• Encadrement d'une équipe de cinq développeurs et mise en place de l'intégration continue
+Développeuse back-end, Démo Technologies SARL    03/2017 – 12/2020
+• Développement des services de facturation en Java et Spring Boot
+Formation
+Master Informatique, Université de Lyon    2015 – 2017
+Licence Informatique, Université de Lyon    2012 – 2015
+Compétences
+Java, Go, Kubernetes, PostgreSQL
+Langues
+Français (langue maternelle), Anglais (courant, C1), Espagnol (notions)`,
+      locale: { languages: ["fr"], region: "FR" },
+      name: "Élodie Lefèvre",
+      email: "elodie.lefevre@example.fr",
+      phone: "+33 6 12 34 56 78",
+      roles: [
+        {
+          title: "Ingénieure logiciel senior",
+          employer: "Exemple Paiements SAS",
+          start: "2021-01",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Développeuse back-end",
+          employer: "Démo Technologies SARL",
+          start: "2017-03",
+          current: false,
+          end: "2020-12",
+        },
+      ],
+      education: [
+        { school: "Université de Lyon", isced: 7, credential: "Master" },
+        { school: "Université de Lyon", isced: 6, credential: "Licence" },
+      ],
+      skills: ["Java", "Go", "Kubernetes", "PostgreSQL"],
+      spokenLanguages: [
+        { language: "Français", cefr: "C2" },
+        { language: "Anglais", cefr: "C1" },
+        { language: "Espagnol", cefr: "A2" },
+      ],
+    },
+    {
+      id: "fr-ingenieur",
+      text: `Thomas Girard
+thomas.girard@example.fr
++33 1 23 45 67 89
+Expérience professionnelle
+Exemple Énergie SA
+Ingénieur données
+Depuis mars 2022
+• Mise en place d'un entrepôt de données sur Snowflake pour 40 équipes
+• Réduction de 30 % du coût des traitements nocturnes
+Modèle Conseil
+Consultant data
+Septembre 2018 à février 2022
+• Développement de tableaux de bord sous Power BI pour des clients industriels
+Formation
+Diplôme d'ingénieur (Bac+5), École Centrale d'Exemple    2015 – 2018
+Baccalauréat S, Lycée Victor Exemple    2013
+Certifications
+AWS Certified Solutions Architect – Associate, Amazon Web Services, 2023
+Compétences
+Python, SQL, Snowflake, Power BI`,
+      locale: { languages: ["fr"], region: "FR" },
+      name: "Thomas Girard",
+      email: "thomas.girard@example.fr",
+      phone: "+33 1 23 45 67 89",
+      roles: [
+        {
+          title: "Ingénieur données",
+          employer: "Exemple Énergie SA",
+          start: "2022-03",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Consultant data",
+          employer: "Modèle Conseil",
+          start: "2018-09",
+          current: false,
+          end: "2022-02",
+        },
+      ],
+      education: [
+        { school: "École Centrale d'Exemple", isced: 7, credential: "Diplôme d'ingénieur" },
+        { school: "Lycée Victor Exemple", isced: 3, credential: "Baccalauréat S" },
+      ],
+      skills: ["Python", "SQL", "Snowflake", "Power BI"],
+      certifications: [
+        {
+          name: "AWS Certified Solutions Architect – Associate",
+          issuer: "Amazon Web Services",
+          date: "2023",
+          expires: "",
+        },
+      ],
+    },
+    {
+      id: "fr-plain",
+      text: `Karim Benali
+karim.benali@example.com | 06 12 34 56 78 | Toulouse
+Competences
+Linux, Ansible, Docker, Bash
+Experience professionnelle
+Administrateur systemes et reseaux, Exemple Hebergement SARL    fevr. 2019 - present
+- Gestion d'un parc de 300 serveurs Linux pour les clients de l'entreprise
+- Automatisation des deploiements avec Ansible
+Technicien support chez Demo Services    2016 - 2019
+- Assistance aux utilisateurs et gestion des incidents
+Formation
+DUT Reseaux et Telecommunications, IUT de Toulouse    2014 - 2016
+BTS SIO, Lycee Jean Exemple    2012 - 2014
+Langues
+Anglais : professionnel (B2) ; Arabe : bilingue`,
+      locale: { languages: ["fr"], region: "FR" },
+      name: "Karim Benali",
+      email: "karim.benali@example.com",
+      phone: "06 12 34 56 78",
+      roles: [
+        {
+          title: "Administrateur systemes et reseaux",
+          employer: "Exemple Hebergement SARL",
+          start: "2019-02",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Technicien support",
+          employer: "Demo Services",
+          start: "2016",
+          current: false,
+          end: "2019",
+        },
+      ],
+      education: [
+        { school: "IUT de Toulouse", isced: 5, credential: "DUT" },
+        { school: "Lycee Jean Exemple", isced: 5, credential: "BTS" },
+      ],
+      skills: ["Linux", "Ansible", "Docker", "Bash"],
+      spokenLanguages: [
+        { language: "Anglais", cefr: "B2" },
+        { language: "Arabe", cefr: "C1" },
+      ],
+    },
+  ],
+  "en-GB": [
+    {
+      id: "en-gb-first-class",
+      text: `Charlotte Davies
+charlotte.davies@example.co.uk | +44 7400 123456 | Bristol
+Personal Statement
+Civil engineer with seven years on rail and highway schemes across the South West.
+Employment History
+Senior Civil Engineer, Severn Rail Partners Ltd    03/2021 – Present
+- Led the design of a 4 km rail realignment delivered £2m under budget
+- Managed a team of 6 engineers and 2 apprentices
+Graduate Civil Engineer, Avonmouth Consulting LLP    09/2017 – 02/2021
+- Produced drainage designs for 12 highway schemes
+Education
+University of Bath, MEng Civil Engineering, First-class honours, 2017
+Clifton Sixth Form College, A-levels: Maths (A*), Physics (A), Chemistry (A), 2013
+Skills
+AutoCAD, Civil 3D, Revit, Eurocodes`,
+      locale: { languages: [], region: "GB" },
+      name: "Charlotte Davies",
+      email: "charlotte.davies@example.co.uk",
+      phone: "+44 7400 123456",
+      roles: [
+        {
+          title: "Senior Civil Engineer",
+          employer: "Severn Rail Partners Ltd",
+          start: "2021-03",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Graduate Civil Engineer",
+          employer: "Avonmouth Consulting LLP",
+          start: "2017-09",
+          current: false,
+          end: "2021-02",
+        },
+      ],
+      education: [
+        { school: "University of Bath", isced: 7, credential: "MEng" },
+        { school: "Clifton Sixth Form College", isced: 3, credential: "A-levels" },
+      ],
+      skills: ["AutoCAD", "Civil 3D", "Revit", "Eurocodes"],
+    },
+    {
+      // Day-first dates no day over 12 settles: read in the UK's order, 01/09/2019 is September.
+      id: "en-gb-stacked-day-first",
+      text: `Rhys Morgan
+rhys.morgan@example.com
++44 20 7946 0123
+Cardiff
+Experience
+Network Engineer
+Dragon Telecom plc
+01/09/2019 - Present
+- Upgraded the core network across 40 sites with no unplanned downtime
+- Automated switch configuration with Python and Ansible
+IT Support Technician
+Valleys College
+04/07/2016 - 02/08/2019
+- Supported 900 staff and students across three campuses
+Education
+Cardiff Metropolitan University
+BSc (Hons) Computer Networks, 2:1, 2016
+HND Computing, Coleg Exemplar, 2014
+GCSEs: 9 subjects including English and Maths, Exemplar Academy, 2010
+Certifications
+Cisco Certified Network Associate (CCNA), Cisco, 2020
+Skills
+Cisco IOS, Python, Ansible, Linux`,
+      locale: { languages: [], region: "GB" },
+      name: "Rhys Morgan",
+      email: "rhys.morgan@example.com",
+      phone: "+44 20 7946 0123",
+      roles: [
+        {
+          title: "Network Engineer",
+          employer: "Dragon Telecom plc",
+          start: "2019-09",
+          current: true,
+          end: "",
+        },
+        {
+          title: "IT Support Technician",
+          employer: "Valleys College",
+          start: "2016-07",
+          current: false,
+          end: "2019-08",
+        },
+      ],
+      education: [
+        { school: "Cardiff Metropolitan University", isced: 6, credential: "BSc" },
+        { school: "Coleg Exemplar", isced: 5, credential: "HND" },
+        { school: "Exemplar Academy", isced: 2, credential: "GCSEs" },
+      ],
+      skills: ["Cisco IOS", "Python", "Ansible", "Linux"],
+      certifications: [
+        {
+          name: "Cisco Certified Network Associate (CCNA)",
+          issuer: "Cisco",
+          date: "2020",
+          expires: "",
+        },
+      ],
+    },
+    {
+      // Degree classes, on the degree's line and on a line of their own, are no credential.
+      id: "en-gb-degree-classes",
+      text: `Priya Patel
+priya.patel@example.co.uk | +44 117 496 0789 | Bristol
+Experience
+Teaching Assistant, Exemplar Primary School, 01/09/2019 - 31/07/2021
+Education
+BA (Hons) History, Upper Second Class Honours, University of York, 2015
+BSc Economics – 2:2 – University of Leeds – 2014
+First Class Honours
+PGCE Primary, University of Bristol, 2016
+HNC Engineering, Bristol College, 2012
+AS-levels: French, German, 2010
+Scottish Highers, Exemplar Academy, 2009
+Skills
+Safeguarding, Phonics`,
+      locale: { languages: [], region: "GB" },
+      name: "Priya Patel",
+      email: "priya.patel@example.co.uk",
+      phone: "+44 117 496 0789",
+      roles: [
+        {
+          title: "Teaching Assistant",
+          employer: "Exemplar Primary School",
+          start: "2019-09",
+          current: false,
+          end: "2021-07",
+        },
+      ],
+      education: [
+        { school: "University of York", isced: 6, credential: "BA" },
+        { school: "University of Leeds", isced: 6, credential: "BSc" },
+        { school: "University of Bristol", isced: 7, credential: "PGCE" },
+        { school: "Bristol College", isced: 5, credential: "HNC" },
+        { school: "", isced: 3, credential: "AS-levels" },
+        { school: "Exemplar Academy", isced: 3, credential: "Highers" },
+      ],
+      skills: ["Safeguarding", "Phonics"],
     },
   ],
   "en-IN": [

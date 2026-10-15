@@ -1,6 +1,6 @@
 import * as z from "zod/mini";
 
-import { wordList } from "../primitives.js";
+import { scriptName, wordList } from "../primitives.js";
 
 /**
  * Text-shape vocabulary the scorer itself reads, as opposed to the parser or the matcher.
@@ -20,12 +20,115 @@ export const engineTextSchema = z.prefault(
   z.object({
     /**
      * The language this policy's own vocabulary is written in (ISO 639): what a resume is read as
-     * when no attached language pack recognises it. A rule limited to some `languages` applies
-     * only to a resume read in one of them.
+     * when no attached language pack recognises it, unless it is written in one of
+     * `otherLanguages`. A rule limited to some `languages` applies only to a resume read in one of
+     * them.
      */
     language: z._default(
       z.string().check(z.regex(/^[a-z]{2,3}$/, "an ISO 639 language code")),
       "en",
+    ),
+    /**
+     * Words common in `language` and rare in the others, by which a resume is recognised as
+     * written in it, as a language pack's `detectionWords` recognise its own: at least three
+     * different ones, making up 3% of the words. See `otherLanguages`.
+     */
+    detectionWords: z._default(z.array(z.string().check(z.minLength(1))), [
+      "the",
+      "and",
+      "of",
+      "with",
+      "for",
+      "to",
+      "from",
+      "by",
+      "at",
+      "are",
+      "were",
+      "our",
+      "you",
+      "your",
+      "this",
+      "that",
+      "which",
+      "have",
+      "has",
+      "into",
+      "across",
+      "than",
+      "using",
+      "including",
+      "while",
+      "led",
+      "built",
+      "managed",
+      "designed",
+      "developed",
+      "reduced",
+      "improved",
+      "created",
+      "launched",
+      "delivered",
+      "years",
+      "skills",
+      "experience",
+      "education",
+      "summary",
+      "university",
+      "work",
+      // The words of a terse resume's headings and dates, so one naming Spanish places and
+      // employers ("El Paso", "Para Los Niños") still has more English than Spanish.
+      "present",
+      "employment",
+      "history",
+      "high",
+      "school",
+    ]),
+    /**
+     * Languages this policy has no vocabulary for, each recognised as a language pack is: by its
+     * script, or by at least three different of its words making up 3% of the words. A resume
+     * written in one of them, in no attached pack's language and not in `language` either, is
+     * read in none (ISO 639 "und"): a rule limited to some `languages` is dropped for it rather
+     * than judging Spanish by English rules. A Latin-script one also needs more of its words in
+     * the resume than `detectionWords` find. Telling a language by what it has, never by what it
+     * lacks, keeps a short or terse English resume in English unless it holds more of another
+     * language's words than of English's. Empty: every resume no pack
+     * recognises is read in `language`.
+     */
+    otherLanguages: z._default(
+      z.array(
+        z
+          .object({
+            script: z.optional(scriptName),
+            detectionWords: z._default(z.array(z.string().check(z.minLength(1))), []),
+          })
+          .check(
+            z.refine((other) => other.script !== undefined || other.detectionWords.length >= 10, {
+              message: "a language needs a script or at least ten detection words",
+            }),
+          ),
+      ),
+      [
+        // Spanish, Portuguese, Italian, French, German, Dutch, Polish and Swedish: words none of
+        // them shares with English, a place or a name ("Los Angeles", "El Paso", "Chicago, IL",
+        // "José Pérez y Martínez") or a web domain.
+        "con para por una desde como sus que más también años experiencia",
+        "em uma não são dos das pelo pela também ao para como",
+        "di della delle dei nel nella con sono che degli alla anni",
+        "une pour avec dans sur chez des du au aux les nous",
+        "und der für mit bei von eine sowie durch zur zum auf",
+        "het een voor naar zijn ook bij werkervaring jaar ervaring",
+        "oraz dla jest się doświadczenie pracy przez jako lat zespołu",
+        "och för att som inom samt erfarenhet utveckling arbetat ansvarig",
+      ]
+        .map((words): { script?: string; detectionWords: string[] } => ({
+          detectionWords: words.split(" "),
+        }))
+        .concat(
+          "Cyrillic Greek Arabic Hebrew Han Hangul Hiragana Katakana Thai Devanagari Bengali Tamil Telugu"
+            .split(" ")
+            .map((script) => ({ script, detectionWords: [] })),
+        ),
     ),
     contentLineVerbs: z._default(wordList("text.contentLineVerbs"), [
       "managed",

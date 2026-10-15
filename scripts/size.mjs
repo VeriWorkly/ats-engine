@@ -31,7 +31,7 @@ const BUDGETS = {
   // 103: the same kind of growth, policy data (word lists, place names, clearance levels) that
   // each reading fix adds, raised once with room for the next few fixes rather than by 0.1 KB a
   // time; at 99.93 when set. The same round's policy-reading loop and freezing (see "./locales")
-  // took it to 100.22.
+  // took it to 100.22. The language detection words (see "./locales" at 75.7) to 100.83.
   ".": 103,
   "./document": 3,
   "./format": 1.5,
@@ -47,7 +47,13 @@ const BUDGETS = {
   // 71.4: freezing a parsed policy, the packs, their JSON Schemas and the exported constants, so a
   // host that changes one throws instead of being read with what was compiled before, to 71.31,
   // and a loop refused at once and the localised policy frozen too, to 71.36.
-  "./locales": 71.4,
+  // 75.7: the words that tell the policy's own language from the eight it has no pack for
+  // (`text.detectionWords`, `text.otherLanguages`, 0.6), and the French pack with the FR and GB
+  // regions (3.4: headings, months, levels, titles, stopwords and soft skills, the French and UK
+  // credentials), took it from 71.37 to 75.37, and the bullets deciding the language and the
+  // French Bac+N and Québec degrees to 75.55. Data only; a gzip of the lists written as one
+  // string each saved 0.01, so they stay readable.
+  "./locales": 75.7,
   // 70: zod/mini in place of zod took it from 141.0 to 67.5.
   // 71.6: the policy's place names (see "."), with what else "." gained, took it from 69.3 to 71.5.
   // 71.8: the policy data and parsing this round's fixes added (see ".") took it to 71.75.
@@ -58,7 +64,9 @@ const BUDGETS = {
   // one) and a two-character Chinese or Korean name took it to 72.36.
   // 72.5: dates read one by one, so a bracketed or listed range is not taken for a phone, took it
   // to 72.42.
-  "./ai": 72.5,
+  // 73.2: the language detection words the policy now carries (see "./locales" at 75.7), on top
+  // of the redaction at 72.5, took it to 73.0.
+  "./ai": 73.2,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,
@@ -98,7 +106,9 @@ const BUDGETS = {
  */
 const NAMED = [
   // 48.2: 47.88 when set, 54.53 before the marks.
-  ["./locales", ["withLocales"], 48.2],
+  // 49: the policy's language detection words (see "./locales" at 75.7) took it from 48.1 to
+  // 48.66; the French pack and the regions drop out, as the others do.
+  ["./locales", ["withLocales"], 49],
   // 9.5: 9.21 when set, 16.29 before the marks.
   [
     "./ai",

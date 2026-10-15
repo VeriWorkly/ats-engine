@@ -292,15 +292,17 @@ Engineer, Globex    03/2017 – 12/2019
 });
 
 describe("when the writing rules stand down", () => {
-  it.each([...LOCALE_FIXTURES.de, ...LOCALE_FIXTURES.hi].map((f) => [f.id, f.text]))(
-    "drops every writing rule for %s, read in its own language",
-    (_, text) => {
-      const report = check(text, LOCALIZED);
-      expect(report.locale.languages.length).toBeGreaterThan(0);
-      expect(writingRules(report)).toEqual([]);
-      expect(report.categories.find((c) => c.category === "writing")).toBeUndefined();
-    },
-  );
+  it.each(
+    [...LOCALE_FIXTURES.de, ...LOCALE_FIXTURES.fr, ...LOCALE_FIXTURES.hi].map((f) => [
+      f.id,
+      f.text,
+    ]),
+  )("drops every writing rule for %s, read in its own language", (_, text) => {
+    const report = check(text, LOCALIZED);
+    expect(report.locale.languages.length).toBeGreaterThan(0);
+    expect(writingRules(report)).toEqual([]);
+    expect(report.categories.find((c) => c.category === "writing")).toBeUndefined();
+  });
 
   it("still judges an English resume sent to a German posting", () => {
     const posting =
@@ -308,6 +310,94 @@ describe("when the writing rules stand down", () => {
     const report = check(WELL_WRITTEN, LOCALIZED, posting);
     expect(report.locale.languages).toContain("de");
     expect(writingRules(report)).toHaveLength(IDS.length);
+  });
+
+  // An invented person, in a language no pack reads: judged by English rules, every bullet
+  // "opens with no action verb" and the dates "are written two ways".
+  const SPANISH = `Lucía Fernández Ruiz
+lucia.fernandez@example.es | +34 612 345 678 | Madrid
+Perfil
+Ingeniera de software con siete años de experiencia en sistemas de pago y en la nube.
+Experiencia profesional
+Ingeniera de software sénior, Ejemplo Tecnología S.L.    enero 2021 – actualidad
+• Diseño de una plataforma de pagos para dos millones de clientes en España
+• Responsable de un equipo de seis personas y de la integración continua
+• Reducción del tiempo de despliegue de dos horas a diez minutos
+Ingeniera de software, Muestra Sistemas S.A.    03/2017 – 12/2020
+• Desarrollo de servicios REST en Java para la gestión de pedidos
+• Migración de la base de datos a PostgreSQL sin pérdida de servicio
+Formación
+Grado en Ingeniería Informática, Universidad de Ejemplo, 2017
+Habilidades
+Go, Java, Kubernetes, PostgreSQL`;
+
+  it.each([
+    ["the base policy", DEFAULT_POLICY],
+    ["the packs attached", LOCALIZED],
+  ])("drops every writing rule for a language nothing reads, with %s", (_, policy) => {
+    const report = check(SPANISH, policy);
+    expect(report.locale.languages).toEqual([]);
+    expect(writingRules(report)).toEqual([]);
+    // Only the rules that read English words: the rest still judge it.
+    expect(report.rules.length).toBeGreaterThan(10);
+  });
+
+  it.each([LOCALE_FIXTURES.de[0], LOCALE_FIXTURES.hi[0]].map((f) => [f.id, f.text]))(
+    "drops every writing rule for %s with no pack attached to read it",
+    (_, text) => expect(writingRules(check(text))).toEqual([]),
+  );
+
+  // Invented people. Terse English bullets, with Spanish names of places, employers and schools.
+  it.each([
+    [
+      "El Paso",
+      [
+        "Ana Ruiz",
+        "ana@example.com | (915) 555-0100 | El Paso, TX",
+        "Employment",
+        "Teacher Aide, Para Los Niños — El Paso, TX",
+        "2019 – Present",
+        "- Bilingual tutoring, grades 1-3",
+        "- Parent outreach en español",
+        "Cashier, Supermercado El Rey y Más — El Paso, TX",
+        "2017 – 2019",
+        "- Cash handling, inventory",
+        "Volunteer, Iglesia San José — El Paso, TX",
+        "- Food drive con familias",
+        "Education",
+        "High School Diploma, Colegio Por Un Mundo Mejor, 2017",
+        "Skills",
+        "Spanish, Customer Service, Microsoft Office, CPR",
+      ],
+    ],
+    [
+      "Miami",
+      [
+        "Daniel Ortiz",
+        "daniel@example.com | (305) 555-0100 | Miami, FL",
+        "EMPLOYMENT",
+        "Line Cook — El Palacio de los Jugos, Miami, FL",
+        "2020 – Present",
+        "- Prep, grill, inventory",
+        "Server — Versailles Restaurant, Miami, FL",
+        "2017 – 2020",
+        "- Table service en inglés y español",
+        "EDUCATION",
+        "GED — Miami Dade College, 2017",
+        "SKILLS",
+        "Food safety, ServSafe, POS",
+      ],
+    ],
+  ])("still judges a terse English resume from %s naming Spanish places", (_, lines) => {
+    expect(writingRules(check(lines.join("\n"))).length).toBeGreaterThan(0);
+    expect(writingRules(check(lines.join("\n"), LOCALIZED)).length).toBeGreaterThan(0);
+  });
+
+  it("still judges a short English resume, too short to tell its language by", () => {
+    const report = check(
+      `${HEAD}Engineer, Acme Corp    Jan 2020 – Present\n• I own the checkout flow`,
+    );
+    expect(rule(report, "firstPerson")).toMatchObject({ passed: false });
   });
 
   it("drops every writing rule when there is nothing to judge", () => {
@@ -333,8 +423,10 @@ const BEFORE_WRITING: Record<string, string> = {
     "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "en-us-stacked":
     "parse:100/0/53/4/4 contact:100/0/20/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
+  // Read in the GB region since it was added, which weighs a stated date of birth as the US does
+  // (contact 24, not 20); the writing rules still move none of it.
   "en-uk-pipes":
-    "parse:100/0/53/4/4 contact:100/0/20/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "en-us-at-and-since":
     "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "en-us-employer-first":
@@ -356,8 +448,20 @@ const BEFORE_WRITING: Record<string, string> = {
   "en-us-certified-cloud":
     "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
   "en-uk-languages-in-skills":
-    "parse:100/0/53/4/4 contact:100/0/20/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+  "en-gb-first-class":
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+  "en-gb-stacked-day-first":
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
+  "en-gb-degree-classes":
+    "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:69/8/26/3/4 integrity:100/0/60/4/4",
   "de-zertifikate":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
+  "fr-accents":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:55/13/29/3/5 integrity:100/0/60/4/4",
+  "fr-ingenieur":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
+  "fr-plain":
     "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
   "hi-certified":
     "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",

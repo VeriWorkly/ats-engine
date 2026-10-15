@@ -96,7 +96,10 @@ export function readResume(
     jobDescription?: string;
     layout?: AtsLayoutSignals;
     now: Date;
-    /** The attached language packs the resume itself is written in; see `RuleContext.languages`. */
+    /**
+     * The attached language packs the resume itself is written in, or "und" for a language the
+     * policy has no vocabulary for; see `RuleContext.languages`.
+     */
     languages?: readonly string[];
   },
 ): ReadResume {
