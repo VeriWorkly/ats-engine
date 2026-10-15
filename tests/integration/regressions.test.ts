@@ -45,15 +45,16 @@ const ADVERSARIAL: Record<string, string> = {
 
 function expectFastOn(policy: AtsEnginePolicy) {
   for (const [label, input] of Object.entries(ADVERSARIAL)) {
-    // Generous: the fixed patterns take single-digit milliseconds. The ceiling is set far below
-    // the seconds the quadratic pattern took, and far above CI noise.
+    // A scan takes 20 to 75 ms, 70 to 215 with the locale packs, on an idle laptop; the quadratic
+    // pattern took about ten seconds. 1.5 s is the budget `adversarial.test.ts` keeps: far below
+    // the bug, and far enough above a busy machine (500 ms failed one with editors open).
     expectFast(
       () =>
         AtsScoringService.check(input, policy, {
           jobDescription: input.slice(0, 20_000),
           now: NOW,
         }),
-      500,
+      1_500,
       label,
     );
   }
@@ -86,7 +87,7 @@ describe("adversarial input", () => {
             languages: ["de", "hi"],
             region: "DE",
           }),
-        500,
+        1_500, // see `expectFastOn`
         label,
       );
       expect(report.locale, label).toEqual({ languages: ["de", "hi"], region: "DE" });
