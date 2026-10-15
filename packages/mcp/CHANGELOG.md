@@ -1,5 +1,23 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.5.0
+
+### Minor Changes
+
+- ea72dfd: **Breaking:** the server's results change for the same file. It runs the engine's French pack and France and United Kingdom regions, and no longer judges a resume in a language with no pack by English rules.
+
+  - `check_resume` reads a French CV in French (headings, dates, degrees, spoken languages), and a resume with a UK number (+44, not one placed in Guernsey, Jersey or the Isle of Man) in the UK's conventions: day-first dates ("01/09/2019" is September 2019), UK credentials (GCSE, HND, PGCE) and a stated date of birth weighed as a warning. Its `parsed` fields, `locale` and readiness score change for such files, and `match_job` reads a French posting's sections and requirements.
+  - A resume in a language with no pack (Spanish, Italian…) no longer gets the English writing checks; its readiness score changes by those rules.
+  - `region` now also accepts `FR` and `GB`.
+
+### Patch Changes
+
+- b0c0c7f: `job_path` must name a `.txt`, `.md`, `.html` (`.htm`), `.pdf` or `.docx` file; any other is refused with a tool error before it is opened. A posting's words come back as missing keywords, so a credentials file named as the posting was echoed to the assistant. PDF reading stops after 100 pages, and a DOCX's headers and footers share one 2 MB budget, so a file padded with empty pages or headers costs what a resume does. A PDF's images are decoded a page at a time rather than all after the file has been read; an image still has no size cap, so a file with large images can hold gigabytes and take tens of seconds.
+- Updated dependencies [b0c0c7f]
+- Updated dependencies [97d2967]
+- Updated dependencies [ea72dfd]
+  - @veriworkly/ats-engine@0.10.0
+
 ## 0.4.1
 
 ### Patch Changes
