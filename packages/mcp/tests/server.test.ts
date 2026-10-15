@@ -61,6 +61,8 @@ const pdfPath = join(dir, "resume.pdf");
 const jobPath = join(dir, "job.txt");
 writeFileSync(pdfPath, pdf);
 writeFileSync(jobPath, JOB);
+const credentialsPath = join(dir, "credentials");
+writeFileSync(credentialsPath, "[default]\naws_secret_access_key = wJalrXUtnFEMIK7MDENG");
 mkdirSync(join(dir, "folder.pdf"));
 
 let client: Client;
@@ -267,6 +269,12 @@ describe("ats-engine-mcp refuses a bad call with a tool error", () => {
     ["text too short to be a resume", { text: "Jane Doe" }, /too short to be a resume/],
     ["both job_path and job_text", { path: pdfPath, job_path: jobPath, job_text: JOB }, /not both/],
     ["a missing job file", { path: pdfPath, job_path: join(dir, "nope.txt") }, /No such file/],
+    // Its words would come back as missing keywords: a credentials file is not a posting.
+    [
+      "a job file that is not a posting",
+      { path: pdfPath, job_path: credentialsPath },
+      /Unsupported job posting file type "[^"]*credentials"\. Use \.txt, \.md, \.html, \.pdf or \.docx\.$/,
+    ],
     ["an unknown region", { path: pdfPath, region: "XX" }, /Unknown region "XX"; use one of US/],
     [
       "an ATS with no notes",
@@ -290,7 +298,8 @@ describe("ats-engine-mcp refuses a bad call with a tool error", () => {
   it.skipIf(process.platform !== "win32")(
     "match_job with a job file on a network share",
     async () => {
-      const job_path = String.raw`\\127.0.0.1\C$\Windows\win.ini`;
+      // A posting's type, so the path's form is what refuses it.
+      const job_path = String.raw`\\127.0.0.1\C$\Windows\posting.txt`;
       const result = await call("match_job", { path: pdfPath, job_path });
       expect(result.isError).toBe(true);
       expect(textOf(result)).toMatch(/is a network share or a device, not a file on this computer/);

@@ -16,6 +16,11 @@ const MAX_PAGES_MEASURED = 6;
  * never as clean.
  */
 const MAX_VISIBILITY_PAGES = 60;
+/**
+ * Pages read at most. The character cap ends a long text first; empty pages never reach it, and
+ * 5 000 of them cost 11 seconds from a few hundred kilobytes.
+ */
+const MAX_PAGES_READ = 100;
 /** Fewer text characters than this on a page with an image, and the page is a picture. */
 const MIN_PAGE_TEXT = 20;
 /**
@@ -47,7 +52,9 @@ type PdfGeometry = Omit<AtsLayoutSignals, "tableCount">;
  * A PDF's text and page geometry, in one pdf.js pass.
  *
  * The text is assembled here (`pageText`), in reading order, rather than by pdf-parse. Reading
- * stops once the text passes `maxChars`, so a thousand-page upload costs what a resume does.
+ * stops once the text passes `maxChars`, or after `MAX_PAGES_READ` pages, so a thousand pages of
+ * text cost what a resume does. Not a thousand pages of images: each page read waits for its own
+ * images to decode, in full, before the next (`seeThroughImages`).
  * Every page whose text is read is measured too — its columns, and what of its text a reader
  * cannot see — so hidden text cannot sit past the pages that are checked. A link whose visible
  * text is "LinkedIn" is read for its target, which follows the text when the text lacks it.
@@ -85,7 +92,8 @@ async function readPdf(
     let visibilityRead = true;
     let measured = 0;
 
-    for (let number = 1; number <= document.numPages && chars < maxChars; number += 1) {
+    const last = Math.min(document.numPages, MAX_PAGES_READ);
+    for (let number = 1; number <= last && chars < maxChars; number += 1) {
       const page = await document.getPage(number);
       const viewport = page.getViewport({ scale: 1 });
       const toViewport = (x: number, y: number) => viewport.convertToViewportPoint(x, y);
@@ -218,7 +226,8 @@ export async function extractPdf(
   // Ruled tables are counted twice and the larger count kept: from the rules the page draws,
   // stroked or filled (a browser prints a CSS border as a thin filled rectangle), and by
   // pdf-parse, which reads stroked rules only but joins them its own way.
-  const parser = new PDFParse({ data: new Uint8Array(data), verbosity: 0 });
+  // No image at all: the tables are rules, and pdf.js would decode every image in full anyway.
+  const parser = new PDFParse({ data: new Uint8Array(data), maxImageSize: 0, verbosity: 0 });
 
   try {
     let tableCount = drawn;

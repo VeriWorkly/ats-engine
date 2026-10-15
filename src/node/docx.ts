@@ -967,11 +967,23 @@ function scanRuns(
   return { hidden, lines };
 }
 
-/** The parts holding a DOCX's page headers and footers, by name. */
-const marginParts = (files: Map<string, ZipEntry>) =>
-  [...files]
-    .filter(([key, entry]) => HEADER_OR_FOOTER.test(key) && !entry.dir)
-    .sort(([a], [b]) => (a < b ? -1 : 1));
+/**
+ * The parts holding a DOCX's page headers and footers, by name, inflated: at most
+ * `MAX_PARSED_XML_BYTES` between them, and a part past that is neither read nor measured. Each
+ * was read up to 8 MB, as many as the archive held: seven took nine seconds. Word's are a few KB.
+ */
+function marginParts(files: Map<string, ZipEntry>): Array<[key: string, content: Buffer]> {
+  let left = MAX_PARSED_XML_BYTES;
+  const parts: Array<[string, Buffer]> = [];
+  for (const [key, entry] of [...files].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    if (!HEADER_OR_FOOTER.test(key) || entry.dir) continue;
+    const content = inflate(entry, left);
+    if (!content) continue;
+    left -= content.length;
+    parts.push([key, content]);
+  }
+  return parts;
+}
 
 /**
  * Hidden runs, tables and pictures in a DOCX's main document, or null when it has none to read.
@@ -1025,9 +1037,7 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
   // A header's banner — a shape or picture behind its text, as Word's templates draw them — is
   // a background this cannot read: white text on the bare page of a part that draws one is not
   // judged.
-  for (const [, margin] of marginParts(files)) {
-    const part = inflate(margin, MAX_XML_BYTES);
-    if (!part) continue;
+  for (const [, part] of marginParts(files)) {
     const content = withoutMarkup(part.toString("utf8"));
     trackedChanges += count(content, REVISION);
     const drawn = behindText || /<w:(?:drawing|pict)\b/.test(content);
@@ -1061,9 +1071,7 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
  */
 export function docxMargins(data: Uint8Array): { header: string; footer: string } {
   const lines = { header: new Set<string>(), footer: new Set<string>() };
-  for (const [key, entry] of marginParts(zipFiles(data) ?? new Map())) {
-    const content = inflate(entry, MAX_XML_BYTES);
-    if (!content) continue;
+  for (const [key, content] of marginParts(zipFiles(data) ?? new Map())) {
     const { lines: paragraphs } = scanRuns(
       withoutMarkup(content.toString("utf8")),
       () => null,

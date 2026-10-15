@@ -4,7 +4,9 @@
 // any Node built-in. Edge: the core, bundled, must score a resume inside a bare V8 context —
 // no `process`, `Buffer`, `require` or file system, as in a Workers/Edge runtime. Types: the
 // TypeScript samples in the README and LOCALES.md must compile against the built `.d.ts` under
-// the strictest options a host may set, `exactOptionalPropertyTypes` among them.
+// the strictest options a host may set, `exactOptionalPropertyTypes` among them. Network: the
+// subpaths SECURITY.md promises make no network call (the MCP server runs `./node`) must not
+// bundle one; only `/ai` reaches a provider, through the fetch its host passes in.
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { build } from "esbuild";
@@ -23,17 +25,28 @@ const BROWSER = [
   "./ai/testing",
 ];
 
-for (const subpath of BROWSER) {
-  await build({
+const NETWORK_FREE = new Set([".", "./document", "./format", "./job", "./locales", "./node"]);
+// A network builtin by either name: esbuild leaves `import … from "https"` as written.
+const NETWORK =
+  /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|["'](?:node:)?(?:https?|http2|net|tls|dgram)["']/;
+
+for (const subpath of [...BROWSER, "./node"]) {
+  const node = subpath === "./node";
+  const bundled = await build({
     stdin: { contents: `export * from "${exports[subpath].import}";`, resolveDir: process.cwd() },
     bundle: true,
     format: "esm",
-    platform: "browser",
+    platform: node ? "node" : "browser",
+    // The optional readers are the host's install, not this package's code.
+    external: node ? ["mammoth", "pdf-parse", "pdfjs-dist"] : [],
     write: false,
     logLevel: "silent",
   });
-  console.log(`browser  ${subpath}`);
+  const network = NETWORK_FREE.has(subpath) && bundled.outputFiles[0].text.match(NETWORK);
+  if (network) throw new Error(`network smoke: ${subpath} bundles "${network[0]}"`);
+  if (!node) console.log(`browser  ${subpath}`);
 }
+console.log(`network  none in ${[...NETWORK_FREE].join(" ")}`);
 
 const core = await build({
   stdin: {

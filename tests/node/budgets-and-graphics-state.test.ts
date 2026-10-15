@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { deflateRawSync } from "node:zlib";
+import { deflateRawSync, deflateSync } from "node:zlib";
 
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -18,8 +18,14 @@ import {
 } from "../../src/node/docx.js";
 import { measureVisibility, seeThroughImages, type Box } from "../../src/node/hidden.js";
 import { extractResume } from "../../src/node/index.js";
-import { buildDocxBody, documentXml, relationshipsXml } from "../fixtures/buildDocx.js";
-import { buildPdf, stream } from "../fixtures/buildPdf.js";
+import {
+  buildDocxBody,
+  buildRichDocx,
+  documentXml,
+  marginXml,
+  relationshipsXml,
+} from "../fixtures/buildDocx.js";
+import { buildPdf, buildPdfPages, stream } from "../fixtures/buildPdf.js";
 import { expectFast, expectFastAsync } from "../fixtures/timing.js";
 
 /**
@@ -253,6 +259,76 @@ describe("table detection reads only the measured pages", () => {
     expect(layout?.tableCount).toBeGreaterThan(0);
     expect(layout?.tableCount).toBeLessThanOrEqual(6);
   }, 30_000);
+});
+
+describe("PDF reading stops at a page cap", () => {
+  // Reading stopped only at the character cap, which empty pages never reach: 5 000 of them held
+  // extraction for 11 seconds, 50 000 for nine minutes, from a file of a few hundred kilobytes.
+  it("reads a few thousand empty pages in the time of a resume, and still counts them", async () => {
+    const pages = [line(700, "Jane Doe Senior Engineer at Acme Corporation since 2019")];
+    for (let page = 1; page < 5_000; page += 1) pages.push("");
+    const pdf = buildPdfPages(pages);
+    const { text, layout } = await expectFastAsync(() => extractResume(pdf, "pdf"), 2_000);
+    expect(text).toContain("Jane Doe Senior Engineer");
+    expect(layout?.pageCount).toBe(5_000);
+  }, 60_000);
+});
+
+describe("a page's images are decoded before the next page is read", () => {
+  // pdf.js decodes every image whether or not anyone asks, and a page left before its images are
+  // decoded leaves them decoding behind it: six pages with a 48 MP photo each held 1.4 GB after
+  // the document had been read. So the wait covers an image with no mask of its own too.
+  it("leaves an unmasked image decoded when it returns", async () => {
+    const pdf = buildPdf(
+      `${line(700, "Jane Doe Senior Engineer at Acme")}\nq 100 0 0 120 450 600 cm /Im1 Do Q`,
+      "/XObject<</Im1 7 0 R>>",
+      "",
+      [
+        stream(
+          "/Type/XObject/Subtype/Image/Width 3000/Height 3000/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/FlateDecode",
+          deflateSync(Buffer.alloc(3000 * 3000 * 3)).toString("latin1"),
+        ),
+      ],
+    );
+    const document = await getDocument({
+      data: new Uint8Array(pdf),
+      isEvalSupported: false,
+      verbosity: 0,
+    }).promise;
+    try {
+      const page = await document.getPage(1);
+      const list = (await page.getOperatorList()) as unknown as Parameters<
+        typeof measureVisibility
+      >[1];
+      const ids = list.argsArray
+        .filter((_, order) => list.fnArray[order] === OPS.paintImageXObject)
+        .map((args) => String(args[0]));
+      expect(ids).toHaveLength(1);
+      await seeThroughImages(OPS as unknown as Record<string, number>, list, page);
+      expect(page.objs.has(ids[0]!)).toBe(true);
+    } finally {
+      await document.destroy();
+    }
+  }, 60_000);
+});
+
+describe("DOCX headers and footers share one budget", () => {
+  // Each header was read up to 8 MB, and as many as the archive held, twice: seven of 7.5 MB
+  // from a 163 KB file took nine seconds, past the two the parse budget keeps a document near.
+  it("reads a document padded with large headers in the time of a resume", async () => {
+    const filler = marginXml("hdr", "<w:p><w:r><w:t>a</w:t></w:r></w:p>".repeat(220_000));
+    const headers: Array<[string, string]> = [
+      ["word/header1.xml", marginXml("hdr", "<w:p><w:r><w:t>jane@example.com</w:t></w:r></w:p>")],
+    ];
+    for (let n = 2; n <= 8; n += 1) headers.push([`word/header${n}.xml`, filler]);
+    const docx = buildRichDocx(
+      "<w:p><w:r><w:t>Jane Doe, Senior Engineer at Acme</w:t></w:r></w:p>",
+      headers,
+    );
+    const { text } = await expectFastAsync(() => extractResume(docx, "docx"), 2_000);
+    expect(text).toContain("jane@example.com");
+    expect(text).toContain("Jane Doe, Senior Engineer at Acme");
+  }, 120_000);
 });
 
 describe("single-quoted attributes in a DOCX", () => {

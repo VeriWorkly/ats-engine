@@ -232,6 +232,110 @@ describe("redaction variants", () => {
     expect(redaction.apply("Jane Doe-Smith")).toBe("Jane Doe-Smith");
     expect(redaction.apply("2019 - 2023")).toBe("2019 - 2023");
   });
+
+  // Under a policy without the country's region the parser reads no phone, and a number it did
+  // not read was sent as written.
+  it.each([
+    "07912 345678",
+    "020 7946 0958",
+    "0412 345 678",
+    "0151 23456789",
+    "0151/23456789",
+    "(02) 9876 5432",
+    "+44 7912 345678",
+    "+33 6 12 34 56 78",
+    // A group that looks like a month and its year inside a number ("6 2012") is still a number.
+    "+31 6 2012 3456",
+    "06 1987 6543",
+    // Two numbers on one line are one placeholder, so no part of the second is sent.
+    "0412 345 678 / 02 9876 5432",
+    "+44 20 7946 0958/0959",
+  ])("catches a phone the parser did not read: %s", (written) => {
+    const redaction = createRedaction(parsed("Jane Doe", ""), "");
+    expect(redaction.apply(`Call ${written} today`)).toBe("Call [PHONE_1] today");
+    expect(redaction.restore("Call [PHONE_1]")).toBe(`Call ${written}`);
+  });
+
+  it("catches a second phone, and gives each number its own placeholder", () => {
+    const redaction = createRedaction(parsed("Jane Doe", "(415) 555-0132"), "");
+    const line = "Mobile: (415) 555-0132  Home: (415) 555-0199  Work: 415.555.0177";
+    const hidden = redaction.apply(line);
+    expect(hidden).toBe("Mobile: [PHONE]  Home: [PHONE_1]  Work: [PHONE_2]");
+    expect(redaction.restore(hidden)).toBe(line);
+  });
+
+  // After a comma or a label's dot a number was not taken, and three on one line were cut after
+  // the thirtieth digit.
+  it.each([
+    ["Tel: 020 7946 0958,07912 345678", "Tel: [PHONE_1],[PHONE_2]"],
+    ["Tel.07912 345678", "Tel.[PHONE_1]"],
+    ["M.+44 7912 345678", "M.[PHONE_1]"],
+    ["07912345678/07700900123/01614960000", "[PHONE_1]"],
+    ["07912 345678 / 020 7946 0958 / 0161 496 0000", "[PHONE_1]"],
+  ])("catches every number in %s", (line, hidden) => {
+    const redaction = createRedaction(parsed("Jane Doe", ""), line);
+    expect(redaction.apply(line)).toBe(hidden);
+    expect(redaction.restore(hidden)).toBe(line);
+  });
+
+  it.each([
+    "Acme, 2019 - 2023",
+    "Acme, 01/2020 - 12/2023",
+    "Acme, 05.2019 – 03.2023",
+    "Acme, 01 2019 - 12 2023",
+    "Acme, 2019-05 – 2023-03",
+    "Acme, 06/15/2019 – 08/30/2021",
+    "Acme, 15/06/2019 - 30/08/2021",
+    "Acme, 06/15/2019",
+    "Grew users from 120,000 to 2,400,000 (+1900%)",
+    "ISBN 978-0-306-40615-7",
+    "Release v0.12.3, build 20230115",
+    "Ranked 0.92 AUC on 1,200,000 rows",
+    "Room 011, ext 0958",
+    "Order 55550132 and 155550132",
+    "https://example.com/id/0412345678",
+    "Raised 1.200.000 in 2019-2020-2021",
+    "Case 123-45-6789, filed 2019.05.12",
+    "Served 415-555 users",
+    // Dates in brackets, with a note after them, and listed.
+    "Engineer (01/2020 - 12/2023)",
+    "01/2020 - 12/2023 (3 yrs)",
+    "09/2019 - 06/2021 / 07/2021 - 12/2023",
+    // A figure after a digit and a separator is part of that figure.
+    "Revenue 1,012,345,678",
+    "Ratio 3.0123456789",
+    "Release v1.0.12345678901",
+  ])("leaves figures that are not phones alone: %s", (text) => {
+    const redaction = createRedaction(parsed("Jane Doe", ""), text);
+    expect(redaction.apply(text)).toBe(text);
+  });
+
+  it("does not send a local phone the parser read none of", () => {
+    const source =
+      "Jane Doe\njane@example.com | 07912 345678\nExperience\nEngineer, Acme, 2019 - 2023";
+    const { parsed: read } = AtsScoringService.check(source, DEFAULT_POLICY);
+    expect(read.phone).toBe("");
+    const hidden = createRedaction(read, source).apply(source);
+    expect(hidden).not.toContain("345678");
+    expect(hidden).toContain("2019 - 2023");
+  });
+
+  // Two characters is a whole name in Chinese and Korean; in Latin script it is too short to
+  // replace safely ("Al" is inside "Algorithms").
+  it.each(["李明", "김민"])("redacts a two-character name: %s", (name) => {
+    expect(createRedaction(parsed(name), "").apply(`${name}\nSigned, ${name}`)).toBe(
+      "[NAME]\nSigned, [NAME]",
+    );
+  });
+
+  // Replacement is whole-word, and Chinese and Korean write no space between words: a name
+  // inside a sentence, or before a Korean particle, is sent. SECURITY.md says so.
+  it("replaces a two-character name only where it stands apart", () => {
+    expect(createRedaction(parsed("李明"), "").apply("姓名: 李明\n李明是工程师")).toBe(
+      "姓名: [NAME]\n李明是工程师",
+    );
+    expect(createRedaction(parsed("김민"), "").apply("김민은 개발자")).toBe("김민은 개발자");
+  });
 });
 
 describe("analyze: keyword suggestions and the request", () => {

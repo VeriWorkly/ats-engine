@@ -93,7 +93,8 @@ The resource `rubric://default` is the whole rubric as JSON.
 **Inputs.**
 
 - Resume files: `.pdf`, `.docx`, `.html`, `.txt`, `.md`, or a `.json` JSON Resume or
-  ats-resume document. Postings: `.txt`, `.md`, `.pdf`, `.docx`, or a saved `.html` page.
+  ats-resume document. Postings: `.txt`, `.md`, `.pdf`, `.docx`, or a saved `.html` page; a
+  `job_path` of any other type is refused, since a posting's words come back in the answer.
 - Give absolute paths. `~/` is read as your home folder; any other relative path is read from
   the folder the server was started in.
 - Pasted `text` and `job_text` may be up to 200 000 characters.

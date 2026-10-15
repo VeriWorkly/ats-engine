@@ -10,7 +10,7 @@ inputs:
     description: Path to the resume (.pdf, .docx, .html, .txt, .md, or a .json resume document).
     required: true
   job:
-    description: Optional path to a job posting (.txt, .pdf, .docx, or a saved .html page) to match against.
+    description: Optional path to a job posting (.txt, .md, .pdf, .docx, or a saved .html page) to match against.
     required: false
     default: ""
   min-score:

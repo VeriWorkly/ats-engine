@@ -134,13 +134,14 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 Counted with esbuild's metafile, every bare import left external. "zod/mini" includes its
 English locale (`zod/v4/locales/en.js`, see `util/issues.ts`). Bundle budgets per subpath are
 enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 103 KB for `.`, 71.4 KB
-for `/locales`, 72.2 KB for `/ai`, 20.9 KB for `/node`, under 4 KB for every other; the script
+for `/locales`, 72.5 KB for `/ai`, 21.2 KB for `/node`, under 4 KB for every other; the script
 prints each entry's size against its budget, with the reason for each budget beside it). Two more
 budgets hold what a host importing only some names bundles: `withLocales` alone (48.2 KB) and
 `/ai`'s prompts and error alone (9.5 KB). The packs' and the tasks' JSON Schemas are built at
 load, so those calls are marked `/* @__PURE__ */` and drop out when not imported;
 `npm run smoke` bundles every runtime-agnostic subpath for the browser, runs the core in a bare
-V8 context (edge), and compiles the TypeScript samples in README.md and LOCALES.md against the
+V8 context (edge), fails if a network-free subpath (`.`, `/document`, `/format`, `/job`,
+`/locales`, `/node`) bundles a network call, and compiles the TypeScript samples in README.md and LOCALES.md against the
 built `.d.ts` with `exactOptionalPropertyTypes` on.
 
 ## Decisions worth knowing
@@ -192,6 +193,6 @@ built `.d.ts` with `exactOptionalPropertyTypes` on.
 
 Keep: everything exported today. Remove in 1.0: `level`, `highestDegree`, `AtsDegreeLevel`,
 `DEGREE_LABELS`. Candidates to rename or make internal at 1.0, decided then rather than churned
-now: `AtsScoringService` (today an alias of the documented `check()` function), `TaskRoute` → `AtsAiRoute`,
+now: `AtsScoringService` (the class the documented `check()` function calls), `TaskRoute` → `AtsAiRoute`,
 `AiEvalCase`/`AiEvalReport` → `AtsAi…`, and the accidental exports `chatCompletionBody`,
 `messagesBody`, `localizePolicy`, `parseQuality`, the grounding helpers.

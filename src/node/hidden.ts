@@ -172,6 +172,12 @@ export type PageObjects = { objs: ObjectStore; commonObjs: ObjectStore };
  * waits for each (`waitMs` at most). An image whose pixels do not arrive, or arrive in a form
  * this cannot read (a bitmap), is taken as see-through: the benefit of the doubt, as before.
  * Pass the result to `measureVisibility`.
+ *
+ * It waits for the page's other images too. pdf.js decodes every image whether or not anyone
+ * asks, and a page closed before its images are decoded leaves them decoding behind it: six
+ * pages with a 48 MP photo each held 1.4 GB after the document had been read, one page's worth
+ * at a time once each page waits for its own. Not every image: one in a tiling pattern or a
+ * Type3 glyph, a soft mask, and one that takes over `waitMs` still decode after the page.
  */
 export async function seeThroughImages(
   ops: Ops,
@@ -179,21 +185,22 @@ export async function seeThroughImages(
   page: PageObjects,
   waitMs = 2_000,
 ): Promise<Set<string>> {
-  const ids = new Set<string>();
+  const ids = new Map<string, boolean>();
   list.fnArray.forEach((fn, order) => {
     const id = list.argsArray[order]?.[0];
-    if (fn === ops.paintImageXObject && typeof id === "string" && ownMask(ops, list, order))
-      ids.add(id);
+    if (fn === ops.paintImageXObject && typeof id === "string")
+      ids.set(id, ids.get(id) || ownMask(ops, list, order));
   });
   const seeThrough = new Set<string>();
   await Promise.all(
-    [...ids].map(async (id) => {
+    [...ids].map(async ([id, masked]) => {
       const store = id.startsWith("g_") ? page.commonObjs : page.objs;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const image = await Promise.race([
         new Promise<unknown>((resolve) => store.get(id, resolve)),
         new Promise<undefined>((resolve) => (timer = setTimeout(() => resolve(undefined), waitMs))),
       ]).finally(() => clearTimeout(timer));
+      if (!masked) return;
       const { kind, data } = (image ?? {}) as { kind?: unknown; data?: unknown };
       // pdf.js's ImageKind: 1 grey, 2 RGB — no alpha, opaque — and 3 RGBA.
       if (kind === 1 || kind === 2) return;

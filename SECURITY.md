@@ -15,9 +15,9 @@ Only the latest minor release receives security fixes while the package is 0.x.
 The engine is built to take input from anyone: a resume, a posting, a web page, an uploaded
 file. These are the guarantees, each held by a test.
 
-**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 81
-shapes, 76 written on one line (letter runs, digit runs, unclosed tags, comma lists, mixed
-scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each), placed in the name
+**Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 100
+shapes, 95 written on one line or under one heading (letter runs, digit runs, unclosed tags,
+comma lists, mixed scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each), placed in the name
 line, a bullet and the posting at once, and again under the certification and language headings,
 scores under the community policy with every locale pack applied in tens of milliseconds for most
 one-line shapes and a few hundred at most, short lines included, on a developer machine
@@ -31,16 +31,27 @@ adversarial suite against a private policy when one is present.
 bounded in depth, array length and node count before it is validated, a policy or a locale pack
 nested deeper than 5 000 levels (or one that contains itself) is refused as invalid with
 `AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
-64 MB and hold at most 2 MB of the XML `mammoth` parses, and PDF text reading stops at the cap. A
-file name is read to its first 255 characters. The CLI and the MCP server read only a regular file
-on this computer: a file over 20 MB is refused before it is opened, and is read through one handle
+64 MB and hold at most 2 MB of the XML `mammoth` parses and 2 MB of page headers and footers (a
+part past that is neither read nor measured), and PDF text reading stops at the cap or
+after the first 100 pages, whichever comes first (the page count still counts every page). PDF
+images have no size cap: pdf.js decodes every image in full, about 12 bytes a pixel, whatever
+its size, and a 420 KB file with one 144 MP image held 1.8 GB. The table pass decodes no image,
+and each page waits (up to 2 s an image) for its own images before the next is read, so they do
+not pile up page after page. Some still decode after the file has been read: images in tiling
+patterns and in Type3 glyphs, soft masks of any size, and a page's images that take over 2 s;
+and a page with many large images decodes them all at once (twenty 12 MP images, 1.5 GB). A file
+name is read to its first 255 characters. The CLI and the MCP server read only a
+regular file on this computer: a file over 20 MB is refused before it is opened, and is read through one handle
 no further than one byte past the limit, so a file that grows meanwhile is refused too; a folder, a
 pipe or a device (which reports no size and can stream without end) is refused before it is opened,
 and so is a network path (`\\host\share\…`, `//host/share/…`, `\\?\UNC\…`) or a device path
 (`\\.\…`); of the paths that start with two slashes, only the local long form `\\?\C:\…` is read.
 Only the path's form is checked: a mapped drive letter, a `subst` drive, a link or junction to a
-share, or an SMB or NFS mount looks local and is read over the network. The MCP server refuses
-pasted text over 200 000 characters. A host should still bound request bodies.
+share, or an SMB or NFS mount looks local and is read over the network. A job posting is read only
+from a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file, before it is opened: its words come back as
+missing keywords, so any other file (a credentials file, a key) would be echoed to whoever named
+it. A JSON file that does not parse is refused with its line and column, without the parser's
+message, which quotes it. The MCP server refuses pasted text over 200 000 characters. A host should still bound request bodies.
 
 **Crashes.** Words from the input are never used as plain-object keys, JSON-LD is read to a fixed
 depth, and malformed PDF or DOCX structure degrades to "not measured" rather than throwing past the
@@ -54,7 +65,13 @@ warnings takes seconds to minutes, and a file of 1.4 KB held it for two minutes.
 file carries is not applied. What passes still costs `mammoth` up to about a second a megabyte of
 XML. PDF parsing (pdf.js) and DOCX parsing (`mammoth`) are CPU-bound: run `/node` extraction in the
 forkable `/node/child` process with a timeout and a memory limit, so a pathological file costs a
-killed process, not a worker.
+killed process, not a worker. Cap the child's memory in the operating system (a cgroup,
+`ulimit -v`, a Windows Job object): decoded images live outside the V8 heap, so
+`--max-old-space-size` does not bound them (a child under `--max-old-space-size=256` reached
+5.6 GB). Set the timeout for the images too: waiting for each page's images before the next keeps
+memory to a page at a time, and costs time instead, 60 pages with a 49 MP image each take
+31 to 34 s, where without the wait the call returned in under half a second and left them
+decoding.
 
 **Advice inputs.** The `file` option and the file name are read only for `report.advice`, never
 for the score. The name is quoted back in the advice's `evidence` as given, so a host that shows
@@ -75,13 +92,28 @@ What does not depend on the model:
 - `analyze` redacts contact details before the request leaves, best effort and only these
   forms. The name as the parser read it, in any case or letter spacing, also as "Doe, Jane", with
   or without a middle initial, and inside a web address built from it (`janedoe.dev`); not
-  initials ("J. Doe"), the first name alone, or a handle written another way (`jane_doe`). Every
+  initials ("J. Doe"), the first name alone, or a handle written another way (`jane_doe`). A name
+  of two characters only in Chinese or Korean (`李明`), and only where it stands apart (on its own
+  line, after a colon or a space): Chinese and Korean write no space between words, so inside a
+  sentence (`李明是工程师`) or before a Korean particle (`김민은`) it is sent. In Latin script two
+  letters are too short to replace safely. Every
   email address in the text, with letters in any script before or after the `@` and an
   apostrophe before it (`zoë.müller@firma.de`, `o'connor.pat@example.com`). The links the
   parser read. The phone by its national number: with or without the country code (`+44`, `0044`, `+44 (0)`, or after
   the exit prefix `011`, `0011` or `010`), with a trunk zero (`020`, `(020)`) or a North
   American `1-`, any spaces, brackets, dots, slashes or dashes between the digits, and an
-  extension after it; not other phone numbers. Postal addresses are not recognised. The report's
+  extension after it. Any other run of 9 or more digits on one line that opens with `+` or a trunk
+  `0` (`07912 345678`, `(02) 9876 5432`, `Tel.07912 345678`, `…0958,07912 345678`; numbers side
+  by side on one line are one placeholder), except one glued to letters (`Tel07912345678`), after
+  a slash or a dash (a web address's path), or with a space after its plus (`+ 44 …`), whether
+  the parser read it or not, so a local number is replaced under a policy without its country's
+  region too; dates are not: one, a range or a list of ranges, in brackets or with a short note
+  after them (`01/2020 - 12/2023`, `06/15/2019 – 08/30/2021`, `(01/2020 - 12/2023)`,
+  `01/2020 - 12/2023 (3 yrs)`, `09/2019 - 06/2021 / 07/2021 - 12/2023`). A North American number written as one, a second one
+  included (`Home: (415) 555-0199`, `415-555-0199`, `415.555.0199`). Not other phone numbers: one
+  with none of these shapes, such as India's `98765 43210` or `415 555 0199` spaced, is sent
+  unless the parser read it (the region pack reads India's). Postal
+  addresses are not recognised. The report's
   `advice` is not sent: it quotes the file name, which can hold the name in a form redaction
   cannot know (`Jane_Doe_Resume.pdf`). The resume is cut after redaction, where its 50 000th
   character falls, or before a contact detail the cut falls in, so nothing past it is sent. Parse repair and conversion must see contact details and do not redact.
@@ -89,8 +121,9 @@ What does not depend on the model:
   including text smuggled in Unicode tag characters or PDF metadata. A phrase in quotes or
   backticks within three words of a word that says it was caught (`text.injectionMentionVerbs`:
   "flags", "blocked", "red-teamed"), with no comma or colon between, is an AI security
-  engineer's example and is not flagged: `Built a filter that flags "ignore previous
-  instructions"`. An attacker can dress an instruction so too, and a model reading the resume
+  engineer's example and is not flagged:
+  `Built a filter that flags "ignore previous instructions"`. An attacker can dress an
+  instruction so too, and a model reading the resume
   may still follow it; the rule trades that for not failing honest security work. It is still
   flagged unquoted (a bare "[INST]" too), on a labelled list line ("Skills: …"), in text hidden
   by the layout, in tag characters or in metadata, and whenever the quote tells the screener
@@ -113,13 +146,15 @@ and refuses to send a key over plain `http` to any host but this machine (`local
 or from a `.env` file, which is never committed.
 
 **State.** The core holds no global state, does no I/O and makes no network calls; only `/ai`
-calls the provider you configure, and only `/node` reads files you pass it.
+calls the provider you configure, and only `/node` reads files you pass it. `npm run smoke` fails
+if the core, `/document`, `/format`, `/job`, `/locales` or `/node` bundles a network call.
 
 ## Around the engine
 
 **The MCP server.** `@veriworkly/ats-engine-mcp` talks over stdio only, makes no network requests
 and calls no model. It reads the files a tool call names, with the rights of the user running it,
-and nothing else; folders, pipes, devices, network paths and files over 20 MB are refused. Its
+and nothing else; folders, pipes, devices, network paths and files over 20 MB are refused, and so
+is a `job_path` that is not a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file. Its
 stdout carries only the protocol. Its answers include text from the resume, which the assistant
 sends to its own model provider.
 

@@ -15,8 +15,10 @@ import type { AtsParsedResume } from "../types.js";
  * with anything else. The name is also caught as "Doe, Jane", with or without a middle initial,
  * and inside a web address built from it ("janedoe.dev", "x.com/janedoe"), where the whole address
  * is replaced. The phone number is caught by its national number whatever separates its digits,
- * dialled as "+44 20…", "0044 20…", "011 44 20…" or "020…", but phone-shaped digit runs in general are *not*
- * swept — "2019 - 2023" has the shape of a phone number. Not caught: a first name used on its own,
+ * dialled as "+44 20…", "0044 20…", "011 44 20…" or "020…". Any other run of 9 or more digits that
+ * opens with "+" or a trunk "0" is a phone too, read by the parser or not; digit runs in general
+ * are *not* swept — "2019 - 2023" has the shape of a phone number, and so has "01/2020 - 12/2023",
+ * which is left alone as a range of dates. Not caught: a first name used on its own,
  * initials ("J. Doe"), a handle written another way ("jane_doe"). Replacement is whole-word, so a
  * three-letter name does not rewrite the inside of another word, and a "name" the parser also read
  * as a job title is left alone — swapping a title for [NAME] would cost the analysis more than it
@@ -51,6 +53,49 @@ const ADDRESS =
 
 /** What may stand between the digits of a phone number: spaces, brackets, dots, any dash. */
 const PHONE_GAP = String.raw`[\s().\-/‐‑‒–—]*`;
+
+/**
+ * A phone number the parser did not read, as one under a policy without its country's region:
+ * 9 or more digits on one line that open with "+" or a trunk "0" ("020 7946 0958", "(02) 9876
+ * 5432"), up to three of `PHONE_GAP`'s characters between two. It may follow a label's dot or a
+ * comma ("Tel.07912…", "M.+44…", "…0958,07912…"), not a letter or a digit, a slash or a dash (a
+ * web address's path, "/id/0412345678"), or a digit and a dot, which make it part of a figure
+ * ("3.0123456789"). A year never opens with "+" or "0", so "2019 - 2023" is
+ * not one. And a North American number, a second one the parser did not take ("Home: (415)
+ * 555-0199"), by its own shape: the area code in brackets, or set off as the other groups are
+ * ("415-555-0199", "415.555.0199"). However many digits, so numbers side by side on one line
+ * ("0412 345 678 / 02 9876 5432") are one placeholder rather than one and part of the next. Not
+ * caught: a number glued to letters ("Tel07912345678"), or a "+" with a space after it ("+ 44").
+ * Linear: a gap never holds a digit and is bounded, and a match starts only where a run of digits
+ * does, or after a space within one, and then takes the run to its end.
+ */
+const OTHER_PHONES =
+  /(?<![\p{L}\p{N}+_@#=/-]|\p{N}\.)(?:(?:\+|(?=\(?0))\(?\d(?:[ \t().\-/‐‑‒–—]{0,3}\d){8,}|(?:1[-. ])?(?:\(\d{3}\)[ \t]?\d{3}[-. \t]|\d{3}([-.])\d{3}\1)\d{4})(?!\p{N}|[./-]\d)/gu;
+
+/**
+ * A month and its year, or a day too ("01/2020", "05.2019", "06/15/2019"), after the dash or
+ * slash that joins it to the date before it ("01/2020 - 12/2023", "… / 07/2021 - …").
+ */
+const DATE = new RegExp(
+  String.raw`(?:[ \t]*[-–—/][ \t]*)?\d{1,2}(?:[./-]\d{1,2})?[ \t]*[./\-–—]?[ \t]*(?:19|20)\d\d`,
+  "uy",
+);
+
+/**
+ * Whether a match is only dates: one or a list of them, in brackets or not, with at most a one-
+ * or two-digit figure after them ("01/2020 - 12/2023 (3 yrs)"). Wholly, so a number with a
+ * year-like group ("+31 6 2012 3456", "06 1987 6543") is still a number. Each date is read where
+ * the last one ended, so this is linear in the match.
+ */
+function onlyDates(match: string): boolean {
+  let at = match.startsWith("(") ? 1 : 0;
+  let dates = 0;
+  for (DATE.lastIndex = at; DATE.test(match); DATE.lastIndex = at) {
+    dates += 1;
+    at = DATE.lastIndex;
+  }
+  return dates > 0 && /^(?:[ \t().\-/‐‑‒–—]{1,3}\d{1,2})?$/.test(match.slice(at));
+}
 
 /**
  * The digits that may name the line wherever it is dialled from (its national number), longest
@@ -108,8 +153,10 @@ export function createRedaction(
 
   const name = parsed.name.trim();
   const parts = name.split(/\s+/).filter(Boolean);
+  // Two characters are a whole Chinese or Korean name ("李明"), but in Latin script too short to
+  // replace safely ("Al" in "Algorithms").
   const named =
-    name.length >= 3 &&
+    (name.length >= 3 || (name.length === 2 && /[\p{sc=Han}\p{sc=Hangul}]/u.test(name))) &&
     !parsed.roles.some((role) => role.title.trim().toLowerCase() === name.toLowerCase());
 
   const links = new Set(parsed.links.map((link) => link.trim()).filter((link) => link.length >= 3));
@@ -197,11 +244,29 @@ export function createRedaction(
     return <T>(value: T) => walk(value) as T;
   };
 
+  // Every other phone number, each with its own placeholder, numbered as first met.
+  const others = new Map<string, string>();
+  const phones = new Map<string, string>();
+  const other = (phone: string) => {
+    if (onlyDates(phone)) return phone;
+    if (!others.has(phone)) {
+      others.set(phone, `[PHONE_${others.size + 1}]`);
+      phones.set(others.get(phone)!, phone);
+    }
+    return others.get(phone)!;
+  };
+
   return {
     apply: deep((text) =>
-      forward.reduce((out, [pattern, to]) => out.replace(pattern, to), normalizeText(text)),
+      forward
+        .reduce((out, [pattern, to]) => out.replace(pattern, to), normalizeText(text))
+        .replace(OTHER_PHONES, other),
     ),
     // Placeholders are unique bracketed tokens, so restoring them needs no boundaries.
-    restore: deep((text) => backward.reduce((out, [from, to]) => out.split(from).join(to), text)),
+    restore: deep((text) =>
+      backward
+        .reduce((out, [from, to]) => out.split(from).join(to), text)
+        .replace(/\[PHONE_\d+\]/g, (placeholder) => phones.get(placeholder) ?? placeholder),
+    ),
   };
 }
