@@ -93,13 +93,11 @@ function decodeText(data: Uint8Array): string {
     if (!length) stray += 1;
   }
   if (stray > multibyte) return cp1252(data);
+  if (!stray) return new TextDecoder().decode(data);
   // Bytes that are not UTF-8 among many that are — one stray byte pasted into a UTF-8 file — are
   // each written as their Windows-1252 character in UTF-8, and the whole decoded once: a decode
   // per stray byte took 37 seconds on 20 MB of them.
   const out = new Uint8Array(data.length + stray * 2);
-  const encoded = [...cp1252(Uint8Array.from({ length: 128 }, (_, i) => 0x80 + i))].map((char) =>
-    new TextEncoder().encode(char),
-  );
   let [start, written] = [0, 0];
   const copy = (end: number) => {
     out.set(data.subarray(start, end), written);
@@ -112,8 +110,8 @@ function decodeText(data: Uint8Array): string {
       continue;
     }
     copy(at);
-    out.set(encoded[data[at]! - 0x80]!, written);
-    written += encoded[data[at]! - 0x80]!.length;
+    out.set(CP1252_UTF8[data[at]! - 0x80]!, written);
+    written += CP1252_UTF8[data[at]! - 0x80]!.length;
     start = at += 1;
     // Each run after a stray byte was decoded on its own, which drops a byte-order mark at its start.
     if (data[at] === 0xef && data[at + 1] === 0xbb && data[at + 2] === 0xbf) start = at += 3;
@@ -147,6 +145,11 @@ function sequence(data: Uint8Array, at: number): number {
 
 /** Windows-1252's characters for 0x80-0x9F; its five unassigned codes stay as they are. */
 const CP1252 = "€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ";
+
+/** Bytes 0x80-0xFF as their Windows-1252 characters in UTF-8: what a stray byte becomes. */
+const CP1252_UTF8 = /* @__PURE__ */ [
+  ...cp1252(Uint8Array.from({ length: 128 }, (_, i) => 0x80 + i)),
+].map((char) => new TextEncoder().encode(char));
 
 /** A link's target in `mammoth`'s HTML: one bounded run of attribute text. */
 const HREF = /<a href="([^"<>]*)"/g;
