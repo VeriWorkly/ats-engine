@@ -50,7 +50,8 @@ const BUDGETS = {
   // 75.7: the words that tell the policy's own language from the eight it has no pack for
   // (`text.detectionWords`, `text.otherLanguages`, 0.6), and the French pack with the FR and GB
   // regions (3.4: headings, months, levels, titles, stopwords and soft skills, the French and UK
-  // credentials), took it from 71.37 to 75.37. Data only; a gzip of the lists written as one
+  // credentials), took it from 71.37 to 75.37, and the bullets deciding the language and the
+  // French Bac+N and Québec degrees to 75.55. Data only; a gzip of the lists written as one
   // string each saved 0.01, so they stay readable.
   "./locales": 75.7,
   // 70: zod/mini in place of zod took it from 141.0 to 67.5.
@@ -64,7 +65,7 @@ const BUDGETS = {
   // 72.5: dates read one by one, so a bracketed or listed range is not taken for a phone, took it
   // to 72.42.
   // 73.2: the language detection words the policy now carries (see "./locales" at 75.7), on top
-  // of the redaction at 72.5, took it to 72.93.
+  // of the redaction at 72.5, took it to 73.0.
   "./ai": 73.2,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
