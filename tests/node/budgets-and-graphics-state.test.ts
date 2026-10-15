@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { deflateRawSync } from "node:zlib";
+import { deflateRawSync, deflateSync } from "node:zlib";
 
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -271,6 +271,44 @@ describe("PDF reading stops at a page cap", () => {
     const { text, layout } = await expectFastAsync(() => extractResume(pdf, "pdf"), 2_000);
     expect(text).toContain("Jane Doe Senior Engineer");
     expect(layout?.pageCount).toBe(5_000);
+  }, 60_000);
+});
+
+describe("a page's images are decoded before the next page is read", () => {
+  // pdf.js decodes every image whether or not anyone asks, and a page left before its images are
+  // decoded leaves them decoding behind it: six pages with a 48 MP photo each held 1.4 GB after
+  // the document had been read. So the wait covers an image with no mask of its own too.
+  it("leaves an unmasked image decoded when it returns", async () => {
+    const pdf = buildPdf(
+      `${line(700, "Jane Doe Senior Engineer at Acme")}\nq 100 0 0 120 450 600 cm /Im1 Do Q`,
+      "/XObject<</Im1 7 0 R>>",
+      "",
+      [
+        stream(
+          "/Type/XObject/Subtype/Image/Width 3000/Height 3000/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/FlateDecode",
+          deflateSync(Buffer.alloc(3000 * 3000 * 3)).toString("latin1"),
+        ),
+      ],
+    );
+    const document = await getDocument({
+      data: new Uint8Array(pdf),
+      isEvalSupported: false,
+      verbosity: 0,
+    }).promise;
+    try {
+      const page = await document.getPage(1);
+      const list = (await page.getOperatorList()) as unknown as Parameters<
+        typeof measureVisibility
+      >[1];
+      const ids = list.argsArray
+        .filter((_, order) => list.fnArray[order] === OPS.paintImageXObject)
+        .map((args) => String(args[0]));
+      expect(ids).toHaveLength(1);
+      await seeThroughImages(OPS as unknown as Record<string, number>, list, page);
+      expect(page.objs.has(ids[0]!)).toBe(true);
+    } finally {
+      await document.destroy();
+    }
   }, 60_000);
 });
 
