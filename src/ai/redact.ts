@@ -56,17 +56,21 @@ const PHONE_GAP = String.raw`[\s().\-/‐‑‒–—]*`;
 
 /**
  * A phone number the parser did not read, as one under a policy without its country's region:
- * 9 to 30 digits on one line that open with "+" or a trunk "0" ("020 7946 0958", "(02) 9876
- * 5432"), up to three of `PHONE_GAP`'s characters between two. A year never opens with either,
- * so "2019 - 2023" is not one. And a North American number, a second one the parser did not
- * take ("Home: (415) 555-0199"), by its own shape: the area code in brackets, or set off as the
- * other groups are ("415-555-0199", "415.555.0199"). Up to 30 digits, so two numbers on one line
- * ("0412 345 678 / 02 9876 5432") are one placeholder rather than one and the rest of the other.
- * Linear: a gap never holds a digit and is bounded, and each alternative reads at most a fixed
- * stretch from where it starts.
+ * 9 or more digits on one line that open with "+" or a trunk "0" ("020 7946 0958", "(02) 9876
+ * 5432"), up to three of `PHONE_GAP`'s characters between two. It may follow a label's dot or a
+ * comma ("Tel.07912…", "M.+44…", "…0958,07912…"), not a letter or a digit, a slash or a dash (a
+ * web address's path, "/id/0412345678"), or a digit and a dot, which make it part of a figure
+ * ("3.0123456789"). A year never opens with "+" or "0", so "2019 - 2023" is
+ * not one. And a North American number, a second one the parser did not take ("Home: (415)
+ * 555-0199"), by its own shape: the area code in brackets, or set off as the other groups are
+ * ("415-555-0199", "415.555.0199"). However many digits, so numbers side by side on one line
+ * ("0412 345 678 / 02 9876 5432") are one placeholder rather than one and part of the next. Not
+ * caught: a number glued to letters ("Tel07912345678"), or a "+" with a space after it ("+ 44").
+ * Linear: a gap never holds a digit and is bounded, and a match starts only where a run of digits
+ * does, or after a space within one, and then takes the run to its end.
  */
 const OTHER_PHONES =
-  /(?<![\p{L}\p{N}+_@#=/.,-])(?:(?:\+|(?=\(?0))\(?\d(?:[ \t().\-/‐‑‒–—]{0,3}\d){8,29}|(?:1[-. ])?(?:\(\d{3}\)[ \t]?\d{3}[-. \t]|\d{3}([-.])\d{3}\1)\d{4})(?!\p{N}|[./-]\d)/gu;
+  /(?<![\p{L}\p{N}+_@#=/-]|\p{N}\.)(?:(?:\+|(?=\(?0))\(?\d(?:[ \t().\-/‐‑‒–—]{0,3}\d){8,}|(?:1[-. ])?(?:\(\d{3}\)[ \t]?\d{3}[-. \t]|\d{3}([-.])\d{3}\1)\d{4})(?!\p{N}|[./-]\d)/gu;
 
 /**
  * A month and its year, or a day too ("01/2020", "05.2019", "06/15/2019"), after the dash or

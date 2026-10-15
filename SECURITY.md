@@ -101,7 +101,9 @@ What does not depend on the model:
   the exit prefix `011`, `0011` or `010`), with a trunk zero (`020`, `(020)`) or a North
   American `1-`, any spaces, brackets, dots, slashes or dashes between the digits, and an
   extension after it. Any other run of 9 or more digits on one line that opens with `+` or a trunk
-  `0` (`07912 345678`, `(02) 9876 5432`; two such numbers together are one placeholder), whether
+  `0` (`07912 345678`, `(02) 9876 5432`, `Tel.07912 345678`, `…0958,07912 345678`; numbers side
+  by side on one line are one placeholder), except one glued to letters (`Tel07912345678`), after
+  a slash or a dash (a web address's path), or with a space after its plus (`+ 44 …`), whether
   the parser read it or not, so a local number is replaced under a policy without its country's
   region too; dates are not: one, a range or a list of ranges, in brackets or with a short note
   after them (`01/2020 - 12/2023`, `06/15/2019 – 08/30/2021`, `(01/2020 - 12/2023)`,

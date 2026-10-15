@@ -264,6 +264,20 @@ describe("redaction variants", () => {
     expect(redaction.restore(hidden)).toBe(line);
   });
 
+  // After a comma or a label's dot a number was not taken, and three on one line were cut after
+  // the thirtieth digit.
+  it.each([
+    ["Tel: 020 7946 0958,07912 345678", "Tel: [PHONE_1],[PHONE_2]"],
+    ["Tel.07912 345678", "Tel.[PHONE_1]"],
+    ["M.+44 7912 345678", "M.[PHONE_1]"],
+    ["07912345678/07700900123/01614960000", "[PHONE_1]"],
+    ["07912 345678 / 020 7946 0958 / 0161 496 0000", "[PHONE_1]"],
+  ])("catches every number in %s", (line, hidden) => {
+    const redaction = createRedaction(parsed("Jane Doe", ""), line);
+    expect(redaction.apply(line)).toBe(hidden);
+    expect(redaction.restore(hidden)).toBe(line);
+  });
+
   it.each([
     "Acme, 2019 - 2023",
     "Acme, 01/2020 - 12/2023",
@@ -287,6 +301,10 @@ describe("redaction variants", () => {
     "Engineer (01/2020 - 12/2023)",
     "01/2020 - 12/2023 (3 yrs)",
     "09/2019 - 06/2021 / 07/2021 - 12/2023",
+    // A figure after a digit and a separator is part of that figure.
+    "Revenue 1,012,345,678",
+    "Ratio 3.0123456789",
+    "Release v1.0.12345678901",
   ])("leaves figures that are not phones alone: %s", (text) => {
     const redaction = createRedaction(parsed("Jane Doe", ""), text);
     expect(redaction.apply(text)).toBe(text);
