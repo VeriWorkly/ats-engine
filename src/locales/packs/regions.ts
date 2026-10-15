@@ -166,12 +166,14 @@ export const FR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   // The French system, by years after the baccalauréat: "Bac+2" (BTS, DUT) is short-cycle
   // tertiary, "Bac+3" (licence, BUT) a bachelor's, "Bac+5" (master, diplôme d'ingénieur) a
   // master's, "Bac+8" a doctorate. Levels are tried highest first, so "Bac+5" is never read as
-  // the baccalauréat itself. "BUT" only with its speciality, since "but" is a French and an
-  // English word.
+  // the baccalauréat itself. "Bac+N" is in the `fr` pack too, for a French posting read
+  // elsewhere. A baccalauréat named for its field ("baccalauréat en informatique") is Québec's
+  // bachelor's, read by the `fr` pack, not this school diploma. "BUT" only with its speciality,
+  // since "but" is a French and an English word.
   degrees: {
     "2": word(String.raw`brevet(?:\s+des\s+coll[èe]ges)?|dnb`),
     "3": word(
-      String.raw`baccalaur[ée]at(?:\s+(?:g[ée]n[ée]ral|technologique|professionnel|s|es|l|stmg|sti2d))?|bac(?!\s*\+)(?:\s+(?:g[ée]n[ée]ral|technologique|pro(?:fessionnel)?|s|es|l|stmg|sti2d))?|cap|bep`,
+      String.raw`baccalaur[ée]at(?!\s+en\s+\p{L})(?:\s+(?:g[ée]n[ée]ral|technologique|professionnel|s|es|l|stmg|sti2d))?|bac(?!\s*\+|\s+en\s+\p{L})(?:\s+(?:g[ée]n[ée]ral|technologique|pro(?:fessionnel)?|s|es|l|stmg|sti2d))?|cap|bep`,
     ),
     "5": word(String.raw`bts|dut|deug|bac\s*\+\s*2`),
     "6": word(

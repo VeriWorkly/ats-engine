@@ -4160,9 +4160,10 @@
           "d['’]\\p{L}+"
         ],
         "degrees": {
-          "6": "(?<![\\p{L}\\p{M}])(?:licence(?:\\s+professionnelle)?)(?![\\p{L}\\p{M}])",
-          "7": "(?<![\\p{L}\\p{M}])(?:dipl[ôo]me\\s+d['’]ing[eéèê]nieur|ing[eéèê]nieur\\s+dipl[ôo]m[eéèê]|mast[eè]re(?:\\s+sp[eéèê]cialis[eéèê])?)(?![\\p{L}\\p{M}])",
-          "8": "(?<![\\p{L}\\p{M}])(?:doctorat|th[eè]se\\s+de\\s+doctorat)(?![\\p{L}\\p{M}])"
+          "5": "(?<![\\p{L}\\p{M}])(?:bac\\s*\\+\\s*2)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:licence(?:\\s+professionnelle)?|bac(?:calaur[ée]at)?\\s+en\\s+\\p{L}+|bac\\s*\\+\\s*3)(?![\\p{L}\\p{M}])",
+          "7": "(?<![\\p{L}\\p{M}])(?:dipl[ôo]me\\s+d['’]ing[eéèê]nieur|ing[eéèê]nieur\\s+dipl[ôo]m[eéèê]|mast[eè]re(?:\\s+sp[eéèê]cialis[eéèê])?|bac\\s*\\+\\s*5)(?![\\p{L}\\p{M}])",
+          "8": "(?<![\\p{L}\\p{M}])(?:doctorat|th[eè]se\\s+de\\s+doctorat|bac\\s*\\+\\s*8)(?![\\p{L}\\p{M}])"
         },
         "contentLineVerbs": [
           "développé",
@@ -4737,7 +4738,7 @@
       {
         "degrees": {
           "2": "(?<![\\p{L}\\p{M}])(?:brevet(?:\\s+des\\s+coll[èe]ges)?|dnb)(?![\\p{L}\\p{M}])",
-          "3": "(?<![\\p{L}\\p{M}])(?:baccalaur[ée]at(?:\\s+(?:g[ée]n[ée]ral|technologique|professionnel|s|es|l|stmg|sti2d))?|bac(?!\\s*\\+)(?:\\s+(?:g[ée]n[ée]ral|technologique|pro(?:fessionnel)?|s|es|l|stmg|sti2d))?|cap|bep)(?![\\p{L}\\p{M}])",
+          "3": "(?<![\\p{L}\\p{M}])(?:baccalaur[ée]at(?!\\s+en\\s+\\p{L})(?:\\s+(?:g[ée]n[ée]ral|technologique|professionnel|s|es|l|stmg|sti2d))?|bac(?!\\s*\\+|\\s+en\\s+\\p{L})(?:\\s+(?:g[ée]n[ée]ral|technologique|pro(?:fessionnel)?|s|es|l|stmg|sti2d))?|cap|bep)(?![\\p{L}\\p{M}])",
           "5": "(?<![\\p{L}\\p{M}])(?:bts|dut|deug|bac\\s*\\+\\s*2)(?![\\p{L}\\p{M}])",
           "6": "(?<![\\p{L}\\p{M}])(?:b\\.u\\.t\\.|but\\s+(?:informatique|gea|tc|mmi|geii|gmp|r&t|rt|qlio|chimie|g[ée]nie\\s+\\p{L}+|techniques\\s+de\\s+commercialisation|gestion\\s+des\\s+entreprises)|bac\\s*\\+\\s*3)(?![\\p{L}\\p{M}])",
           "7": "(?<![\\p{L}\\p{M}])(?:bac\\s*\\+\\s*5|dea|dess|grande\\s+[ée]cole)(?![\\p{L}\\p{M}])",

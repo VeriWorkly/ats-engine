@@ -296,13 +296,19 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
       turc: "turkish",
     },
   },
-  // How any French-speaking posting asks for a degree.
+  // How any French-speaking posting asks for a degree. "Bac+N" is the `FR` region's too (an
+  // English resume from France writes it), and here for a French posting read under another
+  // region. A baccalauréat named for its field is Québec's bachelor's ("baccalauréat en
+  // informatique"); France names its baccalauréat for a stream.
   degrees: {
-    "6": word(String.raw`licence(?:\s+professionnelle)?`),
-    "7": word(
-      String.raw`dipl[ôo]me\s+d['’]ing${e}nieur|ing${e}nieur\s+dipl[ôo]m${e}|mast[eè]re(?:\s+sp${e}cialis${e})?`,
+    "5": word(String.raw`bac\s*\+\s*2`),
+    "6": word(
+      String.raw`licence(?:\s+professionnelle)?|bac(?:calaur[ée]at)?\s+en\s+\p{L}+|bac\s*\+\s*3`,
     ),
-    "8": word(String.raw`doctorat|th[eè]se\s+de\s+doctorat`),
+    "7": word(
+      String.raw`dipl[ôo]me\s+d['’]ing${e}nieur|ing${e}nieur\s+dipl[ôo]m${e}|mast[eè]re(?:\s+sp${e}cialis${e})?|bac\s*\+\s*5`,
+    ),
+    "8": word(String.raw`doctorat|th[eè]se\s+de\s+doctorat|bac\s*\+\s*8`),
   },
   alternationWords: ["ou"],
   stopwords: [

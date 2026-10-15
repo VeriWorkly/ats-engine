@@ -416,8 +416,16 @@ describe("French credentials, by name and by years after the baccalauréat", () 
     ["Bac+5, École de commerce", 7],
     ["Master 2 Informatique", 7],
     ["Doctorat en physique", 8],
+    // Québec's bachelor's, named for its field; France names its baccalauréat for a stream.
+    ["Baccalauréat en informatique, Université Laval", 6],
+    ["Bac en génie logiciel", 6],
   ])("reads %j at level %i", (line, level) => {
     expect(isced(line, FR_POLICY)).toBe(level);
+  });
+
+  it("reads the years after the baccalauréat wherever French is read", () => {
+    expect(isced("Bac+5 en informatique ou équivalent", localized(["fr"], "US"))).toBe(7);
+    expect(isced("Baccalauréat en informatique", localized(["fr"], "US"))).toBe(6);
   });
 
   it('keeps the national ones to France, and an English "but" out of them', () => {
