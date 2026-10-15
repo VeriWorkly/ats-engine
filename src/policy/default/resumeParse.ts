@@ -150,11 +150,11 @@ export const DEFAULT_RESUME_PARSE = {
   // diploma or certificate, so its pattern steps around the school ones, which would otherwise
   // be recorded at the higher level.
   degrees: {
-    "3": String.raw`(?:\b|^)((?:high\s+school(?!\s*\(\s*class\s+(?:x|10)(?:th)?(?![a-z]))|secondary\s+school(?!\s+certificate))(?:\s+(?:diploma|certificate))?|g\.?e\.?d\.?|a[\s-]levels?)(?![a-z])`,
-    "4": String.raw`(?:\b|^)((?<!(?:high|secondary)\s+school\s+)diploma|(?:graduate\s+)?certificate\s+(?:in|of)\b)(?![a-z])`,
-    "5": String.raw`(?:\b|^)(associate(?:'?s)?\s+(?:degree|of\s+[a-z]+)|a\.a\.s?\.?|(?<!,\s*)aas?(?=\s+(?:in|of)\b))(?![a-z])`,
-    "6": String.raw`(?:\b|^)(bachelor(?:'?s)?(?:\s+of\s+[a-z]+)?|b\.s\.c?\.?|b\.?sc\.?|b\.a\.|b\.?eng\.?|b\.?tech\.?|b\.?b\.?a\.?|b\.?f\.?a\.?|b\.\s?ed\.?|ll\.?b\.?|b[as])(?![a-z])`,
-    "7": String.raw`(?:\b|^)(${JD_DEGREE}|juris\s+doctor|m\.\s?d\.|m\.\s?ed\.?|m\.f\.a\.|ll\.m\.?|${LLM_DEGREE}|(?<!scrum\s)master(?!\s+data(?![a-z]))(?:'?s)?(?:\s+of\s+[a-z]+)?|m\.s\.c?\.?|m\.?sc\.?|m\.a\.|m\.?eng\.?|m\.?b\.?a\.?|m\.?tech\.?|(?<=,\s*)m[as](?=${SUBJECT_AFTER})(?!${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER})|(?<!,\s*|\d\s?)m[as](?!-|\.\s+\p{L}|${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER}))(?![a-z])`,
-    "8": String.raw`(?:\b|^)(doctorate|ph\.?d\.?|d\.?phil\.?)(?![a-z])`,
+    "3": String.raw`(?:\b|^)((?:high\s+school(?!\s*\(\s*class\s+(?:x|10)(?:th)?(?![a-z]))|secondary\s+school(?!\s+certificate))(?:\s+(?:diploma|certificate))?|g\.?e\.?d\.?|a[\s-]levels?)(?![\p{L}\p{M}])`,
+    "4": String.raw`(?:\b|^)((?<!(?:high|secondary)\s+school\s+)diploma|(?:graduate\s+)?certificate\s+(?:in|of)\b)(?![\p{L}\p{M}])`,
+    "5": String.raw`(?:\b|^)(associate(?:'?s)?\s+(?:degree|of\s+[a-z]+)|a\.a\.s?\.?|(?<!,\s*)aas?(?=\s+(?:in|of)\b))(?![\p{L}\p{M}])`,
+    "6": String.raw`(?:\b|^)(bachelor(?:'?s)?(?:\s+of\s+[a-z]+)?|b\.s\.c?\.?|b\.?sc\.?|b\.a\.|b\.?eng\.?|b\.?tech\.?|b\.?b\.?a\.?|b\.?f\.?a\.?|b\.\s?ed\.?|ll\.?b\.?|b[as])(?![\p{L}\p{M}])`,
+    "7": String.raw`(?:\b|^)(${JD_DEGREE}|juris\s+doctor|m\.\s?d\.|m\.\s?ed\.?|m\.f\.a\.|ll\.m\.?|${LLM_DEGREE}|(?<!scrum\s)master(?!\s+data(?![a-z]))(?:'?s)?(?:\s+of\s+[a-z]+)?|m\.s\.c?\.?|m\.?sc\.?|m\.a\.|m\.?eng\.?|m\.?b\.?a\.?|m\.?tech\.?|(?<=,\s*)m[as](?=${SUBJECT_AFTER})(?!${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER})|(?<!,\s*|\d\s?)m[as](?!-|\.\s+\p{L}|${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER}))(?![\p{L}\p{M}])`,
+    "8": String.raw`(?:\b|^)(doctorate|ph\.?d\.?|d\.?phil\.?)(?![\p{L}\p{M}])`,
   },
 };

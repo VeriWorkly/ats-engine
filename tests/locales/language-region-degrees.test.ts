@@ -449,6 +449,21 @@ describe("a French posting's requirements", () => {
     ]);
     expect(report.missingKeywords).not.toContain("restaurant");
   });
+
+  // "ma" before an accented letter is a word's start, not a master's: the degree patterns ended
+  // only before an ASCII letter, so "Maîtrise de React" asked for a master's degree.
+  it("reads a skill a line asks a mastery of, not a degree", () => {
+    const { requirements, missingKeywords } = AtsScoringService.check(DE_RESUME, P, {
+      jobDescription: [
+        "Profil recherché",
+        "- Maîtrise de React et Node.js",
+        "- 3 à 5 ans d'expérience en Java",
+      ].join("\n"),
+      now: NOW,
+    });
+    expect(requirements.map(({ kind }) => kind)).toEqual(["skills", "experience"]);
+    expect(missingKeywords.join(" ")).not.toContain("îtrise");
+  });
 });
 
 describe("an inflected German adjective before a bare language name", () => {
