@@ -283,6 +283,10 @@ describe("redaction variants", () => {
     "Raised 1.200.000 in 2019-2020-2021",
     "Case 123-45-6789, filed 2019.05.12",
     "Served 415-555 users",
+    // Dates in brackets, with a note after them, and listed.
+    "Engineer (01/2020 - 12/2023)",
+    "01/2020 - 12/2023 (3 yrs)",
+    "09/2019 - 06/2021 / 07/2021 - 12/2023",
   ])("leaves figures that are not phones alone: %s", (text) => {
     const redaction = createRedaction(parsed("Jane Doe", ""), text);
     expect(redaction.apply(text)).toBe(text);

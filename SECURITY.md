@@ -103,7 +103,9 @@ What does not depend on the model:
   extension after it. Any other run of 9 or more digits on one line that opens with `+` or a trunk
   `0` (`07912 345678`, `(02) 9876 5432`; two such numbers together are one placeholder), whether
   the parser read it or not, so a local number is replaced under a policy without its country's
-  region too; a date or a range of two (`01/2020 - 12/2023`, `06/15/2019 – 08/30/2021`) is not. A North American number written as one, a second one
+  region too; dates are not: one, a range or a list of ranges, in brackets or with a short note
+  after them (`01/2020 - 12/2023`, `06/15/2019 – 08/30/2021`, `(01/2020 - 12/2023)`,
+  `01/2020 - 12/2023 (3 yrs)`, `09/2019 - 06/2021 / 07/2021 - 12/2023`). A North American number written as one, a second one
   included (`Home: (415) 555-0199`, `415-555-0199`, `415.555.0199`). Not other phone numbers: one
   with none of these shapes, such as India's `98765 43210` or `415 555 0199` spaced, is sent
   unless the parser read it (the region pack reads India's). Postal

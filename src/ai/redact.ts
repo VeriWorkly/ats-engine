@@ -69,12 +69,29 @@ const OTHER_PHONES =
   /(?<![\p{L}\p{N}+_@#=/.,-])(?:(?:\+|(?=\(?0))\(?\d(?:[ \t().\-/‐‑‒–—]{0,3}\d){8,29}|(?:1[-. ])?(?:\(\d{3}\)[ \t]?\d{3}[-. \t]|\d{3}([-.])\d{3}\1)\d{4})(?!\p{N}|[./-]\d)/gu;
 
 /**
- * A match that is wholly a date or a range of two: a month and its year, or a day too ("01/2020",
- * "05.2019", "06/15/2019 – 08/30/2021"). Wholly, so a number with a year-like group ("+31 6 2012
- * 3456") is still a number.
+ * A month and its year, or a day too ("01/2020", "05.2019", "06/15/2019"), after the dash or
+ * slash that joins it to the date before it ("01/2020 - 12/2023", "… / 07/2021 - …").
  */
-const DATE = String.raw`\d{1,2}(?:[./-]\d{1,2})?[ \t]*[./\-–—]?[ \t]*(?:19|20)\d\d`;
-const DATES = new RegExp(String.raw`^${DATE}(?:[ \t]*[-–—][ \t]*${DATE})?$`, "u");
+const DATE = new RegExp(
+  String.raw`(?:[ \t]*[-–—/][ \t]*)?\d{1,2}(?:[./-]\d{1,2})?[ \t]*[./\-–—]?[ \t]*(?:19|20)\d\d`,
+  "uy",
+);
+
+/**
+ * Whether a match is only dates: one or a list of them, in brackets or not, with at most a one-
+ * or two-digit figure after them ("01/2020 - 12/2023 (3 yrs)"). Wholly, so a number with a
+ * year-like group ("+31 6 2012 3456", "06 1987 6543") is still a number. Each date is read where
+ * the last one ended, so this is linear in the match.
+ */
+function onlyDates(match: string): boolean {
+  let at = match.startsWith("(") ? 1 : 0;
+  let dates = 0;
+  for (DATE.lastIndex = at; DATE.test(match); DATE.lastIndex = at) {
+    dates += 1;
+    at = DATE.lastIndex;
+  }
+  return dates > 0 && /^(?:[ \t().\-/‐‑‒–—]{1,3}\d{1,2})?$/.test(match.slice(at));
+}
 
 /**
  * The digits that may name the line wherever it is dialled from (its national number), longest
@@ -227,7 +244,7 @@ export function createRedaction(
   const others = new Map<string, string>();
   const phones = new Map<string, string>();
   const other = (phone: string) => {
-    if (DATES.test(phone)) return phone;
+    if (onlyDates(phone)) return phone;
     if (!others.has(phone)) {
       others.set(phone, `[PHONE_${others.size + 1}]`);
       phones.set(others.get(phone)!, phone);
