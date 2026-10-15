@@ -47,6 +47,10 @@ report.locale; // { languages: ["de"], region: "DE" }
   it. The region is not _inferred_ from such a number, because nearly any 10-digit run is a
   valid German or Indian number.
 
+  A region is matched by the one country its `phoneCountry` names. A +44 number the phone
+  metadata places in Guernsey, Jersey or the Isle of Man ("+44 7911 123456" reads as Guernsey)
+  names no attached region, so such a resume is read in `GB` only when asked for.
+
 - Pass `languages` or `region` to `check` to override detection. A host that knows the user's
   country should pass it.
 
