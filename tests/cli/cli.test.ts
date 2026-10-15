@@ -239,6 +239,8 @@ describe("ats-engine check --job-url", () => {
     expect(calls[0]!.url).toBe(`https://api.eu.lever.co/v0/postings/fernbrook/${LEVER_JOB_ID}`);
     const report = JSON.parse(out.join("\n"));
     expect(report.missingKeywords).toEqual(expect.arrayContaining(["airflow", "dbt"]));
+    // Lever names no employer; the board's name in the link stands for it.
+    expect(report.missingKeywords.join(" ")).not.toMatch(/fernbrook/i);
     expect(atsNotes(report, "lever.")).toBe(true);
   });
 
@@ -251,8 +253,8 @@ describe("ats-engine check --job-url", () => {
     expect(calls[0]!.url).toBe("https://api.ashbyhq.com/posting-api/job-board/fernbrook");
     const report = JSON.parse(out.join("\n"));
     expect(report.missingKeywords).toEqual(expect.arrayContaining(["pytorch", "spark"]));
-    // The board's other job is not read.
-    expect(report.missingKeywords.join(" ")).not.toMatch(/vendor/);
+    // The board's other job is not read, and the board's name is not a keyword.
+    expect(report.missingKeywords.join(" ")).not.toMatch(/vendor|fernbrook/i);
     expect(atsNotes(report, "")).toBe(false);
   });
 
@@ -261,6 +263,16 @@ describe("ats-engine check --job-url", () => {
     const url = `https://jobs.ashbyhq.com/fernbrook/${ASHBY_JOB_ID.toUpperCase()}`;
     expect(await main(["check", file("ashby3.txt", RESUME), "--job-url", url], context)).toBe(0);
     expect(out.join("\n")).toContain("pytorch");
+  });
+
+  // What a company's careers page and Greenhouse's "Apply" frame link to.
+  it("reads a Greenhouse embed link, which names the board and the job in its query", async () => {
+    const { calls, context } = board(() => json(GREENHOUSE_JOB));
+    const url = `https://job-boards.greenhouse.io/embed/job_app?for=fernbrook&token=${GREENHOUSE_JOB_ID}`;
+    expect(await main(["check", file("gh4.txt", RESUME), "--job-url", url], context)).toBe(0);
+    expect(calls[0]!.url).toBe(
+      `https://boards-api.greenhouse.io/v1/boards/fernbrook/jobs/${GREENHOUSE_JOB_ID}`,
+    );
   });
 
   it("keeps the --ats given over the board's", async () => {
@@ -283,9 +295,13 @@ describe("ats-engine check --job-url", () => {
       /save the page/i,
     ],
     [`https://fernbrook.example/careers?gh_jid=${GREENHOUSE_JOB_ID}`, /save the page/i],
-    // Greenhouse's embed names the board only in the query.
-    ["https://boards.greenhouse.io/embed/job_app?for=fernbrook&token=1", /not a job posting/],
-    ["https://boards.greenhouse.io/fernbrook", /not a job posting/],
+    ["https://boards.greenhouse.io/embed/job_app?for=fernbrook", /not a job posting/],
+    ["https://boards.greenhouse.io/fernbrook", /not a job posting.*save the page/i],
+    // Greenhouse's EU boards answer on no public API.
+    [
+      `https://job-boards.eu.greenhouse.io/fernbrook/jobs/${GREENHOUSE_JOB_ID}`,
+      /EU boards .*save the page/i,
+    ],
     [`https://jobs.lever.co/fern%2F..%2Fx/${LEVER_JOB_ID}`, /not a job posting/],
     ["https://jobs.lever.co/fernbrook/not-an-id", /not a job posting/],
     [`https://jobs.ashbyhq.com/fernbrook/${ASHBY_JOB_ID}/../../x`, /not a job posting/],
@@ -361,7 +377,7 @@ describe("ats-engine check --job-url", () => {
     const { context } = board(endless);
     const argv = ["check", file("big.txt", RESUME), "--job-url", LEVER_URL];
     expect(await main(argv, context)).toBe(1);
-    expect(err.join("\n")).toMatch(/over 20 MB/);
+    expect(err.join("\n")).toMatch(/over 20 MB.*save the page/i);
     expect(pulled).toBeLessThan(30);
   });
 });

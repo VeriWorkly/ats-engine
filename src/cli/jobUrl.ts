@@ -59,10 +59,19 @@ const BOARDS: readonly Board[] = Object.freeze<Board[]>([
       "boards.greenhouse.io": "boards-api.greenhouse.io",
       "job-boards.greenhouse.io": "boards-api.greenhouse.io",
     },
-    // `/{board}/jobs/{id}`, or `/{board}?gh_jid={id}`. A `gh_jid` on any other path (a company's
-    // own careers page, Greenhouse's embed) does not say which board the job is on.
-    locate([board, jobs, job, ...rest], query) {
-      const id = jobs === undefined ? query.get("gh_jid") : jobs === "jobs" && !rest.length && job;
+    // `/{board}/jobs/{id}`, `/{board}?gh_jid={id}`, or the embed a careers page frames,
+    // `/embed/job_app?for={board}&token={id}`. A `gh_jid` on a company's own careers page does
+    // not say which board the job is on.
+    locate(path, query) {
+      const [board, id] =
+        path.join("/") === "embed/job_app"
+          ? [query.get("for"), query.get("token")]
+          : [
+              path[0],
+              path[1] === undefined
+                ? query.get("gh_jid")
+                : path[1] === "jobs" && path.length === 3 && path[2],
+            ];
       return board && NAME.test(board) && id && NUMBER.test(id) ? [board, id] : null;
     },
     api: (host, board, job) => `https://${host}/v1/boards/${board}/jobs/${job}`,
@@ -135,6 +144,7 @@ const BOARDS: readonly Board[] = Object.freeze<Board[]>([
 ]);
 
 const NAMES = "Greenhouse, Lever or Ashby";
+const SAVE = "Save the page and pass it with --job.";
 const label = (board: Board) => board.ats[0]!.toUpperCase() + board.ats.slice(1);
 const notFound = (board: Board) =>
   new JobUrlError(
@@ -145,7 +155,13 @@ const notFound = (board: Board) =>
 const TIMEOUT_MS = 20_000;
 
 /** Where a posting URL's job is asked for, or a UsageError saying why it is not one. */
-export function locateJob(address: string): { board: Board; api: string; job: string } {
+export function locateJob(address: string): {
+  board: Board;
+  api: string;
+  job: string;
+  /** The board's name in the link: the company's, on every board seen. */
+  name: string;
+} {
   let url: URL;
   try {
     url = new URL(address);
@@ -157,7 +173,9 @@ export function locateJob(address: string): { board: Board; api: string; job: st
   const board = BOARDS.find((entry) => Object.hasOwn(entry.hosts, url.hostname));
   if (!board)
     throw new UsageError(
-      `--job-url reads ${NAMES} job postings only, not ${url.hostname}. Save the page and pass it with --job.`,
+      url.hostname.endsWith(".greenhouse.io")
+        ? `--job-url reads Greenhouse's US boards only: its EU boards (${url.hostname}) have no public API. ${SAVE}`
+        : `--job-url reads ${NAMES} job postings only, not ${url.hostname}. ${SAVE}`,
     );
   // Each segment decoded, so an encoded "/" or "." is checked as what it stands for.
   let path: string[];
@@ -169,7 +187,7 @@ export function locateJob(address: string): { board: Board; api: string; job: st
   const found = board.locate(path, url.searchParams);
   if (!found)
     throw new UsageError(
-      `--job-url ${url.origin}${url.pathname} is not a job posting's address on ${label(board)}.`,
+      `--job-url ${url.origin}${url.pathname} is not a job posting's address on ${label(board)}. ${SAVE}`,
     );
   const [name, job] = found;
   const api = board.api(
@@ -177,12 +195,12 @@ export function locateJob(address: string): { board: Board; api: string; job: st
     encodeURIComponent(name),
     encodeURIComponent(job),
   );
-  return { board, api, job };
+  return { board, api, job, name };
 }
 
 /** The posting at a located address, as `readJobFile` gives a saved page. */
 export async function fetchJob(
-  { board, api, job }: ReturnType<typeof locateJob>,
+  { board, api, job, name }: ReturnType<typeof locateJob>,
   fetchImpl: FetchJob = globalThis.fetch,
 ): Promise<AtsJobFile> {
   const host = new URL(api).host;
@@ -232,7 +250,9 @@ export async function fetchJob(
     .map((html) => jobHtmlToText(html, Number.POSITIVE_INFINITY))
     .filter(Boolean);
   const jobText = normalizeJobText([posting.title, ...description].join("\n"));
-  return posting.company ? { text: jobText, company: posting.company } : { text: jobText };
+  // Lever and Ashby name no employer; the board's name ("palantir", "acme-corp") stands for it,
+  // so the employer is not a keyword the resume is told to add.
+  return { text: jobText, company: posting.company || name.replace(/[-_.]+/g, " ") };
 }
 
 /**
@@ -252,7 +272,7 @@ async function readCapped(response: Response, host: string): Promise<string> {
     if (bytes > MAX_FILE_BYTES) {
       await reader.cancel();
       throw new JobUrlError(
-        `${host} answered with over ${MAX_FILE_BYTES / 1024 / 1024} MB, which is not read.`,
+        `${host} answered with over ${MAX_FILE_BYTES / 1024 / 1024} MB, which is not read. ${SAVE}`,
       );
     }
     chunks.push(value);

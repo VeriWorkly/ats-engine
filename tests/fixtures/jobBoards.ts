@@ -48,7 +48,7 @@ export const LEVER_JOB = {
   lists: [
     {
       text: "What you bring",
-      content: "<li>Airflow and dbt in production</li><li>Strong SQL and Python</li>",
+      content: "<li>Airflow and dbt in production at Fernbrook</li><li>Strong SQL and Python</li>",
     },
   ],
   additional: "<div>We work from Lisbon three days a week.</div>",
@@ -84,9 +84,10 @@ export const ASHBY_BOARD = {
       isListed: true,
       isRemote: true,
       jobUrl: `https://jobs.ashbyhq.com/fernbrook/${ASHBY_JOB_ID}`,
+      // Ashby wraps each item's text in a paragraph.
       descriptionHtml:
-        "<p>Train the demand models.</p><ul><li>PyTorch and Spark</li><li>Model monitoring</li></ul>",
-      descriptionPlain: "Train the demand models.\nPyTorch and Spark\nModel monitoring",
+        "<p>Train Fernbrook's demand models.</p><ul><li><p>PyTorch and Spark</p></li><li><p>Model monitoring</p></li></ul>",
+      descriptionPlain: "Train Fernbrook's demand models.\nPyTorch and Spark\nModel monitoring",
     },
   ],
 };
