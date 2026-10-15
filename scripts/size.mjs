@@ -56,7 +56,9 @@ const BUDGETS = {
   // 72.2: a loop refused at once and the localised policy frozen (see "./locales"), to 72.11.
   // 72.4: redacting a phone the parser did not read (a local number, a second North American
   // one) and a two-character Chinese or Korean name took it to 72.36.
-  "./ai": 72.4,
+  // 72.5: dates read one by one, so a bracketed or listed range is not taken for a phone, took it
+  // to 72.42.
+  "./ai": 72.5,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
   "./ai/testing": 1.5,
