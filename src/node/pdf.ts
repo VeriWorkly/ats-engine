@@ -21,14 +21,6 @@ const MAX_VISIBILITY_PAGES = 60;
  * 5 000 of them cost 11 seconds from a few hundred kilobytes.
  */
 const MAX_PAGES_READ = 100;
-/**
- * Pixels an image may have and still be read. pdf.js decodes every image in full, about 12 bytes
- * a pixel, and goes on decoding after the document is closed: a 144 MP image of zeros, 420 KB of
- * file, took the process to 1.8 GB. A phone's largest photo (48 MP) and a 600 dpi page scan
- * (35 MP) fit. shortcut: a larger image is left out unseen, not counted as a photo or a scan;
- * count it from the PDF's own image dictionaries if a real resume ever carries one.
- */
-const MAX_IMAGE_PIXELS = 50_000_000;
 /** Fewer text characters than this on a page with an image, and the page is a picture. */
 const MIN_PAGE_TEXT = 20;
 /**
@@ -60,8 +52,9 @@ type PdfGeometry = Omit<AtsLayoutSignals, "tableCount">;
  * A PDF's text and page geometry, in one pdf.js pass.
  *
  * The text is assembled here (`pageText`), in reading order, rather than by pdf-parse. Reading
- * stops once the text passes `maxChars`, or after `MAX_PAGES_READ` pages, so a thousand-page
- * upload costs what a resume does.
+ * stops once the text passes `maxChars`, or after `MAX_PAGES_READ` pages, so a thousand pages of
+ * text cost what a resume does. Not a thousand pages of images: each page read waits for its own
+ * images to decode, in full, before the next (`seeThroughImages`).
  * Every page whose text is read is measured too — its columns, and what of its text a reader
  * cannot see — so hidden text cannot sit past the pages that are checked. A link whose visible
  * text is "LinkedIn" is read for its target, which follows the text when the text lacks it.
@@ -79,7 +72,6 @@ async function readPdf(
     .getDocument({
       data,
       isEvalSupported: false,
-      maxImageSize: MAX_IMAGE_PIXELS,
       standardFontDataUrl: standardFontsDirectory(),
       verbosity: 0,
     })

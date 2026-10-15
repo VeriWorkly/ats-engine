@@ -33,13 +33,14 @@ nested deeper than 5 000 levels (or one that contains itself) is refused as inva
 `AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
 64 MB and hold at most 2 MB of the XML `mammoth` parses and 2 MB of page headers and footers (a
 part past that is neither read nor measured), and PDF text reading stops at the cap or
-after the first 100 pages, whichever comes first (the page count still counts every page). A PDF
-image past 50 megapixels is neither decoded nor counted (a phone's 48 MP photo and a 600 dpi page
-scan are under it): pdf.js decodes every image in full, about 12 bytes a pixel, and a 420 KB file
-held 1.8 GB. The table pass decodes no image, and each page waits for its own images before the
-next is read, so none is still decoding after the file has been read; a page with many large
-images still costs them all at once (twenty 12 MP images, 1.5 GB), which the child process below
-bounds. A file name is read to its first 255 characters. The CLI and the MCP server read only a
+after the first 100 pages, whichever comes first (the page count still counts every page). PDF
+images have no size cap: pdf.js decodes every image in full, about 12 bytes a pixel, whatever
+its size, and a 420 KB file with one 144 MP image held 1.8 GB. The table pass decodes no image,
+and each page waits (up to 2 s an image) for its own images before the next is read, so they do
+not pile up page after page. Some still decode after the file has been read: images in tiling
+patterns and in Type3 glyphs, soft masks of any size, and a page's images that take over 2 s;
+and a page with many large images decodes them all at once (twenty 12 MP images, 1.5 GB). A file
+name is read to its first 255 characters. The CLI and the MCP server read only a
 regular file on this computer: a file over 20 MB is refused before it is opened, and is read through one handle
 no further than one byte past the limit, so a file that grows meanwhile is refused too; a folder, a
 pipe or a device (which reports no size and can stream without end) is refused before it is opened,
@@ -64,7 +65,13 @@ warnings takes seconds to minutes, and a file of 1.4 KB held it for two minutes.
 file carries is not applied. What passes still costs `mammoth` up to about a second a megabyte of
 XML. PDF parsing (pdf.js) and DOCX parsing (`mammoth`) are CPU-bound: run `/node` extraction in the
 forkable `/node/child` process with a timeout and a memory limit, so a pathological file costs a
-killed process, not a worker.
+killed process, not a worker. Cap the child's memory in the operating system (a cgroup,
+`ulimit -v`, a Windows Job object): decoded images live outside the V8 heap, so
+`--max-old-space-size` does not bound them (a child under `--max-old-space-size=256` reached
+5.6 GB). Set the timeout for the images too: waiting for each page's images before the next keeps
+memory to a page at a time, and costs time instead, 60 pages with a 49 MP image each take
+31 to 34 s, where without the wait the call returned in under half a second and left them
+decoding.
 
 **Advice inputs.** The `file` option and the file name are read only for `report.advice`, never
 for the score. The name is quoted back in the advice's `evidence` as given, so a host that shows

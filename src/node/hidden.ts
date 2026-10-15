@@ -176,7 +176,8 @@ export type PageObjects = { objs: ObjectStore; commonObjs: ObjectStore };
  * It waits for the page's other images too. pdf.js decodes every image whether or not anyone
  * asks, and a page closed before its images are decoded leaves them decoding behind it: six
  * pages with a 48 MP photo each held 1.4 GB after the document had been read, one page's worth
- * at a time once each page waits for its own.
+ * at a time once each page waits for its own. Not every image: one in a tiling pattern or a
+ * Type3 glyph, a soft mask, and one that takes over `waitMs` still decode after the page.
  */
 export async function seeThroughImages(
   ops: Ops,

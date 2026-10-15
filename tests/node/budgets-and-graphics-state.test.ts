@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { deflateRawSync, deflateSync } from "node:zlib";
+import { deflateRawSync } from "node:zlib";
 
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { afterAll, describe, expect, it, vi } from "vitest";
@@ -272,34 +272,6 @@ describe("PDF reading stops at a page cap", () => {
     expect(text).toContain("Jane Doe Senior Engineer");
     expect(layout?.pageCount).toBe(5_000);
   }, 60_000);
-});
-
-describe("PDF images past 50 megapixels are not decoded", () => {
-  // pdf.js decodes every image in full, and goes on after the document is closed: a 144 MP image
-  // of zeros (420 KB of file) took the reading process to 1.8 GB a few seconds after it returned.
-  // A phone's largest photo (48 MP) and a 600 dpi page scan (35 MP) stay under the cap.
-  const image = (width: number, height: number) =>
-    buildPdf(
-      `${line(700, "Jane Doe Senior Engineer at Acme")}\nq 100 0 0 120 450 600 cm /Im1 Do Q`,
-      "/XObject<</Im1 7 0 R>>",
-      "",
-      [
-        stream(
-          `/Type/XObject/Subtype/Image/Width ${width}/Height ${height}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/FlateDecode`,
-          deflateSync(Buffer.alloc(width * height * 3)).toString("latin1"),
-        ),
-      ],
-    );
-
-  it("leaves out an image past the cap, and still reads the page", async () => {
-    const { text, layout } = await extractResume(image(8_000, 6_400), "pdf");
-    expect(text).toContain("Jane Doe Senior Engineer");
-    expect(layout?.imageCount).toBe(0);
-  }, 60_000);
-
-  it("still counts a photo under it", async () => {
-    expect((await extractResume(image(400, 480), "pdf")).layout?.imageCount).toBe(1);
-  });
 });
 
 describe("DOCX headers and footers share one budget", () => {
