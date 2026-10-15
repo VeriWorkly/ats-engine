@@ -320,8 +320,8 @@ import { createAtsAi } from "@veriworkly/ats-engine/ai";
 import { anthropic } from "@veriworkly/ats-engine/ai/anthropic";
 import { BUILT_IN_LOCALES, withLocales } from "@veriworkly/ats-engine/locales";
 
-// With the locale packs the parser reads a local phone number ("07912 345678"), which redaction
-// then replaces with the rest of the contact details.
+// With the locale packs the parser reads a phone that opens with neither "+" nor "0", such as
+// India's "98765 43210" (the IN pack), which redaction then replaces with the other contact details.
 const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 const ai = createAtsAi({
   provider: anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! }),
