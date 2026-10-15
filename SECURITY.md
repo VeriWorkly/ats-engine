@@ -33,9 +33,14 @@ nested deeper than 5 000 levels (or one that contains itself) is refused as inva
 `AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
 64 MB and hold at most 2 MB of the XML `mammoth` parses and 2 MB of page headers and footers (a
 part past that is neither read nor measured), and PDF text reading stops at the cap or
-after the first 100 pages, whichever comes first (the page count still counts every page). A
-file name is read to its first 255 characters. The CLI and the MCP server read only a regular file
-on this computer: a file over 20 MB is refused before it is opened, and is read through one handle
+after the first 100 pages, whichever comes first (the page count still counts every page). A PDF
+image past 50 megapixels is neither decoded nor counted (a phone's 48 MP photo and a 600 dpi page
+scan are under it): pdf.js decodes every image in full, about 12 bytes a pixel, and a 420 KB file
+held 1.8 GB. The table pass decodes no image, and each page waits for its own images before the
+next is read, so none is still decoding after the file has been read; a page with many large
+images still costs them all at once (twenty 12 MP images, 1.5 GB), which the child process below
+bounds. A file name is read to its first 255 characters. The CLI and the MCP server read only a
+regular file on this computer: a file over 20 MB is refused before it is opened, and is read through one handle
 no further than one byte past the limit, so a file that grows meanwhile is refused too; a folder, a
 pipe or a device (which reports no size and can stream without end) is refused before it is opened,
 and so is a network path (`\\host\share\…`, `//host/share/…`, `\\?\UNC\…`) or a device path
@@ -44,8 +49,8 @@ Only the path's form is checked: a mapped drive letter, a `subst` drive, a link 
 share, or an SMB or NFS mount looks local and is read over the network. A job posting is read only
 from a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file, before it is opened: its words come back as
 missing keywords, so any other file (a credentials file, a key) would be echoed to whoever named
-it. A JSON file that does not parse is refused with its line and column, without the parser's message, which quotes it. The MCP server refuses
-pasted text over 200 000 characters. A host should still bound request bodies.
+it. A JSON file that does not parse is refused with its line and column, without the parser's
+message, which quotes it. The MCP server refuses pasted text over 200 000 characters. A host should still bound request bodies.
 
 **Crashes.** Words from the input are never used as plain-object keys, JSON-LD is read to a fixed
 depth, and malformed PDF or DOCX structure degrades to "not measured" rather than throwing past the

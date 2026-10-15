@@ -21,6 +21,14 @@ const MAX_VISIBILITY_PAGES = 60;
  * 5 000 of them cost 11 seconds from a few hundred kilobytes.
  */
 const MAX_PAGES_READ = 100;
+/**
+ * Pixels an image may have and still be read. pdf.js decodes every image in full, about 12 bytes
+ * a pixel, and goes on decoding after the document is closed: a 144 MP image of zeros, 420 KB of
+ * file, took the process to 1.8 GB. A phone's largest photo (48 MP) and a 600 dpi page scan
+ * (35 MP) fit. shortcut: a larger image is left out unseen, not counted as a photo or a scan;
+ * count it from the PDF's own image dictionaries if a real resume ever carries one.
+ */
+const MAX_IMAGE_PIXELS = 50_000_000;
 /** Fewer text characters than this on a page with an image, and the page is a picture. */
 const MIN_PAGE_TEXT = 20;
 /**
@@ -71,6 +79,7 @@ async function readPdf(
     .getDocument({
       data,
       isEvalSupported: false,
+      maxImageSize: MAX_IMAGE_PIXELS,
       standardFontDataUrl: standardFontsDirectory(),
       verbosity: 0,
     })
@@ -225,7 +234,8 @@ export async function extractPdf(
   // Ruled tables are counted twice and the larger count kept: from the rules the page draws,
   // stroked or filled (a browser prints a CSS border as a thin filled rectangle), and by
   // pdf-parse, which reads stroked rules only but joins them its own way.
-  const parser = new PDFParse({ data: new Uint8Array(data), verbosity: 0 });
+  // No image at all: the tables are rules, and pdf.js would decode every image in full anyway.
+  const parser = new PDFParse({ data: new Uint8Array(data), maxImageSize: 0, verbosity: 0 });
 
   try {
     let tableCount = drawn;

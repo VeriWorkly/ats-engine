@@ -1,8 +1,10 @@
 ---
-"@veriworkly/ats-engine": patch
+"@veriworkly/ats-engine": minor
 ---
 
 Tighter limits on what a file or a resume can cost, and on what the AI analysis sends. Scores and recovered fields are the same for every resume a person would upload.
+
+- **Breaking:** a PDF image past 50 megapixels is no longer decoded or counted, so a file carrying one no longer reports it as a photo or a scanned page (`layout.imageCount`, `layout.imageOnlyPages`), and its score can change. A phone's largest photo (48 MP) and a 600 dpi page scan (35 MP) are under the cap. pdf.js decodes every image in full and goes on after the file has been read: a 420 KB file with one 144 MP image took the process to 1.8 GB, now under 100 MB. The table pass now decodes no image, and each page waits for its own images before the next is read: six pages with a 48 MP photo each went from 2.3 GB to under 0.5 GB, and nothing is left decoding after `extractResume` returns.
 
 - **`readJobFile` reads a posting only from a `.txt`, `.md`, `.html` (`.htm`), `.pdf` or `.docx` file**, and refuses any other with `AtsFileError` before opening it, as `readResumeFile` refuses an unknown resume type. A posting's words come back as missing keywords, so a credentials file or a key named as the posting (`ats-engine check --job`, the MCP server's `job_path`) was echoed back. A JSON file that does not parse is refused as "not valid JSON", with the line and column but without the parser's message, which quoted the file's text.
 - **PDF reading stops after the first 100 pages** as well as at the character cap: 5,000 empty pages held extraction for 11 seconds and 50,000 for nine minutes; they now take about half a second and two and a half. `pageCount` still counts every page.
