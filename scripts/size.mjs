@@ -63,7 +63,8 @@ const BUDGETS = {
   // one) and a two-character Chinese or Korean name took it to 72.36.
   // 72.5: dates read one by one, so a bracketed or listed range is not taken for a phone, took it
   // to 72.42.
-  // 72.9: the language detection words the policy now carries (see "./locales" at 75.7), to 72.61.
+  // 73.2: the language detection words the policy now carries (see "./locales" at 75.7), on top
+  // of the redaction at 72.5, took it to 72.93.
   "./ai": 73.2,
   "./ai/openai-compatible": 2,
   "./ai/anthropic": 2,
