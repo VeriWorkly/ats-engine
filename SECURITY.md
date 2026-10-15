@@ -18,8 +18,9 @@ file. These are the guarantees, each held by a test.
 **Time.** Every pattern over untrusted text is linear. A 50 KB adversarial input in any of 110
 shapes, 105 written on one line or under one heading (letter runs, digit runs, unclosed tags,
 comma lists, mixed scripts…) and 5 as 25,000 short lines ("1", "12", "1.", "a", "क" on each),
-placed in the name line, a bullet and the posting at once, and again under the certification and language headings,
-scores under the community policy with every locale pack applied in tens of milliseconds for most
+placed in the name line, a bullet and the posting at once (under each region: DE, FR, GB, IN),
+and again under the certification and language headings, scores under the community policy
+with every language pack applied in tens of milliseconds for most
 one-line shapes and a few hundred at most, short lines included, on a developer machine
 (`tests/integration/adversarial.test.ts`, which fails any shape past 1.5 s). The analysis's
 redaction (`/ai`) takes milliseconds on 150 000 characters. Patterns in a _policy_ or a _pack_

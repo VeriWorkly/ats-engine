@@ -152,15 +152,20 @@ describe("50 KB adversarial input", () => {
     const resume = `${input}\njane@example.com\nExperience\nEngineer at Acme 2019 - 2022\n- ${input}`;
     const jobDescription = `Requirements\n- ${input}`;
     const html = `<p>${input}</p>`;
-    expectFast(() => {
-      AtsScoringService.check(resume, POLICY, {
-        now: NOW,
-        jobDescription,
-        languages: ["de", "fr", "hi"],
-        region: "DE",
-      });
-      jobTextFromHtml(html);
-    }, 1_500);
+    expectFast(() => jobTextFromHtml(html), 1_500);
+    // Every region's credential patterns, each compiled into the policy only under its region.
+    for (const region of ["DE", "FR", "GB", "IN"])
+      expectFast(
+        () =>
+          AtsScoringService.check(resume, POLICY, {
+            now: NOW,
+            jobDescription,
+            languages: ["de", "fr", "hi"],
+            region,
+          }),
+        1_500,
+        region,
+      );
   });
 
   // Certification and language rows are read only under their headings and on a labelled line.
