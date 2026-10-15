@@ -26,8 +26,9 @@ const BROWSER = [
 ];
 
 const NETWORK_FREE = new Set([".", "./document", "./format", "./job", "./locales", "./node"]);
+// A network builtin by either name: esbuild leaves `import … from "https"` as written.
 const NETWORK =
-  /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bnode:(?:https?|http2|net|tls|dgram)\b/;
+  /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|["'](?:node:)?(?:https?|http2|net|tls|dgram)["']/;
 
 for (const subpath of [...BROWSER, "./node"]) {
   const node = subpath === "./node";
