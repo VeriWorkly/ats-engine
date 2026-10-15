@@ -1,9 +1,10 @@
 /**
- * `ats-engine check <resume> [--job <file>] [--policy <file>] [--json] [--min-score <n>]
+ * `ats-engine check <resume> [--job <file> | --job-url <url>] [--policy <file>] [--json] [--min-score <n>]
  * [--region <code>] [--text] [--ats <name>] [--ai …]`
  *
  * Scores a resume file (PDF, DOCX, HTML, text or Markdown, or a JSON resume document) with the
- * bundled default policy and locale packs, or with `--policy`. `--min-score` makes it usable as a
+ * bundled default policy and locale packs, or with `--policy`. `--job-url` reads a posting from
+ * its job board's public API (`./jobUrl.ts`), the only request made without `--ai`. `--min-score` makes it usable as a
  * CI gate: the exit code is 2 when the readiness score falls below it. `--ats` adds a vendor's
  * documented notes to the advice, which is never scored. `--ai` adds a model's analysis with the
  * user's own key; the score never depends on it. `USAGE` below is the `--help` text, and the
@@ -51,6 +52,7 @@ import {
   renderInsights,
   resolveAiConfig,
 } from "./ai.js";
+import { fetchJob, JobUrlError, locateJob, type FetchJob } from "./jobUrl.js";
 import {
   banner,
   createStyle,
@@ -78,6 +80,9 @@ Scores a resume (.pdf, .docx, .html, .txt, .md, or a .json resume document).
 Options:
   --job <file>        Job posting to match against (.txt, .md, .pdf, .docx, or a saved .html page,
                       whose employer is left out of the keywords)
+  --job-url <url>     Job posting on Greenhouse, Lever or Ashby (https only), read from the
+                      board's public API; other sites: save the page and use --job. A
+                      Greenhouse or Lever posting adds that ATS's notes unless --ats is given
   --policy <file>     Engine policy JSON (default: the bundled default policy)
   --json              Print the full report as JSON, advice included
   --min-score <n>     Exit with code 2 when the readiness score is below n
@@ -117,6 +122,8 @@ export type CliContext = {
   env: Env;
   /** For the AI providers; defaults to the global `fetch`. */
   fetch?: FetchLike;
+  /** For `--job-url`'s job board APIs; defaults to the global `fetch`. */
+  fetchJob?: FetchJob;
 };
 
 function defaultContext(): CliContext {
@@ -233,6 +240,7 @@ function parseCheckArgs(argv: string[]) {
       allowPositionals: true,
       options: {
         job: { type: "string" },
+        "job-url": { type: "string" },
         policy: { type: "string" },
         json: { type: "boolean", default: false },
         "min-score": { type: "string" },
@@ -288,6 +296,9 @@ async function check(argv: string[], context: CliContext): Promise<number> {
   if (strayAiFlag && !values.ai) throw new UsageError(`--${strayAiFlag} needs --ai.`);
   // Settled before any file is read, so a missing key fails at once rather than after a parse.
   const aiConfig = values.ai ? resolveAiConfig(values, context.env) : null;
+  if (values.job !== undefined && values["job-url"] !== undefined)
+    throw new UsageError("Give either --job or --job-url, not both.");
+  const jobUrl = values["job-url"] === undefined ? null : locateJob(values["job-url"]);
 
   // The bundled language and region packs ride on whichever policy is used.
   const policy = withLocales(
@@ -302,11 +313,18 @@ async function check(argv: string[], context: CliContext): Promise<number> {
   const targets = Object.keys(policy.advice.targets);
   if (values.ats !== undefined && !targets.includes(values.ats.toLowerCase()))
     throw new UsageError(`Unknown --ats "${values.ats}"; use one of ${targets.join(", ")}.`);
+  // A posting on a board the policy has notes on brings them, unless --ats names another.
+  const targetAts =
+    values.ats ?? (jobUrl && targets.includes(jobUrl.board.ats) ? jobUrl.board.ats : undefined);
 
   if (terminal.interactive && !values.json) console.log(banner(terminal));
 
   const { input, layout, file } = await readResumeFile(positionals[0]!);
-  const job = values.job ? await readJobFile(values.job) : undefined;
+  const job = jobUrl
+    ? await fetchJob(jobUrl, context.fetchJob)
+    : values.job
+      ? await readJobFile(values.job)
+      : undefined;
   const jobDescription = job?.text;
   const resume = prepareResume(input);
   const report = AtsScoringService.check(resume, policy, {
@@ -314,7 +332,7 @@ async function check(argv: string[], context: CliContext): Promise<number> {
     jobCompany: job?.company,
     layout,
     file,
-    targetAts: values.ats,
+    targetAts,
     region: values.region,
     includeLines: values.text,
   });
@@ -379,7 +397,8 @@ export async function main(argv: string[], context = defaultContext()): Promise<
     console.error(
       `ats-engine: ${printable(error instanceof Error ? error.message : String(error))}`,
     );
-    const usage = error instanceof UsageError || error instanceof AtsFileError;
+    const usage =
+      error instanceof UsageError || error instanceof AtsFileError || error instanceof JobUrlError;
     if (!usage && context.env.DEBUG) console.error(error);
     return 1;
   }

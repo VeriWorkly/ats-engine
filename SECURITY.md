@@ -146,8 +146,13 @@ and refuses to send a key over plain `http` to any host but this machine (`local
 or from a `.env` file, which is never committed.
 
 **State.** The core holds no global state, does no I/O and makes no network calls; only `/ai`
-calls the provider you configure, and only `/node` reads files you pass it. `npm run smoke` fails
-if the core, `/document`, `/format`, `/job`, `/locales` or `/node` bundles a network call.
+calls the provider you configure, and only `/node` reads files you pass it. Without `--ai`, the
+CLI makes a request only for `--job-url`, and only to a job board's public API host listed in
+`src/cli/jobUrl.ts` (`boards-api.greenhouse.io`, `api.lever.co`, `api.eu.lever.co`,
+`api.ashbyhq.com`), never to the host in the URL: it takes `https` posting addresses on those
+boards only, sends no resume text and no key, follows no redirect, waits at most 20 seconds and
+reads at most 20 MB. `npm run smoke` fails if the core, `/document`, `/format`, `/job`,
+`/locales` or `/node` bundles a network call.
 
 ## Around the engine
 
