@@ -181,6 +181,11 @@ describe("readResumeFile and readJobFile", () => {
     await expect(refused).rejects.toThrow(/secret\.json is not valid JSON\.$/);
   });
 
+  it("say where a JSON file goes wrong, without its text", async () => {
+    const refused = readResumeFile(file("comma.json", '{\n  "basics": {},,\n}'));
+    await expect(refused).rejects.toThrow(/comma\.json is not valid JSON \(line 2 column \d+\)\.$/);
+  });
+
   it("are public on /node", () => {
     expect(node.readResumeFile).toBe(readResumeFile);
     expect(node.readJobFile).toBe(readJobFile);

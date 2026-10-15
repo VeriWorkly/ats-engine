@@ -44,7 +44,7 @@ Only the path's form is checked: a mapped drive letter, a `subst` drive, a link 
 share, or an SMB or NFS mount looks local and is read over the network. A job posting is read only
 from a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file, before it is opened: its words come back as
 missing keywords, so any other file (a credentials file, a key) would be echoed to whoever named
-it. A JSON file that does not parse is refused without the parser's message, which quotes it. The MCP server refuses
+it. A JSON file that does not parse is refused with its line and column, without the parser's message, which quotes it. The MCP server refuses
 pasted text over 200 000 characters. A host should still bound request bodies.
 
 **Crashes.** Words from the input are never used as plain-object keys, JSON-LD is read to a fixed
@@ -88,10 +88,10 @@ What does not depend on the model:
   parser read. The phone by its national number: with or without the country code (`+44`, `0044`, `+44 (0)`, or after
   the exit prefix `011`, `0011` or `010`), with a trunk zero (`020`, `(020)`) or a North
   American `1-`, any spaces, brackets, dots, slashes or dashes between the digits, and an
-  extension after it. Any other run of 9 to 15 digits on one line that opens with `+` or a trunk
-  `0` (`07912 345678`, `(02) 9876 5432`), whether the parser read it or not, so a local number
-  is replaced under a policy without its country's region too; a month and its year that open
-  with 0 (`01/2020 - 12/2023`) are not. A North American number written as one, a second one
+  extension after it. Any other run of 9 or more digits on one line that opens with `+` or a trunk
+  `0` (`07912 345678`, `(02) 9876 5432`; two such numbers together are one placeholder), whether
+  the parser read it or not, so a local number is replaced under a policy without its country's
+  region too; a date or a range of two (`01/2020 - 12/2023`, `06/15/2019 – 08/30/2021`) is not. A North American number written as one, a second one
   included (`Home: (415) 555-0199`, `415-555-0199`, `415.555.0199`). Not other phone numbers: one
   with none of these shapes, such as India's `98765 43210` or `415 555 0199` spaced, is sent
   unless the parser read it (the region pack reads India's). Postal

@@ -97,9 +97,11 @@ function size(bytes: number): string {
 export function parseJsonFile(data: Buffer, path: string): unknown {
   try {
     return JSON.parse(data.toString("utf8"));
-  } catch {
-    // Not the parser's message: it quotes the text near the error, which can be a secret.
-    throw new AtsFileError(`${path} is not valid JSON.`);
+  } catch (error) {
+    // Only where it failed: the parser's message quotes the text near the error, which can be a
+    // secret.
+    const where = /\(line \d+ column \d+\)/.exec((error as Error).message)?.[0];
+    throw new AtsFileError(`${path} is not valid JSON${where ? ` ${where}` : ""}.`);
   }
 }
 

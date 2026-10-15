@@ -244,6 +244,12 @@ describe("redaction variants", () => {
     "(02) 9876 5432",
     "+44 7912 345678",
     "+33 6 12 34 56 78",
+    // A group that looks like a month and its year inside a number ("6 2012") is still a number.
+    "+31 6 2012 3456",
+    "06 1987 6543",
+    // Two numbers on one line are one placeholder, so no part of the second is sent.
+    "0412 345 678 / 02 9876 5432",
+    "+44 20 7946 0958/0959",
   ])("catches a phone the parser did not read: %s", (written) => {
     const redaction = createRedaction(parsed("Jane Doe", ""), "");
     expect(redaction.apply(`Call ${written} today`)).toBe("Call [PHONE_1] today");
@@ -264,6 +270,9 @@ describe("redaction variants", () => {
     "Acme, 05.2019 – 03.2023",
     "Acme, 01 2019 - 12 2023",
     "Acme, 2019-05 – 2023-03",
+    "Acme, 06/15/2019 – 08/30/2021",
+    "Acme, 15/06/2019 - 30/08/2021",
+    "Acme, 06/15/2019",
     "Grew users from 120,000 to 2,400,000 (+1900%)",
     "ISBN 978-0-306-40615-7",
     "Release v0.12.3, build 20230115",
