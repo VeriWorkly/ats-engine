@@ -84,8 +84,9 @@ const BUDGETS = {
   // in their figures and a skills line at the foot of two pages were dropped), took it to 20.89.
   // 21.1: a job posting read only from the types a posting comes in, PDF reading stopped after
   // 100 pages, a text file's stray bytes decoded in one pass, and one budget for a DOCX's headers
-  // and footers took it to 21.08.
-  "./node": 21.1,
+  // and footers took it to 21.08. 21.2: naming the line and column a JSON file fails at took it
+  // just past 21.1.
+  "./node": 21.2,
 };
 
 /**
