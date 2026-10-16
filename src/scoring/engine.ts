@@ -31,18 +31,38 @@ const MAX_REPORTED_LINES = 500;
  * 5,000 characters (`hiddenText`), or, from an older extractor, its first 80 (`hiddenTextSample`);
  * a line is set aside when the hidden text contains it, or, that text being cut, when the line
  * begins with it. The integrity cap on the job match covers whatever is past the cut.
+ *
+ * Each stretch of hidden text sets aside one line, the longest lines claiming theirs first: a
+ * visible "Kubernetes" skill stays when the hidden text is "Kubernetes Terraform Kafka", which
+ * the hidden line of that text claims. Returns a filter for each pass over the lines, each
+ * setting aside as many lines of a text as the hidden text holds.
  */
-function visibleLine(layout: AtsLayoutSignals | undefined) {
+function visibleLines(layout: AtsLayoutSignals | undefined, lines: readonly string[]) {
   const full = layout?.hiddenText !== undefined;
   const hidden = normalizeText(layout?.hiddenText ?? layout?.hiddenTextSample ?? "")
     .replace(/\s+/g, " ")
     .trim();
-  if (!hidden || !layout?.hiddenTextChars) return () => true;
+  const textOf = (line: string) => line.replace(BULLET_PREFIX, "").replace(/\s+/g, " ").trim();
+  if (!hidden || !layout?.hiddenTextChars) return () => () => true;
   const cut = hidden.length >= (full ? 5_000 : 80);
-  return (line: string) => {
-    const text = line.replace(BULLET_PREFIX, "").replace(/\s+/g, " ").trim();
-    if (text.length < 4) return true;
-    return !(hidden.includes(text) || (cut && text.startsWith(hidden)));
+  const counts = new Map<string, number>();
+  let left = hidden;
+  for (const text of lines.map(textOf).sort((a, b) => b.length - a.length)) {
+    if (text.length < 4) break;
+    const at = left.indexOf(text);
+    if (at >= 0) left = left.slice(0, at) + " " + left.slice(at + text.length);
+    else if (!(cut && text.startsWith(hidden))) continue;
+    counts.set(text, (counts.get(text) ?? 0) + 1);
+  }
+  return () => {
+    const unclaimed = new Map(counts);
+    return (line: string) => {
+      const text = textOf(line);
+      const n = unclaimed.get(text);
+      if (!n) return true;
+      unclaimed.set(text, n - 1);
+      return false;
+    };
   };
 }
 
@@ -146,13 +166,14 @@ export class AtsScoringService {
     // hidden characters are layout, and the rule says so by passing.
     const hiddenRule = active.find((rule) => metricOf.get(rule.id) === "hiddenTextChars");
     const hiding = !hiddenRule || failedChecks.some((rule) => rule.id === hiddenRule.id);
-    const visible = hiding ? visibleLine(layout) : () => true;
-    const shown = lines.filter(visible);
+    const visible = hiding ? visibleLines(layout, lines) : () => () => true;
+    const shown = lines.filter(visible());
     const headed = withHeadings(lines, sections);
+    const inSections = visible();
     const shownSections: HeadedSection[] =
       shown.length === lines.length
         ? headed
-        : headed.map((section) => ({ ...section, lines: section.lines.filter(visible) }));
+        : headed.map((section) => ({ ...section, lines: section.lines.filter(inSections) }));
     const jobMatch = computeJobMatch(
       shown.length === lines.length ? ctx.text : shown.join(" ").replace(/\s+/g, " ").trim(),
       jobDescription,

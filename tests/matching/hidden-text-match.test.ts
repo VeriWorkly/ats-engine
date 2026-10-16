@@ -48,6 +48,19 @@ describe("hidden text and the job match", () => {
       expect(requirement.evidence.join(" ")).not.toContain("Kubernetes");
   });
 
+  // The hidden block holds the same word as a visible line. Each hidden occurrence sets aside one
+  // line, longest first: the visible "Kubernetes" skill was set aside with the block it repeats.
+  it("keeps a visible line whose text the hidden text also holds", () => {
+    const visible = RESUME.replace("TypeScript, Go, PostgreSQL", "Kubernetes");
+    const report = AtsScoringService.check(visible, DEFAULT_POLICY, {
+      jobDescription: job,
+      now: NOW,
+      layout: layout({ hiddenTextSample: stuffed, hiddenText: `${filler} ${stuffed}` }),
+    });
+    expect(report.matchedKeywords).toContain("kubernetes");
+    expect(report.matchedKeywords).not.toContain("kafka");
+  });
+
   it("still reads the same words when they are visible", () => {
     const report = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
       jobDescription: job,
