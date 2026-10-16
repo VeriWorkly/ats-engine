@@ -68,6 +68,16 @@ function action(inputs: Record<string, string>) {
 }
 
 describe("the GitHub Action", () => {
+  // Every run wrote $RUNNER_TEMP/ats-report.json, so a job checking two resumes read the second
+  // report under the first step's output.
+  it("writes each run's report to its own file", () => {
+    const withJob = action({ ATS_RESUME: resume, ATS_JOB: job });
+    const alone = action({ ATS_RESUME: resume });
+    expect(withJob.outputs.report).not.toBe(alone.outputs.report);
+    expect(JSON.parse(readFileSync(withJob.outputs.report!, "utf8")).jobMatchScore).not.toBeNull();
+    expect(JSON.parse(readFileSync(alone.outputs.report!, "utf8")).jobMatchScore).toBeNull();
+  });
+
   it("writes the score, the job match, the failed checks and the report path", () => {
     const { code, outputs, summary } = action({ ATS_RESUME: resume, ATS_JOB: job });
     expect(code).toBe(0);
