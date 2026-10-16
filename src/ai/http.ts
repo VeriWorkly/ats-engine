@@ -20,7 +20,25 @@ export type FetchResponseLike = {
   redirected?: boolean | undefined;
   /** `"opaqueredirect"` is a browser's redirect handed back unfollowed: it is refused. */
   type?: string | undefined;
+  /** A declared `content-length` past `MAX_RESPONSE_BYTES` is refused before the body is read. */
+  headers?: { get(name: string): string | null } | undefined;
+  /** Read as a stream when there is one, so a body past the limit stops there. */
+  body?:
+    | {
+        getReader(): {
+          read(): Promise<{ done: boolean; value?: Uint8Array }>;
+          cancel(): Promise<void>;
+        };
+      }
+    | null
+    | undefined;
 };
+
+/**
+ * The most of a provider's answer that is read, an error's included: a model's JSON is a few
+ * kilobytes, and the timeout bounds how long a call takes, not how much it receives.
+ */
+export const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
 /** Just enough of `fetch` for the adapters: one POST. Pass your own to proxy or record calls. */
 export type FetchLike = (
@@ -46,7 +64,40 @@ const platform = globalThis as unknown as {
     timeout(ms: number): AbortSignalLike;
     any(signals: AbortSignalLike[]): AbortSignalLike;
   };
+  TextDecoder: new () => { decode(bytes: Uint8Array, options?: { stream: boolean }): string };
 };
+
+const tooBig = () =>
+  new LlmProviderError(
+    `The provider answered with more than ${MAX_RESPONSE_BYTES / 1024 / 1024} MB, which is not read.`,
+    { retryable: false },
+  );
+
+/** The response's body as text, refused past `MAX_RESPONSE_BYTES`. */
+async function readLimited(response: FetchResponseLike): Promise<string> {
+  if (Number(response.headers?.get("content-length")) > MAX_RESPONSE_BYTES) throw tooBig();
+  const reader = response.body?.getReader();
+  // shortcut: a host's fetch without a stream body is read whole, then measured; give it a body
+  // stream if its answers may be large.
+  if (!reader) {
+    const text = await response.text();
+    if (text.length > MAX_RESPONSE_BYTES) throw tooBig();
+    return text;
+  }
+  const decoder = new platform.TextDecoder();
+  let bytes = 0;
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode(new Uint8Array(0));
+    bytes += value?.length ?? 0;
+    if (bytes > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw tooBig();
+    }
+    if (value) text += decoder.decode(value, { stream: true });
+  }
+}
 
 /** Options every HTTP adapter accepts. */
 export type HttpOptions = {
@@ -156,7 +207,7 @@ export async function postJson(
         { retryable: false, ...(status && { status: response.status }) },
       );
     }
-    raw = await response.text();
+    raw = await readLimited(response);
   } catch (error) {
     if (error instanceof LlmProviderError) throw error;
     if (options.signal?.aborted) throw new AbortedError(error);
