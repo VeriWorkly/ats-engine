@@ -6,7 +6,12 @@ import { isJsonResume, isResumeDocument } from "../document/index.js";
 import type { AtsResumeInput } from "../input.js";
 import type { AtsFileInfo } from "../types.js";
 import { extractJobPosting, jobTextFromHtml, normalizeJobText } from "../job/index.js";
-import { detectResumeFormat, extractResume, type AtsExtraction } from "./extract.js";
+import {
+  detectResumeFormat,
+  extractResume,
+  type AtsExtraction,
+  type AtsResumeFormat,
+} from "./extract.js";
 
 /**
  * Reading a resume or a job posting from a path the user named: the CLI's `check` and the MCP
@@ -28,6 +33,13 @@ export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 export type AtsReadFileOptions = {
   /** Refuse a larger file. Default `MAX_FILE_BYTES`. */
   maxBytes?: number | undefined;
+  /**
+   * Reads a PDF or DOCX file's bytes; default `extractResume`, in this process. A host that reads
+   * files it did not write passes one that runs `/node/child` instead, so a file that exhausts
+   * memory or never ends takes down that process, not the host. The path, type and size checks
+   * stay here either way.
+   */
+  extract?: ((data: Uint8Array, format: AtsResumeFormat) => Promise<AtsExtraction>) | undefined;
 };
 
 /** The folder, the pipe or device, and the file over the limit, refused with their reasons. */
@@ -128,7 +140,7 @@ export async function readResumeFile(
       throw new AtsFileError(`${path} is neither a JSON Resume nor an ats-resume document.`);
     return { input: input as AtsResumeInput, file };
   }
-  const { text, layout } = await extractResume(data, format);
+  const { text, layout } = await (options?.extract ?? extractResume)(data, format);
   return { input: readableText(text, format), layout, file };
 }
 
@@ -170,7 +182,7 @@ export async function readJobFile(path: string, options?: AtsReadFileOptions): P
   const format = detectResumeFormat(path);
   const text =
     format === "pdf" || format === "docx"
-      ? (await extractResume(data, format)).text
+      ? (await (options?.extract ?? extractResume)(data, format)).text
       : data.toString("utf8");
   return { text: normalizeJobText(text) };
 }
