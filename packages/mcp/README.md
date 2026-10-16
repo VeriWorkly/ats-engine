@@ -114,7 +114,8 @@ adds the vendor's notes.
 ## Privacy
 
 The server runs on your computer, over stdio. It makes no network requests and calls no AI
-model. It reads only the files you name in a request, and nothing leaves your machine except
+model. It reads only the files you name in a request, a PDF or DOCX in a separate process that
+is stopped after 60 seconds, and nothing leaves your machine except
 what your assistant itself sends to its model provider: the tool results it reads, which include
 text from your resume.
 

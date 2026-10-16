@@ -243,7 +243,7 @@ Soft skills ("communication", "teamwork", "attention to detail") come from the p
 
 ### Read resumes in other languages
 
-Attach the locale packs once at startup and reuse the policy. Language and region are detected per resume, or you can set them with the `languages` and `region` options.
+Attach the locale packs once at startup and reuse the policy. Language and region are detected per resume, or you can set them with the `languages` and `region` options (any case; an id no attached pack has throws `AtsPolicyError`).
 
 ```ts
 import { check, DEFAULT_POLICY } from "@veriworkly/ats-engine";
