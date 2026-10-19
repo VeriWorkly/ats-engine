@@ -1,6 +1,6 @@
 {
   "name": "@veriworkly/ats-engine",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "ATS resume checker and parser: reads a resume (PDF, DOCX, text, JSON Resume) the way an applicant tracking system does, scores it with a published deterministic rubric, and matches it to a job description. Browser- and edge-safe.",
   "keywords": [
     "ats",
@@ -29,7 +29,7 @@
     "type": "git",
     "url": "git+https://github.com/VeriWorkly/ats-engine.git"
   },
-  "homepage": "https://github.com/VeriWorkly/ats-engine#readme",
+  "homepage": "https://docs.veriworkly.com/ats-engine",
   "bugs": {
     "url": "https://github.com/VeriWorkly/ats-engine/issues"
   },
@@ -101,6 +101,7 @@
     "./node/child": {
       "default": "./dist/node/child.js"
     },
+    "./policy.schema.json": "./dist/policy.schema.json",
     "./package.json": "./package.json"
   },
   "files": [
@@ -119,7 +120,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run clean && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json && npm run build -w packages/mcp",
+    "build": "npm run clean && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json && node scripts/policy-schema.mjs && npm run build -w packages/mcp",
     "dev": "tsc -p tsconfig.node.json --watch",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "typecheck": "tsc --noEmit -p tests/tsconfig.json && tsc --noEmit -p packages/mcp/tests/tsconfig.json",

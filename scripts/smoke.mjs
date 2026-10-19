@@ -69,6 +69,18 @@ runInNewContext(core.outputFiles[0].text, sandbox);
 if (typeof sandbox.report?.readinessScore !== "number") throw new Error("edge smoke: no report");
 console.log(`edge     . (readiness ${sandbox.report.readinessScore})`);
 
+// Schema: the policy's JSON Schema ships at its export, names this version, and describes every
+// section of the community policy, so a policy file pointing its `$schema` at it is checked whole.
+const policySchema = JSON.parse(readFileSync(exports["./policy.schema.json"], "utf8"));
+const { DEFAULT_POLICY } = await import("../dist/index.js");
+const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+const undescribed = Object.keys(DEFAULT_POLICY).filter((key) => !(key in policySchema.properties));
+if (!policySchema.$id.includes(`@${version}/`) || undescribed.length > 0)
+  throw new Error(
+    `schema: policy.schema.json is stale (version ${version}; undescribed: ${undescribed.join(", ") || "none"})`,
+  );
+console.log(`schema   policy.schema.json covers ${Object.keys(DEFAULT_POLICY).length} sections`);
+
 // Each sample is its own module beside package.json, so `@veriworkly/ats-engine` resolves to this
 // package's exports. The names a sample uses without defining are declared for it.
 const DECLARED = ["resume", "resumeText", "postingHtml", "jobDescription"]

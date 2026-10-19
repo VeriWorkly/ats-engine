@@ -8,14 +8,14 @@
     "source": "github",
     "subfolder": "packages/mcp"
   },
-  "websiteUrl": "https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme",
-  "version": "0.5.0",
+  "websiteUrl": "https://docs.veriworkly.com/ats-engine/tools/mcp",
+  "version": "0.5.1",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@veriworkly/ats-engine-mcp",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
