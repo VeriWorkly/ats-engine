@@ -67,16 +67,27 @@ const platform = globalThis as unknown as {
   TextDecoder: new () => { decode(bytes: Uint8Array, options?: { stream: boolean }): string };
 };
 
-const tooBig = () =>
-  new LlmProviderError(
-    `The provider answered with more than ${MAX_RESPONSE_BYTES / 1024 / 1024} MB, which is not read.`,
-    { retryable: false },
-  );
-
 /** The response's body as text, refused past `MAX_RESPONSE_BYTES`. */
 async function readLimited(response: FetchResponseLike): Promise<string> {
-  if (Number(response.headers?.get("content-length")) > MAX_RESPONSE_BYTES) throw tooBig();
-  const reader = response.body?.getReader();
+  // An error keeps its status, and stays retryable when the status is: a gateway's huge error
+  // page is not the model's answer.
+  const tooBig = () =>
+    new LlmProviderError(
+      `The provider answered with more than ${MAX_RESPONSE_BYTES / 1024 / 1024} MB, which is not read.`,
+      response.ok
+        ? { retryable: false }
+        : { status: response.status, retryable: isRetryableStatus(response.status) },
+    );
+  // Only what a platform `fetch` gives: node-fetch's body is a Node stream, a double's headers a
+  // plain object, and either is read with `text()`, as before the limit.
+  const headers = response.headers;
+  if (
+    typeof headers?.get === "function" &&
+    Number(headers.get("content-length")) > MAX_RESPONSE_BYTES
+  )
+    throw tooBig();
+  const body = response.body;
+  const reader = typeof body?.getReader === "function" ? body.getReader() : undefined;
   // shortcut: a host's fetch without a stream body is read whole, then measured; give it a body
   // stream if its answers may be large.
   if (!reader) {

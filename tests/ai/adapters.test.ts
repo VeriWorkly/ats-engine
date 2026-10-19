@@ -451,8 +451,28 @@ describe("the provider's answer is read to a limit", () => {
       },
       text: read,
     }));
-    await expect(anthropic({ apiKey: "k", fetch }).complete(request())).rejects.toThrow(tooBig);
+    // A 500 stays retryable however much it says: a gateway's error page is not the model's answer.
+    await expect(anthropic({ apiKey: "k", fetch }).complete(request())).rejects.toMatchObject({
+      message: expect.stringMatching(tooBig),
+      status: 500,
+      retryable: true,
+    });
     expect(read).not.toHaveBeenCalled();
+  });
+
+  // node-fetch's body is a Node stream, a test double's a string, its headers a plain object:
+  // what has no reader or no `get` is read with `text()`, as before the limit.
+  it.each([
+    ["a Node stream body", { body: { pipe() {} }, headers: new Map() }],
+    ["a string body", { body: "{}" }],
+    ["plain-object headers", { headers: { "content-type": "application/json" } }],
+  ])("reads an answer with %s", async (_, shape) => {
+    const answer = { content: [{ type: "text", text: '{"ok":true}' }] };
+    const fetch = vi.fn<FetchLike>(
+      async () =>
+        ({ ok: true, status: 200, text: async () => JSON.stringify(answer), ...shape }) as never,
+    );
+    await expect(anthropic({ apiKey: "k", fetch }).complete(request())).resolves.toBeDefined();
   });
 
   it("refuses an answer a host's fetch hands over whole", async () => {

@@ -34,8 +34,10 @@ const MAX_REPORTED_LINES = 500;
  *
  * Each stretch of hidden text sets aside one line, the longest lines claiming theirs first: a
  * visible "Kubernetes" skill stays when the hidden text is "Kubernetes Terraform Kafka", which
- * the hidden line of that text claims. Returns a filter for each pass over the lines, each
- * setting aside as many lines of a text as the hidden text holds.
+ * the hidden line of that text claims whole. A line is kept only when every place the hidden text
+ * holds it lies inside text already claimed, so a visible line across two hidden ones never frees
+ * them. Returns a filter for each pass over the lines, each setting aside as many lines of a text
+ * as the hidden text holds.
  */
 function visibleLines(layout: AtsLayoutSignals | undefined, lines: readonly string[]) {
   const full = layout?.hiddenText !== undefined;
@@ -46,12 +48,23 @@ function visibleLines(layout: AtsLayoutSignals | undefined, lines: readonly stri
   if (!hidden || !layout?.hiddenTextChars) return () => () => true;
   const cut = hidden.length >= (full ? 5_000 : 80);
   const counts = new Map<string, number>();
-  let left = hidden;
+  // `next[i]`: the first position from `i` no line has claimed, its path shortened as it is read,
+  // so claiming and asking cost next to nothing however many lines there are.
+  const next = Array.from({ length: hidden.length + 1 }, (_, i) => i);
+  const free = (i: number) => {
+    while (next[i] !== i) i = next[i] = next[next[i]!]!;
+    return i;
+  };
+  // Where a text's next search starts: a second line of the same text claims the next place.
+  const from = new Map<string, number>();
   for (const text of lines.map(textOf).sort((a, b) => b.length - a.length)) {
     if (text.length < 4) break;
-    const at = left.indexOf(text);
-    if (at >= 0) left = left.slice(0, at) + " " + left.slice(at + text.length);
-    else if (!(cut && text.startsWith(hidden))) continue;
+    let at = hidden.indexOf(text, from.get(text) ?? 0);
+    while (at >= 0 && free(at) >= at + text.length) at = hidden.indexOf(text, at + 1);
+    if (at >= 0) {
+      from.set(text, at + 1);
+      for (let i = free(at); i < at + text.length; i = free(i)) next[i] = i + 1;
+    } else if (!(cut && text.startsWith(hidden))) continue;
     counts.set(text, (counts.get(text) ?? 0) + 1);
   }
   return () => {
