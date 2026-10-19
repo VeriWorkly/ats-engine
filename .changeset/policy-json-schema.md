@@ -1,5 +1,0 @@
----
-"@veriworkly/ats-engine": minor
----
-
-**The JSON Schema of a scoring policy ships in the package**, as `@veriworkly/ats-engine/policy.schema.json` (JSON Schema draft 2020-12, generated at build from the schema `parseAtsPolicy` validates with). Point a policy file's `$schema` at it, or at `https://cdn.jsdelivr.net/npm/@veriworkly/ats-engine@<version>/dist/policy.schema.json`, for completion and checking in an editor. Before, only the language and region packs had a schema (`atsLanguagePackJsonSchema`, `atsRegionPackJsonSchema`), and writing a whole policy meant reading the source. `parseAtsPolicy` stays the authority: it also compiles the patterns and refuses two rules with one id, which a schema cannot say. The schema is a file, not a module, so no bundle grows. The package's homepage is now the documentation, [docs.veriworkly.com/ats-engine](https://docs.veriworkly.com/ats-engine), and the README and `llms.txt` link to it. Scores, recovered fields and the report are the same for every input.
