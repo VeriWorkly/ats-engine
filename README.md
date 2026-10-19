@@ -434,6 +434,7 @@ node dist/cli/index.js check path/to/resume.pdf --job path/to/posting.txt
 - [CHANGELOG.md](./CHANGELOG.md): releases and breaking changes
 - [llms.txt](./llms.txt): a short summary of the package for AI tools, in the llmstxt.org format; also served from the npm package (`https://cdn.jsdelivr.net/npm/@veriworkly/ats-engine/llms.txt`)
 - [packages/mcp](https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme): the MCP server, `@veriworkly/ats-engine-mcp`
+- `policy.schema.json`: the JSON Schema of a scoring policy, shipped in the package (`@veriworkly/ats-engine/policy.schema.json`) for a policy file's `$schema`. `parseAtsPolicy` stays the authority: it also compiles the patterns and checks that rule ids are unique.
 
 The package is still 0.x. Any change to the report's shape, the policy schema, or the score for the same input is treated as breaking and called out in the changelog. `AtsParsedEducation.level`, `AtsParsedResume.highestDegree`, `AtsDegreeLevel` and `DEGREE_LABELS` are deprecated and will be removed in 1.0; use `isced`, `highestIsced` and `ISCED_LABELS` instead.
 
