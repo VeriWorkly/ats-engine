@@ -5,6 +5,7 @@ coverage/
 # Audit working notes and throwaway probes; not part of the package or its repo.
 AUDIT.md
 PLAN.md
+HANDOVER.md
 *.probe.ts
 .agents/
 .claude/

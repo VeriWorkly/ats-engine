@@ -11,6 +11,8 @@ Read a resume the way an applicant tracking system (ATS) does, see what it would
 
 To try it without installing anything, upload a resume to the [VeriWorkly ATS checker](https://veriworkly.com/ats-checker), which runs on this engine.
 
+**Documentation: [docs.veriworkly.com/ats-engine](https://docs.veriworkly.com/ats-engine)**: guides for Node, Next.js, the edge and the browser, the CLI, the GitHub Action and the MCP server, and a reference generated from each release. Product page: [veriworkly.com/ats-engine](https://veriworkly.com/ats-engine).
+
 [Install](#install) · [Quick start](#quick-start) · [MCP](#use-it-from-an-ai-assistant-mcp) · [GitHub Actions](#use-it-in-github-actions) · [Use it in your app](#use-it-in-your-app) · [AI features](#ai-features) · [Run from source](#run-from-source) · [Documentation](#documentation)
 
 ## What it does
@@ -426,6 +428,8 @@ node dist/cli/index.js check path/to/resume.pdf --job path/to/posting.txt
 
 ## Documentation
 
+The full documentation is at **[docs.veriworkly.com/ats-engine](https://docs.veriworkly.com/ats-engine)**: a quick start, concepts, guides for each runtime, the CLI, the GitHub Action and the MCP server, and a reference for every export, option and report field. In this repository:
+
 - [RUBRIC.md](./RUBRIC.md): every rule, its weight and its fix, generated from the policy
 - [LOCALES.md](./LOCALES.md): supported languages and regions, and how to add one
 - [ARCHITECTURE.md](./ARCHITECTURE.md): how the code is organised
@@ -434,6 +438,7 @@ node dist/cli/index.js check path/to/resume.pdf --job path/to/posting.txt
 - [CHANGELOG.md](./CHANGELOG.md): releases and breaking changes
 - [llms.txt](./llms.txt): a short summary of the package for AI tools, in the llmstxt.org format; also served from the npm package (`https://cdn.jsdelivr.net/npm/@veriworkly/ats-engine/llms.txt`)
 - [packages/mcp](https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme): the MCP server, `@veriworkly/ats-engine-mcp`
+- `policy.schema.json`: the JSON Schema of a scoring policy, shipped in the package (`@veriworkly/ats-engine/policy.schema.json`) for a policy file's `$schema`. `parseAtsPolicy` stays the authority: it also compiles the patterns and checks that rule ids are unique.
 
 The package is still 0.x. Any change to the report's shape, the policy schema, or the score for the same input is treated as breaking and called out in the changelog. `AtsParsedEducation.level`, `AtsParsedResume.highestDegree`, `AtsDegreeLevel` and `DEGREE_LABELS` are deprecated and will be removed in 1.0; use `isced`, `highestIsced` and `ISCED_LABELS` instead.
 

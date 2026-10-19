@@ -10,6 +10,10 @@ The engine is for candidates checking their own resume, not for ranking or filte
 
 ## Docs
 
+- [Documentation](https://docs.veriworkly.com/ats-engine): quick start, concepts, guides (Node, Next.js, edge, browser, structured input, custom policy, locales, AI), CLI, GitHub Action, MCP server, and a reference generated from each release
+- [Documentation as one Markdown file](https://docs.veriworkly.com/ats-engine/llms-full.txt): every docs page in full, for AI tools
+- [Product page](https://veriworkly.com/ats-engine)
+
 - [README](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/README.md): what it does, install, CLI, GitHub Action, MCP server, use in an app, AI features
 - [Scoring rubric](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/RUBRIC.md): every rule with its category, weight, what it reads, when it passes and the fix
 - [Architecture](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/ARCHITECTURE.md): the check() pipeline, modules, invariants and design decisions
