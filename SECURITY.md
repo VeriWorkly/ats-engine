@@ -140,7 +140,7 @@ browser's opaque redirect (status 0), or a response reached by following one. Th
 without a retry, with an error that names the redirect and the address's origin, never its path.
 A `fetch` you pass in receives the option and must pass it on: one that follows a redirect
 anyway has already sent the key on, and only its answer is refused. A provider's answer, an
-error's included, is read to 4 MB (`MAX_RESPONSE_BYTES`) and refused past it, before it is
+error's included, is read to 4 MB and refused past it, before it is
 parsed: a declared `content-length` past it is refused unread, and a streamed body stops there (a
 `fetch` you pass in without a stream body is read whole, then measured). `ats-engine check --ai` reads the key from the environment only, never
 from a flag, so it does not land in shell history or the process list, and never prints it. The
