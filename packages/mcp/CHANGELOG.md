@@ -1,5 +1,13 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.5.1
+
+### Patch Changes
+
+- 559f57d: The server's homepage and its MCP Registry `websiteUrl` are now its documentation page, [docs.veriworkly.com/ats-engine/tools/mcp](https://docs.veriworkly.com/ats-engine/tools/mcp), with setup for each client, every tool and its inputs. The tools and their results are unchanged.
+- Updated dependencies [13ffd6d]
+  - @veriworkly/ats-engine@0.11.0
+
 ## 0.5.0
 
 ### Minor Changes
