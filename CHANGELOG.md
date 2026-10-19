@@ -3,6 +3,20 @@
 Release notes are generated from `.changeset/` by `changeset version`. See
 [.changeset/README.md](.changeset/README.md) for what counts as breaking.
 
+## 0.12.0
+
+### Minor Changes
+
+- 0e3eebc: Fixes from an audit of 0.10.0.
+
+  - **Breaking:** a visible line is no longer set aside as hidden because the hidden text repeats it. When lines, in reading order, joined are the hidden text whole, and it splits into the lines' texts one way only, exactly those lines are set aside, the later copy of a line written twice. Otherwise (a split two ways, a second column's hidden runs read first, or the hidden text cut at 5,000 characters) each stretch of hidden text sets aside one line, the longest claiming theirs first, and a visible line across two hidden ones never frees them. A line under four characters is never set aside, as before, and the lines either side of one set aside are not read as one phrase. So a resume with a visible "Kubernetes" skill and a hidden "Kubernetes Terraform Kafka" block keeps its Kubernetes in the job match (it fell from 100 to 0 and was reported missing), and a visible "Docker Kubernetes" across the wrap of a hidden "Python Java Docker / Kubernetes Terraform" block keeps both. Hidden text is left out as before: on 7,000 generated resumes no hidden word or phrase is matched that 0.11.0 did not match, and visible skills lost to hidden text fell from 4,162 to 16 on 3,000 of them. A hidden run at the end of a visible line is still read with that line, as before; the hidden-text rule fails and caps the job match. The job match, the requirements and the missing keywords change for such resumes.
+  - **Breaking:** the `languages` option is read in any case, and an id no attached pack has throws `AtsPolicyError` naming the attached ones. `languages: ["DE"]` or `["deu"]` was dropped without a word, so a German resume lost its roles and was judged by English writing rules. `[]`, or the policy's own language (`"en"`), still reads with the base only.
+  - **AI:** a provider's answer, an error's included, is read to 4 MB and refused past it before it is parsed; a declared larger `content-length` is refused unread. An error past it keeps its status, and stays retryable when its status is (a gateway's error page is not the model's answer). A `fetch` you pass in whose body is not a web stream (node-fetch's, a test double's) is read whole with `text()`, then measured. The timeout bounded how long a call took, not how much it received.
+  - **`/node`:** `readResumeFile` and `readJobFile` take an `extract` option, the function that reads a PDF's or DOCX's bytes, so a host can run `/node/child` while keeping the path, type and size checks.
+  - **Action:** each run writes its report to its own file in `RUNNER_TEMP`, so a job checking two resumes keeps both reports. Read its path from the `report` output; a step that opened `$RUNNER_TEMP/ats-report.json` by name must use the output instead.
+  - Docs: a report repeats for the same input, policy and reference date (`now`), as tenure and "present" are counted from it.
+  - Bundle sizes (gzipped): `.` from 100.9 to 101.8 KB, `/locales` from 75.5 to 75.6, and the AI adapters from 1.9 to 2.2 KB each.
+
 ## 0.11.0
 
 ### Minor Changes
