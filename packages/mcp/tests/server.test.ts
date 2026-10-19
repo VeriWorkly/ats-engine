@@ -64,6 +64,8 @@ writeFileSync(jobPath, JOB);
 const credentialsPath = join(dir, "credentials");
 writeFileSync(credentialsPath, "[default]\naws_secret_access_key = wJalrXUtnFEMIK7MDENG");
 mkdirSync(join(dir, "folder.pdf"));
+const damagedPath = join(dir, "damaged.pdf");
+writeFileSync(damagedPath, "%PDF-1.4\nnot a PDF past its header");
 
 let client: Client;
 
@@ -264,6 +266,8 @@ describe("ats-engine-mcp refuses a bad call with a tool error", () => {
     ["a folder", { path: join(dir, "folder.pdf") }, /is a folder, not a file/],
     ["a missing file", { path: join(dir, "missing.pdf") }, /No such file: /],
     ["an unsupported type", { path: join(dir, "resume.rtf") }, /Unsupported resume file type/],
+    // Read in the extraction process, whose answer comes back as the reason.
+    ["a damaged PDF", { path: damagedPath }, /could not be read as a PDF; it may be damaged/],
     ["both path and text", { path: pdfPath, text: RESUME.join("\n") }, /path or as text, not both/],
     ["neither path nor text", {}, /Give the resume: path .* or text/],
     ["text too short to be a resume", { text: "Jane Doe" }, /too short to be a resume/],

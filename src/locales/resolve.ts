@@ -117,7 +117,10 @@ export type AtsLocale = { languages: string[]; region: string | null };
 
 /** Set the languages and the region a resume is read in, instead of detecting them. */
 export type AtsLocaleOptions = {
-  /** Language pack ids to read with, instead of detecting them. `[]` reads with the base only. */
+  /**
+   * Language pack ids to read with, instead of detecting them, in any case. `[]`, or the policy's
+   * own language, reads with the base only; an id no attached pack has throws `AtsPolicyError`.
+   */
   languages?: string[] | undefined;
   /** The region pack id to apply (any case), instead of inferring one; unknown ids throw. */
   region?: string | undefined;
@@ -182,6 +185,19 @@ export function localizePolicy(
       [{ path: "locales.regions", message: `no region pack with id "${options.region}"` }],
     );
   }
+  // Languages asked for, the same: in any case, the policy's own language naming no pack, and
+  // an id no pack has refused rather than read as the base without a word.
+  const askedLanguages = options.languages?.map((id) => id.toLowerCase());
+  const unknown = askedLanguages?.find(
+    (id) => id !== policy.text.language && !packs.some((pack) => pack.id === id),
+  );
+  if (unknown !== undefined) {
+    const attached = packs.map((pack) => pack.id).join(", ") || "none";
+    throw new AtsPolicyError(
+      `Language "${unknown}" is not attached to the policy (attached: ${attached}).`,
+      [{ path: "locales.languages", message: `no language pack with id "${unknown}"` }],
+    );
+  }
   const dateOrder = dateOrderIn(resumeText.slice(0, DETECTION_SAMPLE));
   const resumeSample = sampleOf(resumeText);
   // In no pack's language: the base's, or, when the resume says it is not that either, none.
@@ -198,8 +214,8 @@ export function localizePolicy(
     text === resumeText ? "" : text.startsWith(resumeText) ? text.slice(resumeText.length) : text;
   const postingSample = posting ? sampleOf(posting) : undefined;
   const inResume = packs.filter((pack) => isWrittenIn(resumeSample, pack));
-  const languages = options.languages
-    ? packs.filter((pack) => options.languages!.includes(pack.id))
+  const languages = askedLanguages
+    ? packs.filter((pack) => askedLanguages.includes(pack.id))
     : packs.filter(
         (pack) =>
           inResume.includes(pack) ||

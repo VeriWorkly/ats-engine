@@ -186,6 +186,22 @@ describe("readResumeFile and readJobFile", () => {
     await expect(refused).rejects.toThrow(/comma\.json is not valid JSON \(line 2 column \d+\)\.$/);
   });
 
+  // A host that extracts in another process (the MCP server, through /node/child) keeps the same
+  // checks on the path, the type and the size, and only the parsing moves.
+  it("extract a PDF or DOCX with the extractor a host passes", async () => {
+    const extract = vi.fn(async () => ({
+      text: "Jane Doe, Senior Engineer at Acme since 2019. ".repeat(3),
+    }));
+    const resume = await readResumeFile(file("cv.pdf", "%PDF-1.4"), { extract });
+    expect(extract).toHaveBeenCalledWith(expect.any(Uint8Array), "pdf");
+    expect(resume.input).toContain("Jane Doe");
+    const job = await readJobFile(file("job.docx", "PK"), { extract });
+    expect(extract).toHaveBeenLastCalledWith(expect.any(Uint8Array), "docx");
+    expect(job.text).toContain("Senior Engineer");
+    await expect(readResumeFile(file("cv.exe", "x"), { extract })).rejects.toThrow(/Unsupported/);
+    expect(extract).toHaveBeenCalledTimes(2);
+  });
+
   it("are public on /node", () => {
     expect(node.readResumeFile).toBe(readResumeFile);
     expect(node.readJobFile).toBe(readJobFile);

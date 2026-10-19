@@ -40,8 +40,8 @@ const { version } = JSON.parse(
 ) as { version: string };
 
 const DETERMINISTIC =
-  "The score comes from a published, deterministic rubric (the same file always gets the same " +
-  "score), not from an AI model; present it as the rubric's result, not your own judgement.";
+  "The score comes from a published, deterministic rubric (the same file gets the same score " +
+  "from the same engine on the same day), not from an AI model; present it as the rubric's result, not your own judgement.";
 
 const INTENDED_USE =
   "Use it only on the user's own resume, at their request: it is a tool for candidates. Never " +

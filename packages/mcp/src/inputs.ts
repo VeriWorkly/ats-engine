@@ -4,6 +4,8 @@
  * (`@veriworkly/ats-engine/node`), the same policy with the bundled locale packs.
  */
 
+import { fork } from "node:child_process";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
@@ -20,6 +22,9 @@ import {
   normalizeExtractedText,
   readJobFile,
   readResumeFile,
+  type AtsExtraction,
+  type AtsExtractResponse,
+  type AtsResumeFormat,
 } from "@veriworkly/ats-engine/node";
 
 /** The community policy with the bundled language and region packs, as the CLI scores. */
@@ -32,6 +37,49 @@ export const MAX_TEXT_CHARS = 200_000;
 
 /** A mistake in the call, reported to the assistant as a tool error in plain words. */
 export class ToolInputError extends Error {}
+
+const CHILD = createRequire(import.meta.url).resolve("@veriworkly/ats-engine/node/child");
+/** The longest one PDF or DOCX may take to read before its process is stopped. */
+const EXTRACT_TIMEOUT_MS = 60_000;
+
+/**
+ * Reads a PDF or DOCX in its own `/node/child` process, one per file: a file that runs out of
+ * memory, crashes pdf.js or never ends takes down that process, not this server. Memory still
+ * needs an OS limit (SECURITY.md); a process can only be stopped, not capped, from here.
+ */
+export function extractInChild(data: Uint8Array, format: AtsResumeFormat): Promise<AtsExtraction> {
+  return new Promise((done, fail) => {
+    const child = fork(CHILD, [], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
+    const stop = (error?: Error, result?: AtsExtraction) => {
+      clearTimeout(timer);
+      child.removeAllListeners();
+      child.kill();
+      if (error) fail(error);
+      else done(result!);
+    };
+    const timer = setTimeout(
+      () =>
+        stop(
+          new AtsFileError(
+            `Reading the file took longer than ${EXTRACT_TIMEOUT_MS / 1000} s and was stopped.`,
+          ),
+        ),
+      EXTRACT_TIMEOUT_MS,
+    );
+    child.on("message", (answer: AtsExtractResponse) =>
+      answer.ok
+        ? stop(undefined, { text: answer.text, ...(answer.layout && { layout: answer.layout }) })
+        : stop(new AtsFileError(answer.message)),
+    );
+    child.on("error", (error) =>
+      stop(new AtsFileError(`Could not read the file: ${error.message}`)),
+    );
+    child.on("exit", (code, signal) =>
+      stop(new AtsFileError(`Reading the file stopped its process (${signal ?? `exit ${code}`}).`)),
+    );
+    child.send({ id: 1, format, buffer: Buffer.from(data).toString("base64") });
+  });
+}
 
 /** `~/cv.pdf` as a shell would read it; relative paths against the server's working directory. */
 function absolute(path: string): string {
@@ -57,7 +105,8 @@ export async function readResume(
   args: ResumeArgs,
 ): Promise<{ input: AtsResumeInput; layout?: AtsLayoutSignals; file?: AtsFileInfo }> {
   exactlyOne(args.path, args.text, "resume", ["path", "text"]);
-  if (args.path !== undefined) return readResumeFile(absolute(args.path));
+  if (args.path !== undefined)
+    return readResumeFile(absolute(args.path), { extract: extractInChild });
   if (args.text === undefined)
     throw new ToolInputError(
       "Give the resume: path (a file on this computer) or text (the resume itself).",
@@ -76,7 +125,7 @@ export async function readJob(
   exactlyOne(args.job_path, args.job_text, "job posting", ["job_path", "job_text"]);
   const job =
     args.job_path !== undefined
-      ? await readJobFile(absolute(args.job_path))
+      ? await readJobFile(absolute(args.job_path), { extract: extractInChild })
       : args.job_text !== undefined
         ? { text: normalizeJobText(args.job_text) }
         : undefined;

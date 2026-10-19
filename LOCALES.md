@@ -57,7 +57,9 @@ report.locale; // { languages: ["de"], region: "DE" }
   metadata places in Guernsey, Jersey or the Isle of Man ("+44 7911 123456" reads as Guernsey)
   names no attached region, so such a resume is read in `GB` only when asked for.
 
-- Pass `languages` or `region` to `check` to override detection. A host that knows the user's
+- Pass `languages` or `region` to `check` to override detection, in any case (`"DE"`, `"fr"`).
+  An id no attached pack has throws `AtsPolicyError` naming the attached ones; `[]`, or the
+  policy's own language (`"en"`), reads with the base only. A host that knows the user's
   country should pass it.
 
 ## Built-in packs

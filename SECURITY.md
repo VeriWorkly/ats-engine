@@ -139,7 +139,10 @@ origin and a 307 resends the request body. They ask `fetch` to hand a redirect b
 browser's opaque redirect (status 0), or a response reached by following one. The call fails,
 without a retry, with an error that names the redirect and the address's origin, never its path.
 A `fetch` you pass in receives the option and must pass it on: one that follows a redirect
-anyway has already sent the key on, and only its answer is refused. `ats-engine check --ai` reads the key from the environment only, never
+anyway has already sent the key on, and only its answer is refused. A provider's answer, an
+error's included, is read to 4 MB and refused past it, before it is
+parsed: a declared `content-length` past it is refused unread, and a streamed body stops there (a
+`fetch` you pass in without a stream body is read whole, then measured). `ats-engine check --ai` reads the key from the environment only, never
 from a flag, so it does not land in shell history or the process list, and never prints it. The
 CLI says which provider and model the resume is about to be sent to before the request leaves,
 and refuses to send a key over plain `http` to any host but this machine (`localhost`,
@@ -160,8 +163,10 @@ reads at most 20 MB. `npm run smoke` fails if the core, `/document`, `/format`, 
 **The MCP server.** `@veriworkly/ats-engine-mcp` talks over stdio only, makes no network requests
 and calls no model. It reads the files a tool call names, with the rights of the user running it,
 and nothing else; folders, pipes, devices, network paths and files over 20 MB are refused, and so
-is a `job_path` that is not a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file. Its
-stdout carries only the protocol. Its answers include text from the resume, which the assistant
+is a `job_path` that is not a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file. It reads a PDF or
+DOCX in its own `/node/child` process, one per file, stopped after 60 seconds, so a file that
+exhausts memory, crashes the parser or never ends takes down that process and not the server;
+memory still needs an OS limit to stop it early (see **Size**). Its stdout carries only the protocol. Its answers include text from the resume, which the assistant
 sends to its own model provider.
 
 **The GitHub Action.** Its inputs reach `run.mjs` as environment variables, never pasted into a

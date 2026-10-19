@@ -7,7 +7,7 @@
 
 Read a resume the way an applicant tracking system (ATS) does, see what it would store, and get a score with a reason behind every point.
 
-`@veriworkly/ats-engine` is an open-source resume checker from [VeriWorkly](https://veriworkly.com), a privacy-first resume builder. It parses a resume into the fields an ATS keeps, scores it against a [published rubric](./RUBRIC.md), and compares it with a job posting requirement by requirement. The same input always produces the same report. The core does no network calls and keeps no state, so it runs in a browser, at the edge, or on a server.
+`@veriworkly/ats-engine` is an open-source resume checker from [VeriWorkly](https://veriworkly.com), a privacy-first resume builder. It parses a resume into the fields an ATS keeps, scores it against a [published rubric](./RUBRIC.md), and compares it with a job posting requirement by requirement. The same input, policy and reference date (`now`, from which tenure and "present" are counted) always produce the same report. The core does no network calls and keeps no state, so it runs in a browser, at the edge, or on a server.
 
 To try it without installing anything, upload a resume to the [VeriWorkly ATS checker](https://veriworkly.com/ats-checker), which runs on this engine.
 
@@ -245,7 +245,7 @@ Soft skills ("communication", "teamwork", "attention to detail") come from the p
 
 ### Read resumes in other languages
 
-Attach the locale packs once at startup and reuse the policy. Language and region are detected per resume, or you can set them with the `languages` and `region` options.
+Attach the locale packs once at startup and reuse the policy. Language and region are detected per resume, or you can set them with the `languages` and `region` options (any case; an id no attached pack has throws `AtsPolicyError`).
 
 ```ts
 import { check, DEFAULT_POLICY } from "@veriworkly/ats-engine";

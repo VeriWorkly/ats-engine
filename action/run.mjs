@@ -79,8 +79,12 @@ try {
   fail("ats-engine did not print a JSON report.");
 }
 
-const reportPath = join(env.RUNNER_TEMP || ".", "ats-report.json");
-writeFileSync(reportPath, JSON.stringify(report, null, 2));
+// One file per run: a job that checks two resumes keeps both reports.
+const reportPath = join(
+  env.RUNNER_TEMP || ".",
+  `ats-report-${randomBytes(6).toString("hex")}.json`,
+);
+writeFileSync(reportPath, JSON.stringify(report, null, 2), { flag: "wx" });
 
 const failed = (report.failedChecks ?? []).map(({ id, severity, evidence, fix }) => ({
   id,

@@ -227,6 +227,18 @@ describe("detection", () => {
     expect(check(LOCALE_FIXTURES.de[0].text, { languages: [] }).locale.languages).toEqual([]);
   });
 
+  // A language asked for by an id no pack has was dropped without a word: "DE" read a German
+  // resume with no German at all, its roles lost and the English writing rules judging it.
+  it("reads a language asked for in any case, and refuses one no pack has", () => {
+    const german = LOCALE_FIXTURES.de[0].text;
+    expect(check(german, { languages: ["DE"] }).locale.languages).toEqual(["de"]);
+    // The policy's own language names no pack: the base alone, as `[]` does.
+    expect(check(german, { languages: ["en"] }).locale.languages).toEqual([]);
+    expect(() => check(german, { languages: ["deu"] })).toThrow(
+      /Language "deu" is not attached to the policy \(attached: de, fr, hi\)/,
+    );
+  });
+
   it("keeps German stopwords out of an English posting's keywords", () => {
     const report = check("Jane Doe\nArt director.", {
       jobDescription: "Requirements\nArt direction and die-cut packaging design",

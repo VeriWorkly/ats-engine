@@ -404,3 +404,79 @@ describe("redirects", () => {
     ).rejects.toMatchObject({ retryable: true, message: "Network error." });
   });
 });
+
+describe("the provider's answer is read to a limit", () => {
+  // The timeout bounds how long, not how much: a broken or hostile endpoint could stream gigabytes
+  // into memory before it fired.
+  async function answering(handler: http.RequestListener): Promise<[http.Server, string]> {
+    const server = http.createServer(handler);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    return [server, `http://127.0.0.1:${(server.address() as AddressInfo).port}`];
+  }
+  const tooBig = /answered with more than 4 MB/;
+
+  it("stops reading an answer that never ends", async () => {
+    let sent = 0;
+    const [server, baseUrl] = await answering((req, res) => {
+      req.resume();
+      res.setHeader("content-type", "application/json");
+      const chunk = Buffer.alloc(64 * 1024, 32);
+      const pump = () => {
+        while (sent < 64 * 1024 * 1024 && res.write(chunk)) sent += chunk.length;
+        if (sent < 64 * 1024 * 1024) res.once("drain", pump);
+        else res.end();
+      };
+      pump();
+    });
+    try {
+      const provider = openAiCompatible({ apiKey: "k", baseUrl });
+      await expect(provider.complete(request())).rejects.toMatchObject({
+        retryable: false,
+        message: expect.stringMatching(tooBig),
+      });
+      expect(sent).toBeLessThan(64 * 1024 * 1024);
+    } finally {
+      server.closeAllConnections();
+      server.close();
+    }
+  });
+
+  it("refuses an answer that declares more, an error included, before reading it", async () => {
+    const read = vi.fn(async () => "{}");
+    const fetch = vi.fn<FetchLike>(async () => ({
+      ok: false,
+      status: 500,
+      headers: {
+        get: (name: string) => (name === "content-length" ? String(5 * 1024 * 1024) : null),
+      },
+      text: read,
+    }));
+    // A 500 stays retryable however much it says: a gateway's error page is not the model's answer.
+    await expect(anthropic({ apiKey: "k", fetch }).complete(request())).rejects.toMatchObject({
+      message: expect.stringMatching(tooBig),
+      status: 500,
+      retryable: true,
+    });
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  // node-fetch's body is a Node stream, a test double's a string, its headers a plain object:
+  // what has no reader or no `get` is read with `text()`, as before the limit.
+  it.each([
+    ["a Node stream body", { body: { pipe() {} }, headers: new Map() }],
+    ["a string body", { body: "{}" }],
+    ["plain-object headers", { headers: { "content-type": "application/json" } }],
+  ])("reads an answer with %s", async (_, shape) => {
+    const answer = { content: [{ type: "text", text: '{"ok":true}' }] };
+    const fetch = vi.fn<FetchLike>(
+      async () =>
+        ({ ok: true, status: 200, text: async () => JSON.stringify(answer), ...shape }) as never,
+    );
+    await expect(anthropic({ apiKey: "k", fetch }).complete(request())).resolves.toBeDefined();
+  });
+
+  it("refuses an answer a host's fetch hands over whole", async () => {
+    const fetch = fetchReturning(200, "x".repeat(5 * 1024 * 1024));
+    await expect(anthropic({ apiKey: "k", fetch }).complete(request())).rejects.toThrow(tooBig);
+  });
+});

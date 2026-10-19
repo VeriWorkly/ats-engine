@@ -67,8 +67,10 @@ const BUDGETS = {
   // 73.2: the language detection words the policy now carries (see "./locales" at 75.7), on top
   // of the redaction at 72.5, took it to 73.0.
   "./ai": 73.2,
-  "./ai/openai-compatible": 2,
-  "./ai/anthropic": 2,
+  // 2.4: reading a provider's answer as a stream to 4 MB, an error's included, took them to 2.11
+  // and 2.15.
+  "./ai/openai-compatible": 2.4,
+  "./ai/anthropic": 2.4,
   "./ai/testing": 1.5,
   // The zip reader is a port of JSZip's, so the expansion budget reads exactly what mammoth will.
   // 17: reading order by geometry, DOCX headers, footers, styles and links, and the PDF link
