@@ -55,6 +55,12 @@ alters the score or the recovered fields, at the same level: the server returns 
 change breaking only to code (a type, a frozen export) needs none. The GitHub Action in `action/` is
 in neither package: a change there needs no changeset unless the engine changes with it.
 
+The documentation at [docs.veriworkly.com/ats-engine](https://docs.veriworkly.com/ats-engine) lives
+in the VeriWorkly monorepo, under `apps/docs-platform/content/ats-engine`. Its rubric, locales,
+changelog and type tables are generated from the published package when the site moves to a new
+engine, and every TypeScript sample there is compiled against it. A change that alters what a
+guide says (an option, a default, a limit, a flag) needs a docs change there too.
+
 ## Releasing
 
 Releases go out from `main` through changesets and `.github/workflows/release.yml`:

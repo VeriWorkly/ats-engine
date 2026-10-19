@@ -11,6 +11,8 @@ Read a resume the way an applicant tracking system (ATS) does, see what it would
 
 To try it without installing anything, upload a resume to the [VeriWorkly ATS checker](https://veriworkly.com/ats-checker), which runs on this engine.
 
+**Documentation: [docs.veriworkly.com/ats-engine](https://docs.veriworkly.com/ats-engine)**: guides for Node, Next.js, the edge and the browser, the CLI, the GitHub Action and the MCP server, and a reference generated from each release. Product page: [veriworkly.com/ats-engine](https://veriworkly.com/ats-engine).
+
 [Install](#install) · [Quick start](#quick-start) · [MCP](#use-it-from-an-ai-assistant-mcp) · [GitHub Actions](#use-it-in-github-actions) · [Use it in your app](#use-it-in-your-app) · [AI features](#ai-features) · [Run from source](#run-from-source) · [Documentation](#documentation)
 
 ## What it does
@@ -425,6 +427,8 @@ node dist/cli/index.js check path/to/resume.pdf --job path/to/posting.txt
 | `npm run check` | Everything CI runs: build, types, lint, tests, sizes, smoke, pack |
 
 ## Documentation
+
+The full documentation is at **[docs.veriworkly.com/ats-engine](https://docs.veriworkly.com/ats-engine)**: a quick start, concepts, guides for each runtime, the CLI, the GitHub Action and the MCP server, and a reference for every export, option and report field. In this repository:
 
 - [RUBRIC.md](./RUBRIC.md): every rule, its weight and its fix, generated from the policy
 - [LOCALES.md](./LOCALES.md): supported languages and regions, and how to add one

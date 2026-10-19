@@ -29,7 +29,7 @@
     "type": "git",
     "url": "git+https://github.com/VeriWorkly/ats-engine.git"
   },
-  "homepage": "https://github.com/VeriWorkly/ats-engine#readme",
+  "homepage": "https://docs.veriworkly.com/ats-engine",
   "bugs": {
     "url": "https://github.com/VeriWorkly/ats-engine/issues"
   },

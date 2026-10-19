@@ -5,6 +5,8 @@ Code Copilot and others) read **your own resume** the way an applicant tracking 
 does, and score it with [`@veriworkly/ats-engine`](https://github.com/VeriWorkly/ats-engine#readme)'s published, deterministic
 rubric.
 
+Setup for each client, every tool and its inputs, and example prompts: **[docs.veriworkly.com/ats-engine/tools/mcp](https://docs.veriworkly.com/ats-engine/tools/mcp)**.
+
 Ask your assistant things like "check my resume at ~/Documents/cv.pdf", "how well does it match
 this job posting?", "why did it fail the date check?" or "show me how an ATS reads my resume".
 
