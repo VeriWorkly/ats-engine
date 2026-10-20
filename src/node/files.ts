@@ -7,6 +7,7 @@ import type { AtsResumeInput } from "../input.js";
 import type { AtsFileInfo } from "../types.js";
 import { extractJobPosting, jobTextFromHtml, normalizeJobText } from "../job/index.js";
 import {
+  decodeText,
   detectResumeFormat,
   extractResume,
   type AtsExtraction,
@@ -108,7 +109,8 @@ function size(bytes: number): string {
 /** A file's JSON, or an error naming the file. */
 export function parseJsonFile(data: Buffer, path: string): unknown {
   try {
-    return JSON.parse(data.toString("utf8"));
+    // Decoded as a resume's text is: a byte-order mark, UTF-16 or Windows-1252 is read, not refused.
+    return JSON.parse(decodeText(data));
   } catch (error) {
     // Only where it failed: the parser's message quotes the text near the error, which can be a
     // secret.
@@ -174,15 +176,23 @@ export async function readJobFile(path: string, options?: AtsReadFileOptions): P
       `Unsupported job posting file type "${extname(path) || path}". Use .txt, .md, .html, .pdf or .docx.`,
     );
   const data = await readFileBytes(path, options);
+  // Decoded as a resume's text is: a UTF-16 posting (Notepad's "Unicode", PowerShell 5's `>`) read
+  // as UTF-8 matched nothing and listed its letters as missing keywords.
+  let job: AtsJobFile;
   if (/\.html?$/i.test(path)) {
-    const html = data.toString("utf8");
+    const html = decodeText(data);
     const company = extractJobPosting(html)?.company;
-    return company ? { text: jobTextFromHtml(html), company } : { text: jobTextFromHtml(html) };
+    job = company ? { text: jobTextFromHtml(html), company } : { text: jobTextFromHtml(html) };
+  } else {
+    const format = detectResumeFormat(path);
+    const text =
+      format === "pdf" || format === "docx"
+        ? (await (options?.extract ?? extractResume)(data, format)).text
+        : decodeText(data);
+    job = { text: normalizeJobText(text) };
   }
-  const format = detectResumeFormat(path);
-  const text =
-    format === "pdf" || format === "docx"
-      ? (await (options?.extract ?? extractResume)(data, format)).text
-      : data.toString("utf8");
-  return { text: normalizeJobText(text) };
+  // A scanned posting, or an empty page, is no posting: refused rather than read as none, which
+  // scored no job match and said nothing.
+  if (!job.text.trim()) throw new AtsFileError(`${path} has no readable job posting text.`);
+  return job;
 }

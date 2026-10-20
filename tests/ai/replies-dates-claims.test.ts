@@ -12,6 +12,7 @@ import { PLAIN } from "../../src/cli/terminal.js";
 import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { mergeGrounded, writtenYears, type AtsRepairCandidate } from "../../src/repair/merge.js";
+import { expectFastAsync } from "../fixtures/timing.js";
 
 const NOW = new Date("2026-06-01");
 const empty = AtsScoringService.check("", DEFAULT_POLICY, { now: NOW }).parsed;
@@ -149,8 +150,20 @@ describe("reasoning-model replies", () => {
       "a JSON string holding a fence",
       JSON.stringify({ explanation: "Fine.", missingEvidence: ["```x```"] }),
     ],
+    ["a fenced block after prose", `Here it is:\n\`\`\`json\n${INSIGHTS}\n\`\`\`\nDone.`],
+    ["a fence on one line", `\`\`\`json${INSIGHTS}\`\`\``],
   ])("reads %s", async (_label, text) => {
     expect(await read(text)).toBe("Fine.");
+  });
+
+  // A lazy pattern scanned to the end of the reply from every fence left open, growing with the
+  // square of the reply; a reply may run to 4 MB.
+  it("refuses a reply of open fences in bounded time", async () => {
+    const text = `${"```{".repeat(60_000)}${INSIGHTS}`;
+    await expectFastAsync(
+      () => expect(read(text)).rejects.toMatchObject({ code: "invalid_output" }),
+      1_000,
+    );
   });
 });
 

@@ -30,6 +30,15 @@ export type AtsLayoutSignals = {
    * nothing is hidden.
    */
   hiddenText?: string;
+  /**
+   * Of that hidden text, what the document's text holds too, collapsed, joined and cut as
+   * `hiddenText` is: the part an ATS reads, which the job match leaves out. On a PDF all of it; in
+   * a Word document all but the runs a header or footer marks hidden, which its text leaves out;
+   * in an HTML resume none, as hidden elements are left out of the text. Hidden text the text does
+   * not hold can never cost a visible line. Absent from an older extractor or a host that does not
+   * pass it: the engine then sets aside by `hiddenText` and cuts nothing from a visible line.
+   */
+  hiddenTextRead?: string;
   /** Pages with no text layer at all: a scan, or a page exported as a picture. */
   imageOnlyPages?: number;
   /**

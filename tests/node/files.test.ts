@@ -15,6 +15,7 @@ import { printable } from "../../src/format/index.js";
 import {
   AtsFileError,
   MAX_FILE_BYTES,
+  parseJsonFile,
   readFileBytes,
   readJobFile,
   readResumeFile,
@@ -155,6 +156,35 @@ describe("readResumeFile and readJobFile", () => {
     expect(
       (await readJobFile(file("job.txt", "Platform Engineer\n\n\nGo required"))).text,
     ).toContain("Go required");
+  });
+
+  // A posting and a JSON file are decoded as a resume's text is: a UTF-16 posting read as UTF-8
+  // matched nothing and listed its letters as missing keywords, and a byte-order mark made valid
+  // JSON "not valid JSON".
+  it("decode a posting and a JSON file the way a resume is decoded", async () => {
+    const posting = "Développeur Senior\nPython and Kubernetes required";
+    const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(posting, "utf16le")]);
+    expect((await readJobFile(file("job-utf16.txt", utf16))).text).toContain("Développeur");
+    const cp1252 = Buffer.from("D\xe9veloppeur Senior, Python required", "latin1");
+    expect((await readJobFile(file("job-1252.txt", cp1252))).text).toContain("Développeur");
+    const page = Buffer.concat([
+      Buffer.from([0xff, 0xfe]),
+      Buffer.from(`<p>${posting}</p>`, "utf16le"),
+    ]);
+    expect((await readJobFile(file("job-utf16.html", page))).text).toContain("Kubernetes");
+    const bom = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"a": 1}')]);
+    expect(parseJsonFile(bom, "policy.json")).toEqual({ a: 1 });
+  });
+
+  // A scanned posting, or an empty page, is refused: read as no posting, it scored no job match
+  // and said nothing, in the CLI and the Action.
+  it("refuse a posting with no readable text", async () => {
+    await expect(readJobFile(file("empty.txt", "  \n\n "))).rejects.toThrow(
+      /has no readable job posting text/,
+    );
+    await expect(
+      readJobFile(file("empty.html", "<html><body> </body></html>")),
+    ).rejects.toBeInstanceOf(AtsFileError);
   });
 
   // A posting's words come back as missing keywords: any other file read as a posting (a

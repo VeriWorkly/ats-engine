@@ -230,6 +230,157 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).not.toContain("machine learning");
   });
 
+  // White "Kafka Kubernetes" drawn after "Senior Engineer" on one line: on a PDF, whose hidden
+  // runs are all among its lines, it is cut from that line and the rest of the line stays.
+  const glued = [
+    "Jane Doe",
+    "jane.doe@example.com",
+    "Experience",
+    "Senior Engineer Kafka Kubernetes",
+    "Jan 2020 - Present",
+    "- Built payment systems in Python for 2 million users.",
+    "Skills",
+    "Python, Terraform",
+  ].join("\n");
+  const gluedJob = "Experience with Python, Terraform, Kafka and Kubernetes";
+
+  it("cuts hidden text inside a visible line when the hidden runs are among the lines", () => {
+    const report = AtsScoringService.check(glued, DEFAULT_POLICY, {
+      jobDescription: gluedJob,
+      now: NOW,
+      layout: layout({
+        hiddenTextSample: "Kafka Kubernetes",
+        hiddenText: "Kafka Kubernetes",
+        hiddenTextChars: 200,
+        hiddenTextRead: "Kafka Kubernetes",
+      }),
+    });
+    expect(report.matchedKeywords).toEqual(expect.arrayContaining(["python", "terraform"]));
+    expect(report.matchedKeywords).not.toContain("kafka");
+    expect(report.matchedKeywords).not.toContain("kubernetes");
+  });
+
+  // The hidden copy is drawn against punctuation ("Kafka-based") or across two lines, so the one
+  // copy held between word ends is a visible one: a word the kept lines hold more often than the
+  // hidden text owes is not cut, and the visible skill stays.
+  it.each([
+    [
+      "against punctuation",
+      ["- Built Kafka-based pipelines", "Skills", "Kafka Kubernetes"],
+      "Kafka",
+      "kafka",
+    ],
+    [
+      "across two lines",
+      [
+        "- Led the data team Machine",
+        "- Learning curve shortened",
+        "- Applied Machine Learning to fraud",
+      ],
+      "Machine Learning",
+      "machine learning",
+    ],
+  ])("cuts no visible copy when the hidden one is %s", (_, body, hiddenText, term) => {
+    const resume = ["Jane Doe", "jane.doe@example.com", "Experience", ...body].join("\n");
+    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+      jobDescription: "Experience with Kafka, Kubernetes and Machine Learning",
+      now: NOW,
+      layout: layout({
+        hiddenTextSample: hiddenText,
+        hiddenText,
+        hiddenTextChars: 200,
+        hiddenTextRead: hiddenText,
+      }),
+    });
+    expect(report.matchedKeywords).toContain(term);
+    expect(
+      report.requirements.some((r) => r.evidence.some((line) => line.includes("\u2063"))),
+    ).toBe(false);
+  });
+
+  // The visible twins of two hidden lines are set aside in their place: the hidden lines kept
+  // are read apart, so they make no phrase together.
+  it("reads apart the kept copies of a line whose other copies are set aside", () => {
+    const resume = [
+      "Jane Doe",
+      "jane.doe@example.com",
+      "Experience",
+      "Built Python Machine",
+      "Learning Spark Jobs",
+      "Projects",
+      "Built Python Machine",
+      "Awards",
+      "Learning Spark Jobs",
+    ].join("\n");
+    const hiddenText =
+      `Built Python Machine Learning Spark Jobs ${"Built Python Machine ".repeat(240)}`.trim();
+    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+      jobDescription: "Experience with Python, Spark and Machine Learning",
+      now: NOW,
+      layout: layout({
+        hiddenTextSample: hiddenText.slice(0, 80),
+        hiddenText: hiddenText.slice(0, 5_000),
+        hiddenTextChars: 6_000,
+      }),
+    });
+    expect(report.matchedKeywords).not.toContain("machine learning");
+  });
+
+  // A web page's hidden element, or a Word header's hidden run, is reported hidden but is not in
+  // the text: no ATS reads it, so the visible line that repeats it stays whole.
+  it("sets aside nothing for hidden text the lines do not hold", () => {
+    const resume = ["Jane Doe", "jane.doe@example.com", "Skills", "Kafka Kubernetes"].join("\n");
+    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+      jobDescription: "Experience with Kafka and Kubernetes",
+      now: NOW,
+      layout: layout({
+        hiddenTextSample: "Kafka Kubernetes",
+        hiddenText: "Kafka Kubernetes",
+        hiddenTextChars: 200,
+        hiddenTextRead: "",
+      }),
+    });
+    expect(report.matchedKeywords).toEqual(expect.arrayContaining(["kafka", "kubernetes"]));
+  });
+
+  // A layout from an older extractor, or a host that passes only `hiddenText`, does not say which
+  // hidden text the lines hold: nothing is cut from a visible line, as before.
+  it("cuts nothing from a visible line when the layout does not say what the lines hold", () => {
+    const report = AtsScoringService.check(glued, DEFAULT_POLICY, {
+      jobDescription: gluedJob,
+      now: NOW,
+      layout: layout({
+        hiddenTextSample: "Kafka Kubernetes",
+        hiddenText: "Kafka Kubernetes",
+        hiddenTextChars: 200,
+      }),
+    });
+    expect(report.matchedKeywords).toEqual(expect.arrayContaining(["kafka", "kubernetes"]));
+  });
+
+  // A second column's hidden runs read first, and a visible "Airflow Kafka" across their join:
+  // it splits into their texts one way only, so those lines are set aside and the visible stay.
+  it("sets aside the hidden lines when the hidden text runs in another order", () => {
+    const resume = [
+      "Jane Doe",
+      "jane.doe@example.com",
+      "Experience",
+      "Kafka Spark",
+      "Snowflake Airflow",
+      "Skills",
+      "Airflow Kafka",
+    ].join("\n");
+    const hiddenText = "Snowflake Airflow Kafka Spark";
+    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+      jobDescription: "Experience with Kafka, Spark, Snowflake and Airflow",
+      now: NOW,
+      layout: layout({ hiddenTextSample: hiddenText, hiddenText, hiddenTextChars: 200 }),
+    });
+    expect(report.matchedKeywords).toEqual(expect.arrayContaining(["airflow", "kafka"]));
+    expect(report.matchedKeywords).not.toContain("snowflake");
+    expect(report.matchedKeywords).not.toContain("spark");
+  });
+
   // A hidden "Go" glued to a visible word: a line under four characters is never set aside, so
   // the visible "Go" skill stays, as it always did.
   it("never sets aside a line under four characters", () => {
@@ -307,5 +458,104 @@ describe("hidden text and the job match", () => {
       layout: layout({ hiddenTextChars: 0, hiddenText: "" }),
     });
     expect(report.matchedKeywords).toContain("kubernetes");
+  });
+});
+
+/**
+ * What hidden text costs and lets through, held as it stands: generated resumes of each shape the
+ * engine meets (hidden lines, a white block wrapped over two lines, a second column's hidden runs
+ * read first, lines written twice, white text drawn after visible text on one line, and hidden
+ * text the text does not hold), each judged against what a reader sees. A skill only hidden text
+ * names must never match; visible skills lost may fall, never rise.
+ */
+describe("hidden text across generated resumes", () => {
+  const VOCAB = [
+    "Kubernetes",
+    "Terraform",
+    "Kafka",
+    "Spark",
+    "Python",
+    "Docker",
+    "Snowflake",
+    "Airflow",
+  ];
+  const posting = `Requirements\n${VOCAB.map((skill) => `- Experience with ${skill}`).join("\n")}`;
+  let seed = 11;
+  const random = () => (seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648) / 2_147_483_648;
+  const int = (n: number) => Math.floor(random() * n);
+  const pick = (n: number) => {
+    const left = [...VOCAB];
+    return Array.from({ length: n }, () => left.splice(int(left.length), 1)[0]!);
+  };
+  const SHAPES = ["lines", "wrapped", "reordered", "dupes", "inline", "outside"] as const;
+
+  it("matches no hidden-only skill and loses no more visible ones", () => {
+    const tally = Object.fromEntries(SHAPES.map((shape) => [shape, { leaked: 0, lost: 0 }]));
+    for (let n = 0; n < 600; n++) {
+      const shape = SHAPES[n % SHAPES.length]!;
+      let hiddenLines: string[];
+      let hiddenText: string;
+      if (shape === "wrapped") {
+        const block = pick(4 + int(4));
+        const at = 1 + int(block.length - 1);
+        hiddenLines = [block.slice(0, at).join(" "), block.slice(at).join(" ")];
+        hiddenText = block.join(" ");
+      } else {
+        hiddenLines = Array.from({ length: 1 + int(3) }, () => pick(1 + int(3)).join(" "));
+        hiddenText = (shape === "reordered" ? [...hiddenLines].reverse() : hiddenLines).join(" ");
+      }
+      const words = hiddenText.split(" ");
+      let visible = Array.from({ length: 1 + int(3) }, () => {
+        const r = random();
+        if (r < 0.25) return hiddenLines[int(hiddenLines.length)]!;
+        if (r < 0.55 && words.length > 1) {
+          const at = int(words.length - 1);
+          return words.slice(at, at + 1 + int(2)).join(" ");
+        }
+        return pick(1 + int(2)).join(" ");
+      });
+      if (shape === "dupes") visible = [...visible, ...visible];
+      const seen = new Set(visible.join(" ").toLowerCase().split(" "));
+      let body = hiddenLines;
+      if (shape === "inline") {
+        const host = pick(1)[0]!;
+        seen.add(host.toLowerCase());
+        body = [`${host} ${hiddenLines[0]}`, ...hiddenLines.slice(1)];
+      }
+      if (shape === "outside") body = [];
+      const resume = [
+        "Jane Doe",
+        "jane.doe@example.com",
+        "Experience",
+        "Senior Engineer, Acme Corporation",
+        "Jan 2020 - Present",
+        ...body,
+        "Skills",
+        ...visible,
+      ].join("\n");
+      const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+        jobDescription: posting,
+        now: NOW,
+        layout: layout({
+          hiddenText,
+          hiddenTextSample: hiddenText.slice(0, 80),
+          hiddenTextChars: 200,
+          hiddenTextRead: shape === "outside" ? "" : hiddenText,
+        }),
+      });
+      const matched = new Set(report.matchedKeywords);
+      for (const skill of VOCAB.map((word) => word.toLowerCase())) {
+        if (matched.has(skill) && !seen.has(skill)) tally[shape]!.leaked += 1;
+        if (seen.has(skill) && !matched.has(skill)) tally[shape]!.lost += 1;
+      }
+    }
+    // Today, out of 100 each; lower it when a change does better.
+    const lostAtMost = { lines: 0, wrapped: 0, reordered: 1, dupes: 0, inline: 0, outside: 0 };
+    for (const shape of SHAPES) {
+      expect(tally[shape]!.leaked, `${shape}: hidden-only skills matched`).toBe(0);
+      expect(tally[shape]!.lost, `${shape}: visible skills lost`).toBeLessThanOrEqual(
+        lostAtMost[shape],
+      );
+    }
   });
 });

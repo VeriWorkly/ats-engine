@@ -81,7 +81,7 @@ export function normalizeExtractedText(text: string): string {
  * those as UTF-8 turned every accented letter and curly quote into "�"; decoding a whole UTF-8
  * file as Windows-1252 for one stray byte in it turned every "é" into "Ã©".
  */
-function decodeText(data: Uint8Array): string {
+export function decodeText(data: Uint8Array): string {
   const [first, second] = data;
   if (first === 0xff && second === 0xfe) return new TextDecoder("utf-16le").decode(data);
   if (first === 0xfe && second === 0xff) return new TextDecoder("utf-16be").decode(data);
@@ -214,6 +214,9 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
       pageCount: 0,
       imageCount: measured.imageCount,
       ...hiddenSignals([measured.hiddenText, ...chunked]),
+      // What the text holds of it: the document's own, not an embedded page's hidden elements,
+      // which `readHtml` leaves out of the text.
+      hiddenTextRead: measured.hiddenTextRead,
       // Counted whole: the document's hidden text above is cut to its first 5,000 characters.
       hiddenTextChars: measured.hiddenChars + hiddenSignals(chunked).hiddenTextChars,
       // Left in by an editor: advice on the file, never scored.
@@ -244,7 +247,14 @@ function readHtmlResume(html: string): AtsExtraction {
   const { text, hidden, tables } = readHtml(html, "document");
   return {
     text,
-    layout: { columnRatio: null, tableCount: tables, pageCount: 0, ...hiddenSignals(hidden) },
+    // The hidden elements are left out of the text, so none of their text is read.
+    layout: {
+      columnRatio: null,
+      tableCount: tables,
+      pageCount: 0,
+      ...hiddenSignals(hidden),
+      hiddenTextRead: "",
+    },
   };
 }
 

@@ -38,7 +38,7 @@ export type FetchResponseLike = {
  * The most of a provider's answer that is read, an error's included: a model's JSON is a few
  * kilobytes, and the timeout bounds how long a call takes, not how much it receives.
  */
-export const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
 /** Just enough of `fetch` for the adapters: one POST. Pass your own to proxy or record calls. */
 export type FetchLike = (
