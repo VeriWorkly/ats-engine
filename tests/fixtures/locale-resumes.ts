@@ -1,9 +1,7 @@
 /**
- * Synthetic resumes per locale, with the fields an ATS should recover from each. Invented people
- * and companies only — never a real person's resume.
- *
- * Each locale's set is what `tests/locales.test.ts` holds to the field-accuracy target, and what
- * a contributor extends when they improve a pack (see LOCALES.md).
+ * Synthetic resumes per locale (invented people and companies) with the fields an ATS should
+ * recover. `tests/locales.test.ts` holds each set to the field-accuracy target; a contributor
+ * extends it when improving a pack (see LOCALES.md).
  */
 
 import { EN_FIXTURES } from "./en-resumes.js";
@@ -740,9 +738,7 @@ Excel, SQL, Tally`,
       ],
       education: [
         { school: "Example Institute of Management", isced: 7, credential: "MBA" },
-        // B.Com is an Indian credential: without the IN region (no +91, nothing else saying
-        // India) its level is not read. A host that knows the country passes `region`. The
-        // credential is labelled as written, so the bench counts it until it is read.
+        // B.Com is an Indian credential: its level is read only with the IN region (a host passes `region`).
         { school: "Sample College", isced: null, credential: "B.Com" },
       ],
       skills: ["Excel", "SQL", "Tally"],

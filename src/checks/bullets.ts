@@ -5,9 +5,8 @@ import { BULLET, wordListPattern } from "../text/text.js";
 import { memo } from "../util/memo.js";
 
 /**
- * Any year a resume could print. These helpers only ask whether a line is shaped like a role's
- * dated header, so the clock's plausibility ceiling adds nothing, and leaving it out keeps the
- * result a function of the text.
+ * No plausibility ceiling on years: these helpers only ask whether a line is shaped like a dated
+ * header.
  */
 export const ANY_YEAR = new Date(Date.UTC(9999, 0, 1));
 
@@ -20,10 +19,9 @@ const LETTER_WORD = /^[\p{L}]/u;
 const CAPITALIZED = /^\p{Lu}/u;
 
 /**
- * Whether a line reads as a sentence rather than a header: at least a third of its words start
- * in lower case. "Senior Software Engineer", "Northwind Payments | San Francisco, CA" and
- * "Softwareentwickler bei Nordwind GmbH" do not; "Led the migration of 40 services" and
- * "Entwicklung von Microservices" do. Letters without case (Devanagari) count as lower case.
+ * Whether a line reads as a sentence, not a header: at least a third of its words start in lower
+ * case ("Led the migration of 40 services" does, "Senior Software Engineer" does not). Letters
+ * without case (Devanagari) count as lower case.
  */
 export function readsAsSentence(line: string) {
   const lettered = line.split(/\s+/).filter((word) => LETTER_WORD.test(word));
@@ -33,11 +31,9 @@ export function readsAsSentence(line: string) {
 }
 
 /**
- * The lines describing work inside a role, for a resume whose list markers did not survive
- * extraction (Chrome draws `<ul>` markers as paths, so a printed PDF has no "•" to find): in an
- * experience or projects section, below a role's dated line, and written as a sentence rather
- * than as the next role's title, employer or city. Empty when there is no dated role to anchor
- * on, and the caller falls back to its own reading.
+ * The sentences below a role's dated line in an experience or projects section, for a resume
+ * whose list markers did not survive extraction (Chrome draws `<ul>` markers as paths). Empty
+ * when no role is dated.
  */
 export function roleBodyLines(lines: readonly string[], policy: AtsEnginePolicy): string[] {
   const body: string[] = [];
@@ -54,13 +50,13 @@ export function roleBodyLines(lines: readonly string[], policy: AtsEnginePolicy)
 
 const citationHeading = memo(
   (text: AtsEnginePolicy["text"]) =>
-    // Defaulted by the schema; a policy object built by hand, unparsed, may not have it.
+    // Schema-defaulted; a hand-built policy may lack it.
     new RegExp(`^${wordListPattern(text.citationHeadings ?? ["(?!)"])}`, "iu"),
 );
 
 /**
- * What a citation carries: a year, a quoted title, "et al." or an author's initials ("Doe J,",
- * "J. Doe", "Doe, J.").
+ * What a citation carries: a year, a quoted title, "et al." or author initials ("Doe J,", "J.
+ * Doe").
  */
 const CITATION_SIGNS = [
   /(?<!\d)(?:19|20)\d{2}(?!\d)/u,
@@ -71,19 +67,15 @@ const CITATION_SIGNS = [
 const CITATION = new RegExp(CITATION_SIGNS.map((sign) => sign.source).join("|"), "u");
 
 /**
- * The citations that carry two of those signs: a year alone ("Kubernetes alpha project 2021")
- * does not make a list of works of what a stuffed list is.
+ * The citations carrying two of those signs; a year alone ("Kubernetes alpha project 2021") is not
+ * one.
  */
 export const fullCitations = (cited: ReadonlySet<string>) =>
   new Set(
     [...cited].filter((line) => CITATION_SIGNS.filter((sign) => sign.test(line)).length >= 2),
   );
 
-/**
- * The citations under a section heading that opens a list of works (`text.citationHeadings`):
- * "Publications", "Invited Talks". Lines shaped as one, not bullets; any other line there is
- * read as any line is.
- */
+/** Citation-shaped lines under a heading that opens a list of works (`text.citationHeadings`). */
 export function citationLines(lines: readonly string[], policy: AtsEnginePolicy) {
   const heading = citationHeading(policy.text);
   const found = new Set<string>();

@@ -1,13 +1,11 @@
 /**
- * @veriworkly/ats-engine/locales — reading resumes in more than English.
- *
- * Attach the packs to a policy once, where it is loaded; `check` then reads each resume (and
- * posting) in the languages it is written in, and in one region:
+ * @veriworkly/ats-engine/locales: attach packs to a policy once, then `check` reads each resume
+ * in the languages and region it is written in.
  *
  *   const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
  *   check(resume, policy).locale; // { languages: ["de"], region: "DE" }
  *
- * A pack is data — see LOCALES.md for writing one, and the JSON Schemas below for checking it.
+ * A pack is data: see LOCALES.md, and the JSON Schemas below.
  */
 import * as z from "zod/mini";
 

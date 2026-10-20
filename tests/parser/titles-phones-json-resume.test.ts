@@ -17,10 +17,7 @@ import { despaceLines, segmentResume } from "../../src/parser/sections.js";
 import { segmentJob } from "../../src/matching/jobSections.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Parser defects found in review, one block per finding. Every case runs against
- * `DEFAULT_POLICY` at a fixed `now`.
- */
+// Every case runs against `DEFAULT_POLICY` at a fixed `now`.
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const rp = DEFAULT_POLICY.resumeParse;
@@ -321,7 +318,6 @@ describe("text cap splitting a surrogate pair", () => {
   });
 });
 
-/** Found by the review of the fixes above. */
 describe("heading words, bracketed counts and header separators", () => {
   const LOCALES = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
   const kinds = (lines: string[], languages: string[]) =>

@@ -1,8 +1,4 @@
-/**
- * What a tool call names — a resume file or its text, a posting file or its text, a region — read
- * the way the `ats-engine` CLI reads it: the same file readers, limits and messages
- * (`@veriworkly/ats-engine/node`), the same policy with the bundled locale packs.
- */
+/** What a tool call names (resume, posting, region), read as the `ats-engine` CLI reads it: same readers, limits, messages and policy. */
 
 import { fork } from "node:child_process";
 import { createRequire } from "node:module";
@@ -32,7 +28,7 @@ export const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 
 export const REGIONS = POLICY.locales.regions.map((pack) => pack.id);
 
-/** Pasted text longer than this is not a resume or a posting; the engine reads far less. */
+/** Pasted text longer than this is not a resume or a posting. */
 export const MAX_TEXT_CHARS = 200_000;
 
 /** A mistake in the call, reported to the assistant as a tool error in plain words. */
@@ -43,9 +39,9 @@ const CHILD = createRequire(import.meta.url).resolve("@veriworkly/ats-engine/nod
 const EXTRACT_TIMEOUT_MS = 60_000;
 
 /**
- * Reads a PDF or DOCX in its own `/node/child` process, one per file: a file that runs out of
- * memory, crashes pdf.js or never ends takes down that process, not this server. Memory still
- * needs an OS limit (SECURITY.md); a process can only be stopped, not capped, from here.
+ * Reads a PDF or DOCX in its own `/node/child` process, so a file that exhausts memory, crashes
+ * pdf.js or never ends takes down that process, not this server. Memory still needs an OS limit
+ * (SECURITY.md).
  */
 export function extractInChild(data: Uint8Array, format: AtsResumeFormat): Promise<AtsExtraction> {
   return new Promise((done, fail) => {
@@ -81,7 +77,7 @@ export function extractInChild(data: Uint8Array, format: AtsResumeFormat): Promi
   });
 }
 
-/** `~/cv.pdf` as a shell would read it; relative paths against the server's working directory. */
+/** Resolves `~/cv.pdf` and relative paths. */
 function absolute(path: string): string {
   const home = /^~(?=$|[/\\])/;
   return resolve(home.test(path) ? path.replace(home, homedir()) : path);
@@ -111,7 +107,7 @@ export async function readResume(
     throw new ToolInputError(
       "Give the resume: path (a file on this computer) or text (the resume itself).",
     );
-  // Normalised as a .txt file's text is, so pasting a file's contents scores as the file does.
+  // Normalised as a .txt file is, so pasted text scores as the file does.
   const text = normalizeExtractedText(args.text);
   if (text.length < 50)
     throw new ToolInputError("The text is too short to be a resume (under 50 characters).");
@@ -147,7 +143,7 @@ export function checkTarget(target: string | undefined): void {
     throw new ToolInputError(`Unknown target_ats "${target}"; use one of ${TARGETS.join(", ")}.`);
 }
 
-/** Whether an error's message is meant for the person: their mistake, not the server's. */
+/** Whether an error's message is for the person (their mistake), not the server's. */
 export function isUserError(error: unknown): boolean {
   return error instanceof ToolInputError || error instanceof AtsFileError;
 }

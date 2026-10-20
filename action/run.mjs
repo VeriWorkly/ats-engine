@@ -1,6 +1,5 @@
 // Runs the ats-engine CLI on the resume, writes the step outputs and the job summary, and fails
-// the step below min-score. No dependencies of its own: Node and npx come with every GitHub
-// runner, and npx fetches the engine together with the PDF and DOCX readers (its optional peers).
+// the step below min-score. Runs without a build or dependencies: npx fetches the engine.
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { appendFileSync, writeFileSync } from "node:fs";
@@ -15,10 +14,7 @@ const region = env.ATS_REGION?.trim();
 const target = env.ATS_TARGET?.trim();
 const version = env.ATS_VERSION?.trim() || "latest";
 
-/**
- * A workflow command's message, encoded as the runner decodes it: a line break in it (from an
- * input or a file name) would otherwise end the command and start another one.
- */
+/** A workflow command's message, encoded so a line break cannot end the command and start another. */
 const commandData = (text) =>
   String(text).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 
@@ -29,7 +25,7 @@ function fail(message) {
 
 if (!resume) fail("The resume input is required.");
 if (!/^[\w.-]+$/.test(version)) fail(`version "${version}" is not a version or a dist-tag.`);
-// The CLI's rule: digits only, so "0x32" and "1e1", which `Number` reads as 50 and 10, are refused.
+// Digits only, as the CLI: `Number` would read "0x32" and "1e1".
 const minScore = minScoreText
   ? /^\d+(?:\.\d+)?$/.test(minScoreText)
     ? Number(minScoreText)
@@ -38,10 +34,10 @@ const minScore = minScoreText
 if (minScore !== null && !(minScore >= 0 && minScore <= 100))
   fail(`min-score must be a number from 0 to 100, not "${minScoreText}".`);
 
-// The engine's optional peers: npx installs none on its own, and a PDF or DOCX resume needs them.
-// Each must satisfy the engine's peerDependencies (tests/action/run.test.ts checks).
+// The engine's optional peers, which a PDF or DOCX resume needs; they must satisfy its
+// peerDependencies (tests/action/run.test.ts checks).
 const peers = ["pdf-parse@2.4.5", "pdfjs-dist@5.4.296", "mammoth@1.12.0"];
-// Absolute, because npx runs outside the repository: see the spawn below.
+// Absolute: npx runs outside the repository.
 const cliArgs = ["check", resolve(resume), "--json"];
 if (job) cliArgs.push("--job", resolve(job));
 if (region) cliArgs.push("--region", region);
@@ -49,25 +45,22 @@ if (target) cliArgs.push("--ats", target);
 const packages = [`@veriworkly/ats-engine@${version}`, ...peers];
 const args = ["--yes", ...packages.flatMap((spec) => ["-p", spec]), "ats-engine", ...cliArgs];
 
-// On Windows `npx` is a .cmd file, which only a shell runs, and a shell would split a path with
-// spaces: npx's own script is run with this Node instead. ATS_ENGINE_CLI runs a local build of
-// the CLI instead of the published one; the engine's own tests use it.
+// On Windows `npx` is a .cmd that needs a shell, which would split paths with spaces: npx's
+// script is run with this Node instead. ATS_ENGINE_CLI runs a local CLI build (the tests use it).
 const local = env.ATS_ENGINE_CLI?.trim();
 const [command, prefix] = local
   ? [process.execPath, [local]]
   : process.platform === "win32"
     ? [process.execPath, [join(dirname(process.execPath), "node_modules/npm/bin/npx-cli.js")]]
     : ["npx", []];
-// Run outside the repository: inside one whose package.json depends on the engine (or is the
-// engine), npx runs that local copy instead of the pinned version.
+// Outside the repository, or npx would run a local copy of the engine instead of the pinned one.
 const run = spawnSync(command, [...prefix, ...(local ? cliArgs : args)], {
   cwd: env.RUNNER_TEMP || tmpdir(),
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
 });
-// The CLI's warnings can quote the resume, and the runner reads a line starting "::" on either
-// stream as a workflow command: they are passed on with commands stopped, under a token no
-// resume can guess.
+// The CLI's warnings can quote the resume, and the runner reads a "::" line as a workflow
+// command: they are passed on with commands stopped, under a token no resume can guess.
 if (run.stderr) {
   const token = randomBytes(16).toString("hex");
   process.stderr.write(
@@ -84,7 +77,6 @@ try {
   fail("ats-engine did not print a JSON report.");
 }
 
-// One file per run: a job that checks two resumes keeps both reports.
 const reportPath = join(
   env.RUNNER_TEMP || ".",
   `ats-report-${randomBytes(6).toString("hex")}.json`,
@@ -109,12 +101,9 @@ output("failed-checks", JSON.stringify(failed));
 output("report", reportPath);
 
 /**
- * Text from a resume or a posting, shown as text inside a Markdown table cell: one line, cut to
- * 300 characters (whole characters, before anything is escaped), HTML's own characters encoded so
- * no tag survives, and Markdown's escaped, the backslash first: "\<a" would otherwise leave "\\"
- * and a live "<a". GitHub also links an address written on its own ("https://…", "www.…",
- * "name@host"): every colon, the dot after "www" and every "@" are written as entities, which
- * read the same but start no link.
+ * Resume or posting text as inert text in a Markdown table cell: one line, cut to 300
+ * characters before escaping, HTML characters encoded, Markdown's escaped (backslash first), and
+ * every colon, "@" and the dot after "www" written as entities so GitHub links nothing.
  */
 const cell = (text) =>
   Array.from(String(text ?? "").replace(/[\r\n]+/g, " "))
@@ -147,7 +136,7 @@ if (report.requirements?.length) {
     lines.push(`| ${cell(requirement.status)} | ${cell(requirement.text)} |`);
   lines.push("");
 }
-// Grouped when the engine reports groups (0.3 and later), flat otherwise.
+// A pinned older engine reports flat keywords.
 const groups = report.missingKeywordGroups;
 if (groups) {
   if (groups.hard.length) lines.push(`**Missing keywords:** ${cell(groups.hard.join(", "))}`, "");
@@ -155,7 +144,6 @@ if (groups) {
     lines.push(`**Missing soft skills (weigh less):** ${cell(groups.soft.join(", "))}`, "");
 } else if (report.missingKeywords?.length)
   lines.push(`**Missing keywords:** ${cell(report.missingKeywords.join(", "))}`, "");
-// Not scored: the file's name and size, details that can invite age bias, notes on a target ATS.
 if (report.advice?.length) {
   lines.push("### Advice (not scored)", "");
   for (const item of report.advice)

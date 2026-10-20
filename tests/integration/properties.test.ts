@@ -7,8 +7,8 @@ import { findDateRange } from "../../src/parser/dates.js";
 import { isSectionHeading, segmentResume } from "../../src/parser/sections.js";
 
 /**
- * Properties checked over generated input rather than hand-picked examples. A seeded generator,
- * so a failure reproduces exactly; the seed and the case are in the failure message.
+ * Properties over generated input, from a seeded generator: the failure message has the seed and
+ * case.
  */
 
 function generator(seed: number) {
@@ -25,7 +25,7 @@ const RUNS = 500;
 
 describe("normalizeText", () => {
   // What PDFs and word processors leave in text: ligatures, fullwidth and Indic digits, no-break
-  // spaces, zero-width characters, decomposed accents, tag characters, a byte-order mark.
+  // and zero-width characters, decomposed accents, tag characters, a byte-order mark.
   const PIECES = [
     "ﬁ",
     "ﬂ",
@@ -106,7 +106,7 @@ describe("date ranges", () => {
   const de = localizePolicy(withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), "", { region: "DE" })
     .policy.resumeParse;
 
-  // Every spelling of (year, month) a resume uses, with the policy it is written for.
+  // Every spelling of (year, month), with the policy it is written for.
   const spellings = (year: number, month: number, day: number) =>
     [
       [`${MONTHS[month - 1]} ${year}`, us],
@@ -127,8 +127,8 @@ describe("date ranges", () => {
       const day = random.int(13, 28); // over 12, so a numeric date has one reading
       const [start, policy] = random.pick(spellings(startYear, startMonth, day));
       const end = random.pick(spellings(endYear, endMonth, day).filter(([, p]) => p === policy))[0];
-      // A bare hyphen after a numeric date ("2004-07-2019") reads as one longer date, so it
-      // only joins two spelled ones: "Jan 2019-Feb 2020".
+      // A bare hyphen after a numeric date ("2004-07-2019") reads as one date: only spelled ones
+      // join.
       const named = /\p{L}/u.test(start) && /\p{L}/u.test(end);
       const separator = random.pick([" - ", "–", " — ", " to ", ...(named ? ["-"] : [])]);
       const line = `Engineer, Acme ${start}${separator}${end}`;

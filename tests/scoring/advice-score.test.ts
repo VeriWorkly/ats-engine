@@ -4,9 +4,8 @@ import { DEFAULT_POLICY, type AtsReport, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 
 /**
- * Advice never moves a score: the same resume scores byte for byte the same whether or not the
- * call carries anything that produces advice — a badly named, oversized, encrypted file with
- * tracked changes, a target ATS, an old graduation year read in a region that advises on it.
+ * Advice never moves a score: the same resume scores byte for byte the same with or without
+ * anything that produces advice.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -57,7 +56,7 @@ describe("advice and the score", () => {
   it("scores the same as in a region that gives no age advice", () => {
     const us = check(RESUME, POLICY, { now: NOW, region: "US" });
     expect(us.advice.length).toBeGreaterThan(0);
-    // The age thresholds are the only difference the advice makes; the rules are the region's.
+    // The age thresholds are the only difference; the rules are the region's.
     const withoutAge = withLocales(DEFAULT_POLICY, {
       regions: BUILT_IN_LOCALES.regions.map((pack) =>
         pack.id === "US" ? { ...pack, ageAdvice: undefined } : pack,

@@ -3,59 +3,54 @@ import * as z from "zod/mini";
 import { wordListRegex } from "../text/text.js";
 import { policyRegex } from "./regex.js";
 
+/** The message `run` throws, or null when it does not throw. */
+const failure = (run: () => unknown): string | null => {
+  try {
+    run();
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+};
+
+/** Adds a custom issue when the words do not join into one valid alternation. */
+function checkAssembles(label: string, words: string[], ctx: z.core.$RefinementCtx) {
+  const message = failure(() => wordListRegex(words));
+  if (message !== null)
+    ctx.addIssue({
+      code: "custom",
+      message: `${label} does not assemble into a valid regular expression: ${message}`,
+    });
+}
+
 /**
- * A string the engine will hand to `new RegExp`, checked here rather than at match time.
- *
- * Without this a policy that satisfies every other constraint still throws `SyntaxError` on the
- * first request that evaluates the rule — which is the exact failure the boot-time validation
- * exists to prevent: a process that reports itself healthy while an endpoint 500s. The pattern is
- * operator-supplied and never reaches a caller, so naming the offending field in the issue is
- * safe and is the only way to debug a file the process cannot show you.
- *
- * Compiled in Unicode mode, as the engine compiles it (see `policyRegex`): that is where an
- * escape a pattern written for the old non-Unicode engine relied on (`\-` outside a class) fails.
- *
- * Compilation only. It says nothing about whether the pattern is *correct* — that is what the
- * calibration suite is for.
+ * A pattern the engine compiles with `new RegExp`, checked at parse time so a bad one cannot
+ * throw mid-request. Compiled in Unicode mode as the engine does (see `policyRegex`); checks
+ * that it compiles, not that it is correct.
  */
 export const regexString = (label: string) =>
   z.string().check(
     z.minLength(1),
     z.superRefine((pattern, ctx) => {
-      try {
-        policyRegex(pattern);
-      } catch (error) {
+      const message = failure(() => policyRegex(pattern));
+      if (message !== null)
         ctx.addIssue({
           code: "custom",
-          message: `${label} is not a valid regular expression in Unicode mode: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          message: `${label} is not a valid regular expression in Unicode mode: ${message}`,
         });
-      }
     }),
   );
 
-/**
- * Regex flags, which `new RegExp` rejects just as loudly as a malformed pattern — an unknown
- * letter or a repeated one is a `SyntaxError`, so it is validated in the same place.
- *
- * `y` (sticky) compiles but tests one position only — wherever the last match left off — so a
- * rule carrying it passes or fails at random rather than reading the text; it is refused.
- */
+/** Regex flags `new RegExp` accepts. Sticky `y` is refused: it tests one position, not the text. */
 export const regexFlags = z._default(z.string(), "").check(
   z.superRefine((flags, ctx) => {
-    try {
-      new RegExp("", flags);
-    } catch (error) {
+    const message = failure(() => new RegExp("", flags));
+    if (message !== null)
       ctx.addIssue({
         code: "custom",
-        message: `flags "${flags}" are not valid regular-expression flags: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        message: `flags "${flags}" are not valid regular-expression flags: ${message}`,
       });
-      return;
-    }
-    if (flags.includes("y"))
+    else if (flags.includes("y"))
       ctx.addIssue({
         code: "custom",
         message: `flags "${flags}": the sticky flag "y" is not supported`,
@@ -64,52 +59,33 @@ export const regexFlags = z._default(z.string(), "").check(
 );
 
 /**
- * A rule's pattern compiled with the rule's own flags, as the scorer compiles it. Each is valid
- * alone yet the pair can still fail: `[(]` is a class in Unicode mode and a syntax error under
- * `v`. Added to the rule object, since neither field sees the other.
+ * A rule's pattern compiled with the rule's own flags, as the scorer compiles it: each is valid
+ * alone yet the pair can fail (`[(]` is a syntax error under `v`).
  */
 export function checkPatternWithFlags(
   rule: { pattern?: string; flags: string },
   ctx: z.core.$RefinementCtx,
 ) {
   if (!rule.pattern) return;
-  try {
-    policyRegex(rule.pattern, rule.flags);
-  } catch (error) {
+  const { pattern, flags } = rule;
+  const message = failure(() => policyRegex(pattern, flags));
+  if (message !== null)
     ctx.addIssue({
       code: "custom",
       path: ["pattern"],
-      message: `pattern is not a valid regular expression with flags "${rule.flags}": ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      message: `pattern is not a valid regular expression with flags "${flags}": ${message}`,
     });
-  }
 }
 
 /**
- * A word list the engine joins with `|` into one alternation, unescaped.
- *
- * That makes a metacharacter in any single entry a failure of the *whole* pattern, not just of
- * that word: `c++` in `titleWords` raises "Nothing to repeat" and takes down every parse. The
- * entries are deliberately not escaped at use — a policy author can legitimately write a small
- * pattern like `sr\.?` — so the check is that the assembled alternation compiles, which is the
- * thing that actually has to hold.
+ * A word list the engine joins with `|` into one unescaped alternation, so entries may be small
+ * patterns (`sr\.?`). The check is that the assembled alternation compiles: one stray `c++`
+ * would otherwise break every parse.
  */
 export const wordList = (label: string) =>
   z.array(z.string().check(z.minLength(1))).check(
     z.minLength(1),
-    z.superRefine((words, ctx) => {
-      try {
-        wordListRegex(words);
-      } catch (error) {
-        ctx.addIssue({
-          code: "custom",
-          message: `${label} does not assemble into a valid regular expression: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        });
-      }
-    }),
+    z.superRefine((words, ctx) => checkAssembles(label, words, ctx)),
   );
 
 /** A Unicode script name, as `\p{Script=…}` reads it: "Devanagari", "Cyrillic". */
@@ -143,28 +119,23 @@ export const iscedDegrees = z.object({
   "8": z.optional(regexString("degrees.8")),
 });
 
+export const monthNumber = z.number().check(z.int(), z.gte(1), z.lte(12));
+
+/** Season name to the first and last month it covers. */
+export const seasonRanges = z.record(
+  z.string().check(z.minLength(1)),
+  z.tuple([monthNumber, monthNumber]),
+);
+
 /** The six CEFR levels, lowest first: the order a language requirement is judged in. */
 export const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 
-/**
- * Level words keyed to the CEFR level each states. The keys are joined into one alternation, as
- * a word list is, so they are checked the same way: the assembled pattern must compile.
- */
+/** Level words keyed to the CEFR level each states; the keys assemble like a word list. */
 export const cefrLevels = (label: string) =>
   z.record(z.string().check(z.minLength(1)), z.enum(CEFR_LEVELS)).check(
     z.superRefine((levels, ctx) => {
       const words = Object.keys(levels);
-      if (!words.length) return;
-      try {
-        wordListRegex(words);
-      } catch (error) {
-        ctx.addIssue({
-          code: "custom",
-          message: `${label} does not assemble into a valid regular expression: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        });
-      }
+      if (words.length) checkAssembles(label, words, ctx);
     }),
   );
 

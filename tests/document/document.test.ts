@@ -112,7 +112,7 @@ describe("structured document input", () => {
   });
 
   it("scores the same as the JSON-serialised document does not", () => {
-    // The Studio bug this path replaces: a stringified document has no headings and no roles.
+    // A stringified document has no headings and no roles.
     const structured = check(DOCUMENT);
     const stringified = check(JSON.stringify(DOCUMENT));
     expect(structured.readinessScore).toBeGreaterThan(stringified.readinessScore);
@@ -340,8 +340,7 @@ describe("JSON Resume through the engine's front door", () => {
   });
 
   it("is not triggered by a document in another format that shares its section names", () => {
-    // Shaped like a Studio resume: basics, education and skills, but none of what is distinctive
-    // to JSON Resume. Taking it for one read the name and education from the wrong fields.
+    // Has basics, education and skills but nothing distinctive to JSON Resume.
     const studioShaped = {
       basics: { fullName: "Jane Doe", email: "jane@x.com" },
       experience: [{ company: "Acme", role: "Engineer" }],

@@ -6,9 +6,7 @@ import { policyRegex } from "../../src/policy/regex.js";
 import { stem } from "../../src/text/text.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Defects in the job match and the requirements judge, one block each. Invented people only.
- */
+/** Defects in the job match and the requirements judge, one block each. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const HEAD = "Jane Doe\njane@example.com | +1 415 555 0142";

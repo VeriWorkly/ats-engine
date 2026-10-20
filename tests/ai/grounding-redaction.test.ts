@@ -8,10 +8,7 @@ import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { groundingWords, isGrounded, normalizeForGrounding } from "../../src/repair/grounding.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Defects found in the final review of the AI layer, one block each. Every model reply is
- * scripted; no network.
- */
+/** Every model reply is scripted; no network. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const route = { model: "m", maxTokens: 100 };

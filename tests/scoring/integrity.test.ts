@@ -10,8 +10,8 @@ import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * Integrity: what a resume does to game a screener. Every trick here is one candidates are
- * advised to use online; every negative case is honest text that looks like one.
+ * Integrity: what a resume does to game a screener. Every negative case is honest text that looks
+ * like a trick.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -183,7 +183,7 @@ describe("invisible characters", () => {
   });
 
   // Word and LibreOffice wrap a number in an embedding or isolate so it reads left to right
-  // inside right-to-left text; every Arabic or Hebrew resume with a phone number has one.
+  // inside right-to-left text.
   it.each([
     ["an embedding", "\u{202A}+972 54 123 4567\u{202C}"],
     ["an isolate", "\u{2066}(054) 123-4567\u{2069}"],

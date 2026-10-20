@@ -1,7 +1,6 @@
 // Bundle size per public subpath, minified and gzipped, against a budget. Run after `npm run build`.
-// A budget is the size when it was set plus headroom; raise it in the same change that earns it.
-// Writes the sizes it measured to dist/sizes.json, exported as `./sizes.json`, which the docs
-// read their size tables from, so they cannot drift from the build.
+// A budget is the size when set plus headroom; raise it in the change that earns it.
+// Writes dist/sizes.json (exported as `./sizes.json`), which the docs read their size tables from.
 import { readFileSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { build } from "esbuild";
@@ -10,117 +9,31 @@ const { exports, version } = JSON.parse(readFileSync("package.json", "utf8"));
 
 /** Gzipped KB. */
 const BUDGETS = {
-  // 95: zod/mini in place of zod (same schemas and messages) took it from 171.9 to 91.7.
-  // 97: 0.6.0's reading and keyword fixes took it from 93.6 to 96.2, mostly policy data: the
-  // headings, title and organisation words, en-GB stemming rows, injection-mention and
-  // citation words, and the section rules that read gutter headings and role sub-headings.
-  // 98.6: the department words (0.2), then the names of
-  // countries and of the states of the US, Canada, India and Australia and the UK's nations, so
-  // "Berlin, Germany" and "Austin, Texas, United States" are where a role is worked (`placeNames`,
-  // 1.9 of it data: one string cut at its bars, each country's spellings one pattern), took it
-  // from 96.2 to 98.5. No cities: a gazetteer of those would cost tens of KB.
-  // 98.7: a LinkedIn export's name read over a headline with no job title, above where the
-  // person is, and an employer with its country kept on a line of its own, took it to 98.63.
-  // 99.4: the readings 0.4.0 got right restored (an employer with its state's code, a list under
-  // a role, the name over its email, a duration over the dates), requirements read clause by
-  // clause with the UK's clearance levels, and stricter injection and citation checks, took it to
-  // 99.32. 99.7: guards a review found those fixes needed (a sponsorship offered, a verdict in a
-  // quoted prompt, the web domains that end a link, a clearance not held past a semicolon) took
-  // it to 99.67, mostly policy data (`linkDomains`, `sponsorshipOffered`, `injectionVerdicts`).
-  // 99.9: UK levels read in a list and in brackets, the offer of sponsorship read in its clause,
-  // and each line's clearances read once, to 99.86. 100.0: the asked level read over a longer
-  // list of levels ("BPSS, CTC, SC or DV clearance"), to 99.93.
-  // 103: the same kind of growth, policy data (word lists, place names, clearance levels) that
-  // each reading fix adds, raised once with room for the next few fixes rather than by 0.1 KB a
-  // time; at 99.93 when set. The same round's policy-reading loop and freezing (see "./locales")
-  // took it to 100.22. The language detection words (see "./locales" at 75.7) to 100.83.
-  // 106: raised ahead of need, with room for the next rounds of fixes; at 102.9 when set. The
-  // hidden lines set aside as the lines that make up the hidden text, in or out of reading
-  // order, and hidden text cut from inside a visible line, took it from 100.9 to 102.9.
+  // Core: policy data (word lists, place names, clearance levels) grows with each reading fix.
   ".": 106,
   "./document": 3,
   "./format": 1.5,
-  // 3.8: entity decoding, page-furniture skipping and structured JSON-LD requirements (0.2), then
-  // optional end tags, a tag scan that skips scripts and comments, and hidden-element rules (0.2).
+  // Entity decoding, page-furniture skipping, JSON-LD requirements, hidden-element rules.
   "./job": 3.8,
-  // 70: zod/mini in place of zod took it from 141.1 to 67.5.
-  // 70.9: the place names (see "."), and the German pack's for Germany, Austria, Switzerland and
-  // the German states, took it from 68.5 to 70.8.
-  // 71.1: the policy data this round's fixes added (see ".") took it to 71.08.
-  // 71.3: reading a policy with a loop rather than recursion, so one nested past 5,000 levels is
-  // refused as invalid instead of overflowing the stack, took it to 71.24.
-  // 71.4: freezing a parsed policy, the packs, their JSON Schemas and the exported constants, so a
-  // host that changes one throws instead of being read with what was compiled before, to 71.31,
-  // and a loop refused at once and the localised policy frozen too, to 71.36.
-  // 75.7: the words that tell the policy's own language from the eight it has no pack for
-  // (`text.detectionWords`, `text.otherLanguages`, 0.6), and the French pack with the FR and GB
-  // regions (3.4: headings, months, levels, titles, stopwords and soft skills, the French and UK
-  // credentials), took it from 71.37 to 75.37, and the bullets deciding the language and the
-  // French Bac+N and Québec degrees to 75.55. Data only; a gzip of the lists written as one
-  // string each saved 0.01, so they stay readable.
-  // 79.5: raised ahead of need, room for one more language pack (about 3.5 KB); at 75.6 when set.
+  // Policy data, the language detection words and the French pack; room for one more pack.
   "./locales": 79.5,
-  // 70: zod/mini in place of zod took it from 141.0 to 67.5.
-  // 71.6: the policy's place names (see "."), with what else "." gained, took it from 69.3 to 71.5.
-  // 71.8: the policy data and parsing this round's fixes added (see ".") took it to 71.75.
-  // 71.9: the same as "." at 99.9, to 71.84.
-  // 72.1: the same loop as "./locales" at 71.3, to 72.01, and the freezing at 71.4, to 72.07.
-  // 72.2: a loop refused at once and the localised policy frozen (see "./locales"), to 72.11.
-  // 72.4: redacting a phone the parser did not read (a local number, a second North American
-  // one) and a two-character Chinese or Korean name took it to 72.36.
-  // 72.5: dates read one by one, so a bracketed or listed range is not taken for a phone, took it
-  // to 72.42.
-  // 73.2: the language detection words the policy now carries (see "./locales" at 75.7), on top
-  // of the redaction at 72.5, took it to 73.0.
-  // 75: raised ahead of need, room for the policy data the next fixes add; at 73.0 when set.
+  // Core policy data plus redaction; room for the next policy fixes.
   "./ai": 75,
-  // 2.4: reading a provider's answer as a stream to 4 MB, an error's included, took them to 2.11
-  // and 2.15.
+  // Streamed, size-capped response reading.
   "./ai/openai-compatible": 2.4,
   "./ai/anthropic": 2.4,
   "./ai/testing": 1.5,
-  // The zip reader is a port of JSZip's, so the expansion budget reads exactly what mammoth will.
-  // 17: reading order by geometry, DOCX headers, footers, styles and links, and the PDF link
-  // annotations (0.2) took it from 9.7 to 14.0; list-bullet and tab-stop checks, hidden text in
-  // DOCX headers, soft masks and HTML resumes, and encoding repair (0.2) to 16.0.
-  // 19.5: ruled tables found in the page's own drawing, filled CSS borders included (tables.ts,
-  // 1.3), and reading a resume or a posting from a path (`readResumeFile`, `readJobFile`, shared
-  // by the CLI and the MCP server, which validate a .json resume with `/document`'s guards, 1.6),
-  // took it to 18.9 (0.2).
-  // 19.6: the missing-reader message naming the command that installs the readers, and how
-  // with -g or npx, took it from 19.44 to 19.52.
-  // 20.5: refusing, before mammoth parses it, a DOCX whose XML its parser would take seconds to
-  // minutes over (unclosed markup, malformed tags, a prefix bound to two namespaces, thousands of
-  // distinct warnings, over 2 MB) took it to 20.0, and reading only a regular local file, measured
-  // before it is opened and read through one bounded handle (no network path, pipe or device), to
-  // 20.2. The rest is little room: the next addition trims or argues for more.
-  // 20.6: reading a PDF's running header and footer once and its page numbers not at all (between
-  // two pages they parted a role's title from its dates) took it from 20.20 to 20.57.
-  // 20.7: a sidebar taller than the main column read as a column (20.60), and a scan with a
-  // scanner's text stamp still counted as a picture (20.66).
-  // 20.9: a running header or footer told from body text by the margin it sits in, all of it
-  // repeated, and a page number by matching its page (dates opening each page, bullets differing
-  // in their figures and a skills line at the foot of two pages were dropped), took it to 20.89.
-  // 21.1: a job posting read only from the types a posting comes in, PDF reading stopped after
-  // 100 pages, a text file's stray bytes decoded in one pass, and one budget for a DOCX's headers
-  // and footers took it to 21.08. 21.2: naming the line and column a JSON file fails at took it
-  // just past 21.1.
-  // 22.5: raised ahead of need, room for the next reading fixes; at 21.1 when set.
+  // Zip reader (a JSZip port), PDF and DOCX readers, table detection and DOCX XML guards.
   "./node": 22.5,
 };
 
 /**
  * A host importing only some names, against a budget of its own: what it does not import must
- * drop out. The packs' and the tasks' JSON Schemas are built at load, so their calls are marked
- * `@__PURE__`; without the marks a bundler keeps them, and zod's JSON Schema writer with them.
+ * drop out. The packs' and tasks' JSON Schemas are built at load, so their calls are marked
+ * `@__PURE__`; without the marks a bundler keeps them and zod's JSON Schema writer with them.
  */
 const NAMED = [
-  // 48.2: 47.88 when set, 54.53 before the marks.
-  // 49: the policy's language detection words (see "./locales" at 75.7) took it from 48.1 to
-  // 48.66; the French pack and the regions drop out, as the others do.
-  // 50.5: raised ahead of need with "./locales"; at 48.7 when set.
   ["./locales", ["withLocales"], 50.5],
-  // 9.5: 9.21 when set, 16.29 before the marks.
   [
     "./ai",
     ["AtsAiError", "DEFAULT_ANALYZE_PROMPT", "DEFAULT_CONVERT_PROMPT", "DEFAULT_REPAIR_PROMPT"],
@@ -165,9 +78,5 @@ for (const [label, subpath, names, budget] of entries) {
     `${over ? "OVER" : "ok  "}  ${label.padEnd(30)} ${kb.toFixed(1).padStart(6)} KB gz / ${budget} KB`,
   );
 }
-writeFileSync(
-  "dist/sizes.json",
-  `${JSON.stringify(measured, null, 2)}
-`,
-);
+writeFileSync("dist/sizes.json", `${JSON.stringify(measured, null, 2)}\n`);
 process.exitCode = failed ? 1 : 0;

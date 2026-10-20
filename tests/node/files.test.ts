@@ -1,5 +1,3 @@
-// Reading a resume or a posting from a path: shared by the CLI and the MCP server, so both refuse
-// the same files with the same words.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { open } from "node:fs/promises";
@@ -64,8 +62,7 @@ describe("the size limit", () => {
 });
 
 describe("what is not a file on this computer", () => {
-  // A UNC path is read over SMB — a network request from a tool that makes none — and a device
-  // (`\\.\pipe\…`) can stream without end; both are refused before the path is touched.
+  // A UNC path is read over SMB and a device can stream without end: refused before the path is touched.
   it.each([
     String.raw`\\host\share\cv.txt`,
     "//host/share/cv.txt",
@@ -137,7 +134,7 @@ describe("what is not a file on this computer", () => {
   });
 
   it("never opens what it refuses: opening a device can act on it", async () => {
-    // A watchdog arms when it is opened, a terminal can block; so the path is measured first.
+    // Measured first: opening a watchdog arms it, a terminal blocks.
     vi.mocked(open).mockClear();
     await expect(readFileBytes(dir)).rejects.toThrow(/is a folder, not a file\.$/);
     if (process.platform !== "win32")
@@ -158,9 +155,6 @@ describe("readResumeFile and readJobFile", () => {
     ).toContain("Go required");
   });
 
-  // A posting and a JSON file are decoded as a resume's text is: a UTF-16 posting read as UTF-8
-  // matched nothing and listed its letters as missing keywords, and a byte-order mark made valid
-  // JSON "not valid JSON".
   it("decode a posting and a JSON file the way a resume is decoded", async () => {
     const posting = "Développeur Senior\nPython and Kubernetes required";
     const utf16 = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(posting, "utf16le")]);
@@ -176,8 +170,6 @@ describe("readResumeFile and readJobFile", () => {
     expect(parseJsonFile(bom, "policy.json")).toEqual({ a: 1 });
   });
 
-  // A scanned posting, or an empty page, is refused: read as no posting, it scored no job match
-  // and said nothing, in the CLI and the Action.
   it("refuse a posting with no readable text", async () => {
     await expect(readJobFile(file("empty.txt", "  \n\n "))).rejects.toThrow(
       /has no readable job posting text/,
@@ -187,8 +179,7 @@ describe("readResumeFile and readJobFile", () => {
     ).rejects.toBeInstanceOf(AtsFileError);
   });
 
-  // A posting's words come back as missing keywords: any other file read as a posting (a
-  // credentials file, a key) would be echoed to whoever asked, the MCP server's model included.
+  // A posting's words come back as missing keywords, so a credentials file would be echoed.
   it("read a posting only from the file types a posting comes in", async () => {
     const secret = file("credentials", "[default]\naws_secret_access_key = wJalrXUtnFEMIK7MDENG");
     const message =
@@ -216,8 +207,7 @@ describe("readResumeFile and readJobFile", () => {
     await expect(refused).rejects.toThrow(/comma\.json is not valid JSON \(line 2 column \d+\)\.$/);
   });
 
-  // A host that extracts in another process (the MCP server, through /node/child) keeps the same
-  // checks on the path, the type and the size, and only the parsing moves.
+  // A host extracting in another process keeps the path, type and size checks.
   it("extract a PDF or DOCX with the extractor a host passes", async () => {
     const extract = vi.fn(async () => ({
       text: "Jane Doe, Senior Engineer at Acme since 2019. ".repeat(3),

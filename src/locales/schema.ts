@@ -4,23 +4,20 @@ import * as z from "zod/mini";
 import {
   cefrLevels,
   iscedDegrees,
+  monthNumber,
   regexString,
+  seasonRanges,
   scriptName,
   term,
   wordList,
 } from "../policy/primitives.js";
 
 /**
- * Locale packs: the vocabulary a resume in one language, or from one country, is written in.
- *
- * A pack is a fragment of a policy's vocabulary, never a whole policy, so it extends whatever
- * policy it is attached to — the community one or a private one — rather than replacing it.
- * Every field is optional and every list is added to what the policy already has; patterns are
- * added as alternatives. Rules, weights and thresholds are the policy's alone, except the few a
- * region pack may adjust by rule id.
- *
- * Packs are plain JSON-compatible data, validated here, so a new locale is a data contribution
- * (see LOCALES.md), not a code change.
+ * Locale packs: the vocabulary a resume in one language, or from one country, is written in. A
+ * pack is a fragment of a policy's vocabulary: every field is optional, lists are added to the
+ * policy's own and patterns are added as alternatives. Rules, weights and thresholds are the
+ * policy's alone, except the few a region pack may adjust by rule id. Packs are plain data (see
+ * LOCALES.md).
  */
 
 const optionalList = (label: string) => z.optional(wordList(label));
@@ -51,25 +48,14 @@ const vocabularyShape = {
       id: optionalList("credentialWords.id"),
     }),
   ),
-  months: z.optional(
-    z.record(z.string().check(z.minLength(1)), z.number().check(z.int(), z.gte(1), z.lte(12))),
-  ),
+  months: z.optional(z.record(z.string().check(z.minLength(1)), monthNumber)),
   /** Seasons a term is dated by, as the first and last month each covers: "Sommer 2019". */
-  seasons: z.optional(
-    z.record(
-      z.string().check(z.minLength(1)),
-      z.tuple([
-        z.number().check(z.int(), z.gte(1), z.lte(12)),
-        z.number().check(z.int(), z.gte(1), z.lte(12)),
-      ]),
-    ),
-  ),
+  seasons: z.optional(seasonRanges),
   /** Units of a role's printed duration: "4 Jahre 9 Monate". */
   durationUnits: optionalList("durationUnits"),
   /** Labels a name is written under: "Name: …". */
   nameLabels: optionalList("nameLabels"),
-  /** Letters after a name ("Dipl.-Ing.", "CA" for a chartered accountant), and codes that name a
-   * region rather than a credential ("MH", "KA"). */
+  /** Letters after a name ("Dipl.-Ing.", "CA"), and codes that name a region, not a credential ("MH", "KA"). */
   postNominals: optionalList("postNominals"),
   regionCodes: optionalList("regionCodes"),
   /** Countries and states in the pack's language: "Deutschland", "Bayern". */
@@ -140,14 +126,18 @@ const vocabularyShape = {
  */
 const status = z.enum(["verified", "community"]);
 
+const packMeta = {
+  name: z.string().check(z.minLength(1)),
+  status,
+  maintainers: z._default(z.array(z.string().check(z.minLength(1))), []),
+};
+
 export const languagePackSchema = z
   .object({
     ...vocabularyShape,
     /** ISO 639-1 (or 639-3) code: "de", "hi". */
     id: z.string().check(z.regex(/^[a-z]{2,3}$/, "an ISO 639 language code")),
-    name: z.string().check(z.minLength(1)),
-    status,
-    maintainers: z._default(z.array(z.string().check(z.minLength(1))), []),
+    ...packMeta,
     /**
      * The script the language is written in when it is not Latin ("Devanagari"). Text with a
      * fair share of letters in it is read as this language, whatever its words.
@@ -172,9 +162,7 @@ export const regionPackSchema = z.object({
   ...vocabularyShape,
   /** ISO 3166-1 alpha-2: "DE", "IN". */
   id: z.string().check(z.regex(/^[A-Z]{2}$/, "an ISO 3166 country code")),
-  name: z.string().check(z.minLength(1)),
-  status,
-  maintainers: z._default(z.array(z.string().check(z.minLength(1))), []),
+  ...packMeta,
   /**
    * The country a national phone number is read as. Typed as the `CountryCode` the check proves,
    * as zod's `.refine` with a type guard would type it.

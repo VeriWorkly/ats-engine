@@ -3,15 +3,9 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_POLICY, parseResume } from "../../src/index.js";
 import { livePolicy } from "../fixtures/livePolicy.js";
 
-// The live policy when present, the public default otherwise: parsing is exercised in every
-// checkout, not only in ones that hold the private file.
+// The live policy when present, the public default otherwise.
 const policy = livePolicy ?? DEFAULT_POLICY;
 
-/**
- * The parser recovers the fields an applicant tracking system stores. These cover the layouts
- * real resumes actually use — dates on the header line and on their own line, employer-first and
- * title-first ordering, and the sections that must *not* be read as work history.
- */
 const NOW = new Date(Date.UTC(2026, 7, 31));
 
 async function parse(text: string) {
@@ -109,8 +103,7 @@ describe("resume parsing — what an ATS recovers", () => {
       ].join("\n"),
     );
 
-    // Every heading terminates the block above it, including ones we do not classify. Without
-    // that, a dated certifications list becomes extra jobs and inflates years of experience.
+    // Every heading ends the block above it, including unclassified ones, or a dated list becomes jobs.
     expect(parsed.roles).toHaveLength(1);
     expect(parsed.roles[0].employer).toBe("Acme");
   });
@@ -180,8 +173,7 @@ describe("resume parsing — what an ATS recovers", () => {
       ["Jane Doe", "Software Engineer, Acme Corp — Jan 2021 – Dec 2023"].join("\n"),
     );
 
-    // The absent heading is reported by the structure rules. Refusing to parse as well would
-    // punish the same mistake twice and hide the rows the candidate needs to check.
+    // The structure rules report the absent heading; the parser still shows the rows.
     expect(parsed.roles).toHaveLength(1);
     expect(parsed.roles[0].employer).toBe("Acme Corp");
   });

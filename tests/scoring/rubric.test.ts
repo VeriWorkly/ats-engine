@@ -9,12 +9,12 @@ import {
 import { CATEGORY_LABELS, sortByCategoryOrder } from "../../src/format/index.js";
 
 /**
- * RUBRIC.md is generated from the community policy, so the published rubric cannot drift from the
- * rules that actually score. This fails when they differ; `npm run rubric` regenerates it.
+ * RUBRIC.md is generated from the community policy; this fails when they differ (`npm run rubric`
+ * regenerates it).
  */
 it("RUBRIC.md describes the community policy exactly", async () => {
   const entries = sortByCategoryOrder(policyRubric(DEFAULT_POLICY));
-  // Evidence templates read as prose here: "{n}" becomes "n", a quoted sample an ellipsis.
+  // Evidence templates as prose: "{n}" becomes "n", a quoted sample an ellipsis.
   const escape = (text: string) =>
     text
       .replace(/\{(?:n|pct)\}/g, "n")

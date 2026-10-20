@@ -1,13 +1,10 @@
 /**
  * @veriworkly/ats-engine/ai/anthropic — the Anthropic Messages API, over `fetch`.
  *
- * One `POST /v1/messages` per `complete()`, never retried by the adapter itself (the task owns
- * retries). `json_schema` output uses `output_config.format`; `json_object` relies on the
- * prompt, and the task tolerates a fenced reply.
- *
- * Current Claude models reject sampling parameters, so `temperature` is sent only when a route
- * sets one. On models that always think, thinking counts against `maxTokens` — budget for it.
- * Pass `output_config.effort` (or anything else the API accepts) through `providerOptions`.
+ * One `POST /v1/messages` per `complete()`; never retried here, the task owns retries.
+ * `json_schema` output uses `output_config.format`; `json_object` relies on the prompt.
+ * `temperature` is sent only when a route sets one. Thinking counts against `maxTokens`.
+ * Pass `output_config.effort` or anything else the API accepts through `providerOptions`.
  */
 
 import { own } from "../util/own.js";
@@ -44,16 +41,11 @@ const FINISH: Record<string, LlmResponse["finish"]> = {
   end_turn: "stop",
   stop_sequence: "stop",
   max_tokens: "length",
-  // The input filled the window and the reply was cut: as truncated as `max_tokens`, and a retry
-  // with the same input is cut again.
   model_context_window_exceeded: "length",
   refusal: "refusal",
 };
 
-/**
- * Structured outputs document `anyOf` with a `null` branch for optional values rather than a
- * `type` array, so `type: [X, "null"]` is rewritten as `anyOf: [{ type: X, … }, { type: "null" }]`.
- */
+/** Rewrites `type: [X, "null"]` as `anyOf: [{ type: X, … }, { type: "null" }]`, the form structured outputs document. */
 function toAnthropicSchema(input: Record<string, unknown>): Record<string, unknown> {
   const node = { ...input };
   if (node.properties && typeof node.properties === "object")
@@ -89,10 +81,7 @@ export function messagesBody(request: LlmRequest) {
   };
 }
 
-/**
- * A provider for the Anthropic Messages API (`POST {baseUrl}/v1/messages`). One HTTP call per
- * `complete()`, never retried here. Throws `LlmProviderError` without an API key.
- */
+/** A provider for the Anthropic Messages API. Throws `LlmProviderError` without an API key. */
 export function anthropic(options: AnthropicOptions): LlmProvider {
   if (!options.apiKey) throw new LlmProviderError("An API key is required.", { retryable: false });
   const url = `${(options.baseUrl || "https://api.anthropic.com").replace(/\/+$/, "")}/v1/messages`;
@@ -122,7 +111,7 @@ export function anthropic(options: AnthropicOptions): LlmProvider {
                 (usage.cache_creation_input_tokens ?? 0) +
                 (usage.cache_read_input_tokens ?? 0),
               outputTokens: usage.output_tokens ?? 0,
-              // Part of `inputTokens`, priced apart: reads at a tenth, writes at a premium.
+              // Part of `inputTokens`, priced apart.
               ...(typeof usage.cache_read_input_tokens === "number" && {
                 cacheReadTokens: usage.cache_read_input_tokens,
               }),

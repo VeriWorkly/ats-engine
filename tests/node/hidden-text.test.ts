@@ -37,8 +37,7 @@ describe("hidden text", () => {
     ["fully transparent", `q /GS1 gs 0 g ${line(700)} Q`],
     ["covered by an image drawn after it", `0 g ${line(700)} ${IMAGE(40, 690, 400, 30)}`],
     ["covered by a white box drawn after it", `0 g ${line(700)} 1 1 1 rg 40 690 400 30 re f`],
-    // Positioned with a text matrix, as react-pdf does: pdf.js hands that over as a typed array,
-    // which was once read as NaN and hid nothing.
+    // Positioned with a text matrix, as react-pdf does: pdf.js hands it over as a typed array.
     ["placed by a text matrix", `1 1 1 rg BT /F1 10 Tf 1 0 0 1 50 700 Tm (${KEYWORDS}) Tj ET`],
   ])("finds text %s", async (_, content) => {
     const layout = await hidden(content, "/ExtGState<</GS1<</ca 0>>>>");
@@ -56,7 +55,7 @@ describe("hidden text", () => {
   });
 
   it("does not flag the invisible OCR layer of a scan", async () => {
-    // A scan is the page image first, then its recognised text drawn invisibly on top.
+    // The page image first, then its recognised text drawn invisibly on top.
     const scan = `${IMAGE(0, 0, 612, 792)} BT 3 Tr /F1 10 Tf 50 700 Td (${KEYWORDS}) Tj ET`;
     const { layout } = await extractResume(buildPdf(scan), "pdf");
     expect(layout).toMatchObject({ hiddenTextChars: 0, imageOnlyPages: 0 });
@@ -102,7 +101,6 @@ describe("metadata", () => {
 
 describe("extraction stays bounded", () => {
   it("reads a PDF with an inline image promptly", async () => {
-    // pdf-parse's image pass never settled on inline images; it is no longer used.
     const pdf = buildPdf(`${visible}\n${IMAGE(450, 650, 100, 120)}`);
     await expectFastAsync(() => extractResume(pdf, "pdf"), 3_000);
   });
@@ -120,8 +118,7 @@ describe("image-only pages", () => {
 });
 
 describe("a scan with a small text stamp", () => {
-  // A phone scanner's app prints its name in a corner of every page it saves: 23 characters of
-  // text over a picture of the whole page, which is still a picture.
+  // A scanner app's 23-character name stamp over a picture of the whole page.
   const scan = (text: string) =>
     extractResume(buildPdf(`${IMAGE(0, 0, 612, 792)}\n${line(20, text, 8)}`), "pdf");
 
@@ -141,7 +138,7 @@ describe("a scan with a small text stamp", () => {
   });
 
   it("is not a picture when a designed template's short last page sits on its background", async () => {
-    // A background picture across every page, and a second page of two short sections.
+    // A background picture on every page, and a second page of two short sections.
     const background = IMAGE(0, 0, 612, 792);
     const first = [background, ...Array.from({ length: 20 }, (_, at) => line(700 - 14 * at))];
     const second = [

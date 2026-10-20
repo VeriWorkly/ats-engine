@@ -14,10 +14,9 @@ export type RuleContext = {
   headingLines: string[];
   contentLines: string[];
   /**
-   * The languages the resume is read in: the attached language packs it is written in, or the
-   * policy's own `text.language` when it is written in none, or "und" (undetermined) when it is
-   * written in one of `text.otherLanguages` instead. A rule with `languages` applies only when
-   * each of these is among them.
+   * The languages the resume is read in: the attached packs it is written in, else the policy's
+   * `text.language`, or "und" for one of `text.otherLanguages`. A rule with `languages` applies
+   * only when each is among them.
    */
   languages: readonly string[];
   /** Lines that extracted letter-spaced ("E X P E R I E N C E") and were read back as words. */
@@ -29,15 +28,12 @@ export type RuleContext = {
   sections: ReadonlySet<ResumeSectionKind>;
   /** Field-recovery metrics from `parseResume`; see the "parsed" rule kind. */
   quality: ReturnType<typeof parseQuality> & { dateOfBirthStated: number };
-  /**
-   * What the checks that read the resume itself found (see `checks/`). Null where a check does
-   * not apply — copying a posting needs a posting — which drops its rule from the report.
-   */
+  /** What the checks found (see `checks/`); null where one does not apply, dropping its rule. */
   findings: Record<FindingMetric, Finding | null>;
   policy: AtsEnginePolicy;
 };
 
-/** The bands metrics measured by a check that also quotes what it found. */
+/** Bands metrics measured by a check that also quotes what it found. */
 const FINDING_METRICS = [
   "injectionPhrases",
   "invisibleCharacters",
@@ -61,43 +57,29 @@ export type FindingMetric = (typeof FINDING_METRICS)[number];
 const isFinding = (metric: string): metric is FindingMetric =>
   (FINDING_METRICS as readonly string[]).includes(metric);
 
-/**
- * A rule is applicable only when the evidence it reads actually exists. Layout rules measure
- * page geometry, which is present for uploaded documents and absent for pasted text — and an
- * absent signal is not a pass. Inapplicable rules are dropped from the report and from the
- * score's denominator rather than being silently awarded or silently deducted.
- */
-/**
- * Where the first contact detail sits in the text, or Infinity when there is none. A rule's own
- * pattern finds its own match; without one the parser's recovered value is located.
- */
-function earliestContact(rule: Extract<AtsEngineRule, { kind: "position" }>, ctx: RuleContext) {
-  const patterns = positionPatterns(rule);
-  const at = (pattern: RegExp | null, recovered: string) => {
-    const index = pattern
-      ? ctx.text.match(pattern)?.index
-      : recovered
-        ? // The text's whitespace is collapsed; the recovered value's ("+1 415  555 0142") is not.
-          ctx.text.indexOf(recovered.replace(/\s+/g, " "))
-        : -1;
-    return index === undefined || index < 0 ? Infinity : index;
+/** Where the first contact detail sits in the text, or Infinity when there is none. */
+function earliestContact(ctx: RuleContext) {
+  const at = (recovered: string) => {
+    // The text's whitespace is collapsed; the recovered value's ("+1 415  555 0142") is not.
+    const index = recovered ? ctx.text.indexOf(recovered.replace(/\s+/g, " ")) : -1;
+    return index < 0 ? Infinity : index;
   };
-  return Math.min(at(patterns.email, ctx.contact.email), at(patterns.phone, ctx.contact.phone));
+  return Math.min(at(ctx.contact.email), at(ctx.contact.phone));
 }
 
+/**
+ * Whether the evidence a rule reads exists. An absent signal is not a pass: inapplicable rules
+ * are dropped from the report and the score's denominator.
+ */
 export function isApplicable(rule: AtsEngineRule, ctx: RuleContext) {
-  // A rule that reads one language's words has nothing to judge in another.
   const { languages } = rule;
   if (languages && !ctx.languages.every((language) => languages.includes(language))) return false;
-  // Where the contact details sit means nothing when there are none; the email rule says so.
-  if (rule.kind === "position") return Number.isFinite(earliestContact(rule, ctx));
-  // With no line structure at all (a pasted single paragraph, or a resume that extracted as one
-  // run) there are no headings to find, and failing every section on that would be a guess.
+  // Position means nothing without contact details; the email rule says so.
+  if (rule.kind === "position") return Number.isFinite(earliestContact(ctx));
+  // No line structure means no headings to find; failing every section would be a guess.
   if (rule.kind === "section") return ctx.lines.length > 1;
-  // A check that does not apply to this resume (copying a posting, without one) drops its rule.
   if (rule.kind === "bands" && isFinding(rule.metric)) return ctx.findings[rule.metric] !== null;
-  // A share of the recovered roles means nothing when none was recovered; `rolesDetected` says
-  // so, and failing completeness on top of it charged twice for one finding.
+  // A share of roles means nothing with none recovered; `rolesDetected` already says so.
   if (
     rule.kind === "parsed" &&
     (rule.metric === "roleCompleteness" || rule.metric === "datedRoleRatio")
@@ -105,8 +87,7 @@ export function isApplicable(rule: AtsEngineRule, ctx: RuleContext) {
     return ctx.quality.rolesDetected > 0;
   if (rule.kind !== "layout") return true;
   if (!ctx.layout) return false;
-  // Measured per metric, not per document: a short resume can still be checked for ruled tables
-  // even though it has too few lines for the column ratio to carry any signal.
+  // Per metric: a short resume can still be checked for ruled tables.
   if (rule.metric === "imageCount") return ctx.layout.imageCount !== undefined;
   if (rule.metric === "hiddenTextChars") return ctx.layout.hiddenTextChars !== undefined;
   if (rule.metric === "imageOnlyPages") return ctx.layout.imageOnlyPages !== undefined;
@@ -114,19 +95,13 @@ export function isApplicable(rule: AtsEngineRule, ctx: RuleContext) {
 }
 
 /**
- * Which strings a `presence` rule is tested against.
- *
- * `document` is the whitespace-collapsed resume — correct for rules that ask whether something
- * exists anywhere (an email address, a date range). It is *wrong* for anything line-anchored:
- * the collapsed string has no newlines, so a `^` under the `m` flag has nothing to bind to and
- * matches only offset zero. `line` and `heading` exist so those rules test what they mean to.
+ * Which strings a `presence` rule is tested against. `document` is whitespace-collapsed, so a
+ * line-anchored `^` only binds at offset zero: those rules use `line` or `heading`.
  */
 function presenceTargets(scope: "document" | "line" | "heading", ctx: RuleContext) {
   if (scope === "line") return ctx.lines.length ? ctx.lines : [ctx.text];
   if (scope === "heading") {
-    // With no line structure at all (a pasted single-paragraph resume, or a resume that
-    // extracted as one run) headings are undetectable, so fall back rather than failing every
-    // structure rule on a document whose layout we simply cannot see.
+    // No line structure: headings are undetectable, so fall back rather than fail every rule.
     if (ctx.lines.length <= 1) return ctx.lines.length ? ctx.lines : [ctx.text];
     return ctx.headingLines;
   }
@@ -154,8 +129,8 @@ function resolveBandMetric(
   if (isFinding(rule.metric)) return ctx.findings[rule.metric]?.value ?? 0;
 
   if (rule.metric === "metricsRatio" || rule.metric === "actionVerbRatio") {
-    // A rule's own pattern belongs to the rule; the action verbs belong to the (localised) text,
-    // which packs extend while sharing the rule object, so each is cached on its own owner.
+    // The rule's pattern and the localised action verbs are cached on their own owners: packs
+    // extend the text while sharing the rule object.
     const re = rule.pattern
       ? ratioPattern(rule)
       : rule.metric === "actionVerbRatio"
@@ -167,13 +142,9 @@ function resolveBandMetric(
     if (rule.metric === "metricsRatio")
       return targetLines.filter((line) => re.test(line)).length / targetLines.length;
 
-    // Action verbs are graded on where they appear, not merely whether they appear. A single
-    // verb anywhere in the document used to satisfy this check outright; what recruiters and
-    // parsers actually reward is bullets that *open* with one, so the match has to land in the
-    // opening few words of the line.
-    // A verb-final language (`text.actionVerbAnywhere`) puts the verb at the end instead.
-    // A regular past tense ("Shepherded") counts as the first word without being listed; a
-    // rule with a pattern of its own is graded by that alone.
+    // The verb must open the line (first three words); `text.actionVerbAnywhere` lifts that for
+    // verb-final languages. A regular past tense ("Shepherded") counts as the first word; a rule
+    // with its own pattern is graded by that alone.
     const forms = rule.pattern ? null : actionVerbForms(ctx.policy.text);
     const opensWithVerb = (line: string) => {
       const opening = line.replace(BULLET_PREFIX, "").split(/\s+/).slice(0, 3);
@@ -206,20 +177,11 @@ const actionVerbForms = memo((text: AtsEnginePolicy["text"]) =>
   policyRegex(`^(?:${text.actionVerbForms.join("|")})$`, "i"),
 );
 
-/**
- * The lines both ratio metrics divide by: the bullets. Where the list markers did not survive
- * extraction (a PDF printed from Chrome draws them as paths), the lines written as sentences
- * under a role's dated line, so a resume grades the same from its PDF as from its text file;
- * counting every four-word line instead took in the contact row and the role headers. The
- * context reads them that way (`contentLinesOf` in context.ts); every line when it found none.
- */
+/** The lines both ratio metrics divide by (`contentLinesOf` in context.ts), else every line. */
 const ratioLines = (ctx: RuleContext) =>
   ctx.contentLines.length > 0 ? ctx.contentLines : ctx.lines;
 
-/**
- * A rule's result: its evidence template filled with `vars`, and what it cost. A failing band
- * may word its own evidence and fix (too short, too long), in place of the rule's.
- */
+/** A rule's result; a failing band may word its own evidence and fix. */
 function result(
   rule: AtsEngineRule,
   passed: boolean,
@@ -239,19 +201,10 @@ function result(
   };
 }
 
-/**
- * A presence rule's pattern, compiled once per rule and stripped of `g`: a global regex carries
- * `lastIndex` between `.test()` calls, which would make results depend on how many targets precede.
- */
+/** Compiled once per rule, without `g`: a global regex carries `lastIndex` between tests. */
 const presencePattern = memo((rule: Extract<AtsEngineRule, { kind: "presence" }>) =>
   policyRegex(rule.pattern, rule.flags.replace(/g/g, "")),
 );
-
-/** A position rule's own patterns, compiled once per rule; null where it locates the parser's. */
-const positionPatterns = memo((rule: Extract<AtsEngineRule, { kind: "position" }>) => ({
-  email: rule.emailPattern ? policyRegex(rule.emailPattern, "i") : null,
-  phone: rule.phonePattern ? policyRegex(rule.phonePattern, "") : null,
-}));
 
 export function evaluateRule(rule: AtsEngineRule, ctx: RuleContext): AtsRuleResult {
   if (rule.kind === "min-words") {
@@ -272,12 +225,12 @@ export function evaluateRule(rule: AtsEngineRule, ctx: RuleContext): AtsRuleResu
   }
 
   if (rule.kind === "position") {
-    // Applicable only when a contact detail was found (see `isApplicable`), so it is finite.
-    const passed = earliestContact(rule, ctx) <= ctx.text.length * rule.windowFraction;
+    // Finite: `isApplicable` requires a contact detail.
+    const passed = earliestContact(ctx) <= ctx.text.length * rule.windowFraction;
     return result(rule, passed, passed ? 0 : rule.weight);
   }
 
-  // kind === "bands" | "layout" | "parsed" — all three grade a number against ordered thresholds.
+  // "bands", "layout" and "parsed" grade a number against ordered thresholds.
   const value =
     rule.kind === "layout"
       ? resolveLayoutMetric(rule, ctx)
@@ -288,7 +241,6 @@ export function evaluateRule(rule: AtsEngineRule, ctx: RuleContext): AtsRuleResu
     rule.bands.find((candidate) => candidate.upTo !== null && value <= candidate.upTo) ??
     rule.bands[rule.bands.length - 1];
   const passed = band.weight === 0;
-  // `{sample}` quotes what a check found, so the candidate sees the text in question.
   const sample =
     rule.kind === "bands" && isFinding(rule.metric)
       ? (ctx.findings[rule.metric]?.sample ?? "")
@@ -304,12 +256,7 @@ export function evaluateRule(rule: AtsEngineRule, ctx: RuleContext): AtsRuleResu
   );
 }
 
-/**
- * The worst this rule could have cost. For everything except banded rules that is simply the
- * rule's weight; a banded rule's ceiling is its heaviest band. Used to turn per-rule impacts
- * into a per-category percentage and to normalise the headline score — the individual weights
- * never leave the server.
- */
+/** The most a rule can cost: its weight, or its heaviest band. */
 export function maxImpactOf(rule: AtsEngineRule): number {
   if (rule.kind === "bands" || rule.kind === "layout" || rule.kind === "parsed")
     return rule.bands.reduce((worst, band) => Math.max(worst, band.weight), 0);

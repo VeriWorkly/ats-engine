@@ -1,11 +1,8 @@
 /**
- * Ruled tables from a page's own vector drawing. Pure geometry, kept apart from the PDF reader so
- * it can be tested without one; `hidden.ts` collects the rules during the replay it already does.
- *
- * A browser prints a CSS border as a thin filled rectangle (`re f`), not a stroked line, so a
- * resume laid out in a bordered HTML table has no stroked rules at all. A rule here is either:
- * a stroked straight line, or a filled shape, no thicker than `RULE_WIDTH`. A table is rules that
- * close at least two rows of at least two cells each; only a cell with text in it counts.
+ * Ruled tables from a page's own vector drawing: pure geometry; `hidden.ts` collects the rules
+ * during its replay. A browser prints a CSS border as a thin filled rectangle (`re f`), so a rule
+ * is a stroked straight line or a filled shape no thicker than `RULE_WIDTH`. A table is rules that
+ * close at least two rows of at least two cells each; only a cell with text counts.
  */
 
 import type { Box } from "./surroundings.js";
@@ -21,21 +18,17 @@ const MIN_RULE_LENGTH = 3;
 const SNAP = 2;
 /** Points between two cells' borders that still make them neighbours: CSS `border-spacing`. */
 const CELL_GAP = 4;
-/** Rules kept from a page, and cells with text grouped into tables; past these, the rest are
- * not. A resume's tables draw a few hundred edges, but a dotted background or an underline per
- * word can draw thousands of thin shapes before them: joining and lookup cost n log n, and the
- * lookups are bounded by `MAX_CHECKS` besides. */
+/** Rules kept from a page, and cells grouped into tables; past these, the rest are dropped (a dotted background draws thousands of thin shapes). */
 const MAX_RULES = 50_000;
 const MAX_CELLS = 500;
 /** Lines looked at, across a page, while finding the cell around each piece of text. */
 const MAX_CHECKS = 1_000_000;
 
 /**
- * Adds to `rules` what a path paints that is a rule: each thin subpath it fills; the four sides
- * of a thin frame it fills (a rectangle with a slightly smaller one cut out of it); and each
- * straight, level or upright segment it strokes, when `width` (the pen, in page points; absent
- * when the path is not stroked) is thin. `data` is pdf.js's path: `0 x y` move, `1 x y` line,
- * `2 x1 y1 x2 y2 x y` curve, `3` close. `toPage` takes a point to page space.
+ * Adds to `rules` what a path paints that is a rule: each thin filled subpath; the four sides of a
+ * filled thin frame (a rectangle with a slightly smaller one cut out); and each straight, level or
+ * upright stroked segment when `width` (the pen, absent if not stroked) is thin. `data` is pdf.js's
+ * path: `0 x y` move, `1 x y` line, `2 x1 y1 x2 y2 x y` curve, `3` close.
  */
 export function pathRules(
   data: ArrayLike<number>,
@@ -119,7 +112,7 @@ export function pathRules(
 /** A straight line, level or upright: where it is across, and from where to where it runs. */
 type Line = { at: number; from: number; to: number };
 
-/** Pieces of one line that meet are one line: a collapsed border is drawn an edge per cell. */
+/** Pieces of one line that meet are one line (a collapsed border is drawn an edge per cell). */
 function joinLines(pieces: Line[]) {
   pieces.sort((a, b) => Math.round(a.at) - Math.round(b.at) || a.from - b.from);
   const lines: Line[] = [];
@@ -173,11 +166,8 @@ const neighbours = (a: Cell, b: Cell) =>
 /**
  * How many ruled tables a page holds: groups of neighbouring cells, each closed on four sides by
  * `rules` and holding one of `points` (where text is), with at least two rows of at least two
- * cells. So one rule under a heading, an underline, a border round the page or round one box,
- * and a page split by a rule into a header and two columns are not tables; a two-by-two grid is.
- *
- * Linear apart from sorting: each point finds its four sides by binary search, and the lines
- * looked at past that are bounded by `MAX_CHECKS` across the page.
+ * cells. A rule under a heading, a page border, or a box is not a table; a two-by-two grid is.
+ * Linear apart from sorting; lines looked at past each binary search are bounded by `MAX_CHECKS`.
  */
 export function countRuledTables(rules: readonly Box[], points: readonly Point[]): number {
   const level: Line[] = [];
@@ -194,8 +184,7 @@ export function countRuledTables(rules: readonly Box[], points: readonly Point[]
   for (const [x, y] of points) {
     if (cells.size >= MAX_CELLS || budget.left <= 0) break;
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    // The sides either way along the line of text, then the rules above and below it that run
-    // the whole way between them: a stray hairline across the cell is no side unless it does.
+    // The sides either way along the text, then the rules above and below that span between them.
     const leftAt = nearest(down, x, [y, y], -1, budget);
     const rightAt = nearest(down, x, [y, y], 1, budget);
     if (leftAt < 0 || rightAt < 0) continue;

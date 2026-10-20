@@ -5,9 +5,8 @@ import { buildVocabulary, canonicalize } from "../../src/matching/vocabulary.js"
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * A posting's soft skills ("communication", "teamwork") are claimed on a resume, not evidenced,
- * and an ATS's keyword match gives them little value. The report names them apart from the hard
- * skills and the score weighs them less. Every company and person here is invented.
+ * A posting's soft skills ("communication", "teamwork") are claimed, not evidenced: the report
+ * names them apart from the hard skills and the score weighs them less.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");

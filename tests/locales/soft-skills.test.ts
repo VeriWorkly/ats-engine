@@ -6,11 +6,7 @@ import { applyVocabulary } from "../../src/locales/languages.js";
 import { languagePackSchema } from "../../src/locales/schema.js";
 import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
 
-/**
- * A language pack adds the soft skills its postings ask for, so a German or Hindi posting's
- * "Teamfähigkeit" or "नेतृत्व" is named apart and weighed as "teamwork" is. Invented people and
- * companies only.
- */
+/** A language pack adds the soft skills its postings ask for, weighed as "teamwork" is. Invented people and companies only. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

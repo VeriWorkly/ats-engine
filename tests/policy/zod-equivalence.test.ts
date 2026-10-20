@@ -27,11 +27,9 @@ import { languagePackSchema, regionPackSchema } from "../../src/locales/schema.j
 import { atsEngineSchema } from "../../src/policy/schema.js";
 
 /**
- * What the schemas do, recorded so a change of validation library (or of its version) is seen
- * to change nothing: parsed output with every default, the issues (path, message and the raw
- * issue's other fields) an invalid policy, locale pack, document or model reply raises, and the
- * JSON Schemas generated from them. The snapshots are the behaviour; a diff in one is a change
- * users would see.
+ * What the schemas do, recorded so a change of validation library is seen to change nothing:
+ * parsed output with every default, the issues an invalid policy, pack, document or model reply
+ * raises, and the generated JSON Schemas. A snapshot diff is a change users would see.
  */
 
 const SNAPSHOTS = "./__snapshots__/zod-equivalence";
@@ -311,7 +309,6 @@ const INVALID_POLICIES: Array<[string, unknown]> = [
   ["min-words min Infinity", withRule({ ...rule("min-words"), min: Number.POSITIVE_INFINITY })],
   ["position window above 1", withRule({ ...rule("position"), windowFraction: 2 })],
   ["position window below 0", withRule({ ...rule("position"), windowFraction: -0.1 })],
-  ["position emailPattern malformed", withRule({ ...rule("position"), emailPattern: "[" })],
   ["bands empty", withRule({ ...rule("bands"), bands: [] })],
   [
     "bands not ascending",

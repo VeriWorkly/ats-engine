@@ -5,15 +5,14 @@ import { canonicalize, extractVocabulary, opensSentence, type Vocabulary } from 
 
 /**
  * Terms a posting writes only as names: always capitalised, at least once mid-sentence, only in
- * its prose, never in a list, and not in the policy's vocabulary. "At Freightways, we ship from
- * our Harbor Point depot" names the employer and a place; a skill the role asks for is listed,
- * known to the policy, or written in lowercase somewhere.
+ * its prose, never in a list, and not in the policy's vocabulary ("At Freightways, we ship from
+ * our Harbor Point depot").
  *
  * A list line is a bullet or any line under a required or preferred heading. A prose line is any
- * other line with a word in lowercase, so a title ("Senior Platform Engineer") or a label counts
- * with the lists and keeps its words. A posting with fewer than `minListLines` list lines gives
- * nothing to compare with and keeps every word. Off where a capital says nothing about a name: a
- * language that capitalises every noun, or one whose pack turns it off.
+ * other line with a lowercase word, so a title counts with the lists and keeps its words. Fewer
+ * than `minListLines` list lines gives nothing to compare with and keeps every word. Off where a
+ * capital says nothing about a name (a language that capitalises every noun, or a pack that
+ * turns it off).
  */
 export function proseNames(
   sections: readonly JobSection[],
@@ -53,7 +52,7 @@ export function proseNames(
     if (!PLAIN_CAPITAL.test(raw)) kept.add(token);
     else if (!opensSentence(prose, match.index) && namedAt(prose, match.index, raw, cues))
       names.add(token);
-    // Written once without a name's signs ("written in Rust"), it is not only a name.
+    // Written once without a name's signs ("written in Rust"): not only a name.
     else if (!opensSentence(prose, match.index)) kept.add(token);
   }
   for (const token of names)
@@ -69,8 +68,8 @@ const AFTER = /^[ \t]+([\p{L}\p{M}]+)/u;
 
 /**
  * Whether the capitalised word at `index` is written as a name: beside another capitalised word
- * ("Harbor Point", "Cedar Valley Health"; one that opens the sentence does not count, so "Using
- * Rust" is no name), or after a cue ("At Freightways", "the Sunbelt").
+ * that does not open the sentence ("Harbor Point"; "Using Rust" is no name), or after a cue
+ * ("At Freightways").
  */
 function namedAt(prose: string, index: number, raw: string, cues: ReadonlySet<string>) {
   const head = prose.slice(Math.max(0, index - 40), index);

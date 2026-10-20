@@ -213,14 +213,6 @@
                   "type": "string",
                   "const": "position"
                 },
-                "emailPattern": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "phonePattern": {
-                  "type": "string",
-                  "minLength": 1
-                },
                 "windowFraction": {
                   "type": "number",
                   "minimum": 0,
@@ -5206,14 +5198,6 @@
                 "kind": {
                   "type": "string",
                   "const": "position"
-                },
-                "emailPattern": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "phonePattern": {
-                  "type": "string",
-                  "minLength": 1
                 },
                 "windowFraction": {
                   "type": "number",

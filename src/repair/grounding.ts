@@ -1,28 +1,13 @@
 import { normalizeText } from "../text/text.js";
 import { memo } from "../util/memo.js";
 
-/**
- * Grounding checks for the AI parse-repair pass.
- *
- * The deterministic parser cannot invent an employer. A model can, and that is the property we
- * give up the moment one is allowed near the parse. This module buys it back: every value the
- * model returns must appear in the source document, so a fabricated employer is *structurally*
- * detectable rather than something we hope does not happen.
- *
- * The check is deliberately one-directional. It never asks "is this the right employer" — that
- * is a judgement, and judgements are what we are trying not to trust. It asks only "does this
- * string occur in the document the user uploaded", which is decidable. A model that copies the
- * wrong span passes; a model that hallucinates a plausible one does not, and hallucination is
- * the failure that puts a fabricated employer on a person's resume.
- */
+// Grounding checks for the AI parse-repair pass: every value a model returns must occur in the
+// source document, so a fabricated employer is detectable. One-directional: it never asks whether
+// a value is right, only whether it occurs, which is decidable.
 
 /**
- * Source text folded to make matching survive the transformations that caused the bad parse in
- * the first place — a column-scrambled PDF splits words with newlines, ligatures arrive as
- * single glyphs, and a stacked header can leave doubled spaces between tokens.
- *
- * Case is folded too. A model that returns "acme corp" as "Acme Corp" has fixed the casing of a
- * value that is present, which is repair, not invention.
+ * Source text folded so matching survives what caused the bad parse (newline-split words,
+ * ligatures, doubled spaces). Case is folded too: recasing a present value is repair.
  */
 export function normalizeForGrounding(text: string): string {
   // Digits of every script fold to ASCII first, so "2019" grounds in "२०१९" and back.
@@ -47,24 +32,18 @@ const UNSPACED =
 const ADDRESS =
   /^(?:[^\s@]+@[^\s@]+|(?:https?:\/\/|www\.)\S+|[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+\/\S+)$/iu;
 
-/** An address without its scheme, "www." and trailing slash: "https://www.x.dev/" is "x.dev". */
+/** An address without scheme, "www." and trailing slash. */
 const bare = (address: string) =>
   address
     .replace(/^https?:\/\//i, "")
     .replace(/^www\./i, "")
     .replace(/(?<!\/)\/+$/, "");
 
-/**
- * Whether an address occurs in the source as one of its tokens. An address is an identity, not a
- * phrase: "janedoe@acme.com" is not "jane.doe@acme.com", and "github.com/jane" is not
- * "github.com/janedoe", though their words join the same.
- */
+/** Whether an address occurs in the source as one of its tokens: "github.com/jane" is not "github.com/janedoe". */
 function addressGrounded(value: string, normalized: string) {
   const target = bare(value);
-  // The source as written, and as it may have been laid out: "B.Sc/M.Sc" spaced as "B.Sc / M.Sc",
-  // or an address broken after its "-", "/" or "@" at a line end. Each reading only adds whole
-  // tokens, so neighbouring values never merge into one the source does not hold.
-  // (`normalized` has its whitespace collapsed, so a gap is one space.)
+  // The source as written and as laid out ("B.Sc / M.Sc", an address broken after "-", "/" or "@").
+  // Each reading only adds whole tokens, so neighbouring values never merge.
   const readings = [
     normalized,
     normalized.replace(/ ?\/ ?/g, "/"),
@@ -72,13 +51,13 @@ function addressGrounded(value: string, normalized: string) {
   ];
   return readings.some((text) =>
     text
-      // An icon glyph glued to the address ("✉jane@…") separates it like a space.
+      // An icon glyph glued to the address separates it like a space.
       .split(/[\s|,;<>()"'\p{So}\p{Co}]+/u)
       .some(
         (token) =>
           bare(
             token
-              // "Email:jane@acme.com": a label, not part of the address; "https://" is kept.
+              // A label ("Email:"), not part of the address; "https://" is kept.
               .replace(/^\p{L}+:(?!\/\/)/u, "")
               .replace(/(?<![.:;!?])[.:;!?]+$/, ""),
           ) === target,
@@ -86,14 +65,11 @@ function addressGrounded(value: string, normalized: string) {
   );
 }
 
-/**
- * A list separator between two words: a value never spans one it does not write itself, or
- * "Clients: Acme, Globex" would ground an employer called "Acme Globex".
- */
+/** A list separator: a value never spans one it does not write itself ("Acme, Globex" is not "Acme Globex"). */
 const SEPARATOR = /[,;|•·]/;
-/** A word glued to the next by "&" or "-": the "R" of "R&D" and the "go" of "go-to-market". */
+/** A word glued to the next by "&" or "-" ("R&D"). */
 const GLUE = /^[&-]$/;
-/** What may follow a comma inside one company name: "Acme, Inc." is still "Acme Inc". */
+/** What may follow a comma inside one company name ("Acme, Inc."). */
 const LEGAL_SUFFIX = new Set(
   "inc llc ltd limited corp co plc gmbh ag kg sa sarl srl bv nv lp llp pty pvt ab as oy".split(" "),
 );
@@ -120,15 +96,10 @@ export function groundingWords(normalized: string): string[] {
 }
 
 /**
- * Whether `value` occurs in the source as a run of whole words.
- *
- * The value's letters and digits must equal a run of consecutive source words joined together.
- * Whole words, because a substring test grounded "Meta" in "metadata", "Intel" in
- * "intelligence" and "Apple" in "pineapple" — real employers a model could fabricate and have
- * accepted. Joined, because a PDF that splits a word across a line or column ("Acme Corp\noration")
- * must still ground a value copied correctly from it. Punctuation and spacing are ignored on both
- * sides, so "Q&A" matches "q & a" and "Acme Corp" matches "AcmeCorp"; order and adjacency are not,
- * so "Corporation Acme" and "Acme Globex" do not.
+ * Whether `value` occurs in the source as a run of whole words: its letters and digits must equal
+ * consecutive source words joined together. Whole words, so "Meta" is not in "metadata"; joined,
+ * so a word split across a line ("Acme Corp\noration") still grounds. Punctuation and spacing are
+ * ignored ("Q&A" matches "q & a"); order and adjacency are not.
  *
  * `normalized` must come from `normalizeForGrounding`. Pass `words` when checking many values
  * against one document, so it is split once.
@@ -142,9 +113,8 @@ export function isGrounded(
   if (ADDRESS.test(folded)) return addressGrounded(folded, normalized);
   const valueWords = groundingWords(folded);
   const target = valueWords.join("");
-  if (!target) return true; // no letters or digits: asserts nothing, so there is nothing to ground
-  // Chinese, Japanese or Thai run their words together, so a company inside a sentence is part
-  // of one long "word"; there any occurrence counts, not only one on word boundaries.
+  if (!target) return true; // no letters or digits: asserts nothing
+  // Unspaced scripts run words together, so there any occurrence counts, not only on word boundaries.
   const { joined, starts, wordAt } = joinedWords(words);
   const anywhere = UNSPACED.test(target);
   const gaps = gapsOf.get(words);
@@ -164,8 +134,7 @@ export function isGrounded(
     }
     return false;
   };
-  // "R" is a skill; the "R" of "R&D" is not. Short values only: a long one glued that way
-  // ("full-stack") is still the same words.
+  // "R" is a skill; the "R" of "R&D" is not. Short values only: "full-stack" is still the same words.
   const glued = (at: number) => {
     const first = wordAt[at]!;
     const next = wordAt[at + target.length]!;
@@ -180,10 +149,7 @@ export function isGrounded(
   });
 }
 
-/**
- * The words run together, a mark at every offset where a word starts or the run ends, and the
- * index of the word starting at each offset (-1 elsewhere, and at the end).
- */
+/** The words run together, a mark at each offset where a word starts or the run ends, and the word index starting at each offset (-1 elsewhere). */
 const joinedWords = memo((words: readonly string[]) => {
   const joined = words.join("");
   const starts = new Uint8Array(joined.length + 1);
@@ -199,9 +165,8 @@ const joinedWords = memo((words: readonly string[]) => {
 });
 
 /**
- * Whether `target` occurs in `text` at an offset `accept` takes, in time linear in both
- * (Knuth–Morris–Pratt). A value is model output a prompt-injected resume can steer, so a search
- * that rescans — as matching from each word does on "a a a …" — is not an option.
+ * Whether `target` occurs in `text` at an offset `accept` takes, in linear time (Knuth–Morris–
+ * Pratt): the value is model output a prompt-injected resume can steer, so no rescanning.
  */
 function occurs(text: string, target: string, accept: (at: number) => boolean) {
   const fallback = new Int32Array(target.length);
@@ -225,17 +190,9 @@ function occurs(text: string, target: string, accept: (at: number) => boolean) {
 export type GroundingViolation = { path: string; value: string };
 
 /**
- * Every string in `candidate` that does not occur in `source`.
- *
- * `skipPaths` are left unchecked: a field name at any depth ("summary"), or a path with `[]` for
- * any index ("skills[].name").
- *
- * Walks the object generically so a field added to the repair schema is covered without anyone
- * remembering to add it here — the failure mode of a hand-listed field set is that the newest
- * field, the one least reviewed, is the one left unchecked.
- *
- * Numbers and booleans are skipped: they carry no fabricated identity, and a parsed month is
- * checked by the date logic rather than by substring.
+ * Every string in `candidate` that does not occur in `source`. `skipPaths` are left unchecked: a
+ * field name at any depth ("summary") or a path with `[]` for any index ("skills[].name"). Walks
+ * generically, so a new schema field is covered automatically. Numbers and booleans are skipped.
  */
 export function findGroundingViolations(
   candidate: unknown,
@@ -247,7 +204,6 @@ export function findGroundingViolations(
   const violations: GroundingViolation[] = [];
 
   const walk = (node: unknown, path: string) => {
-    // "skills[].name" names one field of every item; a bare "summary" names it at any depth.
     const anyIndex = path.replace(/\[\d+\]/g, "[]");
     if (
       skipPaths.some(
@@ -261,7 +217,7 @@ export function findGroundingViolations(
       return;
 
     if (typeof node === "string") {
-      // A value made only of punctuation ("—", "@") asserts nothing true; it is not grounded.
+      // A value of only punctuation asserts nothing true; it is not grounded.
       const empty = node.trim() !== "" && !/[\p{L}\p{N}]/u.test(node);
       if (empty || !isGrounded(node, normalized, words)) violations.push({ path, value: node });
       return;

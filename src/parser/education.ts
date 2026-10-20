@@ -13,7 +13,6 @@ type EducationMatchers = {
   levels: Array<{ isced: AtsIscedLevel; re: RegExp }>;
 };
 
-/** Compiled once per policy rather than once per call; the policy is stable for its lifetime. */
 const matchersFor = memo((rp: AtsEnginePolicy["resumeParse"]): EducationMatchers => ({
   schools: wordListRegex(rp.schoolWords),
   schoolsAll: wordListRegex(rp.schoolWords, "gi"),
@@ -28,7 +27,7 @@ const matchersFor = memo((rp: AtsEnginePolicy["resumeParse"]): EducationMatchers
 
 type NamedLevel = { isced: AtsIscedLevel; matched: string };
 
-/** Every education level a piece of text names, highest first, with the words that named each. */
+/** Every education level a text names, highest first, with the words that named each. */
 export function degreeLevels(text: string, policy: AtsEnginePolicy): NamedLevel[] {
   return matchersFor(policy.resumeParse).levels.flatMap(({ isced, re }) => {
     const match = re.exec(text);
@@ -36,7 +35,7 @@ export function degreeLevels(text: string, policy: AtsEnginePolicy): NamedLevel[
   });
 }
 
-/** The highest education level a piece of text names: what a resume's line holds. */
+/** The highest education level a text names. */
 export function degreeLevel(text: string, policy: AtsEnginePolicy): NamedLevel | null {
   return degreeLevels(text, policy)[0] ?? null;
 }
@@ -63,12 +62,10 @@ export function parseEducation(
     const isSchool = schools.test(line);
     if (!degree && !isSchool) return;
 
-    // A degree's end may be ahead of today: an expected graduation, up to a degree's length.
+    // An expected graduation may be ahead of today, up to a degree's length.
     const range = findDateRange(line, policy.resumeParse, now, { aheadYears: DEGREE_YEARS });
 
-    // The date range comes out before the institution is read, otherwise it rides along on the
-    // end of the school name — an entry reading "University of California - 2014 - 2018" is not
-    // the employer-equivalent field a recruiter would search on.
+    // The date range comes out first, or it rides along on the school name.
     const school = isSchool
       ? schoolName(range ? line.replace(range.matched, " ") : line, degree?.matched ?? "", policy)
       : "";
@@ -80,11 +77,8 @@ export function parseEducation(
       end: range ? range.range.end : loneYear(line, now),
     };
 
-    // A degree printed over its school ("B.S., Computer Science 2015 - 2019" / "University of
-    // Washington"), or under it, is one entry. Read line by line it was two half-empty rows.
-    // Not when the two lines are dated differently: "B.Tech, IIT Bombay, 2014 - 2018" over
-    // "Class XII, Delhi Public School, 2014" are two qualifications, and the B.Tech is not from
-    // the school below it.
+    // A degree over or under its school is one entry, unless the two lines are dated differently
+    // ("B.Tech, IIT Bombay, 2014 - 2018" over "Class XII, Delhi Public School, 2014").
     const other = open?.at === at - 1 ? open.entry : null;
     const datedApart = other?.end && entry.end && other.end.year !== entry.end.year;
     if (
@@ -111,10 +105,11 @@ const YEAR = /(?<!\d)(?:19|20)\d{2}(?!\d)/g;
 /** How far ahead an expected graduation's short end year may run: "2023–27". */
 const DEGREE_YEARS = 6;
 
-/** The separators an education line's parts are printed between, kept by `split`. */
-// A dash's spaces are matched from the start of their run: from inside it, a long run of spaces
-// with no dash would be rescanned from every position.
-// A comma between digits is a decimal one, as in a German grade: "Note 1,7".
+/**
+ * The separators an education line's parts are printed between, kept by `split`. A dash's spaces
+ * match from the start of their run (else a long run without a dash rescans from every position);
+ * a comma between digits is decimal ("Note 1,7").
+ */
 const PART = /([|•·]|(?<!\d),|,(?!\d)|(?<!\s)\s+[–—-]\s+)/;
 
 /** A month and year standing alone: "06/2011", "6.2011". */
@@ -124,15 +119,10 @@ const MONTH_YEAR = /(?<![\d./-])\d{1,2}[./](?:19|20)\d{2}(?![\d./-])/g;
 const NUMBERED_NOTE = /\([^()\d]{0,40}\d[^()]{0,40}\)/g;
 
 /**
- * The institution named in an education line, its date range already taken out.
- *
- * - The part naming the school, not the credential: "High School Diploma, Lincoln High School"
- *   has a school word in both, and the first is the diploma.
- * - Ending at its comma. A campus after one ("University of California, Berkeley") cannot be
- *   told from a city ("Harvard University, Cambridge") or a field of study ("Universität
- *   Hamburg, Informatik") without vocabulary, and a name cut short is better than a wrong one.
- * - A lone graduation year goes: "State University 2016" is not the institution's name, and so
- *   does a lone month and year ("Beethoven-Gymnasium Bonn   06/2011"), whole.
+ * The institution named in an education line, its date range already taken out: the part naming
+ * the school, not the credential ("High School Diploma, Lincoln High School"); ending at its
+ * comma (a campus, city or field of study cannot be told apart without vocabulary); a lone year
+ * or month and year dropped.
  */
 function schoolName(text: string, credential: string, policy: AtsEnginePolicy) {
   const { schools, schoolsAll } = matchersFor(policy.resumeParse);

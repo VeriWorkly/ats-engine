@@ -1,10 +1,8 @@
 /**
  * @veriworkly/ats-engine/format — presentation helpers for ATS reports.
  *
- * Dependency-free and policy-free, so a browser bundle can import it without pulling in the
- * scorer or its schema library. Everything here is display: nothing changes a score.
- *
- * English only: labels are literals, to be taken as parameters when a second locale ships.
+ * Dependency-free and policy-free, so a browser bundle can import it without the scorer. Display
+ * only: nothing changes a score. English only.
  */
 
 import type {
@@ -21,9 +19,8 @@ import { own } from "../util/own.js";
 export type AtsScoreTone = "good" | "warn" | "bad";
 
 /**
- * Lower bounds of the display bands: the verdict's own (`VERDICT_BANDS` in the main entry), so a
- * score labelled "good" here is one the verdict calls "strong". Copied rather than imported to keep
- * `/format` free of dependencies; `tests/format/format.test.ts` holds the two equal.
+ * Lower bounds of the display bands, equal to `VERDICT_BANDS` in the main entry ("good" is the
+ * verdict's "strong"). Copied to keep `/format` dependency-free; a test holds the two equal.
  */
 export const SCORE_BANDS = /* @__PURE__ */ Object.freeze({ good: 75, warn: 45 } as const);
 
@@ -34,11 +31,7 @@ export function scoreTone(score: number): AtsScoreTone {
   return "bad";
 }
 
-/**
- * Category ids in the order a report reads best: can it be trusted, read, found, navigated,
- * believed, and then how well it reads. Integrity leads because a finding there outweighs
- * everything below it; writing style comes last because no ATS filters on it.
- */
+/** Category ids in report order: integrity leads (it outweighs the rest), writing comes last. */
 export const CATEGORY_ORDER = /* @__PURE__ */ Object.freeze([
   "integrity",
   "parse",
@@ -49,7 +42,7 @@ export const CATEGORY_ORDER = /* @__PURE__ */ Object.freeze([
   "writing",
 ] as const);
 
-/** What each category id is called on a report: "content" is "Evidence", "format" "Format risk". */
+/** What each category id is called on a report ("content" is "Evidence"). */
 export const CATEGORY_LABELS: Readonly<Record<string, string>> = /* @__PURE__ */ Object.freeze({
   parse: "Parsing",
   contact: "Contact & links",
@@ -60,7 +53,7 @@ export const CATEGORY_LABELS: Readonly<Record<string, string>> = /* @__PURE__ */
   writing: "Writing",
 });
 
-/** A policy may define categories this list does not know; they are title-cased, not hidden. */
+/** An unknown category is title-cased, not hidden. */
 export function categoryLabel(category: string) {
   return own(CATEGORY_LABELS, category) ?? category.charAt(0).toUpperCase() + category.slice(1);
 }
@@ -92,7 +85,7 @@ const MONTH_LABELS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" "
 /** "Mar 2021", or "2021" when only the year is known, or `null` when there is no date. */
 export function formatParsedDate(date: AtsParsedDate | null): string | null {
   if (!date) return null;
-  // A month outside 1–12 (from hand-built input) reads as the year alone, never "undefined 2021".
+  // A month outside 1–12 reads as the year alone.
   const month = date.month ? MONTH_LABELS[date.month - 1] : undefined;
   return month ? `${month} ${date.year}` : String(date.year);
 }
@@ -128,8 +121,8 @@ export function formatTenure(months: number): string {
 
 /**
  * Calendar months one role spans, inclusive of both ends. A current role runs to `now`; a role
- * with only a start counts as that one month. A missing start month reads as January and a
- * missing end month as December, the generous reading the parser also uses.
+ * with only a start counts as one month. A missing start month is January, a missing end month
+ * December, as in the parser.
  */
 export function roleSpanMonths(
   role: Pick<AtsParsedRole, "start" | "end" | "current">,
@@ -145,10 +138,7 @@ export function roleSpanMonths(
   return Math.max(0, to - from + 1);
 }
 
-/**
- * What each ISCED 2011 level is called on a report. Short and international: "Bachelor's or
- * equivalent" is true of a B.Tech, a Licence and a Bachelor alike.
- */
+/** What each ISCED 2011 level is called on a report. */
 export const ISCED_LABELS: Readonly<Record<AtsIscedLevel, string>> = /* @__PURE__ */ Object.freeze({
   2: "Lower secondary",
   3: "Upper secondary",
@@ -159,17 +149,10 @@ export const ISCED_LABELS: Readonly<Record<AtsIscedLevel, string>> = /* @__PURE_
   8: "Doctorate",
 });
 
-/**
- * Control characters, which text from a resume, a posting or a model can carry: an escape
- * sequence printed raw recolours the terminal, clears it, or sets its title. Line breaks and tabs
- * stay.
- */
+/** Control characters (a raw escape sequence can recolour or clear a terminal); line breaks and tabs stay. */
 const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g; // eslint-disable-line no-control-regex
 
-/**
- * Every string in `value`, at any depth, made safe to print in a terminal: control characters
- * removed. JSON escapes C0 controls but not C1 (U+0080–U+009F), which a terminal still acts on.
- */
+/** Every string in `value`, at any depth, with control characters removed (JSON does not escape C1). */
 export function printable<T>(value: T): T {
   if (typeof value === "string") return value.replace(CONTROLS, "") as T;
   if (Array.isArray(value)) return value.map(printable) as T;

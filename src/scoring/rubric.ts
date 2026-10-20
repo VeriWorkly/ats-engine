@@ -18,7 +18,9 @@ export type AtsRubricEntry = {
   fix: string;
 };
 
-/** What the rule reads, and the languages it is limited to, if any: "passiveVoiceRatio (en only)". */
+/**
+ * What the rule reads, and the languages it is limited to, if any: "passiveVoiceRatio (en only)".
+ */
 function measures(rule: AtsEngineRule): string {
   const read = reads(rule);
   return rule.languages ? `${read} (${rule.languages.join(", ")} only)` : read;
@@ -39,11 +41,7 @@ function reads(rule: AtsEngineRule): string {
   }
 }
 
-/**
- * A policy's rules as a published rubric: what each checks, what it can cost, how to fix it.
- * The community policy's is published as RUBRIC.md, generated from this; a host's private
- * policy need not be.
- */
+/** A policy's rules as a published rubric: what each checks, what it can cost, how to fix it. */
 export function policyRubric(policy: AtsEnginePolicy): AtsRubricEntry[] {
   return policy.rules.map((rule) => ({
     id: rule.id,

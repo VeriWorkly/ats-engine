@@ -1,12 +1,6 @@
 import { createHash } from "node:crypto";
 
-/**
- * Minimal single-page PDF writer for layout-detection fixtures.
- *
- * Hand-built rather than checked in as binaries so the geometry under test is visible in the
- * test itself: the difference between the two-column and single-column cases is two numbers,
- * and a reviewer can see exactly what is being asserted without opening a PDF viewer.
- */
+// Minimal PDF writer for layout-detection fixtures, so the geometry under test is visible in the test.
 /**
  * `resources` is added to the page's resource dictionary, e.g. an inline `/ExtGState<<…>>`.
  * `info` is the body of the document Info dictionary, e.g. `/Keywords(…)`.
@@ -69,9 +63,8 @@ function rc4(key: Uint8Array, data: Uint8Array): Uint8Array {
 
 /**
  * Trailer entries (for `buildPdf`'s `trailer`) that encrypt a PDF with an empty user password and
- * an owner password restricting copying and printing: it opens without a password, as many
- * "secured" exports do. Standard security handler revision 4, with the Identity crypt filter for
- * strings and streams, so the content stays as written and only the password check is real.
+ * an owner password restricting copying and printing. Standard security handler revision 4 with
+ * the Identity crypt filter, so the content stays as written and only the password check is real.
  */
 export function ownerPasswordTrailer(): string {
   const PAD = Buffer.from(

@@ -1,12 +1,3 @@
-/**
- * The whole contract a model provider implements.
- *
- * Deliberately small: one non-streaming completion that returns text. Tasks build the prompt,
- * validate the output and decide whether to retry; an adapter only moves a request over the
- * wire and reports what came back. Anything a deployment needs that this does not model — a
- * gateway's routing hints, a provider's own knobs — travels in `extraBody`.
- */
-
 /** Just enough of `AbortSignal`: the package compiles without DOM or Node types. */
 export type AbortSignalLike = {
   readonly aborted: boolean;
@@ -19,11 +10,8 @@ export type AbortSignalLike = {
 export type LlmMessage = { role: "user" | "assistant"; content: string };
 
 /**
- * How to ask for JSON.
- *
- * `json_schema` constrains the response to `schema` and is the mode to prefer, but support is a
- * property of the model and the endpoint serving it, so it is the caller's switch. `json_object`
- * asks only for well-formed JSON; the prompt carries the shape and validation catches the rest.
+ * How to ask for JSON. `json_schema` constrains the response to `schema`, but support depends on
+ * the model and endpoint. `json_object` asks only for well-formed JSON.
  */
 export type LlmOutputFormat = {
   name: string;
@@ -74,11 +62,8 @@ export interface LlmProvider {
 }
 
 /**
- * A failed provider call.
- *
- * `retryable` is the adapter's verdict. A rejection on the request's merits (a 4xx other than
- * 429) is not: sending the same request again spends the budget twice for the same refusal.
- * Rate limits, server faults, timeouts and unreadable bodies are.
+ * A failed provider call. `retryable` is false for a rejection on the request's merits (a 4xx
+ * other than 429); rate limits, server faults, timeouts and unreadable bodies are retryable.
  */
 export class LlmProviderError extends Error {
   readonly status?: number;

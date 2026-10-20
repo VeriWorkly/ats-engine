@@ -434,7 +434,7 @@ describe("--timeout", () => {
       context({ env, fetch: provider.fetch }),
     );
     expect(code).toBe(1);
-    // The report still printed; the AI part failed within its total budget, not 2 × 120 s.
+    // The report still printed; the AI part failed within its total budget.
     expect(out.join("\n")).toContain("Readiness");
     expect(performance.now() - started).toBeLessThan(5_000);
     // The deadline covers the retry too: the call that timed out is not made again.

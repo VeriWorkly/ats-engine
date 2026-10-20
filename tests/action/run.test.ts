@@ -6,11 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-/**
- * The GitHub Action in action/: it runs the CLI, writes the step outputs and the job summary,
- * and fails the step below min-score. Run here against the local build (ATS_ENGINE_CLI), so it
- * needs `npm run build` first, as the MCP tests do.
- */
+/** The GitHub Action, run against the local build (ATS_ENGINE_CLI): needs `npm run build` first. */
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), "ats-action-"));
@@ -68,8 +64,7 @@ function action(inputs: Record<string, string>) {
 }
 
 describe("the GitHub Action", () => {
-  // Every run wrote $RUNNER_TEMP/ats-report.json, so a job checking two resumes read the second
-  // report under the first step's output.
+  // One report file per run, so a job checking two resumes keeps both.
   it("writes each run's report to its own file", () => {
     const withJob = action({ ATS_RESUME: resume, ATS_JOB: job });
     const alone = action({ ATS_RESUME: resume });
@@ -113,8 +108,7 @@ describe("the GitHub Action", () => {
 });
 
 describe("text from the resume", () => {
-  // A stand-in CLI that prints a report carrying hostile text, and hostile lines on stderr, as a
-  // resume or a posting can make the real one do.
+  // A stand-in CLI printing hostile text in the report and on stderr.
   const stub = join(dir, "stub-cli.mjs");
   const hostile = String.raw`\<a href=https://evil.example/apply#\>apply here\</a\>`;
   writeFileSync(
@@ -156,13 +150,12 @@ process.stdout.write(JSON.stringify({
   it("is shown as text in the job summary, never as HTML or Markdown", () => {
     const { status, summary } = stubbed();
     expect(status).toBe(0);
-    // No tag survives: a backslash before "<" no longer leaves the "<" live.
+    // No tag survives, even after a backslash.
     expect(summary).not.toMatch(/<(?!sub>|\/sub>)/);
     expect(summary).toContain("\\\\&lt;a href=https&#58;//evil.example/apply#\\\\&gt;apply here");
     expect(summary).toContain("&lt;img src=x onerror=alert(1)&gt;");
     expect(summary).toContain("Jane \\| Doe \\*x\\* &amp; &lt;b&gt;y&lt;/b&gt;");
-    // Nor a link GitHub would make of an address on its own: the colon of a scheme, the dot
-    // after "www" and the "@" are written as entities, which read the same.
+    // Nor an autolink: the scheme's colon, the dot after "www" and "@" are entities.
     expect(summary).toContain(
       "Apply at https&#58;//evil.example/login, WWW&#46;evil.com or hr&#64;evil.example",
     );
@@ -236,9 +229,8 @@ describe("the ats input", () => {
 });
 
 describe("the Action's npx run", () => {
-  // `npx` installs no optional peers, so the Action asks it for the PDF and DOCX readers next to
-  // the engine; without them a PDF resume exits 1. The tests above run the local build and never
-  // reach npx, so a preload stands in for spawnSync and records what would be passed to it.
+  // npx installs no optional peers, so the Action asks for the PDF and DOCX readers. The tests
+  // above never reach npx: a preload stands in for spawnSync and records its arguments.
   const preload = join(dir, "preload.mjs");
   const record = join(dir, "argv.json");
   writeFileSync(

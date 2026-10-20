@@ -1,14 +1,9 @@
 /**
- * Geometry recovered while parsing an uploaded document, for the checks that text cannot answer.
- *
- * `columnRatio` is the share of content lines whose text items are separated by a horizontal gap
- * wide enough to read as a column gutter — the signature of a two-column layout, a sidebar, or a
- * floating text box, all of which extract in a scrambled order. `tableCount` is the number of
- * ruled table grids found by tracing the page's vector drawing operators: stroked lines, and the
- * thin filled rectangles a browser prints a CSS border as.
- *
- * Absent for pasted text and Studio documents, which have no geometry to measure; the rules that
- * depend on it are then omitted from the report rather than assumed to pass.
+ * Geometry recovered while parsing an uploaded document, for checks that text cannot answer.
+ * `columnRatio` is the share of content lines split by a gutter-wide gap (a two-column layout,
+ * sidebar or text box); `tableCount` the ruled table grids traced from the page's drawing
+ * operators. Absent for pasted text and structured documents; the rules that depend on it are
+ * then omitted rather than assumed to pass.
  */
 export type AtsLayoutSignals = {
   /** `null` when the document had too few content lines for the ratio to mean anything. */
@@ -17,42 +12,27 @@ export type AtsLayoutSignals = {
   pageCount: number;
   /** Images at least 80px a side — a photo, rarely a logo. Absent when it was not measured. */
   imageCount?: number;
-  /**
-   * Characters drawn so a reader cannot see them while an ATS still reads them: in the page's
-   * own colour or near it, too small to read, off the page, invisible, or under an image.
-   */
+  /** Characters a reader cannot see but an ATS reads: page-coloured, tiny, off-page, invisible or under an image. */
   hiddenTextChars?: number;
   /**
-   * All of that hidden text, whitespace collapsed to single spaces, its runs joined in reading
-   * order, and cut to the first 5,000 characters. Present whenever `hiddenTextChars` is; "" when
-   * nothing is hidden.
+   * All of that hidden text, whitespace collapsed, runs joined in reading order, cut to 5,000
+   * characters. Present whenever `hiddenTextChars` is; "" when nothing is hidden.
    */
   hiddenText?: string;
   /**
-   * Of that hidden text, what the document's text holds too, collapsed, joined and cut as
-   * `hiddenText` is: the part an ATS reads, which the job match leaves out. On a PDF all of it; in
-   * a Word document all but the runs a header or footer marks hidden, which its text leaves out;
-   * in an HTML resume none, as hidden elements are left out of the text. Hidden text the text does
-   * not hold can never cost a visible line. Absent from an older extractor or a host that does not
-   * pass it: the engine then sets aside by `hiddenText` and cuts nothing from a visible line.
+   * The part of `hiddenText` the document's text holds too (collapsed, joined and cut the same
+   * way): what an ATS reads, which the job match leaves out. A PDF: all of it; DOCX: all but runs
+   * a header or footer marks hidden; HTML: none. Absent when the extractor does not pass it; the
+   * engine then sets aside by `hiddenText`.
    */
   hiddenTextRead?: string;
   /** Pages with no text layer at all: a scan, or a page exported as a picture. */
   imageOnlyPages?: number;
-  /**
-   * The file's title, subject, keywords and author fields. Never scored as resume text — an ATS
-   * does not index them — but read for instructions aimed at an AI, which hide there.
-   */
+  /** The file's title, subject, keywords and author fields: not scored, read for instructions aimed at an AI. */
   metadataText?: string;
-  /**
-   * A PDF that opened without a password but is encrypted: an owner password restricts copying,
-   * printing or editing. Absent when it is not. Advice, never scored.
-   */
+  /** A PDF that opened without a password but is encrypted (an owner password). Advice only. */
   encrypted?: boolean;
-  /**
-   * A Word document's tracked changes (insertions, deletions, moves, formatting changes) and
-   * comments still in the file. Measured for DOCX only; advice, never scored.
-   */
+  /** A Word document's tracked changes and comments still in the file. DOCX only; advice only. */
   trackedChanges?: number;
   comments?: number;
 };

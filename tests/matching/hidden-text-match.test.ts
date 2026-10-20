@@ -49,7 +49,7 @@ describe("hidden text and the job match", () => {
   });
 
   // The hidden block holds the same word as a visible line. Each hidden occurrence sets aside one
-  // line, longest first: the visible "Kubernetes" skill was set aside with the block it repeats.
+  // line, longest first, so the visible "Kubernetes" skill stays.
   it("keeps a visible line whose text the hidden text also holds", () => {
     const visible = RESUME.replace("TypeScript, Go, PostgreSQL", "Kubernetes");
     const report = check(visible, DEFAULT_POLICY, {
@@ -61,8 +61,8 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).not.toContain("kafka");
   });
 
-  // A visible line across the end of one hidden line and the start of the next: cutting it out
-  // of the hidden text left neither hidden line to find, and both counted as evidence.
+  // A visible line across the end of one hidden line and the start of the next must not hide
+  // both hidden lines from detection.
   it.each([
     ["across two", ["Kafka Kubernetes", "Terraform Spark"], "Kubernetes Terraform"],
     ["overlapping", ["Kafka Spark", "Spark Terraform Kubernetes"], "Spark Terraform"],
@@ -88,8 +88,8 @@ describe("hidden text and the job match", () => {
       for (const line of hiddenLines) expect(requirement.evidence).not.toContain(line);
   });
 
-  // The hidden lines, read in order, are the hidden text whole, so they and only they are set
-  // aside: a visible line that runs where two of them meet keeps its words.
+  // The hidden lines, in order, are the hidden text whole: only they are set aside, and a visible
+  // line where two meet keeps its words.
   it.each([
     [
       "the wrap of a hidden block",
@@ -126,8 +126,8 @@ describe("hidden text and the job match", () => {
     for (const term of dropped) expect(report.matchedKeywords).not.toContain(term);
   });
 
-  // Hidden text read in another order than the lines (a second column's runs first) has no
-  // lines that join to it; the longest lines still claim theirs, and nothing hidden counts.
+  // Hidden text in another order than the lines (a second column first) has no lines that join
+  // to it; the longest lines still claim theirs.
   it("counts nothing hidden when the hidden text runs in another order than the lines", () => {
     const resume = [
       "Jane Doe",
@@ -168,8 +168,8 @@ describe("hidden text and the job match", () => {
     });
   };
 
-  // "Go Machine" / "Learning" / "Learning Big" also join to the hidden text: split two ways, a
-  // phrase could be in either, so no set of lines is trusted and the longest lines claim theirs.
+  // Joining two ways, a phrase could be in either, so no set of lines is trusted and the longest
+  // lines claim theirs.
   it("trusts no set of lines when the hidden text splits two ways", () => {
     const report = read(
       [
@@ -189,8 +189,8 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).not.toContain("machine learning");
   });
 
-  // The hidden "Machine" and "Learning" are the last two lines; the visible ones come first. The
-  // lines set aside are those that join to the hidden text, not the first lines with their words.
+  // The hidden "Machine" and "Learning" are the last two lines. The lines set aside are those that
+  // join to the hidden text, not the first lines with their words.
   it("sets aside the hidden copies of a line, not the first ones", () => {
     const report = read(
       [
@@ -211,8 +211,7 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).not.toContain("machine learning");
   });
 
-  // Setting aside "Science Spark" must not make "Machine" and "Learning" a phrase: the lines
-  // either side of a line set aside are read apart.
+  // Setting aside "Science Spark" must not make "Machine" and "Learning" a phrase.
   it("reads no phrase across a line set aside", () => {
     const report = read(
       [
@@ -228,8 +227,8 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).not.toContain("machine learning");
   });
 
-  // White "Kafka Kubernetes" drawn after "Senior Engineer" on one line: on a PDF, whose hidden
-  // runs are all among its lines, it is cut from that line and the rest of the line stays.
+  // White "Kafka Kubernetes" after "Senior Engineer" on one line: on a PDF it is cut from that
+  // line and the rest stays.
   const glued = [
     "Jane Doe",
     "jane.doe@example.com",
@@ -257,9 +256,8 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).not.toContain("kubernetes");
   });
 
-  // The hidden copy is drawn against punctuation ("Kafka-based") or across two lines, so the one
-  // copy held between word ends is a visible one: a word the kept lines hold more often than the
-  // hidden text owes is not cut, and the visible skill stays.
+  // A hidden copy drawn against punctuation ("Kafka-based") or across two lines: a word the kept
+  // lines hold more often than the hidden text owes is not cut.
   it.each([
     [
       "against punctuation",
@@ -294,8 +292,8 @@ describe("hidden text and the job match", () => {
     ).toBe(false);
   });
 
-  // The visible twins of two hidden lines are set aside in their place: the hidden lines kept
-  // are read apart, so they make no phrase together.
+  // The visible twins of two hidden lines are set aside in their place; the hidden lines kept are
+  // read apart.
   it("reads apart the kept copies of a line whose other copies are set aside", () => {
     const resume = [
       "Jane Doe",
@@ -321,8 +319,8 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).not.toContain("machine learning");
   });
 
-  // A web page's hidden element, or a Word header's hidden run, is reported hidden but is not in
-  // the text: no ATS reads it, so the visible line that repeats it stays whole.
+  // A hidden element or Word header run is reported hidden but not in the text: the visible line
+  // that repeats it stays whole.
   it("sets aside nothing for hidden text the lines do not hold", () => {
     const resume = ["Jane Doe", "jane.doe@example.com", "Skills", "Kafka Kubernetes"].join("\n");
     const report = check(resume, DEFAULT_POLICY, {
@@ -337,8 +335,8 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).toEqual(expect.arrayContaining(["kafka", "kubernetes"]));
   });
 
-  // A layout from an older extractor, or a host that passes only `hiddenText`, does not say which
-  // hidden text the lines hold: nothing is cut from a visible line, as before.
+  // A layout with only `hiddenText` does not say which hidden text the lines hold: nothing is cut
+  // from a visible line.
   it("cuts nothing from a visible line when the layout does not say what the lines hold", () => {
     const report = check(glued, DEFAULT_POLICY, {
       jobDescription: gluedJob,
@@ -351,8 +349,8 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).toEqual(expect.arrayContaining(["kafka", "kubernetes"]));
   });
 
-  // A second column's hidden runs read first, and a visible "Airflow Kafka" across their join:
-  // it splits into their texts one way only, so those lines are set aside and the visible stay.
+  // A second column's hidden runs first, and a visible "Airflow Kafka" across their join: it
+  // splits into their texts one way only, so those lines are set aside and the visible stay.
   it("sets aside the hidden lines when the hidden text runs in another order", () => {
     const resume = [
       "Jane Doe",
@@ -374,8 +372,7 @@ describe("hidden text and the job match", () => {
     expect(report.matchedKeywords).not.toContain("spark");
   });
 
-  // A hidden "Go" glued to a visible word: a line under four characters is never set aside, so
-  // the visible "Go" skill stays, as it always did.
+  // A hidden "Go" glued to a visible word: a line under four characters is never set aside.
   it("never sets aside a line under four characters", () => {
     const resume = ["Jane Doe", "jane.doe@example.com", "Skills", "Go", "Languages: PythonGo"].join(
       "\n",
@@ -452,11 +449,10 @@ describe("hidden text and the job match", () => {
 });
 
 /**
- * What hidden text costs and lets through, held as it stands: generated resumes of each shape the
- * engine meets (hidden lines, a white block wrapped over two lines, a second column's hidden runs
- * read first, lines written twice, white text drawn after visible text on one line, and hidden
- * text the text does not hold), each judged against what a reader sees. A skill only hidden text
- * names must never match; visible skills lost may fall, never rise.
+ * What hidden text costs and lets through: generated resumes of each shape (hidden lines, a white
+ * block over two lines, a second column first, lines written twice, white text after visible text,
+ * hidden text the text does not hold), judged against what a reader sees. A skill only hidden
+ * text names must never match; visible skills lost may fall, never rise.
  */
 describe("hidden text across generated resumes", () => {
   const VOCAB = [

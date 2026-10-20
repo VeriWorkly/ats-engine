@@ -1,18 +1,6 @@
 import type { AtsDocumentSection, AtsResumeDocument } from "./types.js";
 
-/**
- * The canonical plain-text form of a structured resume: the page as a reader sees it.
- *
- * One line per visual line, a heading line per section, bullets prefixed with "- ". This is the
- * text the content rules score and the text an AI pass is given, so it deliberately mirrors how
- * the document prints rather than how it is stored.
- *
- * Dates are kept in their stored `YYYY-MM` form. Rendering them as "Mar 2021" would bind the
- * output to English month names; the ISO form reads the same in every language and no rule
- * scores its spelling.
- */
-
-/** One line: a newline inside a title field would split one header into several content lines. */
+/** One line: a newline inside a field would split one header into several content lines. */
 const clean = (value: string | undefined) => value?.replace(/\s+/g, " ").trim() ?? "";
 
 function join(parts: Array<string | undefined>, separator = ", ") {
@@ -41,8 +29,7 @@ function pushBullets(lines: string[], items: string[] | undefined) {
 function pushText(lines: string[], value: string | undefined) {
   const text = value?.trim();
   if (!text) return;
-  // A multi-line summary keeps its own line structure; collapsing it would merge sentences into
-  // one line and understate the document's content lines.
+  // A multi-line summary keeps its line structure.
   for (const line of text.split(/\r?\n/)) if (line.trim()) lines.push(line.trim());
 }
 
@@ -92,7 +79,6 @@ function renderSection(section: AtsDocumentSection): string[] {
       }
       break;
     case "certifications":
-      // Earned and expiry as a range, as a role's dates are: the ISO form reads in any language.
       for (const item of section.items) {
         const line = join([item.name, item.issuer, span(item.date, item.expires, false)]);
         if (line) lines.push(line);
@@ -122,8 +108,9 @@ function renderSection(section: AtsDocumentSection): string[] {
 }
 
 /**
- * The canonical plain text of a structured resume: one line per visual line, a heading line per
- * section, bullets prefixed with "- ", dates as stored. What the content rules score.
+ * The canonical plain text of a structured resume, as the page prints: one line per visual line,
+ * a heading per section, "- " bullets, dates as stored (ISO, so no English month names). What the
+ * content rules score and an AI pass reads.
  */
 export function renderResumeDocument(doc: AtsResumeDocument): string {
   const { basics } = doc;
@@ -139,8 +126,7 @@ export function renderResumeDocument(doc: AtsResumeDocument): string {
 
   for (const section of doc.sections) {
     const body = renderSection(section);
-    // An empty section prints nothing on the page, so it contributes no heading either — a bare
-    // "Experience" heading would otherwise satisfy the structure rule with nothing under it.
+    // An empty section prints no heading, or a bare one would satisfy the structure rule.
     if (!body.length) continue;
     lines.push("", ...(clean(section.title) ? [clean(section.title)] : []), ...body);
   }

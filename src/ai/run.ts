@@ -136,7 +136,7 @@ const parses = (text: string) => {
   }
 };
 
-/** The object or array opening at `start`, to its matching close, read past strings; or null. */
+/** The object or array opening at `start`, to its matching close, skipping strings; or null. */
 function balancedFrom(text: string, start: number): string | null {
   let depth = 0;
   let inString = false;
@@ -157,24 +157,19 @@ function balancedFrom(text: string, start: number): string | null {
   return null;
 }
 
-/** How many opening braces are tried as the start of the answer. Replies are bounded anyway. */
+/** How many fences or opening braces are tried as the start of the answer. */
 const MAX_CANDIDATES = 20;
 
 /**
- * The JSON in a reply. Models asked for JSON without a schema sometimes wrap it: in a fence on
- * several lines or on one ("```json{…}```"), after reasoning ("<think>…</think>", printed first by
- * open models such as DeepSeek-R1 and Qwen3, whose chat template may supply the opening tag), or
- * between sentences ("Here it is: {…} Hope this helps!"). Reasoning goes, then the answer is
- * taken whole if it parses, else the first fenced block or whole JSON object in it. A reply with
- * no object is returned as it is, and fails to parse.
+ * The JSON in a reply that may wrap it in a fence, in prose, or after `<think>…</think>`
+ * reasoning (whose opening tag a chat template may supply). The answer whole if it parses, else
+ * the first fenced block or balanced JSON object that does; else the reply as it is.
  */
 function unfence(text: string): string {
   const close = text.toLowerCase().lastIndexOf("</think>");
   const answer = (close === -1 ? text : text.slice(close + "</think>".length)).trim();
   if (parses(answer)) return answer;
-  // A fence, a language name, then the block to the next fence. Found with `indexOf`, not a lazy
-  // pattern, which scanned to the end of the reply from every fence left open: 32 KB of them took
-  // 278 ms, growing with the square of the reply.
+  // `indexOf`, not a lazy pattern: unclosed fences made that quadratic.
   for (
     let open = answer.indexOf("```"), fences = 0;
     open !== -1 && fences < MAX_CANDIDATES;
@@ -235,8 +230,7 @@ function classify(
   signal: AbortSignalLike | undefined,
 ): { error: AtsAiError; retryable: boolean } {
   if (error instanceof AtsAiError) return { error, retryable: error.code === "invalid_output" };
-  // The caller's own abort, however the provider reported it (a custom one may throw a DOM
-  // AbortError or anything else once the signal fires): never retried.
+  // The caller's own abort, however a custom provider reported it: never retried.
   if (
     error instanceof AbortedError ||
     signal?.aborted ||
@@ -264,11 +258,8 @@ function classify(
 
 /**
  * Runs one task: build the request, call the provider, validate, retry what a retry can fix.
- *
- * Retried, immediately and up to `retries` times: malformed or empty output, rate limits, server
- * faults and timeouts. Not retried: refusals, output truncated at `maxTokens`, 4xx rejections
- * other than 429, and the caller's own abort — each of those would fail the same way again and
- * be billed again.
+ * Retried up to `retries` times: malformed or empty output, rate limits, server faults and
+ * timeouts. Not retried: refusals, truncation at `maxTokens`, 4xx other than 429, the caller's abort.
  */
 export async function runTask<Raw, Result>(
   context: RunContext,

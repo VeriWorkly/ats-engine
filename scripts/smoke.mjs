@@ -1,18 +1,16 @@
-// Browser and edge smoke test. Run after `npm run build`.
-//
-// Browser: every runtime-agnostic subpath must bundle for `platform: "browser"`, which fails on
-// any Node built-in. Edge: the core, bundled, must score a resume inside a bare V8 context —
-// no `process`, `Buffer`, `require` or file system, as in a Workers/Edge runtime. Types: the
-// TypeScript samples in the README and LOCALES.md must compile against the built `.d.ts` under
-// the strictest options a host may set, `exactOptionalPropertyTypes` among them. Network: the
-// subpaths SECURITY.md promises make no network call (the MCP server runs `./node`) must not
-// bundle one; only `/ai` reaches a provider, through the fetch its host passes in.
+// Smoke test, run after `npm run build`.
+// Browser: every runtime-agnostic subpath must bundle for `platform: "browser"`.
+// Edge: the core must score a resume in a bare V8 context (no `process`, `Buffer`, `require`).
+// Schema and sizes: policy.schema.json and sizes.json must match this build.
+// Types: the README and LOCALES.md samples must compile against the built `.d.ts` under strict
+// options, `exactOptionalPropertyTypes` included.
+// Network: the subpaths SECURITY.md promises make no network call must not bundle one.
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { build } from "esbuild";
 import ts from "typescript";
 
-const { exports } = JSON.parse(readFileSync("package.json", "utf8"));
+const { exports, version } = JSON.parse(readFileSync("package.json", "utf8"));
 const BROWSER = [
   ".",
   "./document",
@@ -26,7 +24,7 @@ const BROWSER = [
 ];
 
 const NETWORK_FREE = new Set([".", "./document", "./format", "./job", "./locales", "./node"]);
-// A network builtin by either name: esbuild leaves `import … from "https"` as written.
+// esbuild leaves `import … from "https"` as written, so both builtin names are matched.
 const NETWORK =
   /\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|["'](?:node:)?(?:https?|http2|net|tls|dgram)["']/;
 
@@ -37,7 +35,6 @@ for (const subpath of [...BROWSER, "./node"]) {
     bundle: true,
     format: "esm",
     platform: node ? "node" : "browser",
-    // The optional readers are the host's install, not this package's code.
     external: node ? ["mammoth", "pdf-parse", "pdfjs-dist"] : [],
     write: false,
     logLevel: "silent",
@@ -69,11 +66,8 @@ runInNewContext(core.outputFiles[0].text, sandbox);
 if (typeof sandbox.report?.readinessScore !== "number") throw new Error("edge smoke: no report");
 console.log(`edge     . (readiness ${sandbox.report.readinessScore})`);
 
-// Schema: the policy's JSON Schema ships at its export, names this version, and describes every
-// section of the community policy, so a policy file pointing its `$schema` at it is checked whole.
 const policySchema = JSON.parse(readFileSync(exports["./policy.schema.json"], "utf8"));
 const { DEFAULT_POLICY } = await import("../dist/index.js");
-const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 const undescribed = Object.keys(DEFAULT_POLICY).filter((key) => !(key in policySchema.properties));
 if (!policySchema.$id.includes(`@${version}/`) || undescribed.length > 0)
   throw new Error(
@@ -81,8 +75,6 @@ if (!policySchema.$id.includes(`@${version}/`) || undescribed.length > 0)
   );
 console.log(`schema   policy.schema.json covers ${Object.keys(DEFAULT_POLICY).length} sections`);
 
-// Sizes: `npm run size` wrote them for this version, for every subpath a bundler imports, so the
-// docs that read their size tables from `./sizes.json` describe this build.
 const sizes = JSON.parse(readFileSync(exports["./sizes.json"], "utf8"));
 const unsized = Object.keys(exports).filter(
   (subpath) => exports[subpath].import && !(subpath in sizes.subpaths),
@@ -94,7 +86,7 @@ if (sizes.version !== version || unsized.length > 0)
 console.log(`sizes    sizes.json covers ${Object.keys(sizes.subpaths).length} subpaths`);
 
 // Each sample is its own module beside package.json, so `@veriworkly/ats-engine` resolves to this
-// package's exports. The names a sample uses without defining are declared for it.
+// package's exports.
 const DECLARED = ["resume", "resumeText", "postingHtml", "jobDescription"]
   .map((name) => `declare const ${name}: string;`)
   .join(" ");
@@ -105,9 +97,8 @@ for (const doc of ["README.md", "LOCALES.md"]) {
   for (const [index, [, code]] of [...blocks].entries())
     samples.set(`${root}/${doc}.sample-${index + 1}.ts`, `${DECLARED}\n${code}`);
 }
-// What a host writes beyond the docs, which must keep compiling: its own exact-optional types
-// filled from what the package returns (so a returned type never gains `| undefined`), and a
-// retry hook typed for one task, or left out with `undefined`.
+// A host's own exact-optional types filled from what the package returns (a returned type never
+// gains `| undefined`), and a retry hook typed for one task or set to `undefined`.
 samples.set(
   `${root}/host.sample.ts`,
   `import { DEFAULT_POLICY, check, fromJsonResume, prepareResume } from "@veriworkly/ats-engine";

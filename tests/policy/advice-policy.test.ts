@@ -3,11 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AtsPolicyError, DEFAULT_POLICY, parseAtsPolicy } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 
-/**
- * The advice section of the policy: file-name words, the size limit, the target-ATS notes and
- * every message, with defaults, so a policy written before it still parses; and the region
- * packs' age thresholds, which turn age advice on where a region asks for it.
- */
+/** The advice section of the policy and its defaults, and the region packs' age thresholds. */
 
 describe("policy.advice", () => {
   it("defaults in a policy written before it", () => {

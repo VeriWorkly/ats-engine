@@ -2,10 +2,7 @@ import type { AiEvalCase } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
 import { check } from "../../src/scoring/engine.js";
 
-/**
- * Synthetic eval cases. Every person, employer and address here is invented — no real resume
- * belongs in this repository.
- */
+// Synthetic eval cases: every person, employer and address is invented.
 
 const STANDARD = [
   "Priya Raman",

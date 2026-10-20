@@ -5,12 +5,7 @@ import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { segmentResume } from "../../src/parser/sections.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Certifications and licences read as rows of their own — name, issuer, date earned, date of
- * expiry — the way Textkernel and Affinda file them, so a posting asking for "AWS
- * certification" can be answered from a row rather than from a word somewhere in the text.
- * Invented people only.
- */
+// Certifications and licences read as rows: name, issuer, date earned, date of expiry.
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const LOCALES = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

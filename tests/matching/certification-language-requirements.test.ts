@@ -11,8 +11,7 @@ import { expectFast } from "../fixtures/timing.js";
 
 /**
  * A certification asked for is met by a certification row, and a language by a spoken-language
- * row at or above the level asked, with the row as the evidence. Where no row names it, the
- * lines are read as before, so nothing met by them is lost. Invented people only.
+ * row at or above the level asked, with the row as the evidence. Without a row, lines are read.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");

@@ -152,7 +152,7 @@ describe("an employer with its state's code", () => {
     [["Analyst at Deloitte, NY\tJan 2020 - Present"], "Analyst", "Deloitte"],
     [["Nurse at Kaiser, CA\tJan 2020 - Present"], "Nurse", "Kaiser"],
     [["Engineer @ Intel, OR\tJan 2020 - Present"], "Engineer", "Intel"],
-    // An organisation's name keeps its place between bars, as it did.
+    // An organisation's name keeps its place between bars.
     [["Nurse | Mercy Hospital | CA\tJan 2020 - Present"], "Nurse", "Mercy Hospital"],
   ])("keeps the title and the employer of %j", (block, title, employer) => {
     expect(rolesIn(...block)).toEqual([{ title, employer }]);
@@ -194,7 +194,7 @@ describe("a city with its state or country named in full", () => {
     [["Software Engineer | Acme Corp", "Jan 2020 - Present | Remote, India"]],
     [["Software Engineer", "Acme Corp", "Berlin, Germany", "Jan 2020 - Present"]],
     [["Acme Corp", "Software Engineer", "Austin, Texas, United States", "Jan 2020 - Present"]],
-    // A first part ending in a legal form is the employer, not a city: it was dropped as one.
+    // A first part ending in a legal form is the employer, not a city.
     [["Software Engineer", "Acme Corp, TX", "Jan 2020 - Present"]],
   ])("is neither the title nor the employer in %j", (block) => {
     expect(rolesIn(...block)).toEqual([{ title: "Software Engineer", employer: "Acme Corp" }]);
@@ -367,7 +367,7 @@ describe("a comma inside the title", () => {
     // A comma part beside a place, or a city and its country, is still the employer.
     ["Senior Engineer, Acme — Austin, TX", "Senior Engineer", "Acme"],
     ["Senior Engineer, Acme | Remote", "Senior Engineer", "Acme"],
-    // The city goes with its country (`placeNames`): it was kept as part of the employer.
+    // The city goes with its country (`placeNames`).
     ["Software Engineer, Acme | Berlin, Germany", "Software Engineer", "Acme"],
     // Without a company's legal form after it, a third part is where.
     ["Software Engineer, Acme, Berlin", "Software Engineer", "Acme, Berlin"],

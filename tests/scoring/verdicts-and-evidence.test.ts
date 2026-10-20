@@ -7,7 +7,7 @@ import {
   check as score,
 } from "../../src/index.js";
 
-/** Defects found in the final review of scoring, checks and matching, one block each. */
+/** Verdicts and evidence, one block per defect. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 
@@ -161,7 +161,7 @@ describe("homoglyphs from other alphabets", () => {
   });
 });
 
-/** Found by the review of the fixes above. */
+/** Follow-up defects. */
 describe("paste artifacts, Greek names, spread stuffing and spaced phones", () => {
   const POSTING =
     "Requirements\n- Go and Kubernetes for payment services at scale\n- Python and Kafka data pipelines";

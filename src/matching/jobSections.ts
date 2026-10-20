@@ -10,17 +10,8 @@ export type JobSectionKind = "required" | "preferred" | "responsibilities" | "bo
 export type JobSection = { kind: JobSectionKind; text: string; heading?: string };
 
 /**
- * Splits a job posting into labelled blocks, each running from its heading to the *next*
- * heading.
- *
- * The previous implementation took a fixed 600-character window after a "Requirements" heading.
- * On a normally formatted posting that window overshoots the requirements list and swallows the
- * nice-to-haves and responsibilities that follow it, so optional skills were billed at the
- * required weight and the preferred discount could never apply. Terminating at the next heading
- * is both simpler and correct at any section length.
- *
- * A posting with no recognisable headings yields a single `body` block. That is intentional:
- * scoring still works, and the specificity weighting below is what keeps boilerplate in check.
+ * Splits a job posting into labelled blocks, each running from its heading to the next. A
+ * posting with no recognisable headings yields a single `body` block.
  */
 export function segmentJob(jobText: string, policy: AtsEnginePolicy): JobSection[] {
   const km = policy.keywordMatch;
@@ -39,8 +30,8 @@ export function segmentJob(jobText: string, policy: AtsEnginePolicy): JobSection
 
   for (const rawLine of jobText.split(/\r?\n/)) {
     const line = rawLine.trim();
-    // A heading is a short standalone line. Requiring that shape stops a requirement written as
-    // prose ("...you will be responsible for...") from re-labelling everything after it.
+    // A heading is a short standalone line, so prose ("...you will be responsible for...") does
+    // not re-label what follows.
     const heading = classifyHeading(line, matchers);
     if (!heading) {
       current.text += `${line}\n`;
@@ -59,8 +50,8 @@ export function segmentJob(jobText: string, policy: AtsEnginePolicy): JobSection
 }
 
 /**
- * An amount of money: "$175,000", "€80k", "90,000 EUR". A figure is read from the start of its
- * digit run only, so a long run of digits costs one pass, not one per digit.
+ * An amount of money: "$175,000", "€80k", "90,000 EUR". Read from the start of a digit run only,
+ * so it is linear.
  */
 const MONEY = /[$€£₹¥]\s?\d|(?<![\d,.])\d[\d,.]*\s?(?:k\b|usd|eur|gbp|inr)/i;
 
@@ -71,9 +62,9 @@ const offerMatchers = memo((km: AtsEnginePolicy["keywordMatch"]) => ({
 }));
 
 /**
- * What the posting offers (pay, benefits), which is not something it asks of the candidate: a
- * line labelled with an offer word, or naming one beside an amount of money. An offer word alone
- * is not enough: "Compensation analysis experience" and "Equity research" are requirements.
+ * What the posting offers (pay, benefits): a line labelled with an offer word, or naming one
+ * beside an amount of money. An offer word alone is not enough ("Equity research" is a
+ * requirement).
  */
 export function isOfferLine(line: string, policy: AtsEnginePolicy) {
   const text = line.replace(BULLET_PREFIX, "").trim();

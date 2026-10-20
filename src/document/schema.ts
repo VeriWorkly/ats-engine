@@ -3,16 +3,8 @@ import * as z from "zod/mini";
 import { cut, normalizeText } from "../text/text.js";
 import { ATS_DOCUMENT_FORMAT, DOCUMENT_LIMITS as L, type AtsResumeDocument } from "./types.js";
 
-/**
- * Validation for `AtsResumeDocument`, which reaches the engine from untrusted callers.
- *
- * Strings are cut to length rather than rejected: a description one character over is still the
- * user's resume. Arrays are bounded and rejected past their limit. The cost of walking a huge
- * array is stopped earlier than this, by the size pre-check in `prepareResume`.
- */
-
-// Normalised as text input is (see `normalizeText`), so a field and the page rendered from it
-// read the same: a fullwidth "２０２０" date or a ligature in a title would otherwise differ.
+// Strings are cut to length, not rejected; arrays past their limit are rejected. Normalised like
+// text input so a field and the page rendered from it read the same.
 const text = (max: number = L.field) =>
   z.pipe(
     z.string(),

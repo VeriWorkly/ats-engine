@@ -12,8 +12,8 @@ import { stem } from "../../src/text/text.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * Regressions a review of the October 2026 audit commit found in the job match, the requirements
- * judge and the integrity checks, one block per finding. Invented people only.
+ * Regressions in the job match, the requirements judge and the integrity checks, one block per
+ * finding.
  */
 
 const NOW = new Date("2026-10-05T00:00:00Z");

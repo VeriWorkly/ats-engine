@@ -6,11 +6,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { main } from "../../src/cli/main.js";
 
-/**
- * The CLI's "Advice" section: what the file and the resume's conventions are worth knowing,
- * printed under its own heading after the failed checks, never in the score. `--ats` adds the
- * documented notes on one applicant tracking system.
- */
+/** The CLI's "Advice" section, printed after the failed checks and never scored; `--ats` adds one ATS's notes. */
 
 const dir = mkdtempSync(join(tmpdir(), "ats-cli-advice-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

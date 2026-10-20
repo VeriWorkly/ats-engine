@@ -8,10 +8,7 @@ export function fnv1a(text: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-/**
- * JSON with object keys sorted at every level, so two equal values serialise identically however
- * their keys were inserted. What a fingerprint of structured data must hash.
- */
+/** JSON with object keys sorted at every level, so equal values serialise identically. */
 export function canonicalJson(value: unknown): string {
   return JSON.stringify(value, (_, item: unknown) =>
     item && typeof item === "object" && !Array.isArray(item)

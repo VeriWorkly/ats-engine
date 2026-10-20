@@ -1,15 +1,10 @@
 /**
- * Compiles a pattern a policy carries, always in Unicode mode.
+ * Compiles a policy pattern, always in Unicode mode (`\p{L}` for any script; stray escapes like
+ * `\-` are errors). `parseAtsPolicy` compiles every pattern this way, so a validated one cannot
+ * fail here. A `v` flag already implies Unicode mode.
  *
- * Unicode mode is what makes `\p{L}` and friends available to policy authors, so a heading or a
- * degree pattern can be written for German or Hindi as easily as for English. It is also
- * stricter: an escape of a character that needs none (`\-` outside a class, `\'`) is a syntax
- * error rather than a literal. `parseAtsPolicy` compiles every pattern this way, so a policy that
- * passes validation cannot fail here. A `v` flag already implies Unicode mode and is left alone.
- *
- * A group name used twice is refused on every engine. Node 24 accepts one per alternative
- * (ES2025); Node 22, and older browsers, throw. A policy built on the newer engine would
- * otherwise pass validation there and fail on the first resume read on an older one.
+ * A repeated group name is refused on every engine: Node 24 accepts one per alternative
+ * (ES2025), Node 22 and older browsers throw.
  */
 export function policyRegex(pattern: string, flags = "") {
   const repeated = repeatedGroupName(pattern);
@@ -20,7 +15,7 @@ export function policyRegex(pattern: string, flags = "") {
 
 const NAME_CHAR = /[\p{ID_Continue}$\u{200C}\u{200D}]/u;
 
-/** The first capture-group name the pattern declares twice, or null. One pass, linear. */
+/** The first capture-group name the pattern declares twice, or null. */
 export function repeatedGroupName(pattern: string): string | null {
   const seen = new Set<string>();
   let inClass = false;
@@ -35,7 +30,7 @@ export function repeatedGroupName(pattern: string): string | null {
       continue;
     }
     if (char === "[") inClass = true;
-    // "(?<name>", not a lookbehind "(?<=" or "(?<!".
+    // "(?<name>", not a lookbehind.
     if (char !== "(" || pattern[i + 1] !== "?" || pattern[i + 2] !== "<") continue;
     let end = i + 3;
     while (end < pattern.length && NAME_CHAR.test(pattern[end]!)) end += 1;

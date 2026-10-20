@@ -71,11 +71,8 @@ export const DEFAULT_REPAIR_PROMPT = [
 ].join(" ");
 
 /**
- * Re-reads a badly parsed resume and fills the gaps — grounded, and one-directional.
- *
- * The result is the deterministic parse with empty fields filled from the model where the
- * model's value occurs in the source; a value the parser already found is never replaced. See
- * `mergeGrounded`. Contact details are deliberately not redacted: recovering them is the point.
+ * The deterministic parse with empty fields filled from the model where its value occurs in the
+ * source (`mergeGrounded`); parsed values are never replaced. Contact details are not redacted.
  */
 export function repairParseSpec(
   input: RepairParseInput,

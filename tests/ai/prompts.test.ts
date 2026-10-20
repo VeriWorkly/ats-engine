@@ -20,11 +20,7 @@ function keys(node: unknown, found = new Set<string>()): Set<string> {
   return found;
 }
 
-/**
- * Structured outputs are off by default, and then the schema never reaches the model: the
- * prompt is all it has. A key the prompt does not name is a key the model has to guess, and a
- * wrong guess is dropped silently, so the task returns nothing without failing.
- */
+/** Structured outputs are off by default, so the prompt must name every key: a guessed key is dropped silently. */
 describe.each([
   ["analyze", DEFAULT_ANALYZE_PROMPT, insightsSchema],
   ["repairParse", DEFAULT_REPAIR_PROMPT, repairedResumeSchema],

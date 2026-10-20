@@ -14,11 +14,6 @@ import {
 import { buildPdf, stream } from "../fixtures/buildPdf.js";
 import { expectFast, expectFastAsync } from "../fixtures/timing.js";
 
-/**
- * Regressions for the second review of the file-extraction audit: each block names the finding
- * it protects. Invented people throughout.
- */
-
 const html = (page: string) => extractResume(new TextEncoder().encode(page), "html");
 const lines = (extracted: string) => extracted.split("\n").filter((line) => line.trim());
 
@@ -435,7 +430,7 @@ describe("a date line is not taken for a justified one", () => {
   });
 
   it("still reads a justified paragraph's stretched spaces as spaces", () => {
-    // Four lines set flush both sides, each with its own word widths and stretched spaces.
+    // Four lines set flush both sides, with stretched spaces.
     const widths = [
       [60, 40, 70, 55, 80, 50, 45],
       [90, 35, 75, 60, 85, 55],
@@ -513,11 +508,10 @@ describe("one stray byte does not turn a UTF-8 file into Windows-1252", () => {
     expect((await extractResume(bytes, "text")).text).toBe("José Müller – Engineer");
   });
 
-  // Each stray byte was decoded on its own: 20 MB of them took 37 seconds. The text must not change.
   it("reads every kind of stray byte as before", async () => {
     const bytes = Buffer.concat([
       Buffer.from(`Zoë Müller – “QA” ${"é".repeat(40)} `),
-      // A byte-order mark after a stray byte is dropped, as it always was.
+      // A byte-order mark after a stray byte is dropped.
       Buffer.from([0x92, 0xef, 0xbb, 0xbf]),
       Buffer.from("s "),
       // C1 and unassigned codes, a lead byte with no tail, an overlong form, a surrogate, and a

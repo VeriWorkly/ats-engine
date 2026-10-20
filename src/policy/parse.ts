@@ -4,28 +4,20 @@ import { deepFreeze } from "../util/memo.js";
 import { AtsPolicyError, type AtsPolicyIssue } from "./errors.js";
 import { atsEngineSchema, type AtsEnginePolicy } from "./schema.js";
 
-/**
- * How deep a policy may nest. The schema nests six levels; this is far past that. The recursive
- * walk this replaced ran out of stack at a depth that varied by machine, runtime and warm-up
- * (2,000 to about 7,000 levels on Node), so some policies deeper than this were read before.
- */
+/** How deep a policy may nest; the schema itself nests six levels. */
 const MAX_POLICY_DEPTH = 5_000;
 
 /**
- * Every string in the policy in the form resume text is normalised to (`normalizeText`), so a
- * word written with a precomposed character — Hindi "ज़" — matches the decomposed text it will
- * be compared with. Object keys too: month names are keys.
+ * Every string in the policy, and every object key, in the form resume text is normalised to
+ * (`normalizeText`), so a precomposed Hindi "ज़" matches the decomposed text.
  *
- * A loop over a stack rather than recursion, so a policy nested deeper than `MAX_POLICY_DEPTH`,
- * or one that contains itself, is refused as invalid instead of overflowing the stack. An object
- * met again inside itself is refused at once; one used in two places is read in both. It visits
- * values in the order the recursion did, and two keys that normalise to one still keep the
- * first one's place and the last one's value.
+ * Iterative, so a policy nested past `MAX_POLICY_DEPTH` or containing itself is refused as
+ * invalid instead of overflowing the stack. Two keys that normalise to one keep the first
+ * one's place and the last one's value.
  */
 function normalizeStrings(json: unknown): unknown {
   const root: Record<PropertyKey, unknown> = {};
-  // Where a value's normalised form goes, the value, and how many objects and arrays hold it; a
-  // task with no target marks where the walk leaves an object, so it is off the path again.
+  // [target object, key, value, depth]; a task with no target marks leaving an object.
   const stack: [Record<PropertyKey, unknown> | null, PropertyKey, unknown, number][] = [
     [root, 0, json, 0],
   ];
@@ -48,11 +40,10 @@ function normalizeStrings(json: unknown): unknown {
       path.add(value);
       stack.push([null, 0, value, 0]);
       const array = Array.isArray(value);
-      // An array's entries skip its holes, as `map` did; an object's keys are normalised.
+      // An array's entries skip its holes; an object's keys are normalised.
       const entries: [PropertyKey, unknown][] = array
         ? value.flatMap((item, index) => [[index, item]])
         : Object.entries(value).map(([name, item]) => [normalizeText(name), item]);
-      // An object's keys in first-seen order, as `Object.fromEntries` places them; values below.
       const out = (array ? new Array(value.length) : Object.fromEntries(entries)) as typeof root;
       target[key] = out;
       for (let index = entries.length; index--;)
@@ -65,12 +56,7 @@ function normalizeStrings(json: unknown): unknown {
 const invalid = (issues: AtsPolicyIssue[]) =>
   new AtsPolicyError("ATS engine policy is invalid.", issues);
 
-/**
- * Validates a policy and returns it, or throws `AtsPolicyError`.
- *
- * Pure by design. Caching a policy is a host concern — the host knows where the JSON comes from
- * and when it changes — so this function does exactly what its signature says and nothing more.
- */
+/** Validates a policy and returns it frozen, or throws `AtsPolicyError`. Pure: caching is the host's. */
 export function parseAtsPolicy(json: unknown): AtsEnginePolicy {
   const result = atsEngineSchema.safeParse(normalizeStrings(json), ENGLISH_ISSUES);
   if (result.success) return deepFreeze(result.data);

@@ -14,20 +14,14 @@ import {
   type AtsResumeFormat,
 } from "./extract.js";
 
-/**
- * Reading a resume or a job posting from a path the user named: the CLI's `check` and the MCP
- * server read files the same way, with the same limits and the same messages.
- */
+/** Reading a resume or job posting from a path: the CLI and the MCP server share these limits and messages. */
 
 /** A file that cannot be read as asked. The message is for the person who named the file. */
 export class AtsFileError extends Error {
   override name = "AtsFileError";
 }
 
-/**
- * The largest file read. A resume or a posting with a text layer is a few hundred kilobytes; a
- * file past this is refused before it is read into memory rather than after.
- */
+/** The largest file read; a larger one is refused before it is read into memory. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 /** Options of `readResumeFile` and `readJobFile`. */
@@ -54,28 +48,24 @@ function checkFile(info: Stats, path: string, maxBytes: number) {
 }
 
 /**
- * A file's bytes, with the usual mistakes — no such file, a folder, too large — named plainly.
- * Only a regular file on this computer is read: a network share would be read over the network,
- * and a pipe or a device reports no size and can stream without end. Read through one handle, at
- * most one byte past the limit, so a file that grows after it was measured is still refused.
+ * A file's bytes, with the usual mistakes (no such file, a folder, too large) named plainly. Only
+ * a regular file on this computer is read. Read through one handle, at most one byte past the
+ * limit, so a file that grows after it was measured is still refused.
  */
 export async function readFileBytes(
   path: string,
   { maxBytes = MAX_FILE_BYTES }: AtsReadFileOptions = {},
 ): Promise<Buffer> {
-  // A path that starts with two slashes names another computer (`\\host\share`, `//host/share`,
-  // `\\?\UNC\…`) or a device (`\\.\pipe\…`, `\\?\GLOBALROOT\…`), except the long form of a local
-  // path, `\\?\C:\…`. Checked as given and as resolved: on Windows a relative path resolves onto
-  // a share when the working folder is one. Only the path's form is read: a mapped drive letter,
-  // a link to a share or a network mount looks local and is read over the network.
+  // Two leading slashes name another computer (`\\host\share`, `\\?\UNC\…`) or a device
+  // (`\\.\pipe\…`), except the local long form `\\?\C:\…`. Checked as given and as resolved: a
+  // relative path resolves onto a share when the working folder is one. Mapped drives and
+  // network mounts look local and are not caught.
   if ([path, resolve(path)].some((form) => /^[\\/]{2}(?!\?\\[A-Za-z]:\\)/.test(form)))
     throw new AtsFileError(`${path} is a network share or a device, not a file on this computer.`);
   try {
-    // Measured before it is opened: opening a device can act on it (a watchdog arms, a tape
-    // rewinds) or wait.
+    // Measured before it is opened: opening a device can act on it or wait.
     checkFile(await stat(path), path, maxBytes);
-    // Read-only (`O_RDONLY` is 0) and without blocking: opening a FIFO otherwise waits for a
-    // writer. Windows has no such flag, and no FIFOs.
+    // Read-only and non-blocking: opening a FIFO otherwise waits for a writer (no flag on Windows).
     const handle = await open(path, constants.O_NONBLOCK ?? "r");
     try {
       // The handle's file is the one measured and read, whatever the path names meanwhile.
@@ -85,7 +75,7 @@ export async function readFileBytes(
       for await (const chunk of handle.createReadStream({ end: maxBytes, autoClose: false }))
         chunks.push(chunk as Buffer);
       const data = Buffer.concat(chunks);
-      // At the size read: a file that grew past the limit after it was measured is refused too.
+      // Checked again at the size read, for a file that grew.
       info.size = data.length;
       checkFile(info, path, maxBytes);
       return data;
@@ -109,11 +99,9 @@ function size(bytes: number): string {
 /** A file's JSON, or an error naming the file. */
 export function parseJsonFile(data: Buffer, path: string): unknown {
   try {
-    // Decoded as a resume's text is: a byte-order mark, UTF-16 or Windows-1252 is read, not refused.
     return JSON.parse(decodeText(data));
   } catch (error) {
-    // Only where it failed: the parser's message quotes the text near the error, which can be a
-    // secret.
+    // Only the position: the parser's message quotes the text near the error, which can be a secret.
     const where = /\(line \d+ column \d+\)/.exec((error as Error).message)?.[0];
     throw new AtsFileError(`${path} is not valid JSON${where ? ` ${where}` : ""}.`);
   }
@@ -121,9 +109,8 @@ export function parseJsonFile(data: Buffer, path: string): unknown {
 
 /**
  * A resume file as the scorer takes it: the extracted text and, where measurable, its layout; or
- * the document itself for a `.json` JSON Resume or ats-resume document. PDF and DOCX need the
- * optional peers `extractResume` needs. `file` (its name, size and format) is `check`'s `file`
- * option, for the advice on the file itself.
+ * the document itself for a `.json` JSON Resume or ats-resume document. `file` is `check`'s `file`
+ * option.
  */
 export async function readResumeFile(
   path: string,
@@ -146,10 +133,7 @@ export async function readResumeFile(
   return { input: readableText(text, format), layout, file };
 }
 
-/**
- * Text too short to be a resume, refused with the reason: for a PDF that is nearly always a scan
- * or a flattened image, which an ATS cannot read either.
- */
+/** Text too short to be a resume is refused; for a PDF that is a scan or flattened image. */
 function readableText(text: string, format: string): string {
   if (text.length < 50)
     throw new AtsFileError(
@@ -164,20 +148,16 @@ function readableText(text: string, format: string): string {
 export type AtsJobFile = { text: string; company?: string };
 
 /**
- * A job posting file's text, normalised as a fetched posting is: a saved `.html` page is read for
- * its posting, a PDF or a Word file the way a resume is, a `.txt` or `.md` file as text. A saved
- * page's JSON-LD names the employer, which `check`'s `jobCompany` leaves out of the keywords.
+ * A job posting file's text, normalised as a fetched posting is: `.html` read for its posting, PDF
+ * and Word as a resume is, `.txt` and `.md` as text. A saved page's JSON-LD names the employer.
  */
 export async function readJobFile(path: string, options?: AtsReadFileOptions): Promise<AtsJobFile> {
-  // A posting's words come back as missing keywords, so any other file (a credentials file, a
-  // key) would be echoed to whoever named it: only the types a posting comes in are read.
+  // A posting's words come back as missing keywords, so other files (a key) would be echoed.
   if (!/\.(txt|md|html?|pdf|docx)$/i.test(path))
     throw new AtsFileError(
       `Unsupported job posting file type "${extname(path) || path}". Use .txt, .md, .html, .pdf or .docx.`,
     );
   const data = await readFileBytes(path, options);
-  // Decoded as a resume's text is: a UTF-16 posting (Notepad's "Unicode", PowerShell 5's `>`) read
-  // as UTF-8 matched nothing and listed its letters as missing keywords.
   let job: AtsJobFile;
   if (/\.html?$/i.test(path)) {
     const html = decodeText(data);
@@ -191,8 +171,7 @@ export async function readJobFile(path: string, options?: AtsReadFileOptions): P
         : decodeText(data);
     job = { text: normalizeJobText(text) };
   }
-  // A scanned posting, or an empty page, is no posting: refused rather than read as none, which
-  // scored no job match and said nothing.
+  // A scan or an empty page is refused, not scored as no job match.
   if (!job.text.trim()) throw new AtsFileError(`${path} has no readable job posting text.`);
   return job;
 }

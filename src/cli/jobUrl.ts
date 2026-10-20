@@ -1,12 +1,8 @@
 /**
- * `--job-url`: a job posting read from its board's public JSON API, never from the page itself.
- *
- * The URL is the user's, but only its board and job id are used: the request goes to the fixed
- * API host the table below names for the posting's host, so a URL cannot point the CLI at a
- * machine of its choosing (a host on the local network, a cloud metadata address). A posting on
- * any other host is refused; the user saves the page and passes it with `--job`. This is the only
- * network request `check` makes without `--ai`, and it lives here so the core, `/job`, `/node`
- * and the MCP server stay free of any.
+ * `--job-url`: a posting read from its board's public JSON API. Only the URL's board and job id
+ * are used: the request goes to the fixed API host `BOARDS` names, so a URL cannot point the CLI
+ * at a machine of its choosing (SSRF: a local-network host, a cloud metadata address). The only
+ * network request `check` makes without `--ai`.
  */
 
 import { decodeEntities } from "../job/html.js";
@@ -35,23 +31,17 @@ type Board = {
   read(json: Record<string, unknown>, job: string): Posting | "missing" | null;
 };
 
-/**
- * A board's or a job's name in a path: letters, digits, `-`, `_` and `.`, starting with a letter
- * or a digit, so it can never be `..` or carry a `/`, `?` or `%` into the API's path.
- */
+/** A board's or job's name in a path: it can never be `..` or carry `/`, `?` or `%` into the API's path. */
 const NAME = /^[A-Za-z\d][\w.-]{0,99}$/;
 const NUMBER = /^\d{1,20}$/;
-// Any case in a link; Lever and Ashby list their ids in lowercase, so it is asked for so.
+// Any case in a link; the APIs list ids in lowercase.
 const UUID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 const field = (value: unknown, name: string) =>
   value && typeof value === "object" ? (value as Record<string, unknown>)[name] : undefined;
 
-/**
- * The job boards `--job-url` reads, each with its public, keyless posting API. A new board is a
- * new entry; its API host is the only host ever asked.
- */
+/** The job boards `--job-url` reads, each with its public, keyless posting API. */
 const BOARDS: readonly Board[] = Object.freeze<Board[]>([
   {
     ats: "greenhouse",
@@ -59,9 +49,7 @@ const BOARDS: readonly Board[] = Object.freeze<Board[]>([
       "boards.greenhouse.io": "boards-api.greenhouse.io",
       "job-boards.greenhouse.io": "boards-api.greenhouse.io",
     },
-    // `/{board}/jobs/{id}`, `/{board}?gh_jid={id}`, or the embed a careers page frames,
-    // `/embed/job_app?for={board}&token={id}`. A `gh_jid` on a company's own careers page does
-    // not say which board the job is on.
+    // `/{board}/jobs/{id}`, `/{board}?gh_jid={id}`, or `/embed/job_app?for={board}&token={id}`.
     locate(path, query) {
       const [board, id] =
         path.join("/") === "embed/job_app"
@@ -75,7 +63,7 @@ const BOARDS: readonly Board[] = Object.freeze<Board[]>([
       return board && NAME.test(board) && id && NUMBER.test(id) ? [board, id] : null;
     },
     api: (host, board, job) => `https://${host}/v1/boards/${board}/jobs/${job}`,
-    // `content` is the description's HTML, escaped once more, as JSON-LD's often is.
+    // `content` is HTML, sometimes escaped once more.
     read: (json) =>
       typeof json.content === "string"
         ? {
@@ -99,7 +87,7 @@ const BOARDS: readonly Board[] = Object.freeze<Board[]>([
         ? [site, job.toLowerCase()]
         : null,
     api: (host, site, job) => `https://${host}/v0/postings/${site}/${job}`,
-    // No employer: the API names none. The bullets are in `lists`, each under its heading.
+    // No employer in the API; the bullets are in `lists`, each under its heading.
     read: (json) =>
       typeof json.description === "string"
         ? {
@@ -128,11 +116,10 @@ const BOARDS: readonly Board[] = Object.freeze<Board[]>([
       !rest.length
         ? [org, job.toLowerCase()]
         : null,
-    // The API lists the board's jobs, descriptions included; it has no address for one job.
+    // The API lists the board's jobs; it has no address for one.
     api: (host, org) => `https://${host}/posting-api/job-board/${org}`,
     read(json, job) {
       if (!Array.isArray(json.jobs)) return null;
-      // An unlisted job is not in the list either.
       const posting: unknown = json.jobs.find((item) => field(item, "id") === job);
       if (!posting) return "missing";
       const html = field(posting, "descriptionHtml");
@@ -177,7 +164,7 @@ export function locateJob(address: string): {
         ? `--job-url reads Greenhouse's US boards only: its EU boards (${url.hostname}) have no public API. ${SAVE}`
         : `--job-url reads ${NAMES} job postings only, not ${url.hostname}. ${SAVE}`,
     );
-  // Each segment decoded, so an encoded "/" or "." is checked as what it stands for.
+  // Decoded, so an encoded "/" or "." is checked as what it stands for.
   let path: string[];
   try {
     path = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
@@ -204,11 +191,10 @@ export async function fetchJob(
   fetchImpl: FetchJob = globalThis.fetch,
 ): Promise<AtsJobFile> {
   const host = new URL(api).host;
-  // Covers the body too: `fetch` aborts the stream it is reading when the signal fires.
   const signal = AbortSignal.timeout(TIMEOUT_MS);
   let raw: string;
   try {
-    // Never followed: the API host is the only one asked, wherever it points.
+    // Never followed: the API host is the only one asked.
     const response = await fetchImpl(api, {
       headers: { accept: "application/json" },
       redirect: "manual",
@@ -222,7 +208,7 @@ export async function fetchJob(
     raw = await readCapped(response, host);
   } catch (error) {
     if (error instanceof JobUrlError) throw error;
-    // Node says only "fetch failed"; what failed (DNS, TLS, a refused connection) is its cause.
+    // Node says only "fetch failed"; the cause has the code.
     const failed = error as Error & { cause?: { code?: unknown } };
     const reason = typeof failed.cause?.code === "string" ? failed.cause.code : failed.message;
     throw new JobUrlError(
@@ -245,21 +231,15 @@ export async function fetchJob(
   if (posting === "missing") throw notFound(board);
   if (!posting)
     throw new JobUrlError(`${host} answered with JSON that is not a ${label(board)} posting.`);
-  // JSON-LD descriptions get the same reading (`extractJobPosting`): HTML to lines, then capped.
   const description = posting.html
     .map((html) => jobHtmlToText(html, Number.POSITIVE_INFINITY))
     .filter(Boolean);
   const jobText = normalizeJobText([posting.title, ...description].join("\n"));
-  // Lever and Ashby name no employer; the board's name ("palantir", "acme-corp") stands for it,
-  // so the employer is not a keyword the resume is told to add.
+  // Lever and Ashby name no employer; the board's name stands for it so it is not a keyword.
   return { text: jobText, company: posting.company || name.replace(/[-_.]+/g, " ") };
 }
 
-/**
- * The body as text, refused past the size a file may be: an API's answer is read into memory, so
- * an endless or huge one stops at the limit. A big Ashby board lists every job's description and
- * runs to megabytes.
- */
+/** The body as text, refused past the size a file may be (a big Ashby board runs to megabytes). */
 async function readCapped(response: Response, host: string): Promise<string> {
   const chunks: Uint8Array[] = [];
   let bytes = 0;

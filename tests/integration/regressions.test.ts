@@ -16,12 +16,9 @@ import { livePolicy } from "../fixtures/livePolicy.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * Regressions found in the September 2026 audit, one test per defect.
- *
- * Every case runs against `DEFAULT_POLICY`, so this suite needs no private files and always runs
- * in CI. The adversarial-input budget also runs against the live policy when it is present,
- * because a pattern-level ReDoS in the shipped policy is the one that would actually take a
- * worker down.
+ * Regressions, one test per audit defect, against `DEFAULT_POLICY`. The adversarial-input budget
+ * also runs against the live policy when present: a ReDoS in the shipped policy is the one that
+ * takes a worker down.
  */
 
 const NOW = new Date("2026-09-30T00:00:00Z");
@@ -32,10 +29,7 @@ const check = (
   policy: AtsEnginePolicy = DEFAULT_POLICY,
 ) => score(resume, policy, { jobDescription, now: NOW });
 
-/**
- * Inputs that made one regex restart its scan at every position. The unbounded email pattern
- * took over a second per call on the first two and a scan runs it about nine times.
- */
+/** Inputs that made one regex restart its scan at every position. */
 const ADVERSARIAL: Record<string, string> = {
   "dotted run": "a.".repeat(25_000),
   "dashed run": "a-".repeat(25_000),
@@ -46,9 +40,8 @@ const ADVERSARIAL: Record<string, string> = {
 
 function expectFastOn(policy: AtsEnginePolicy) {
   for (const [label, input] of Object.entries(ADVERSARIAL)) {
-    // A scan takes 20 to 75 ms, 70 to 215 with the locale packs, on an idle laptop; the quadratic
-    // pattern took about ten seconds. 1.5 s is the budget `adversarial.test.ts` keeps: far below
-    // the bug, and far enough above a busy machine (500 ms failed one with editors open).
+    // A scan takes 20 to 75 ms (70 to 215 with the locale packs). 1.5 s is the budget
+    // `adversarial.test.ts` keeps: far below the bug, far above a busy machine.
     expectFast(
       () =>
         score(input, policy, {
@@ -67,9 +60,8 @@ describe("adversarial input", () => {
   });
 
   it("stays bounded with the locale packs detected and applied", () => {
-    // Asked for rather than detected: the pathological run outweighs any real text, so detection
-    // rightly reads it as no language. The packs' patterns (German compounds among them) and the
-    // DE region are what scan it.
+    // Asked for, not detected: the pathological run outweighs any real text, so detection reads
+    // no language. The packs' patterns and the DE region are what scan it.
     const localized = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
     const lead = "und der das mit für von bei auf ist sind eine Berufserfahrung +49 30 12345678 ";
     const devanagari = "कार्य अनुभव शिक्षा कौशल ".repeat(20);
@@ -387,8 +379,8 @@ describe("bullets, headings and bounded scans", () => {
 });
 
 describe("a LinkedIn profile export", () => {
-  // A sidebar (Contact, Top Skills, Languages) read before the name, and roles grouped under
-  // their employer with the time there on a line of its own.
+  // A sidebar read before the name, and roles grouped under their employer with the time there
+  // on its own line.
   const SIDEBAR = [
     "Contact",
     "jordan.ellery@example.com",
@@ -507,7 +499,7 @@ describe("reproducibility", () => {
     const { parseAtsPolicy, policyFingerprint } = await import("../../src/index.js");
     const changed = parseAtsPolicy({ ...structuredClone(DEFAULT_POLICY), version: "ats-v2" });
     expect(policyFingerprint(changed)).toBe(policyFingerprint(DEFAULT_POLICY));
-    // A parsed policy is frozen, so the change is made to a copy.
+    // A parsed policy is frozen: change a copy.
     const edited = structuredClone(changed);
     edited.rules[0] = { ...edited.rules[0], fix: "Something else." };
     expect(policyFingerprint(parseAtsPolicy(edited))).not.toBe(policyFingerprint(DEFAULT_POLICY));

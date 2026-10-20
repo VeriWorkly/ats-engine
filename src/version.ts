@@ -1,5 +1,2 @@
-/**
- * This package's version, stamped on every report. Kept equal to `package.json` by a test, so a
- * release that forgets to bump it fails the build rather than mislabelling its scores.
- */
+/** This package's version, stamped on every report. A test keeps it equal to `package.json`. */
 export const ENGINE_VERSION = "0.13.0";

@@ -155,8 +155,7 @@ describe("reasoning-model replies", () => {
     expect(await read(text)).toBe("Fine.");
   });
 
-  // A lazy pattern scanned to the end of the reply from every fence left open, growing with the
-  // square of the reply; a reply may run to 4 MB.
+  // Unclosed fences must not make the scan quadratic; a reply may run to 4 MB.
   it("refuses a reply of open fences in bounded time", async () => {
     const text = `${"```{".repeat(60_000)}${INSIGHTS}`;
     await expectFastAsync(

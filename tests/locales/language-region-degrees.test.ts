@@ -458,8 +458,7 @@ describe("a French posting's requirements", () => {
     expect(report.missingKeywords).not.toContain("restaurant");
   });
 
-  // "ma" before an accented letter is a word's start, not a master's: the degree patterns ended
-  // only before an ASCII letter, so "Maîtrise de React" asked for a master's degree.
+  // "ma" before an accented letter is a word's start, not a master's ("Maîtrise de React").
   it("reads a skill a line asks a mastery of, not a degree", () => {
     const { requirements, missingKeywords } = score(DE_RESUME, P, {
       jobDescription: [

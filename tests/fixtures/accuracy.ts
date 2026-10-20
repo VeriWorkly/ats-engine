@@ -18,13 +18,10 @@ const text = (value: unknown) => JSON.stringify(value) ?? "undefined";
 const sorted = (values: readonly string[]) => [...values].sort();
 
 /**
- * Field by field, what the fixture says an ATS should recover against what was recovered. One
- * point per field: name, email, phone, the links as a set, how many roles and education rows were
- * read (a row the labels do not have costs a point, and so does a missing one), each role's
- * title, employer, start, end (where labelled) and current flag, each education row's school,
- * level and credential (where labelled), the skill list as a set, how many certification and
- * spoken-language rows were read, each certification's name, issuer, date and expiry (where
- * labelled), and each language's name and CEFR level.
+ * What the fixture says an ATS should recover against what was recovered, one point per field:
+ * name, email, phone, links (a set), row counts (an extra or missing row costs a point), each
+ * role's, education row's, certification's and language's fields (where labelled), and skills
+ * (a set).
  */
 export function fieldChecks(report: AtsReport, fixture: LocaleFixture): FieldCheck[] {
   const { parsed } = report;

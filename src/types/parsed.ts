@@ -1,8 +1,7 @@
 /**
- * An education level on the ISCED 2011 scale (UNESCO), which every national system maps onto:
- * 2 lower secondary (India's Class X), 3 upper secondary (Abitur, Class XII, a US high school
- * diploma), 4 post-secondary non-tertiary, 5 short-cycle tertiary (associate), 6 bachelor's or
- * equivalent, 7 master's or equivalent (a German Diplom), 8 doctoral.
+ * An education level on the ISCED 2011 scale (UNESCO): 2 lower secondary, 3 upper secondary,
+ * 4 post-secondary non-tertiary, 5 short-cycle tertiary (associate), 6 bachelor's, 7 master's
+ * (or a German Diplom), 8 doctoral.
  */
 export type AtsIscedLevel = 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
@@ -29,11 +28,7 @@ export type AtsParsedEducation = {
 /** A level on the Common European Framework of Reference for Languages, A1 lowest. */
 export type AtsCefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 
-/**
- * One certification or licence, as an ATS files it: "AWS Certified Solutions Architect –
- * Associate, Amazon Web Services, 2023". `date` is when it was earned, `expires` when it lapses;
- * either is null when the resume does not say.
- */
+/** One certification or licence. `date` is when it was earned, `expires` when it lapses; null if unstated. */
 export type AtsParsedCertification = {
   name: string;
   issuer: string;
@@ -42,9 +37,8 @@ export type AtsParsedCertification = {
 };
 
 /**
- * One language the candidate speaks. `language` as written ("Deutsch", "English"), `level` the
- * words that state the level as written ("native", "verhandlungssicher, C1"; empty when none),
- * and `cefr` that level on the CEFR scale, or null when no level word the policy knows was given.
+ * One language the candidate speaks. `language` and `level` are as written ("Deutsch", "native";
+ * `level` is empty when none); `cefr` is null when no level word the policy knows was given.
  */
 export type AtsParsedLanguage = {
   language: string;
@@ -64,25 +58,15 @@ export type AtsParsedField =
   | "spokenLanguages";
 
 /**
- * Where a recovered field came from.
- *
- * - `parser` — read from the document text by the deterministic parser: what an ATS would see.
+ * Where a recovered field came from, kept per field group:
+ * - `parser` — read from the text by the deterministic parser: what an ATS would see.
  * - `structured` — taken from typed fields of an `AtsResumeDocument`; nothing was parsed.
  * - `ai` — recovered by a model after the parser missed it, and grounded against the text.
- * - `none` — not recovered at all.
- *
- * Kept per field group rather than inferred by diffing before and after, so a report can say
- * truthfully which values a parser read and which a model read — the two are different claims.
+ * - `none` — not recovered.
  */
 export type AtsProvenance = "parser" | "structured" | "ai" | "none";
 
-/**
- * What a parser recovers from the document — the fields a recruiter actually searches on.
- *
- * Returned to the caller as well as scored, because showing the candidate the rows we recovered
- * is more useful than any number: an empty employer or a missing date range is a column the
- * hiring team's filter cannot match, and seeing it is what makes that concrete.
- */
+/** What a parser recovers from the document: the fields a recruiter searches on. */
 export type AtsParsedResume = {
   name: string;
   email: string;
@@ -93,10 +77,7 @@ export type AtsParsedResume = {
   skills: string[];
   /** Certifications and licences, from their own section or a "Certifications:" line. */
   certifications: AtsParsedCertification[];
-  /**
-   * Languages spoken, from their own section or a "Languages:" line among the skills. Each
-   * language once. Programming languages stay in `skills`.
-   */
+  /** Languages spoken, each once, from their own section or a "Languages:" line. Programming languages stay in `skills`. */
   spokenLanguages: AtsParsedLanguage[];
   /** Calendar months covered by at least one role, so overlapping jobs are not double counted. */
   monthsOfExperience: number | null;

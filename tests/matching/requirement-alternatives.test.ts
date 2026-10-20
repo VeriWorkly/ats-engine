@@ -151,7 +151,7 @@ describe("a bare two-letter degree is told from a state code by what follows it"
     ["Harvard, MA (Economics), 2015", 7],
     ["B.S. Computer Science, Boston University, Boston MA, 2015", 6],
     ["BS Biology, Tufts University, Medford MA 2016", 6],
-    // No state is "BS" or "BA", so those read as degrees wherever they stand, as they always did.
+    // No state is "BS" or "BA": those read as degrees wherever they stand.
     ["Northeastern University, BS, Computer Science", 6],
     ["Oberlin College, BA, 2014", 6],
     ["BA 2016", 6],
@@ -231,13 +231,12 @@ describe("an unknown region is an error, not silently ignored", () => {
   });
 });
 
-/** Found by the final review. */
+/** Follow-up defects. */
 describe("degree requirements beside fields and places", () => {
   it("keeps an alternative inside the field of study out of the degree-or-years choice", () => {
     const line =
       "Bachelor's degree in Computer Science, Engineering or a related field, and 3+ years of experience";
-    // Not met: 1 year of 3. (Missing, not partial, since the field words belong to the degree
-    // and no longer stand in for the years.)
+    // Not met: 1 year of 3 (the field words belong to the degree, not the years).
     expect(one(line, resume({ roles: ONE_YEAR, education: BACHELOR })).status).not.toBe("met");
     const de = localizePolicy(P, "", { languages: ["de"] }).policy;
     expect(

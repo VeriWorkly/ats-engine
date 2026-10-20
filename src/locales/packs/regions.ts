@@ -2,19 +2,15 @@ import { deepFreeze } from "../../util/memo.js";
 import type { AtsRegionPackInput } from "../schema.js";
 
 /**
- * Region packs: what differs by country rather than by language — how a national phone number
- * and an all-numeric date are written, the credentials of the national education system, and
- * the conventions a recruiter there holds a resume to.
+ * Region packs: what differs by country rather than by language: phone and date formats, the
+ * credentials of the national education system, and the conventions recruiters there hold a
+ * resume to. Credentials live here because an English resume carries them too ("Abitur",
+ * "Class XII").
  *
- * Credentials live here, not in the language packs, because an English resume carries them too:
- * "Abitur" from Germany, "Class XII" and "B.Com" from India.
- *
- * The rule adjustments name rules of the community policy. A date of birth or a photo is
- * expected in Germany and India and a liability in the US, where it invites age and appearance
- * bias; `weight: 0` turns the rule off for the region rather than passing it. For the same reason
- * only the US pack turns on the age advice (`ageAdvice`): a German Lebenslauf and an Indian
- * resume customarily give a date of birth, so advising to hide a graduation year there would
- * contradict the convention.
+ * Rule adjustments name rules of the community policy: a date of birth or a photo is expected in
+ * Germany and India and a liability in the US; `weight: 0` turns the rule off for the region.
+ * Only the US pack turns on `ageAdvice`, since advising to hide a graduation year would contradict
+ * the convention elsewhere.
  */
 const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 
@@ -37,8 +33,7 @@ export const US: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "ats-v2.privacy.dateOfBirth": { weight: 6, severity: "warning" },
     "ats-v2.format.photo": { weight: 6, severity: "warning" },
   },
-  // US recruiters expect no age on a resume (the ADEA protects applicants 40 and over), and
-  // career advice there commonly drops graduation years and roles older than 15–20 years.
+  // US recruiters expect no age on a resume (the ADEA protects applicants 40 and over).
   ageAdvice: { graduationYears: 20, experienceYears: 20 },
 });
 
@@ -59,16 +54,15 @@ export const DE: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "3": word(
       String.raw`abitur|fachabitur|(?:allgemeine\s+|fachgebundene\s+)?hochschulreife|fachhochschulreife|(?:abgeschlossene\s+)?berufsausbildung|ausbildung\s+(?:zum|zur|als)|gesellen(?:brief|prüfung)`,
     ),
-    // Diplom (FH) is a bachelor's equivalent, as is a Diplom (BA) from a Berufsakademie, and so,
-    // at DQR level 6, are a master craftsman (Meister, alone or compounded:
-    // "Elektrotechnikermeister") and a state-certified technician or business economist
-    // ("Staatlich geprüfter Techniker"). The compound prefix is bounded to stay linear, and skips
-    // the Meister who hold no credential: caretaker, mayor, champion.
+    // Diplom (FH) and Diplom (BA) are bachelor's equivalents, as at DQR level 6 are a master
+    // craftsman (Meister, alone or compounded) and a state-certified technician or business
+    // economist. The compound prefix is bounded to stay linear, and skips the Meister who hold no
+    // credential: caretaker, mayor, champion.
     "6": word(
       String.raw`dipl(?:om|\.)(?:-\p{L}+)?\.?\s*\((?:fh|ba)\)|\p{L}{0,30}(?<!haus|bürger|welt|europa|bundes|landes|kreis|stadt|vereins|kapell|konzert|ballett|schach)meister(?:in|prüfung|brief|titel)?|staatl(?:ich|\.)\s*gepr(?:üfte[nr]?|\.)\s+\p{L}+`,
     ),
-    // The lookahead pair keeps "Diplom-Informatiker (FH)" or "(BA)" from backtracking into a match
-    // here; its optional dot keeps "Dipl.-Ing. (FH)" from matching as "Dipl.-Ing" before the dot.
+    // The lookahead pair stops "Diplom-Informatiker (FH)" backtracking into a match here; the
+    // optional dot stops "Dipl.-Ing. (FH)" matching as "Dipl.-Ing" before the dot.
     "7": word(
       String.raw`dipl(?:om|\.)(?:-\p{L}+)?\.?(?![\p{L}-])(?!\.?\s*\((?:fh|ba)\))|magister|staatsexamen`,
     ),
@@ -148,10 +142,7 @@ export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   },
 });
 
-/**
- * France: day-first dates, French credentials; a date of birth or a photo is not judged, as a
- * French CV commonly carries both (or an age) and no recruiter there reads them as a fault.
- */
+/** France: day-first dates, French credentials; a date of birth or a photo is not judged, as French CVs carry both. */
 export const FR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   id: "FR",
   name: "France",
@@ -163,13 +154,11 @@ export const FR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "ats-v2.privacy.dateOfBirth": { weight: 0 },
     "ats-v2.format.photo": { weight: 0 },
   },
-  // The French system, by years after the baccalauréat: "Bac+2" (BTS, DUT) is short-cycle
-  // tertiary, "Bac+3" (licence, BUT) a bachelor's, "Bac+5" (master, diplôme d'ingénieur) a
-  // master's, "Bac+8" a doctorate. Levels are tried highest first, so "Bac+5" is never read as
-  // the baccalauréat itself. "Bac+N" is in the `fr` pack too, for a French posting read
-  // elsewhere. A baccalauréat named for its field ("baccalauréat en informatique") is Québec's
-  // bachelor's, read by the `fr` pack, not this school diploma. "BUT" only with its speciality,
-  // since "but" is a French and an English word.
+  // The French system, by years after the baccalauréat: "Bac+2" (BTS, DUT) short-cycle tertiary,
+  // "Bac+3" (licence, BUT) bachelor's, "Bac+5" (master, diplôme d'ingénieur) master's, "Bac+8"
+  // doctorate. Tried highest first, so "Bac+5" is never read as the baccalauréat. "Bac+N" is in
+  // the `fr` pack too. A baccalauréat named for its field is Québec's bachelor's (`fr` pack).
+  // "BUT" only with its speciality, since "but" is a French and an English word.
   degrees: {
     "2": word(String.raw`brevet(?:\s+des\s+coll[èe]ges)?|dnb`),
     "3": word(
@@ -185,10 +174,9 @@ export const FR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
 });
 
 /**
- * The United Kingdom: day-first dates, UK credentials; a date of birth or a photo is a warning,
- * as in the US: a UK CV carries neither, and the Equality Act 2010 makes age and appearance
- * protected characteristics. A-levels are the policy's own (level 3). The degree classes ("2:1",
- * "First-class honours") need nothing: a class is read as part of the degree line, not as one.
+ * The United Kingdom: day-first dates, UK credentials; a date of birth or a photo is a warning
+ * (the Equality Act 2010 protects age and appearance). A-levels are the policy's own (level 3);
+ * degree classes need nothing.
  */
 export const GB: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   id: "GB",

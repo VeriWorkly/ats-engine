@@ -233,8 +233,7 @@ describe("redaction variants", () => {
     expect(redaction.apply("2019 - 2023")).toBe("2019 - 2023");
   });
 
-  // Under a policy without the country's region the parser reads no phone, and a number it did
-  // not read was sent as written.
+  // Under a policy without the country's region the parser reads no phone.
   it.each([
     "07912 345678",
     "020 7946 0958",
@@ -264,8 +263,7 @@ describe("redaction variants", () => {
     expect(redaction.restore(hidden)).toBe(line);
   });
 
-  // After a comma or a label's dot a number was not taken, and three on one line were cut after
-  // the thirtieth digit.
+  // After a comma or a label's dot; three on one line.
   it.each([
     ["Tel: 020 7946 0958,07912 345678", "Tel: [PHONE_1],[PHONE_2]"],
     ["Tel.07912 345678", "Tel.[PHONE_1]"],

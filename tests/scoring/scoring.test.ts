@@ -35,8 +35,6 @@ const policy = {
       category: "contact",
       severity: "warning" as const,
       kind: "position" as const,
-      emailPattern: "\\b\\S+@\\S+\\.\\S+\\b",
-      phonePattern: "\\d{3}-\\d{3}-\\d{4}",
       windowFraction: 0.3,
       weight: 5,
       passEvidence: "contact near top",
@@ -161,21 +159,10 @@ const policy = {
 };
 
 /**
- * The engine takes the policy as an argument rather than fetching it, so the fixture is injected
- * here instead of mocked into a module. `check` keeps the arity the tests were written against.
- */
-/**
- * The fixture as the engine receives it.
- *
- * Not run through `parseAtsPolicy`: this fixture deliberately declares an `implies` entry whose
- * multi-word term is absent from `phrases`, which the schema's cross-field check rejects — and
- * it always has. Under the previous arrangement it reached the scorer through a mocked
- * `getAtsEnginePolicy`, so validation never saw it. Validating it now would mean editing the
- * fixture, which would change what these tests exercise; the point of this suite is the scoring
- * behaviour, and `engine-policy.test.ts` is what covers the schema. So the fixture is injected
- * exactly as the mock delivered it, with only the schema's own defaults filled in — taken from
- * `DEFAULT_POLICY`, which carries every one of them, so a field added to the schema later
- * reaches this fixture too instead of leaving it a step behind.
+ * The fixture as the engine receives it. Not run through `parseAtsPolicy`: it declares an
+ * `implies` entry whose multi-word term is absent from `phrases`, which the schema's cross-field
+ * check rejects (`engine-policy.test.ts` covers the schema). Only the schema's defaults are
+ * filled in, from `DEFAULT_POLICY`.
  */
 const fixture = {
   ...policy,
@@ -266,8 +253,7 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
     expect(report.jobMatchScore).not.toBeNull();
     expect(report.matchedKeywords).toContain("js");
     expect(report.matchedKeywords).toContain("project management");
-    // "ML" in the job text expands through the synonym map to the multi-word canonical
-    // phrase "machine learning" — the resume never mentions it, so it should read as missing.
+    // "ML" expands through the synonym map to "machine learning", which the resume never mentions.
     expect(report.missingKeywords).toContain("machine learning");
   });
 
@@ -312,9 +298,8 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
 
 describe("ATS category rollup", () => {
   it("scores each category by the share of its own weight the resume kept", async () => {
-    // Contact carries two rules: email (weight 10) and position (weight 5). With no contact
-    // details at all, email fails outright and position has nothing to locate, so it is dropped
-    // rather than passed — the category keeps none of its 10 possible points.
+    // Contact has email (weight 10) and position (weight 5). With no contact details email fails
+    // and position is dropped, so the category keeps none of its 10 possible points.
     const report = check("Experience Skills Education summary of work history");
 
     const contact = report.categories.find((entry) => entry.category === "contact");
@@ -366,8 +351,7 @@ describe("ATS category rollup", () => {
     for (let depth = 0; depth < 50_000; depth += 1) nested = { value: nested };
 
     expect(() => check(nested as AtsResumeInput)).not.toThrow();
-    // Past the depth cap the payload contributes nothing, so it scores as an empty resume
-    // rather than crashing the worker.
+    // Past the depth cap the payload contributes nothing: it scores as an empty resume.
     expect(check(nested as AtsResumeInput).wordCount).toBeLessThan(30);
   });
 });

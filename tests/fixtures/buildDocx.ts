@@ -1,11 +1,6 @@
 import { crc32, deflateRawSync } from "node:zlib";
 
-/**
- * Minimal DOCX writer: one paragraph per line, stored (uncompressed) zip entries.
- *
- * Generated rather than checked in as a binary, for the same reason as `buildPdf`: what the test
- * asserts is visible in the test.
- */
+// Minimal DOCX writer: one paragraph per line, stored (uncompressed) zip entries.
 
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
 

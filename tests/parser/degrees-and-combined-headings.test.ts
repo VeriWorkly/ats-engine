@@ -6,11 +6,6 @@ import { degreeLevel } from "../../src/parser/education.js";
 import { findDateRange } from "../../src/parser/dates.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Parser regressions a review of the October audit fixes found, one block each. Every resume
- * here is invented.
- */
-
 const NOW = new Date(Date.UTC(2026, 9, 5));
 
 const parse = (text: string, policy = DEFAULT_POLICY) =>

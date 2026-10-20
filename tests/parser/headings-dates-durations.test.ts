@@ -6,10 +6,6 @@ import { statesDateOfBirth } from "../../src/parser/contact.js";
 import { segmentResume } from "../../src/parser/sections.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Parser defects from the October audit, one block each. Every resume here is invented.
- */
-
 const NOW = new Date(Date.UTC(2026, 7, 31));
 
 const parse = (text: string, policy = DEFAULT_POLICY) =>
@@ -266,7 +262,7 @@ describe("experience and skills headings beyond software's", () => {
   });
 
   it("reads a role titled with a heading word as a role", () => {
-    // Neither part holds a title word, so which is the title is the order's guess, as before.
+    // Neither part holds a title word, so the first is taken as the title.
     expect(
       underRole("Volunteer Firefighter\nAustin Fire Dept\tJan 2015 - Dec 2019").roles,
     ).toHaveLength(3);

@@ -7,11 +7,7 @@ import { cefrLevel } from "../../src/parser/languages.js";
 import { segmentResume } from "../../src/parser/sections.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Spoken languages read as rows — the language, the level as written, and that level on the
- * CEFR scale — from a Languages section or a "Languages:" line among the skills. Invented
- * people only.
- */
+// Spoken languages as rows (language, level as written, CEFR) from a Languages section or line.
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const LOCALES = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);

@@ -1,6 +1,6 @@
-// After `changeset version`: copy package.json's version into ENGINE_VERSION, which every report
-// is stamped with, and into the GitHub Action's default engine version; and the MCP package's
-// version into its registry metadata, packages/mcp/server.json. Tests hold each pair equal.
+// After `changeset version`: copies package.json's version into ENGINE_VERSION and the Action's
+// default engine version, and the MCP package's version into packages/mcp/server.json.
+// Tests hold each pair equal.
 import { readFileSync, writeFileSync } from "node:fs";
 
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
@@ -14,7 +14,6 @@ console.log(`ENGINE_VERSION = ${version}`);
 
 const actionFile = "action/action.yml";
 const action = readFileSync(actionFile, "utf8");
-// The `default:` of the `version` input, the first one after its key.
 const pinned = action.replace(
   /(\n {2}version:\n(?: {4}.*\n)*? {4}default: )"[^"]*"/,
   `$1"${version}"`,

@@ -6,11 +6,7 @@ import { convertedResumeSchema } from "../../src/ai/tasks/convertResume.js";
 import { repairedResumeSchema } from "../../src/ai/tasks/repairParse.js";
 import recorded from "../fixtures/ai-strict-schemas.json" with { type: "json" };
 
-/**
- * `ai-strict-schemas.json` is what the server sent before the schemas were generated: three
- * JSON Schemas written by hand next to the zod schemas that parse the reply. Generating them
- * must not change a byte a model sees.
- */
+/** `ai-strict-schemas.json` pins the exact JSON Schemas sent to a model. */
 describe("strict JSON Schema generation", () => {
   it.each([
     ["ats_insights", insightsSchema],

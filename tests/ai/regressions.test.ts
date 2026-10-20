@@ -8,7 +8,7 @@ import { DEFAULT_POLICY } from "../../src/policy/default.js";
 import { mergeGrounded, needsRepair } from "../../src/repair/merge.js";
 import { check } from "../../src/scoring/engine.js";
 
-/** Bugs found in review of the AI layer. Each test failed before its fix. */
+/** Regressions in the AI layer. */
 
 const route = { model: "m", maxTokens: 100 };
 
@@ -37,8 +37,7 @@ describe("AI layer regressions", () => {
   });
 
   it("does not sell a repair that the merge cannot apply", () => {
-    // Roles found, but missing employers and dates. The merge never edits rows the parser
-    // found, so a paid repair here would change nothing.
+    // The merge never edits rows the parser found, so a repair here would change nothing.
     const parsed = check(
       ["Experience", "Senior Engineer", "Staff Engineer", "Principal Engineer"].join("\n"),
       DEFAULT_POLICY,

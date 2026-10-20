@@ -10,24 +10,13 @@ import { optional } from "./peer.js";
 
 /** Pages whose pictures and ruled tables are counted, here and by pdf-parse. */
 const MAX_PAGES_MEASURED = 6;
-/**
- * Pages with text whose visibility is measured. Every page whose text is read is measured up to
- * this; a document with text on more pages than this reports its hidden text as not measured,
- * never as clean.
- */
+/** Pages with text whose visibility is measured; past this, hidden text is reported as not measured, never as clean. */
 const MAX_VISIBILITY_PAGES = 60;
-/**
- * Pages read at most. The character cap ends a long text first; empty pages never reach it, and
- * 5 000 of them cost 11 seconds from a few hundred kilobytes.
- */
+/** Pages read at most; the character cap does not bound empty pages. */
 const MAX_PAGES_READ = 100;
 /** Fewer text characters than this on a page with an image, and the page is a picture. */
 const MIN_PAGE_TEXT = 20;
-/**
- * Fewer than this over an image across most of the page, and the page is a picture: a scanner's
- * one-line stamp ("Scanned with CamScanner"), not two short sections on a designed template's
- * background.
- */
+/** Fewer than this over an image across most of the page, and it is a picture: a scanner's one-line stamp. */
 const STAMP_TEXT = 40;
 /** Points a side (about 0.7in) an image must reach to count as a photo. */
 const PHOTO_MIN = 50;
@@ -35,12 +24,7 @@ const PHOTO_MIN = 50;
 const ENCRYPTED = "The PDF is password-protected; remove the password and upload it again.";
 const DAMAGED = "The file could not be read as a PDF; it may be damaged.";
 
-/**
- * Where pdf.js finds the standard 14 fonts' data. On Node it reads this with `fs.readFile`, so it
- * is a file-system path, not a `file:` URL — which `readFile` takes as a relative path, failing
- * (and warning) once per font of every such PDF. pdf.js insists on a trailing "/", which `fs`
- * accepts on Windows as well.
- */
+/** Where pdf.js finds the standard fonts: a file-system path (not a `file:` URL) with the trailing "/" pdf.js insists on. */
 function standardFontsDirectory() {
   const packageJson = createRequire(import.meta.url).resolve("pdfjs-dist/package.json");
   return `${join(dirname(packageJson), "standard_fonts")}/`;
@@ -49,18 +33,10 @@ function standardFontsDirectory() {
 type PdfGeometry = Omit<AtsLayoutSignals, "tableCount">;
 
 /**
- * A PDF's text and page geometry, in one pdf.js pass.
- *
- * The text is assembled here (`pageText`), in reading order, rather than by pdf-parse. Reading
- * stops once the text passes `maxChars`, or after `MAX_PAGES_READ` pages, so a thousand pages of
- * text cost what a resume does. Not a thousand pages of images: each page read waits for its own
- * images to decode, in full, before the next (`seeThroughImages`).
- * Every page whose text is read is measured too — its columns, and what of its text a reader
- * cannot see — so hidden text cannot sit past the pages that are checked. A link whose visible
- * text is "LinkedIn" is read for its target, which follows the text when the text lacks it.
- *
- * pdf.js's own errors ("No password given", "Invalid PDF structure.") become messages a person
- * can act on, with the original as the cause.
+ * A PDF's text and page geometry, in one pdf.js pass. The text is assembled in reading order
+ * (`pageText`); reading stops once it passes `maxChars` or after `MAX_PAGES_READ` pages. Every page
+ * whose text is read is measured too (columns, hidden text), so hidden text cannot sit past the
+ * checked pages. pdf.js's errors become messages a person can act on, with the original as cause.
  */
 async function readPdf(
   data: Uint8Array,
@@ -101,10 +77,9 @@ async function readPdf(
       const textItems: PdfTextItem[] = items.flatMap((item) => ("str" in item ? [item] : []));
       let marks: Box[] = [];
 
-      // What a reader sees of the page's text. Its own try: a page whose drawing operators
-      // cannot be replayed still has text and columns, and the hidden-text and image signals
-      // are then left out rather than reported as clean. A page past the first few with no text
-      // can hide none, and is not replayed.
+      // Its own try: a page whose drawing operators cannot be replayed still has text and columns;
+      // its hidden-text and image signals are left out, not reported as clean. A page past the
+      // first few with no text can hide none, and is not replayed.
       const hasText = textItems.some((item) => item.str.trim());
       if (number <= MAX_PAGES_MEASURED || hasText)
         if (++measured > MAX_VISIBILITY_PAGES) visibilityRead = false;
@@ -124,23 +99,19 @@ async function readPdf(
                 page as unknown as Parameters<typeof seeThroughImages>[2],
               ),
             );
-            // A loop, not `push(...)`: a spread of a few hundred thousand runs overflows the
-            // stack, and this catch would then report the page's hidden text as unmeasured.
+            // A loop, not `push(...)`: a spread of many runs overflows the stack.
             for (const run of seen.hidden) hidden.push(run);
             if (number <= MAX_PAGES_MEASURED) {
               tables += seen.tables;
-              // A photo: an image printed at least PHOTO_MIN points a side (icons and logo marks
-              // are smaller) but not across most of the page, which is a scan or a background.
+              // A photo: at least PHOTO_MIN points a side, but not across most of the page (a scan or background).
               const [, , pageWidth, pageHeight] = page.view as Box;
               const wide = ([x0, y0, x1, y1]: Box) =>
                 (x1 - x0) * (y1 - y0) >= pageWidth * pageHeight * 0.5;
               imageCount += seen.images.filter(
                 (box) => box[2] - box[0] >= PHOTO_MIN && box[3] - box[1] >= PHOTO_MIN && !wide(box),
               ).length;
-              // An image and next to no text: a scan with no OCR layer, or a page saved as a
-              // picture. Over an image across most of the page with no OCR layer (text drawn
-              // invisibly), a line or two is a scanner's stamp ("Scanned with CamScanner"), not
-              // the resume's text.
+              // An image and next to no text is a scan; over a full-page image with invisible OCR
+              // text, a line or two is a scanner's stamp, not the resume.
               const stamped = seen.images.some(wide) && seen.invisibleChars < MIN_PAGE_TEXT;
               if (seen.images.length && seen.textChars < (stamped ? STAMP_TEXT : MIN_PAGE_TEXT))
                 imageOnlyPages += 1;
@@ -163,19 +134,17 @@ async function readPdf(
       const lines = pageText(textItems, toViewport, viewport.width, marks);
       pages.push(lines);
       chars += lines.lines.join(" ").length + 2;
-      // The worst page wins: one two-column page is a two-column resume, and averaging it
-      // against clean pages would hide exactly the problem worth reporting.
+      // The worst page wins: averaging would hide a two-column page.
       if (lines.columns !== null) columnRatio = Math.max(columnRatio ?? 0, lines.columns);
       page.cleanup();
     }
 
     const hiddenText = hidden.join(" ").replace(/\s+/g, " ").trim();
 
-    // The document's own description fields, which no reader sees and an instruction to an AI
-    // can hide in. Read for that alone: an ATS does not index them.
+    // Description fields no reader sees, where an instruction to an AI can hide.
     let metadataText: string | undefined;
-    // Encrypted, yet opened without a password: an owner password restricts the file. pdf.js
-    // names the security handler only for an encrypted document.
+    // Encrypted yet opened without a password: an owner password. pdf.js names the security
+    // handler only for an encrypted document.
     let encrypted = false;
     try {
       const info = (await document.getMetadata()).info as Record<string, unknown> | undefined;
@@ -200,8 +169,7 @@ async function readPdf(
         ...(visibilityRead && {
           hiddenTextChars: hiddenText.replace(/\s/g, "").length,
           hiddenText: hiddenText.slice(0, MAX_HIDDEN_TEXT),
-          // A hidden run is a text item like any other, and every text item is read into a line
-          // (a copy drawn over itself once, `pageText`): the text holds all of the hidden text.
+          // Every text item, hidden or not, is read into a line, so the text holds all hidden text.
           hiddenTextRead: hiddenText.slice(0, MAX_HIDDEN_TEXT),
           imageOnlyPages,
           imageCount,
@@ -221,30 +189,25 @@ export async function extractPdf(
   maxChars: number,
 ): Promise<{ text: string; layout: AtsLayoutSignals }> {
   const { PDFParse } = await optional(() => import("pdf-parse"), "pdf-parse and pdfjs-dist");
-  // pdf.js can take ownership of (detach) the bytes it is handed, so each of the two passes gets
-  // its own copy. `new Uint8Array(…)` always copies; `.slice()` would not on a Node `Buffer`,
-  // where it returns a view of the same memory.
+  // pdf.js can detach the bytes it is handed, so each pass gets a copy. `new Uint8Array(…)`
+  // copies; `.slice()` on a Node `Buffer` returns a view.
   const { text, geometry, tables: drawn } = await readPdf(new Uint8Array(data), maxChars);
-  // Ruled tables are counted twice and the larger count kept: from the rules the page draws,
-  // stroked or filled (a browser prints a CSS border as a thin filled rectangle), and by
-  // pdf-parse, which reads stroked rules only but joins them its own way.
-  // No image at all: the tables are rules, and pdf.js would decode every image in full anyway.
+  // Ruled tables are counted twice, the larger kept: from the stroked or filled rules the page
+  // draws (a CSS border prints as a thin filled rectangle), and by pdf-parse (stroked only).
+  // `maxImageSize: 0`: tables are rules, and images would be decoded in full.
   const parser = new PDFParse({ data: new Uint8Array(data), maxImageSize: 0, verbosity: 0 });
 
   try {
     let tableCount = drawn;
     try {
-      // The first pages only: every page cost a 1 500-page upload minutes, and a table count no
-      // resume would have.
+      // The first pages only: every page costs minutes on a long upload.
       const tables = await parser.getTable({ first: MAX_PAGES_MEASURED });
       tableCount = Math.max(
         drawn,
         tables.pages.reduce((sum, page) => sum + page.tables.length, 0),
       );
     } catch {
-      // Table detection walks vector drawing operators and is the more fragile of the two
-      // passes. A document it cannot analyse still has perfectly good text, so extraction
-      // succeeds with the table signal simply absent rather than failing the upload.
+      // The more fragile pass: the document keeps its text, with the table signal absent.
     }
 
     return { text, layout: { ...geometry, tableCount } };

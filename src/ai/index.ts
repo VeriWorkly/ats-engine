@@ -2,12 +2,9 @@
  * @veriworkly/ats-engine/ai — the model-backed tasks, with any provider.
  *
  * Bring a provider (`/ai/openai-compatible`, `/ai/anthropic`, or your own `LlmProvider`) and a
- * model per task; override prompts if you like. Each task returns its result with token usage,
- * attempts and the prompt version, so the host can bill and audit — the package never touches
- * credits or quotas itself.
- *
- * What a model returns is never trusted as-is: output is schema-validated, and every value that
- * claims to come from the input is checked against it (see each task).
+ * model per task. Each task returns its result with token usage, attempts and the prompt
+ * version. Output is schema-validated and every value claiming to come from the input is
+ * checked against it.
  */
 
 import { DEFAULT_POLICY } from "../policy/default.js";
@@ -37,18 +34,10 @@ export type AtsAiOptions = {
   routes?: { [Task in AtsAiTask]?: RouteSettings | undefined } | undefined;
   /** System prompt overrides per task. */
   prompts?: { [Task in AtsAiTask]?: string | undefined } | undefined;
-  /**
-   * Contact-detail redaction per task. Defaults to on for `analyze`, which does not need to
-   * know who the candidate is. `repairParse` and `convertResume` exist to recover those details
-   * and ignore this setting.
-   */
+  /** Contact-detail redaction. On by default for `analyze`; `repairParse` and `convertResume` ignore it. */
   redact?: { analyze?: boolean | undefined } | undefined;
   /** Engine policy used to classify repaired credentials. Defaults to `DEFAULT_POLICY`. */
   enginePolicy?: AtsEnginePolicy | undefined;
-  /**
-   * `onRetry` is checked as a method is (its event either way), so a handler written for one
-   * task fits, and it may also be set to `undefined`.
-   */
   hooks?: { onRetry?: { method(event: AtsAiRetryEvent): void }["method"] | undefined } | undefined;
 };
 

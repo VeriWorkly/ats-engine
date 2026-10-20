@@ -1,27 +1,10 @@
-/**
- * A resume as structured data — the input for callers that already hold typed fields.
- *
- * Text input has to be parsed, and parsing is lossy by nature: that loss is what the engine
- * reports on. A caller holding the resume as data (an editor, a profile store, a JSON Resume
- * file) has nothing to lose, so it sends this instead. The recovered record is then taken from
- * the fields directly (provenance `structured`), and the content rules run on a canonical text
- * rendering with real section headings.
- *
- * `format` is the discriminator. Any object without it is treated as an arbitrary document and
- * flattened, which is the legacy behaviour.
- *
- * Dates are `YYYY-MM` or `YYYY`. Other spellings are accepted if the policy's date vocabulary
- * can read them, but the ISO forms are the contract.
- */
+// `format` is the discriminator: an object without it is flattened to text like any other JSON.
+// Dates are `YYYY-MM` or `YYYY`; other spellings work if the policy's date vocabulary reads them.
 
 /** The `format` an `AtsResumeDocument` declares, and the version of its shape. */
 export const ATS_DOCUMENT_FORMAT = "ats-resume@1";
 
-/**
- * Size limits for a document. Arrays past these are rejected; strings past theirs are cut.
- * Set at or above what the Studio editor itself allows, so a resume a user can build is never
- * refused for its size.
- */
+/** Size limits for a document. Arrays past these are rejected; strings past theirs are cut. */
 export const DOCUMENT_LIMITS = /* @__PURE__ */ Object.freeze({
   sections: 40,
   items: 200,
@@ -81,10 +64,7 @@ export type AtsDocumentCertification = {
   url?: string;
 };
 
-/**
- * A language spoken. `level` as the resume states it: a word ("Native", "fließend") or a CEFR
- * level ("B2"); the engine reads its CEFR level from either.
- */
+/** A language spoken. `level` is a word ("Native", "fließend") or a CEFR level ("B2"). */
 export type AtsDocumentLanguage = {
   language: string;
   level?: string;
@@ -96,10 +76,7 @@ export type AtsDocumentEntry = {
   lines?: string[];
 };
 
-/**
- * `title` is the heading as printed on the page, in whatever language the resume is in. The
- * structure rules read it, so it should be what the reader actually sees.
- */
+/** `title` is the heading as printed on the page, in the resume's language; structure rules read it. */
 export type AtsDocumentSection =
   | { kind: "summary"; title: string; text: string }
   | { kind: "experience"; title: string; items: AtsDocumentRole[] }
@@ -122,7 +99,7 @@ export type AtsDocumentBasics = {
 
 /**
  * A resume as structured data (`format: "ats-resume@1"`). The engine reads its fields directly
- * (provenance `structured`) and scores a rendering of it with real section headings.
+ * (provenance `structured`) and scores a text rendering with real section headings.
  */
 export type AtsResumeDocument = {
   format: typeof ATS_DOCUMENT_FORMAT;

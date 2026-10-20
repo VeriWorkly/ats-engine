@@ -5,10 +5,7 @@ import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { VERDICT_BANDS, computeVerdict } from "../../src/scoring/verdict.js";
 import { words } from "../../src/text/text.js";
 
-/**
- * Scoring rules and checks fixed after the October 2026 audit, one block per finding. Every
- * resume here is an invented person at an invented company.
- */
+/** Scoring rules and checks, one block per audit finding. Every resume is invented. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -59,7 +56,7 @@ describe("action verbs", () => {
       /^(Lead|Achieved|Cut|Hired|Closed|Exceeded) (.*)$/gm,
       "Responsible for $2",
     );
-    // Six bullets, none with a verb: 0%, not a share diluted or inflated by the header rows.
+    // Six bullets, none with a verb: 0%, not diluted by the header rows.
     expect(rule(check(duties), "content.verbs")?.evidence).toMatch(/^Only 0%/);
   });
 

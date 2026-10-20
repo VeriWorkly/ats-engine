@@ -5,18 +5,13 @@ import type { AtsCefrLevel, AtsParsedLanguage } from "../types.js";
 import { memo } from "../util/memo.js";
 import { own } from "../util/own.js";
 
-/**
- * Spoken languages as rows: "English (native), German (B2)" is English at C2 and German at B2.
- *
- * A language is a name the policy lists (`keywordMatch.requirements.languageNames`, keys and
- * values, which the packs extend with "Deutsch", "हिंदी" and the rest), so "Languages: Go, Rust"
- * among the skills names none. Its level is what stands beside it — before it up to the last
- * separator ("fluent German"), after it up to the next ("German (B2)", "German – fließend") — read
- * against the policy's `languageLevels`, or written as a CEFR level. Languages run together with
- * no separator between them ("Fluent in English and Spanish") share the level one of them states.
- */
+// Spoken languages as rows: "English (native), German (B2)". A language is a name the policy lists
+// (`keywordMatch.requirements.languageNames`), so "Languages: Go, Rust" names none. Its level
+// stands beside it (before up to the last separator, after up to the next), read against the
+// policy's `languageLevels` or written as CEFR. Languages with no separator between them
+// ("Fluent in English and Spanish") share the level one states.
 
-/** A CEFR level as written: "B2", "c1". Notation, not a word of any language. */
+/** A CEFR level as written ("B2", "c1"): notation, not a word of any language. */
 const CEFR_TOKEN = "[abc][12]";
 const CEFR_EXACT = /^[abc][12]$/iu;
 const SEPARATORS = new Set([",", ";", "|", "/", "•", "·"]);
@@ -78,7 +73,7 @@ function cefrOfMatches(found: readonly string[], matchers: LevelMatchers): AtsCe
   return null;
 }
 
-/** The CEFR level a piece of text states — "fluent", "Muttersprache", "B2" — or null. */
+/** The CEFR level a text states ("fluent", "B2"), or null. */
 export function cefrLevel(text: string, policy: AtsEnginePolicy): AtsCefrLevel | null {
   const matchers = levelsOf(policy.resumeParse);
   return cefrOfMatches(levelsIn(text, matchers), matchers);
@@ -118,9 +113,8 @@ function separatorAt(text: string, fromEnd: boolean) {
 }
 
 /**
- * The languages one line names, each with the level beside it. A line naming none gives none;
- * a line that is only a level ("Native or bilingual proficiency", which LinkedIn prints under the
- * language) comes back as `levelOnly`.
+ * The languages one line names, each with the level beside it. A line that is only a level
+ * ("Native or bilingual proficiency") comes back as `levelOnly`.
  */
 export function readLanguages(
   line: string,
@@ -133,7 +127,7 @@ export function readLanguages(
   if (!named.length) {
     const found = levelsIn(body, levels);
     const cefr = cefrOfMatches(found, levels);
-    // Only a line that is nothing but its level: not a sentence that happens to hold "basic".
+    // Only a line that is nothing but its level, not a sentence holding "basic".
     const rest = found.reduce((out, word) => out.replace(word, ""), body);
     return {
       rows: [],
@@ -158,7 +152,7 @@ export function readLanguages(
       language: match[0],
       found,
       suffix,
-      // Joined to the language before it, with no separator between: one clause.
+      // No separator between it and the language before: one clause.
       joined: i > 0 && separatorAt(before, false) === -1,
     };
   });
@@ -187,9 +181,8 @@ export function readLanguages(
 }
 
 /**
- * The rows of the lines given — a Languages section, or a "Languages:" line — each language once:
- * where it is named twice, the reading that states a level is kept. A line that is only a level
- * gives it to the language above it that has none.
+ * The rows of a Languages section or "Languages:" line, each language once (the reading stating
+ * a level wins). A line that is only a level goes to the language above it that has none.
  */
 export function parseSpokenLanguages(
   lines: readonly string[],

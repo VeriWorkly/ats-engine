@@ -1,6 +1,10 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsParsedCertification, AtsParsedLanguage, AtsParsedResume } from "../types.js";
-import { parseCertificationList, parseCertifications } from "./certifications.js";
+import {
+  addCertifications,
+  parseCertificationList,
+  parseCertifications,
+} from "./certifications.js";
 import { EMAIL, LINK, findName } from "./contact.js";
 import { findDateRange, readingDatesAt } from "./dates.js";
 import { degreeLevel, parseEducation } from "./education.js";
@@ -17,19 +21,15 @@ import {
   type ResumeSectionKind,
 } from "./sections.js";
 
-/**
- * The category label on a skills line — "Languages: " in "Languages: TypeScript, Go". Needs a
- * space after the colon, so a value with a colon of its own ("https://…") is left whole.
- */
+/** The category label on a skills line ("Languages: "); the space after the colon keeps "https://…" whole. */
 const SKILL_LABEL = /^[^:,;|]{1,40}:\s+/;
 
 /** What separates one skill from the next: a list punctuation mark, or a column gap. */
 const SKILL_SEPARATOR = /[,;|•·]|\s{2,}/g;
 
 /**
- * A skills line cut into skills at its separators, except inside brackets: "AWS (EC2, S3,
- * Lambda)" is one skill. A separator inside a bracket that never closes still cuts, so a stray
- * "(" does not swallow the rest of the line.
+ * A skills line cut at its separators, except inside brackets ("AWS (EC2, S3)" is one skill). A
+ * bracket that never closes does not swallow the rest of the line.
  */
 function splitSkills(line: string): string[] {
   const parts: string[] = [];
@@ -55,18 +55,11 @@ function splitSkills(line: string): string[] {
   return parts;
 }
 
-/** Certifications in a list, each once by name, in the order first read. */
-function addCertifications(into: AtsParsedCertification[], rows: AtsParsedCertification[]) {
-  for (const row of rows)
-    if (!into.some((kept) => kept.name.toLowerCase() === row.name.toLowerCase())) into.push(row);
-}
-
 /**
- * The certification and spoken-language rows, in page order: from their own sections, and from
- * a labelled line among the skills ("Languages: English (native)", "Certifications: PMP"). What
- * such a line names as rows is not also a skill, so the line comes back without it in `skillLines`
- * ("Languages: English, Python" leaves "Python"); "Languages: Go, Rust" names no language and
- * stays a skills line whole.
+ * The certification and spoken-language rows, in page order: from their own sections and from a
+ * labelled line among the skills ("Languages: English (native)"). What such a line names as rows
+ * is not also a skill, so `skillLines` holds the line without it ("Languages: English, Python"
+ * leaves "Python"); "Languages: Go, Rust" names no language and stays a skills line whole.
  */
 function readCredentialRows(
   sections: readonly ResumeSection[],
@@ -101,17 +94,9 @@ function readCredentialRows(
 }
 
 /**
- * Recovers the fields an applicant tracking system stores, from the same plain text one would
- * receive.
- *
- * The point is not to parse perfectly. It is to parse *representatively*: an ATS shreds a resume
- * into name, contact, and one row per job holding an employer, a title and a date range, then
- * lets recruiters search and filter those rows. A resume whose job history cannot be recovered
- * does not rank badly — it arrives with empty columns, and no amount of keyword density fixes
- * that. So when this parser cannot find a field, that is itself the finding worth reporting, and
- * the recovered rows are worth showing the candidate verbatim: this is what the software sees.
- *
- * Everything here is deterministic and stays on the free tier. No model is involved.
+ * Recovers the fields an applicant tracking system stores (name, contact, one row per job) from
+ * plain text. Parses representatively, not perfectly: a field it cannot find is itself the
+ * finding. Deterministic; no model.
  */
 export function parseResume(
   lines: string[],
@@ -123,12 +108,9 @@ export function parseResume(
 
 /**
  * The resume's sections, with the name's line opening a block of its own when the name was read
- * over a headline further down. A sidebar read before the main column (a LinkedIn export: "Top
- * Skills" over its skills, then the name) leaves the name, the headline and the city under the
- * sidebar's last heading, where they were read as skills or certifications. Only such a name
- * cuts a section: one taken from a list's rows for want of another is one of its rows, and so is
- * one that is the first line under its heading ("CERTIFICATIONS" over "Google Cloud" over
- * "Professional Cloud Architect").
+ * over a headline further down (a LinkedIn export's sidebar leaves name, headline and city under
+ * its last heading). A name taken from a list's rows, or the first line under its heading, is
+ * one of those rows and cuts nothing.
  */
 export function readSections(lines: string[], policy: AtsEnginePolicy): ResumeSection[] {
   const sections = segmentResume(lines, policy);
@@ -147,10 +129,7 @@ export function readSections(lines: string[], policy: AtsEnginePolicy): ResumeSe
   ];
 }
 
-/**
- * `parseResume` on lines already through `readResumeLines`, as `check` has them, and already
- * read into sections (`readSections`) when the caller has done that too.
- */
+/** `parseResume` on lines already through `readResumeLines` (and sections already read, if given). */
 export function parseReadLines(
   lines: string[],
   policy: AtsEnginePolicy,
@@ -164,10 +143,8 @@ export function parseReadLines(
     sections.filter((section) => section.kind === kind).flatMap((section) => section.lines);
 
   const experienceLines = take("experience");
-  // A resume with no recognisable Experience heading still has a work history somewhere, so the
-  // fallback reads every block except the ones known not to hold jobs: a degree's "2010 - 2014"
-  // read as a role once added four years of experience nobody worked, and a licence's dates
-  // would too.
+  // Without an Experience heading, read every block not known to hold something else (a degree's
+  // "2010 - 2014" is not a role).
   const roles = parseRoles(
     experienceLines.length
       ? experienceLines
@@ -182,12 +159,9 @@ export function parseReadLines(
     policy,
     now,
   );
-  // Without an Education heading, every block that can hold a degree is read, never a bullet:
-  // "Ran a PhD intern program" is not a doctorate, nor "Partnered with Stanford University" a
-  // school. From the work history, skills and projects — where the lines under an education
-  // heading the policy does not know end up — only a line naming a degree, and the school line
-  // beside it: not a role's dated header ("MBA Intern, Goldman Sachs  2019"), and not the employer
-  // over a title ("Stanford University" / "Research Assistant").
+  // Without an Education heading, read every block that can hold a degree, never a bullet ("Ran a
+  // PhD intern program"). From work history, skills and projects take only a line naming a degree
+  // and the school line beside it, not a role's dated header ("MBA Intern, Goldman Sachs  2019").
   const education = parseEducation(
     take("education").length
       ? take("education")
@@ -215,15 +189,13 @@ export function parseReadLines(
       splitSkills(skillLines.get(line) ?? line.replace(BULLET_PREFIX, "").replace(SKILL_LABEL, "")),
     )
     .map((skill) => skill.replace(BULLET_PREFIX, "").trim())
-    // A skill names something, so it has a letter: a date or a number under the Skills heading
-    // ("Geburtsdatum: 04.05.1990", once its label is dropped) is not one.
     .filter(
       (skill) =>
-        // One letter is a skill only as a capital — the languages R and C — not a stray "o".
+        // One letter is a skill only as a capital (R, C), not a stray "o".
         (skill.length > 1 || /^\p{Lu}$/u.test(skill)) &&
         skill.length <= 60 &&
+        // A date or number is not a skill, nor is an address.
         /\p{L}/u.test(skill) &&
-        // Nor is an address: a links list under the skills is links.
         !/^(?:https?:\/\/|www\.)|@/i.test(skill),
     );
 
@@ -247,10 +219,8 @@ export function parseReadLines(
 }
 
 /**
- * How much of what an ATS needs was actually recoverable.
- *
- * `roleCompleteness` is the one that matters most: a job row missing its employer or its dates
- * is a row a recruiter's filter cannot match on, however well the bullets underneath it read.
+ * How much of what an ATS needs was recoverable. `roleCompleteness` matters most: a job row
+ * missing its employer or dates is one a recruiter's filter cannot match.
  */
 export function parseQuality(parsed: AtsParsedResume) {
   const complete = parsed.roles.filter((role) => role.title && role.employer && role.start).length;

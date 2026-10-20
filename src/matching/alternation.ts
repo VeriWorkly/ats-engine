@@ -5,11 +5,7 @@ import { canonicalize, slashParts, type Vocabulary } from "./vocabulary.js";
 
 const isTermChar = (char: string) => /[\p{L}\p{M}\p{N}+#./-]/u.test(char);
 
-/**
- * Caps how many alternatives one "or" can bind together. A real posting offers a handful;
- * anything longer is prose that happens to contain a comma list, and grouping all of it would
- * make a single match satisfy a dozen unrelated requirements.
- */
+/** Caps the alternatives one "or" binds: a longer comma list is prose, not a choice. */
 const MAX_ALTERNATION_MEMBERS = 8;
 
 /** The comma-separated run immediately preceding an "or": "React, Vue, " -> [react, vue]. */
@@ -17,9 +13,7 @@ function trailingList(text: string) {
   const tokens: string[] = [];
   let index = text.length;
 
-  // Step over an Oxford comma. "React, Vue, or Angular" leaves a trailing comma right before
-  // the "or"; without this the backward scan hits it immediately and returns nothing, silently
-  // reducing the commonest three-way alternative to three separate requirements.
+  // Step over an Oxford comma ("React, Vue, or Angular").
   while (index > 0 && /\s/.test(text[index - 1])) index -= 1;
   if (index > 0 && text[index - 1] === ",") index -= 1;
 
@@ -50,20 +44,15 @@ function leadingList(text: string) {
 }
 
 /**
- * Groups terms a posting offers as alternatives — "Go or Java", "React, Vue, or Angular" —
- * so the group is satisfied by any one member and counts once toward the total.
+ * Groups terms a posting offers as alternatives ("Go or Java", "React, Vue, or Angular"), so the
+ * group is satisfied by any one member and counts once. Scanned per line; a term appearing on
+ * its own elsewhere joins the same group through the union-find.
  *
- * Without this, every posting that names a substitute penalises the candidate for not holding
- * both sides of a choice it explicitly said was a choice. Scanned per line, because alternation
- * is a within-sentence relationship; a term appearing on its own elsewhere joins the same group
- * through the union-find, which is what makes chained lists collapse correctly.
+ * Only the policy's `alternationWords` ("or", "oder") separate. A slash joins skills asked
+ * together ("HTML/CSS"), but beside an "or" each part is an alternative ("Python/Django or Go").
  *
- * The policy's `alternationWords` ("or", "oder") are the only separators honoured. A slash joins
- * skills asked together ("HTML/CSS" asks for both), so it offers no choice; beside an "or", each
- * of its parts is one of the alternatives ("Python/Django or Go").
- *
- * Returns the union-find root of a term, and the separator word that grouped it, so the
- * missing-keyword label can read "Go oder Java" for a German posting.
+ * Returns the union-find root of a term, and the separator that grouped it, so the missing label
+ * can read "Go oder Java".
  */
 export function alternationGroups(
   lines: string[],
@@ -84,26 +73,14 @@ export function alternationGroups(
     if (rootA !== rootB) parent.set(rootA, rootB);
   };
 
-  /**
-   * A term joins at most one alternation group — the first that names it.
-   *
-   * Without this the union-find chains transitively across the whole posting, and any word that
-   * turns up beside two different "or"s silently welds their requirements together. Measured:
-   * a posting asking for "Java or equivalent" and "Python or equivalent" scored a Java-only
-   * resume at 100 and dropped Python from the missing list entirely, because "equivalent"
-   * bridged them. Treating "Java or Kotlin" and "Kotlin or Swift" as two separate choices rather
-   * than one three-way choice is also simply the more faithful reading.
-   */
+  // A term joins at most one group, the first that names it: otherwise a word beside two "or"s
+  // ("Java or equivalent", "Python or equivalent") welds unrelated requirements together.
   const grouped = new Set<string>();
 
   for (const line of lines) {
-    // Split first, then scan outwards from each "or" by hand. The obvious regex for this —
-    // a comma-list followed by "or" — nests a quantifier inside a repetition, and on a line
-    // holding a long comma-separated list with no "or" in it the engine backtracks through
-    // every possible split at every start position. Measured at 546 ms for one such job
-    // description against 10 ms for a normal one, on an endpoint that is free, unauthenticated,
-    // and single-threaded. The hand-rolled scan below is linear and needs no such care.
-    // The capture keeps the separators: [text, "or", text, "oder", text].
+    // Split, then scan outwards from each "or" by hand: a regex for "comma list then or" nests
+    // quantifiers and backtracks badly on a long list without one. The capture keeps the
+    // separators: [text, "or", text, "oder", text].
     const parts = line.split(splitterOf(km));
     if (parts.length < 3) continue;
 

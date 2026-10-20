@@ -1,11 +1,4 @@
-/**
- * Just enough of `fetch` for the adapters.
- *
- * The package compiles without DOM or Node types so that nothing runtime-specific leaks into
- * the browser build, which means the platform's `fetch` and `AbortSignal` are described here
- * structurally rather than imported. Every runtime the package targets — Node
- * 22.12+, browsers, edge workers — provides them.
- */
+/** `fetch` and `AbortSignal` are described structurally: the package compiles without DOM or Node types. */
 
 import { isRetryableStatus, LlmProviderError, type AbortSignalLike } from "./provider.js";
 
@@ -34,10 +27,7 @@ export type FetchResponseLike = {
     | undefined;
 };
 
-/**
- * The most of a provider's answer that is read, an error's included: a model's JSON is a few
- * kilobytes, and the timeout bounds how long a call takes, not how much it receives.
- */
+/** The most of a provider's answer that is read, an error's included; the timeout does not bound size. */
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
 /** Just enough of `fetch` for the adapters: one POST. Pass your own to proxy or record calls. */
@@ -49,10 +39,8 @@ export type FetchLike = (
     body: string;
     signal?: AbortSignalLike;
     /**
-     * Always `"manual"`: a redirect is handed back, never followed, and the call fails. `fetch`
-     * keeps headers such as `x-api-key` on a redirect to another origin, and a 307 or 308 resends
-     * the body, so following one would hand the key and the resume to whoever answered. Pass it
-     * on to the `fetch` you wrap; a response that was redirected anyway is refused.
+     * Always `"manual"`: a redirect fails the call, because `fetch` keeps `x-api-key` across
+     * origins and a 307/308 resends the body. Pass it on to the `fetch` you wrap.
      */
     redirect?: "manual";
   },
@@ -69,8 +57,6 @@ const platform = globalThis as unknown as {
 
 /** The response's body as text, refused past `MAX_RESPONSE_BYTES`. */
 async function readLimited(response: FetchResponseLike): Promise<string> {
-  // An error keeps its status, and stays retryable when the status is: a gateway's huge error
-  // page is not the model's answer.
   const tooBig = () =>
     new LlmProviderError(
       `The provider answered with more than ${MAX_RESPONSE_BYTES / 1024 / 1024} MB, which is not read.`,
@@ -78,8 +64,7 @@ async function readLimited(response: FetchResponseLike): Promise<string> {
         ? { retryable: false }
         : { status: response.status, retryable: isRetryableStatus(response.status) },
     );
-  // Only what a platform `fetch` gives: node-fetch's body is a Node stream, a double's headers a
-  // plain object, and either is read with `text()`, as before the limit.
+  // Only a platform `fetch`'s headers and stream body are used; anything else is read with `text()`.
   const headers = response.headers;
   if (
     typeof headers?.get === "function" &&
@@ -88,8 +73,7 @@ async function readLimited(response: FetchResponseLike): Promise<string> {
     throw tooBig();
   const body = response.body;
   const reader = typeof body?.getReader === "function" ? body.getReader() : undefined;
-  // shortcut: a host's fetch without a stream body is read whole, then measured; give it a body
-  // stream if its answers may be large.
+  // shortcut: a fetch without a stream body is read whole, then measured.
   if (!reader) {
     const text = await response.text();
     if (text.length > MAX_RESPONSE_BYTES) throw tooBig();
@@ -128,11 +112,7 @@ export class AbortedError extends Error {
   }
 }
 
-/**
- * Whether the response is a redirect, by the response alone: a 3xx handed back (Node, workers),
- * a browser's opaque redirect (status 0), or a response a caller's `fetch` reached by following
- * one regardless.
- */
+/** A 3xx, a browser's opaque redirect (status 0), or a response a caller's `fetch` followed. */
 function isRedirect(response: FetchResponseLike): boolean {
   return (
     (response.status >= 300 && response.status < 400) ||
@@ -152,21 +132,14 @@ function originOf(url: string): string {
 /** A header whose value is a credential. */
 const SECRET_HEADER = /auth|key|token|secret/i;
 
-/**
- * A bearer token, or a key in a provider's usual form: OpenAI and Anthropic ("sk-…", "sk-ant-…"),
- * Google ("AIza…"), Groq ("gsk_…"), Hugging Face ("hf_…"), xAI ("xai-…"), Replicate ("r8_…"),
- * Together ("tgp_v1_…").
- */
+/** A bearer token, or a key in a provider's form: sk-, pk-, rk-, xai-, gsk_, hf_, r8_, tgp_v1_, AIza. */
 const SECRET =
   /\b[Bb]earer\s+[^\s"',;]+|\b(?:sk|pk|rk|xai)-[\w-]{8,}|\b(?:gsk|hf|r8|tgp_v1)_[\w-]{8,}|\bAIza[\w-]{20,}/g;
 
 /** A JSON member, its name and its string value: `"api_key": "…"`. */
 const JSON_MEMBER = /"([\w-]{1,64})"(\s*:\s*)"(?:[^"\\]|\\.)*"/g;
 
-/**
- * An error body with the credentials taken out. A proxy or gateway that echoes the request puts
- * the key in its error, and the error's message is printed and logged.
- */
+/** An error body with credentials removed: a gateway that echoes the request puts the key in it. */
 function withoutSecrets(text: string, headers: Record<string, string>): string {
   let out = text;
   for (const [name, value] of Object.entries(headers))
@@ -182,11 +155,8 @@ function withoutSecrets(text: string, headers: Record<string, string>): string {
 }
 
 /**
- * POSTs `body` as JSON and returns the parsed JSON response.
- *
- * Every failure becomes an `LlmProviderError` with the shared retry rule applied, except an
- * abort the caller asked for, which is an `AbortedError` — the caller has stopped waiting, so
- * there is nothing to retry for. A timeout is the adapter's own abort and is retryable.
+ * POSTs `body` as JSON and returns the parsed JSON response. Every failure is an
+ * `LlmProviderError` with the shared retry rule, except the caller's own abort (`AbortedError`).
  */
 export async function postJson(
   url: string,
@@ -246,7 +216,6 @@ export async function postJson(
       cause: error,
     });
   }
-  // Adapters read fields off the body; anything but an object is a bad response, not a crash.
   if (!json || typeof json !== "object" || Array.isArray(json))
     throw new LlmProviderError("Provider returned JSON that is not an object.", {
       status: response.status,

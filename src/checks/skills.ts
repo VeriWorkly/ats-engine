@@ -6,14 +6,9 @@ import { NO_FINDING, quote, type Finding } from "./finding.js";
 const MIN_SKILLS = 3;
 
 /**
- * Listed skills the rest of the resume never mentions: the share of them, and the first few.
- *
- * An LLM screener grading a resume against a posting now asks where each skill was used (Workday
- * HiredScore's "Fit & Gap", Ashby's per-criterion citations), and a recruiter reads a skills list
- * the same way. A skill only in the list is a claim; the same skill in a role's bullet is
- * evidence. Read across every section but Skills, so a project counts as evidence too.
- *
- * Null — not applicable — for a short list, or a resume with nothing but its skills to read.
+ * Listed skills the rest of the resume never mentions: the share of them, and the first few. A
+ * skill only in the list is a claim; in any other section it is evidence. Null (not applicable)
+ * for a short list or a resume with nothing but its skills.
  */
 export function unsupportedSkills(
   sections: readonly ResumeSection[],
@@ -26,7 +21,7 @@ export function unsupportedSkills(
     .join("\n");
   if (!elsewhere.trim()) return null;
 
-  // A substring test first: a skill absent as text is absent as a word, without a pattern.
+  // Substring first: a skill absent as text is absent as a word, without compiling a pattern.
   const lower = elsewhere.toLowerCase();
   const missing = skills.filter(
     (skill) =>

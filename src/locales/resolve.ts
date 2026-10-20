@@ -44,11 +44,9 @@ export function withLocales(
 }
 
 /**
- * Each pack's patterns are valid alone, yet joined to the base's as alternatives they can still
- * fail to compile — a named group the base and a pack both use is a duplicate — and would then
- * throw on the first resume read in that language. So the combinations `check` can build are
- * compiled here, through the same schema: every language pack at once, with each region in turn.
- * A clash between any packs that can apply together shows up in one of those.
+ * Patterns valid alone can fail once joined as alternatives (a named group used by the base and a
+ * pack). So the combinations `check` can build, every language pack at once with each region in
+ * turn, are compiled here through the schema.
  */
 function assertCombinable(policy: AtsEnginePolicy) {
   const { languages, regions } = policy.locales;
@@ -69,11 +67,7 @@ function assertCombinable(policy: AtsEnginePolicy) {
   }
 }
 
-/**
- * A rule as a region weighs it, or null when the region turns it off (`weight: 0`). Off, not
- * passed: a date-of-birth rule weighted to nothing would otherwise report "no date of birth is
- * stated" about a resume that states one.
- */
+/** A rule as a region weighs it, or null when the region turns it off (`weight: 0`). */
 function adjustRule(
   rule: AtsEngineRule,
   change: AtsRegionPack["rules"][string] | undefined,
@@ -112,6 +106,16 @@ function applyRegion(policy: AtsEnginePolicy, region: AtsRegionPack): AtsEngineP
   };
 }
 
+/** The error for a region or language a call names that the policy has no pack for. */
+function notAttached(kind: "region" | "language", id: string, packs: { id: string }[]) {
+  const attached = packs.map((pack) => pack.id).join(", ") || "none";
+  const label = kind[0]!.toUpperCase() + kind.slice(1);
+  return new AtsPolicyError(
+    `${label} "${id}" is not attached to the policy (attached: ${attached}).`,
+    [{ path: `locales.${kind}s`, message: `no ${kind} pack with id "${id}"` }],
+  );
+}
+
 /** What `check` read a resume as. Packs are named by id; the policy's base vocabulary is not. */
 export type AtsLocale = { languages: string[]; region: string | null };
 
@@ -131,11 +135,7 @@ const localizedOf = memo<AtsEnginePolicy, Map<string, AtsEnginePolicy>>(() => ne
 
 const FULL_DATE = /(?<!\d)(\d{1,2})[./-](\d{1,2})[./-]\d{4}(?!\d)/g;
 
-/**
- * How the resume orders an all-numeric date, when its own dates settle it: "15/07/2015" can only
- * be day-first, "07/15/2015" only month-first. Undefined when none settles it or they disagree.
- * The country's convention is a guess; a resume that writes a 15th of the month is not.
- */
+/** The order a resume's own all-numeric dates settle ("15/07/2015" is day-first), else undefined. */
 function dateOrderIn(text: string): "DMY" | "MDY" | undefined {
   let dayFirst = false;
   let monthFirst = false;
@@ -150,10 +150,9 @@ function dateOrderIn(text: string): "DMY" | "MDY" | undefined {
  * The policy a given resume (and posting) is scored with: the base, plus the attached language
  * packs it is written in, plus one region, plus the date order the resume's own dates show.
  *
- * The region is the one asked for; failing that the country of the first phone number written
- * with a country code; failing that the default region of a language the resume itself is
- * written in (or of a language asked for). Memoised per
- * combination, so every resume read as German shares one compiled policy.
+ * The region is the one asked for, else the country of the first phone number with a country
+ * code, else the default region of a language the resume is written in (or asked for). Memoised
+ * per combination.
  */
 export function localizePolicy(
   policy: AtsEnginePolicy,
@@ -173,34 +172,20 @@ export function localizePolicy(
   resumeLanguages: string[];
 } {
   const { languages: packs, regions } = policy.locales;
-  // A region asked for by name is applied or refused, never dropped: ignoring it would also skip
-  // the inference from the phone number, and score the resume under no region without a word.
+  // A region or language asked for is applied or refused, never silently dropped.
   const asked = options.region
     ? regions.find((pack) => pack.id === options.region!.toUpperCase())
     : undefined;
-  if (options.region && !asked) {
-    const attached = regions.map((pack) => pack.id).join(", ") || "none";
-    throw new AtsPolicyError(
-      `Region "${options.region}" is not attached to the policy (attached: ${attached}).`,
-      [{ path: "locales.regions", message: `no region pack with id "${options.region}"` }],
-    );
-  }
-  // Languages asked for, the same: in any case, the policy's own language naming no pack, and
-  // an id no pack has refused rather than read as the base without a word.
+  if (options.region && !asked) throw notAttached("region", options.region, regions);
+  // The policy's own language names no pack and is accepted.
   const askedLanguages = options.languages?.map((id) => id.toLowerCase());
   const unknown = askedLanguages?.find(
     (id) => id !== policy.text.language && !packs.some((pack) => pack.id === id),
   );
-  if (unknown !== undefined) {
-    const attached = packs.map((pack) => pack.id).join(", ") || "none";
-    throw new AtsPolicyError(
-      `Language "${unknown}" is not attached to the policy (attached: ${attached}).`,
-      [{ path: "locales.languages", message: `no language pack with id "${unknown}"` }],
-    );
-  }
+  if (unknown !== undefined) throw notAttached("language", unknown, packs);
   const dateOrder = dateOrderIn(resumeText.slice(0, DETECTION_SAMPLE));
   const resumeSample = sampleOf(resumeText);
-  // In no pack's language: the base's, or, when the resume says it is not that either, none.
+  // No pack's language: the base's, or "und" when the resume is not the base's either.
   const orBase = (ids: string[]) =>
     ids.length || options.languages || baseLanguageOf(policy, resumeSample) !== UNDETERMINED
       ? ids
@@ -208,8 +193,7 @@ export function localizePolicy(
   if (packs.length === 0 && regions.length === 0 && dateOrder === undefined)
     return { policy, locale: { languages: [], region: null }, resumeLanguages: orBase([]) };
 
-  // The resume and the posting are detected apart, each in its own language: measured together,
-  // a long English posting dilutes a German resume below the share that recognises it.
+  // Detected apart: a long English posting would dilute a German resume below the detection share.
   const posting =
     text === resumeText ? "" : text.startsWith(resumeText) ? text.slice(resumeText.length) : text;
   const postingSample = posting ? sampleOf(posting) : undefined;
@@ -221,9 +205,8 @@ export function localizePolicy(
           inResume.includes(pack) ||
           (postingSample !== undefined && isWrittenIn(postingSample, pack)),
       );
-  // Each pack the resume has words of adds its vocabulary; the language its bullets are written
-  // in decides its rules and its country's date order. English bullets under a French summary,
-  // or beside "Banque Nationale du Canada", stay English; German bullets under "Skills" do not.
+  // Every pack the resume has words of adds its vocabulary; the language of its bullets decides
+  // rules and region (English bullets under a French summary stay English).
   const bullets = sampleOf(
     resumeText
       .slice(0, DETECTION_SAMPLE)
@@ -235,8 +218,7 @@ export function localizePolicy(
     ? languages
     : inResume.filter((pack) => outweighs(bullets, pack, policy.text));
 
-  // A language only the posting is written in says where the job is, not how the resume writes
-  // its dates: a US resume applying to a German posting keeps month-first dates.
+  // A posting-only language says where the job is, not how the resume writes its dates.
   const country = asked ? undefined : phoneCountry(resumeText.slice(0, DETECTION_SAMPLE));
   const region =
     asked ??
@@ -256,9 +238,8 @@ export function localizePolicy(
   if (!localized) {
     localized = languages.reduce(applyVocabulary, policy);
     if (region) localized = applyRegion(localized, region);
-    // With no region known, a national number is still recovered if any attached region reads
-    // it. The region is not inferred from that: the "min" metadata takes nearly any 10-digit run
-    // as a valid German or Indian number, US ones included, so validity cannot name a country.
+    // No region known: any attached region may still read a national number, but validity cannot
+    // name a country (the "min" metadata accepts nearly any 10-digit run).
     else if (regions.length)
       localized = {
         ...localized,
@@ -272,7 +253,7 @@ export function localizePolicy(
       };
     if (dateOrder)
       localized = { ...localized, resumeParse: { ...localized.resumeParse, dateOrder } };
-    // Shared by every resume read this way, so frozen as the policy it came from is.
+    // Shared across resumes, so frozen.
     cached.set(key, deepFreeze(localized));
   }
   const resumeLanguages = orBase(leading.map((pack) => pack.id));
