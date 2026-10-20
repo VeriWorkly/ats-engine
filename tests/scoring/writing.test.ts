@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  AtsScoringService,
-  DEFAULT_POLICY,
-  policyRubric,
-  type AtsReport,
-} from "../../src/index.js";
+import { DEFAULT_POLICY, policyRubric, type AtsReport, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import type { AtsEnginePolicy } from "../../src/policy/schema.js";
 import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
@@ -19,7 +14,7 @@ import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
 const NOW = new Date("2026-10-01T00:00:00Z");
 const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 const check = (text: string, policy: AtsEnginePolicy = DEFAULT_POLICY, jobDescription?: string) =>
-  AtsScoringService.check(text, policy, { now: NOW, jobDescription });
+  score(text, policy, { now: NOW, jobDescription });
 const rule = (report: AtsReport, id: string) =>
   report.rules.find((r) => r.id === `ats-v2.writing.${id}`);
 const writingRules = (report: AtsReport) => report.rules.filter((r) => r.category === "writing");

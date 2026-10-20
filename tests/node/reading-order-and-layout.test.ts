@@ -691,7 +691,7 @@ describe("the hidden-text sample reads as words", () => {
     const { layout } = await pdf(
       `${at(50, 700, "Jane Doe")}\n1 1 1 rg BT /F1 10 Tf 50 600 Td ${glyphs} ET`,
     );
-    expect(layout?.hiddenTextSample).toBe("Kubernetes Terraform");
+    expect(layout?.hiddenText).toBe("Kubernetes Terraform");
   });
 });
 
@@ -819,12 +819,11 @@ describe("letter-spaced text keeps its word breaks", () => {
 });
 
 describe("hiddenText carries all of the hidden text", () => {
-  it("holds what the 80-character sample cuts off, from a PDF and a DOCX", async () => {
+  it("holds more than 80 characters, from a PDF and a DOCX", async () => {
     const words =
       "Kubernetes Terraform Golang Rust Snowflake Databricks Kafka Spark Airflow dbt Flink Pulsar";
     const fromPdf = (await pdf(`${at(50, 700, "Jane Doe")}\n1 1 1 rg ${at(20, 600, words, 8)}`))
       .layout;
-    expect(fromPdf?.hiddenTextSample).toHaveLength(80);
     expect(fromPdf?.hiddenText).toBe(words);
     const docx = buildDocxBody(p("Jane Doe") + p(words, "<w:vanish/>"));
     const fromDocx = (await extractResume(docx, "docx")).layout;

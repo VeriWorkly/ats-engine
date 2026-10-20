@@ -59,7 +59,7 @@ describe("resume parsing — what an ATS recovers", () => {
       end: { year: 2020, month: 12 },
     });
 
-    expect(parsed.highestDegree).toBe("bachelor");
+    expect(parsed.highestIsced).toBe(6);
     // The institution is the searchable field; the date range must not ride along on it.
     expect(parsed.education[0].school).toBe("University of California");
   });
@@ -203,7 +203,7 @@ describe("resume parsing — what an ATS recovers", () => {
       ].join("\n"),
     );
 
-    expect(parsed.highestDegree).toBe("doctorate");
+    expect(parsed.highestIsced).toBe(8);
   });
 });
 

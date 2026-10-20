@@ -1,13 +1,6 @@
 import * as z from "zod/mini";
 
-import {
-  cefrLevels,
-  credentialWords,
-  iscedDegrees,
-  regexString,
-  wordList,
-  type IscedDegrees,
-} from "../primitives.js";
+import { cefrLevels, credentialWords, iscedDegrees, regexString, wordList } from "../primitives.js";
 
 /**
  * Vocabulary the resume parser needs. Data, so it lives in the policy alongside the rules rather
@@ -408,32 +401,11 @@ export const resumeParseSchema = z.object({
    * One pattern per ISCED 2011 level (see `AtsIscedLevel`), naming the credentials at it. Levels
    * are tried highest first, so a line naming two credentials is recorded at the higher one —
    * which is why a level's pattern must not also match a credential of a lower one ("high school
-   * diploma" is level 3, not the diploma of level 4). A policy written before ISCED, keyed
-   * diploma/associate/bachelor/master/doctorate, is still read: as levels 4, 5, 6, 7 and 8.
+   * diploma" is level 3, not the diploma of level 4).
    */
-  degrees: z
-    .union([
-      z.pipe(
-        z.object({
-          diploma: regexString("degrees.diploma"),
-          associate: regexString("degrees.associate"),
-          bachelor: regexString("degrees.bachelor"),
-          master: regexString("degrees.master"),
-          doctorate: regexString("degrees.doctorate"),
-        }),
-        z.transform((legacy): IscedDegrees => ({
-          "4": legacy.diploma,
-          "5": legacy.associate,
-          "6": legacy.bachelor,
-          "7": legacy.master,
-          "8": legacy.doctorate,
-        })),
-      ),
-      iscedDegrees,
-    ])
-    .check(
-      z.refine((degrees) => Object.values(degrees).some(Boolean), {
-        message: "degrees must name at least one level",
-      }),
-    ),
+  degrees: iscedDegrees.check(
+    z.refine((degrees) => Object.values(degrees).some(Boolean), {
+      message: "degrees must name at least one level",
+    }),
+  ),
 });

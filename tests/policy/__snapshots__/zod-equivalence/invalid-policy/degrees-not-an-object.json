@@ -5,29 +5,14 @@
     "issues": [
       {
         "path": "resumeParse.degrees",
-        "message": "Invalid input"
+        "message": "Invalid input: expected object, received string"
       }
     ]
   },
   "raw": [
     {
-      "code": "invalid_union",
-      "errors": [
-        [
-          {
-            "expected": "object",
-            "code": "invalid_type",
-            "path": []
-          }
-        ],
-        [
-          {
-            "expected": "object",
-            "code": "invalid_type",
-            "path": []
-          }
-        ]
-      ],
+      "expected": "object",
+      "code": "invalid_type",
       "path": [
         "resumeParse",
         "degrees"

@@ -245,25 +245,6 @@ describe("zod equivalence: parsed policies", () => {
     await snap("partial-policy", partial);
   });
 
-  it("reads legacy degree names as ISCED levels", async () => {
-    await snap(
-      "legacy-degrees",
-      parseAtsPolicy({
-        ...MINIMAL_POLICY,
-        resumeParse: {
-          ...MINIMAL_POLICY.resumeParse,
-          degrees: {
-            diploma: "dip",
-            associate: "assoc",
-            bachelor: "bach",
-            master: "mast",
-            doctorate: "doc",
-          },
-        },
-      }).resumeParse.degrees,
-    );
-  });
-
   it("strips unknown keys", async () => {
     await snap(
       "unknown-keys",
@@ -419,7 +400,6 @@ const INVALID_POLICIES: Array<[string, unknown]> = [
   ["titleWords missing", withField("resumeParse", "titleWords", undefined)],
   ["degrees naming no level", withField("resumeParse", "degrees", {})],
   ["degrees malformed", withField("resumeParse", "degrees", { "6": "(" })],
-  ["degrees legacy incomplete", withField("resumeParse", "degrees", { bachelor: "b" })],
   ["degrees not an object", withField("resumeParse", "degrees", "bachelor")],
   ["text language not ISO", { ...POLICY, text: { language: "english" } }],
   ["text section null", { ...POLICY, text: null }],
@@ -556,7 +536,7 @@ describe("zod equivalence: locale packs", () => {
         softSkills: ["Esprit D'équipe"],
       }),
       region: regionPackSchema.parse(REGION_PACK),
-      attached: withLocales(MINIMAL_POLICY, {
+      attached: withLocales(MINIMAL_POLICY as never, {
         languages: [LANGUAGE_PACK as never],
         regions: [REGION_PACK as never],
       }).locales,

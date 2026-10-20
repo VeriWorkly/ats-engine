@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   DEFAULT_POLICY,
   parseResume,
   prepareResume,
   type AtsResumeInput,
+  check as score,
 } from "../../src/index.js";
 import { BUILT_IN_LOCALES, localizePolicy, withLocales } from "../../src/locales/index.js";
 import { findDateRange } from "../../src/parser/dates.js";
@@ -25,8 +25,7 @@ import { expectFast } from "../fixtures/timing.js";
 const NOW = new Date("2026-10-01T00:00:00Z");
 const rp = DEFAULT_POLICY.resumeParse;
 
-const check = (resume: AtsResumeInput) =>
-  AtsScoringService.check(resume, DEFAULT_POLICY, { now: NOW });
+const check = (resume: AtsResumeInput) => score(resume, DEFAULT_POLICY, { now: NOW });
 
 const parse = (text: string) =>
   parseResume(

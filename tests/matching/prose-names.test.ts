@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { main } from "../../src/cli/main.js";
-import { AtsScoringService, DEFAULT_POLICY, parseAtsPolicy } from "../../src/index.js";
+import { DEFAULT_POLICY, parseAtsPolicy, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 
 /**
@@ -22,7 +22,7 @@ const missing = (
   jobDescription: string,
   options: { jobCompany?: string; policy?: typeof POLICY } = {},
 ) =>
-  AtsScoringService.check(resume, options.policy ?? POLICY, {
+  check(resume, options.policy ?? POLICY, {
     jobDescription,
     jobCompany: options.jobCompany,
     now: NOW,

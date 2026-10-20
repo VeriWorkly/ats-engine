@@ -205,8 +205,6 @@ function listItems(line: string): string[] | null {
  * it; a two-letter skill ("Go") counts as a list item. `now` bounds the plausible years.
  */
 export function stuffedTerms(
-  // Read per line instead, so a term counts once per line; kept for the callers.
-  _text: string,
   lines: string[],
   policy: AtsEnginePolicy,
   now: Date,

@@ -23,8 +23,8 @@ const check = async (
   jobDescription?: string,
   layout?: AtsLayoutSignals,
 ) => {
-  const { AtsScoringService } = await import("../../src/index.js");
-  return AtsScoringService.check(resume, policy!, { jobDescription, layout });
+  const { check: score } = await import("../../src/index.js");
+  return score(resume, policy!, { jobDescription, layout });
 };
 
 const STRONG_RESUME = [
@@ -366,7 +366,7 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
     // Resolved first, then asserted synchronously: `check` is async here only because it imports
     // the engine, and a rejected promise would sail straight past `.not.toThrow()`.
     for (const resume of [null, undefined, 42, "", "   \n\n  ", {}, [], { a: { b: [] } }]) {
-      const report = await check(resume).then(
+      const report = await check(resume as AtsResumeInput).then(
         (value) => () => value,
         (error: unknown) => () => {
           throw error;

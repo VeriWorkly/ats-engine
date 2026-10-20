@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { extractResume } from "../../src/node/index.js";
 import { buildPdf, buildPdfPages } from "../fixtures/buildPdf.js";
 import { expectFastAsync } from "../fixtures/timing.js";
@@ -43,7 +43,7 @@ describe("hidden text", () => {
   ])("finds text %s", async (_, content) => {
     const layout = await hidden(content, "/ExtGState<</GS1<</ca 0>>>>");
     expect(layout.hiddenTextChars).toBe(KEYWORDS.replace(/\s/g, "").length);
-    expect(layout.hiddenTextSample).toBe(KEYWORDS);
+    expect(layout.hiddenText).toBe(KEYWORDS);
   });
 
   it.each([
@@ -74,7 +74,7 @@ describe("hidden text", () => {
       buildPdf(`${visible}\n1 1 1 rg ${line(700, `${KEYWORDS} ${KEYWORDS}`)}`),
       "pdf",
     );
-    const report = AtsScoringService.check(text, DEFAULT_POLICY, { layout });
+    const report = check(text, DEFAULT_POLICY, { layout });
     const rule = report.rules.find((r) => r.id === "ats-v2.integrity.hiddenText");
     expect(rule).toMatchObject({ passed: false, severity: "error", scoreImpact: 30 });
     expect(rule?.evidence).toContain("Kubernetes Terraform");
@@ -93,7 +93,7 @@ describe("metadata", () => {
     );
     expect(text).not.toContain("Ignore");
     expect(layout?.metadataText).toContain("Jane Doe Resume");
-    const report = AtsScoringService.check(text, DEFAULT_POLICY, { layout });
+    const report = check(text, DEFAULT_POLICY, { layout });
     expect(report.rules.find((r) => r.id === "ats-v2.integrity.promptInjection")?.passed).toBe(
       false,
     );

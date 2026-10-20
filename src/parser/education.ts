@@ -1,18 +1,9 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { wordListRegex } from "../text/text.js";
 import { policyRegex } from "../policy/regex.js";
-import type { AtsDegreeLevel, AtsIscedLevel, AtsParsedDate, AtsParsedEducation } from "../types.js";
+import type { AtsIscedLevel, AtsParsedDate, AtsParsedEducation } from "../types.js";
 import { findDateRange, isPlausibleDate } from "./dates.js";
 import { memo } from "../util/memo.js";
-
-/** The pre-ISCED label each level is still reported under. */
-export function degreeLabel(isced: AtsIscedLevel): AtsDegreeLevel {
-  if (isced >= 8) return "doctorate";
-  if (isced === 7) return "master";
-  if (isced === 6) return "bachelor";
-  if (isced === 5) return "associate";
-  return "diploma";
-}
 
 type EducationMatchers = {
   schools: RegExp;
@@ -35,13 +26,13 @@ const matchersFor = memo((rp: AtsEnginePolicy["resumeParse"]): EducationMatchers
     .sort((a, b) => b.isced - a.isced),
 }));
 
-type NamedLevel = { isced: AtsIscedLevel; level: AtsDegreeLevel; matched: string };
+type NamedLevel = { isced: AtsIscedLevel; matched: string };
 
 /** Every education level a piece of text names, highest first, with the words that named each. */
 export function degreeLevels(text: string, policy: AtsEnginePolicy): NamedLevel[] {
   return matchersFor(policy.resumeParse).levels.flatMap(({ isced, re }) => {
     const match = re.exec(text);
-    return match ? [{ isced, level: degreeLabel(isced), matched: match[0].trim() }] : [];
+    return match ? [{ isced, matched: match[0].trim() }] : [];
   });
 }
 
@@ -53,7 +44,7 @@ export function degreeLevel(text: string, policy: AtsEnginePolicy): NamedLevel |
 /** The level fields of an education row whose credential is already known to be one. */
 export function educationLevel(credential: string, policy: AtsEnginePolicy) {
   const degree = credential ? degreeLevel(credential, policy) : null;
-  return { isced: degree?.isced ?? null, level: degree?.level ?? null };
+  return { isced: degree?.isced ?? null };
 }
 
 export function parseEducation(
@@ -86,7 +77,6 @@ export function parseEducation(
       school,
       credential: degree?.matched ?? "",
       isced: degree?.isced ?? null,
-      level: degree?.level ?? null,
       end: range ? range.range.end : loneYear(line, now),
     };
 
@@ -105,7 +95,6 @@ export function parseEducation(
       other.school ||= entry.school;
       other.credential ||= entry.credential;
       other.isced ??= entry.isced;
-      other.level ??= entry.level;
       other.end ??= entry.end;
       open = null;
       return;

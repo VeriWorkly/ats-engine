@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsLayoutSignals } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsLayoutSignals, check } from "../../src/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 const NOW = new Date("2024-06-01");
@@ -35,11 +35,10 @@ describe("hidden text and the job match", () => {
   const job = "We need Kubernetes, Terraform and Kafka experience.";
 
   it("leaves hidden lines past the first 80 characters out of the match", () => {
-    const report = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+    const report = check(RESUME, DEFAULT_POLICY, {
       jobDescription: job,
       now: NOW,
       layout: layout({
-        hiddenTextSample: `${filler} ${stuffed}`.slice(0, 80),
         hiddenText: `${filler} ${stuffed}`,
       }),
     });
@@ -53,10 +52,10 @@ describe("hidden text and the job match", () => {
   // line, longest first: the visible "Kubernetes" skill was set aside with the block it repeats.
   it("keeps a visible line whose text the hidden text also holds", () => {
     const visible = RESUME.replace("TypeScript, Go, PostgreSQL", "Kubernetes");
-    const report = AtsScoringService.check(visible, DEFAULT_POLICY, {
+    const report = check(visible, DEFAULT_POLICY, {
       jobDescription: job,
       now: NOW,
-      layout: layout({ hiddenTextSample: stuffed, hiddenText: `${filler} ${stuffed}` }),
+      layout: layout({ hiddenText: `${filler} ${stuffed}` }),
     });
     expect(report.matchedKeywords).toContain("kubernetes");
     expect(report.matchedKeywords).not.toContain("kafka");
@@ -79,10 +78,10 @@ describe("hidden text and the job match", () => {
       "Skills",
       visibleLine,
     ].join("\n");
-    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+    const report = check(resume, DEFAULT_POLICY, {
       jobDescription: "Experience with Kafka / Spark / Kubernetes and Terraform",
       now: NOW,
-      layout: layout({ hiddenTextSample: hiddenText, hiddenText, hiddenTextChars: 200 }),
+      layout: layout({ hiddenText, hiddenTextChars: 200 }),
     });
     expect(report.matchedKeywords).not.toContain("kafka");
     for (const requirement of report.requirements)
@@ -118,10 +117,10 @@ describe("hidden text and the job match", () => {
       "Skills",
       visibleLine,
     ].join("\n");
-    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+    const report = check(resume, DEFAULT_POLICY, {
       jobDescription: "Experience with Python, Java, Docker, Kubernetes, Terraform and Airflow",
       now: NOW,
-      layout: layout({ hiddenTextSample: hiddenText, hiddenText, hiddenTextChars: 200 }),
+      layout: layout({ hiddenText, hiddenTextChars: 200 }),
     });
     for (const term of kept) expect(report.matchedKeywords).toContain(term);
     for (const term of dropped) expect(report.matchedKeywords).not.toContain(term);
@@ -142,10 +141,10 @@ describe("hidden text and the job match", () => {
       "Python",
     ].join("\n");
     const hiddenText = "Snowflake Airflow Kafka Spark";
-    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+    const report = check(resume, DEFAULT_POLICY, {
       jobDescription: "Experience with Python, Kafka, Spark, Snowflake and Airflow",
       now: NOW,
-      layout: layout({ hiddenTextSample: hiddenText, hiddenText, hiddenTextChars: 200 }),
+      layout: layout({ hiddenText, hiddenTextChars: 200 }),
     });
     expect(report.matchedKeywords).toContain("python");
     for (const term of ["kafka", "spark", "snowflake", "airflow"])
@@ -159,11 +158,10 @@ describe("hidden text and the job match", () => {
       .map(([text]) => text)
       .join(" ");
     const resume = ["Jane Doe", "jane.doe@example.com", ...lines.map(([text]) => text)].join("\n");
-    return AtsScoringService.check(resume, DEFAULT_POLICY, {
+    return check(resume, DEFAULT_POLICY, {
       jobDescription,
       now: NOW,
       layout: layout({
-        hiddenTextSample: hiddenText.slice(0, 80),
         hiddenText,
         hiddenTextChars: 200,
       }),
@@ -245,11 +243,10 @@ describe("hidden text and the job match", () => {
   const gluedJob = "Experience with Python, Terraform, Kafka and Kubernetes";
 
   it("cuts hidden text inside a visible line when the hidden runs are among the lines", () => {
-    const report = AtsScoringService.check(glued, DEFAULT_POLICY, {
+    const report = check(glued, DEFAULT_POLICY, {
       jobDescription: gluedJob,
       now: NOW,
       layout: layout({
-        hiddenTextSample: "Kafka Kubernetes",
         hiddenText: "Kafka Kubernetes",
         hiddenTextChars: 200,
         hiddenTextRead: "Kafka Kubernetes",
@@ -282,11 +279,10 @@ describe("hidden text and the job match", () => {
     ],
   ])("cuts no visible copy when the hidden one is %s", (_, body, hiddenText, term) => {
     const resume = ["Jane Doe", "jane.doe@example.com", "Experience", ...body].join("\n");
-    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+    const report = check(resume, DEFAULT_POLICY, {
       jobDescription: "Experience with Kafka, Kubernetes and Machine Learning",
       now: NOW,
       layout: layout({
-        hiddenTextSample: hiddenText,
         hiddenText,
         hiddenTextChars: 200,
         hiddenTextRead: hiddenText,
@@ -314,11 +310,10 @@ describe("hidden text and the job match", () => {
     ].join("\n");
     const hiddenText =
       `Built Python Machine Learning Spark Jobs ${"Built Python Machine ".repeat(240)}`.trim();
-    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+    const report = check(resume, DEFAULT_POLICY, {
       jobDescription: "Experience with Python, Spark and Machine Learning",
       now: NOW,
       layout: layout({
-        hiddenTextSample: hiddenText.slice(0, 80),
         hiddenText: hiddenText.slice(0, 5_000),
         hiddenTextChars: 6_000,
       }),
@@ -330,11 +325,10 @@ describe("hidden text and the job match", () => {
   // the text: no ATS reads it, so the visible line that repeats it stays whole.
   it("sets aside nothing for hidden text the lines do not hold", () => {
     const resume = ["Jane Doe", "jane.doe@example.com", "Skills", "Kafka Kubernetes"].join("\n");
-    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+    const report = check(resume, DEFAULT_POLICY, {
       jobDescription: "Experience with Kafka and Kubernetes",
       now: NOW,
       layout: layout({
-        hiddenTextSample: "Kafka Kubernetes",
         hiddenText: "Kafka Kubernetes",
         hiddenTextChars: 200,
         hiddenTextRead: "",
@@ -346,11 +340,10 @@ describe("hidden text and the job match", () => {
   // A layout from an older extractor, or a host that passes only `hiddenText`, does not say which
   // hidden text the lines hold: nothing is cut from a visible line, as before.
   it("cuts nothing from a visible line when the layout does not say what the lines hold", () => {
-    const report = AtsScoringService.check(glued, DEFAULT_POLICY, {
+    const report = check(glued, DEFAULT_POLICY, {
       jobDescription: gluedJob,
       now: NOW,
       layout: layout({
-        hiddenTextSample: "Kafka Kubernetes",
         hiddenText: "Kafka Kubernetes",
         hiddenTextChars: 200,
       }),
@@ -371,10 +364,10 @@ describe("hidden text and the job match", () => {
       "Airflow Kafka",
     ].join("\n");
     const hiddenText = "Snowflake Airflow Kafka Spark";
-    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+    const report = check(resume, DEFAULT_POLICY, {
       jobDescription: "Experience with Kafka, Spark, Snowflake and Airflow",
       now: NOW,
-      layout: layout({ hiddenTextSample: hiddenText, hiddenText, hiddenTextChars: 200 }),
+      layout: layout({ hiddenText, hiddenTextChars: 200 }),
     });
     expect(report.matchedKeywords).toEqual(expect.arrayContaining(["airflow", "kafka"]));
     expect(report.matchedKeywords).not.toContain("snowflake");
@@ -387,10 +380,10 @@ describe("hidden text and the job match", () => {
     const resume = ["Jane Doe", "jane.doe@example.com", "Skills", "Go", "Languages: PythonGo"].join(
       "\n",
     );
-    const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+    const report = check(resume, DEFAULT_POLICY, {
       jobDescription: "Experience with Go, Python and SQL",
       now: NOW,
-      layout: layout({ hiddenTextSample: "Go", hiddenText: "Go", hiddenTextChars: 2 }),
+      layout: layout({ hiddenText: "Go", hiddenTextChars: 2 }),
     });
     expect(report.matchedKeywords).toContain("go");
   });
@@ -400,11 +393,10 @@ describe("hidden text and the job match", () => {
     const resume = `Jane Doe\njane@example.com\n${Array.from({ length: 15_000 }, () => "Go").join("\n")}`;
     expectFast(
       () =>
-        AtsScoringService.check(resume, DEFAULT_POLICY, {
+        check(resume, DEFAULT_POLICY, {
           jobDescription: job,
           now: NOW,
           layout: layout({
-            hiddenTextSample: hiddenText.slice(0, 80),
             hiddenText,
             hiddenTextChars: 3_200,
           }),
@@ -419,11 +411,10 @@ describe("hidden text and the job match", () => {
     const hiddenText = words.slice(0, 1_250).join(" ");
     expectFast(
       () =>
-        AtsScoringService.check(resume, DEFAULT_POLICY, {
+        check(resume, DEFAULT_POLICY, {
           jobDescription: job,
           now: NOW,
           layout: layout({
-            hiddenTextSample: hiddenText.slice(0, 80),
             hiddenText,
             hiddenTextChars: 4_000,
           }),
@@ -438,11 +429,10 @@ describe("hidden text and the job match", () => {
     const hiddenText = words.slice(0, 600).join(" ");
     expectFast(
       () =>
-        AtsScoringService.check(resume, DEFAULT_POLICY, {
+        check(resume, DEFAULT_POLICY, {
           jobDescription: job,
           now: NOW,
           layout: layout({
-            hiddenTextSample: hiddenText.slice(0, 80),
             hiddenText,
             hiddenTextChars: 5_000,
           }),
@@ -452,7 +442,7 @@ describe("hidden text and the job match", () => {
   });
 
   it("still reads the same words when they are visible", () => {
-    const report = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+    const report = check(RESUME, DEFAULT_POLICY, {
       jobDescription: job,
       now: NOW,
       layout: layout({ hiddenTextChars: 0, hiddenText: "" }),
@@ -533,12 +523,11 @@ describe("hidden text across generated resumes", () => {
         "Skills",
         ...visible,
       ].join("\n");
-      const report = AtsScoringService.check(resume, DEFAULT_POLICY, {
+      const report = check(resume, DEFAULT_POLICY, {
         jobDescription: posting,
         now: NOW,
         layout: layout({
           hiddenText,
-          hiddenTextSample: hiddenText.slice(0, 80),
           hiddenTextChars: 200,
           hiddenTextRead: shape === "outside" ? "" : hiddenText,
         }),

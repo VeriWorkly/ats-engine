@@ -12,7 +12,7 @@ import { resolveAiConfig } from "../../src/cli/ai.js";
 import { main, type CliContext } from "../../src/cli/main.js";
 import { detectTerminal, PLAIN, printable } from "../../src/cli/terminal.js";
 import { formatParsedDate, formatTenure } from "../../src/format/index.js";
-import { AtsScoringService, DEFAULT_POLICY, type AtsParsedResume } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsParsedResume, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { isGrounded, normalizeForGrounding } from "../../src/repair/grounding.js";
 import { mergeGrounded, type AtsRepairCandidate } from "../../src/repair/merge.js";
@@ -50,7 +50,7 @@ describe("grounding: a value never spans a list separator", () => {
 });
 
 describe("repair: dates and current", () => {
-  const empty: AtsParsedResume = AtsScoringService.check("", DEFAULT_POLICY, { now: NOW }).parsed;
+  const empty: AtsParsedResume = check("", DEFAULT_POLICY, { now: NOW }).parsed;
   const role = (overrides: Partial<AtsRepairCandidate["roles"][number]>) => ({
     title: "Analyst",
     employer: "Globex Ltd",
@@ -211,7 +211,7 @@ describe("redaction variants", () => {
 
   it("redacts the candidate's own email whole when it holds the name's letters", () => {
     const source = "José García\njosé.garcía@correo.es | +34 612 345 678";
-    const { parsed: read } = AtsScoringService.check(source, DEFAULT_POLICY);
+    const { parsed: read } = check(source, DEFAULT_POLICY);
     expect(read.email).toBe("josé.garcía@correo.es");
     expect(createRedaction(read, source).apply(source)).not.toContain("correo");
   });
@@ -313,7 +313,7 @@ describe("redaction variants", () => {
   it("does not send a local phone the parser read none of", () => {
     const source =
       "Jane Doe\njane@example.com | 07912 345678\nExperience\nEngineer, Acme, 2019 - 2023";
-    const { parsed: read } = AtsScoringService.check(source, DEFAULT_POLICY);
+    const { parsed: read } = check(source, DEFAULT_POLICY);
     expect(read.phone).toBe("");
     const hidden = createRedaction(read, source).apply(source);
     expect(hidden).not.toContain("345678");
@@ -358,7 +358,7 @@ describe("analyze: keyword suggestions and the request", () => {
   const route = { analyze: { model: "m", maxTokens: 100 } };
 
   it("drops a sentence that smuggles in a number or a name the posting and resume lack", async () => {
-    const report = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+    const report = check(RESUME, DEFAULT_POLICY, {
       jobDescription: JOB,
       now: NOW,
     });
@@ -381,7 +381,7 @@ describe("analyze: keyword suggestions and the request", () => {
   });
 
   it("does not send the text as read twice", async () => {
-    const report = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+    const report = check(RESUME, DEFAULT_POLICY, {
       now: NOW,
       includeLines: true,
     });
@@ -407,9 +407,8 @@ describe("replies from reasoning models", () => {
       provider: { complete: async () => ({ text, finish: "stop" }) },
       routes: { analyze: { model: "m", maxTokens: 100 } },
     });
-    return (
-      await ai.analyze({ resumeText: "x", report: AtsScoringService.check("x", DEFAULT_POLICY) })
-    ).result.explanation;
+    return (await ai.analyze({ resumeText: "x", report: check("x", DEFAULT_POLICY) })).result
+      .explanation;
   };
 
   it.each([

@@ -1,11 +1,11 @@
 import type { AtsParsedField, AtsParsedResume, AtsProvenance } from "../types.js";
-import { degreeLabel, highestIsced } from "./education.js";
+import { highestIsced } from "./education.js";
 import { monthsOfExperience } from "./tenure.js";
 
 /** The recovered values themselves; everything else in `AtsParsedResume` is derived from them. */
 export type ParsedCore = Omit<
   AtsParsedResume,
-  "monthsOfExperience" | "highestIsced" | "highestDegree" | "provenance"
+  "monthsOfExperience" | "highestIsced" | "provenance"
 >;
 
 const PARSED_FIELDS: readonly AtsParsedField[] = [
@@ -60,15 +60,13 @@ export function finalizeParsed(
   const provenance = {} as Record<AtsParsedField, AtsProvenance>;
   for (const field of PARSED_FIELDS)
     provenance[field] = capped[field].length > 0 ? sourceOf(field) : "none";
-  const highest = highestIsced(core.education);
 
   return {
     ...capped,
     // Tenure counts every recovered role, not only the reported ones: capping the table at 20
     // rows is a display decision and must not shorten someone's career.
     monthsOfExperience: monthsOfExperience(core.roles, now),
-    highestIsced: highest,
-    highestDegree: highest === null ? null : degreeLabel(highest),
+    highestIsced: highestIsced(core.education),
     provenance,
   };
 }

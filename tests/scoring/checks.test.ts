@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsReport } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsReport, check as score } from "../../src/index.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
-const check = (text: string) => AtsScoringService.check(text, DEFAULT_POLICY, { now: NOW });
+const check = (text: string) => score(text, DEFAULT_POLICY, { now: NOW });
 const rule = (report: AtsReport, id: string) =>
   report.rules.find((r) => r.id === `ats-v2.content.${id}`);
 const HEAD = "Jane Doe\njane@example.com | +1 415 555 0142\nEXPERIENCE\n";

@@ -1,7 +1,7 @@
 import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { extractResume } from "../../src/node/extract.js";
 import { measureVisibility } from "../../src/node/hidden.js";
 import { countRuledTables, type Box } from "../../src/node/tables.js";
@@ -219,7 +219,7 @@ describe("a resume laid out in a bordered table", () => {
     const { text: extracted, layout } = await extractResume(buildPdf(page), "pdf");
     expect(layout?.tableCount).toBe(1);
 
-    const report = AtsScoringService.check(extracted, DEFAULT_POLICY, {
+    const report = check(extracted, DEFAULT_POLICY, {
       layout,
       now: new Date("2026-10-01T00:00:00Z"),
     });

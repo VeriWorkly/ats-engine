@@ -119,7 +119,6 @@ describe("resume extraction", () => {
       pageCount: 0,
       imageCount: 0,
       hiddenTextChars: 0,
-      hiddenTextSample: "",
       hiddenText: "",
       hiddenTextRead: "",
       trackedChanges: 0,

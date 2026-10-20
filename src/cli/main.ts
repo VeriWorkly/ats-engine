@@ -24,7 +24,7 @@ import {
   scoreTone,
 } from "../format/index.js";
 import {
-  AtsScoringService,
+  check,
   computeVerdict,
   DEFAULT_POLICY,
   parseAtsPolicy,
@@ -270,7 +270,7 @@ function parseCheckArgs(argv: string[]) {
   }
 }
 
-async function check(argv: string[], context: CliContext): Promise<number> {
+async function runCheck(argv: string[], context: CliContext): Promise<number> {
   const { values, positionals } = parseCheckArgs(argv);
   const { terminal } = context;
   const style = createStyle(values.json ? 1 : terminal.depth);
@@ -327,7 +327,7 @@ async function check(argv: string[], context: CliContext): Promise<number> {
       : undefined;
   const jobDescription = job?.text;
   const resume = prepareResume(input);
-  const report = AtsScoringService.check(resume, policy, {
+  const report = check(resume, policy, {
     jobDescription,
     jobCompany: job?.company,
     layout,
@@ -384,7 +384,7 @@ function printUsage(terminal: Terminal) {
 export async function main(argv: string[], context = defaultContext()): Promise<number> {
   const [command, ...rest] = argv;
   try {
-    if (command === "check") return await check(rest, context);
+    if (command === "check") return await runCheck(rest, context);
     if (command === "--version" || command === "-v") {
       console.log(ENGINE_VERSION);
       return 0;

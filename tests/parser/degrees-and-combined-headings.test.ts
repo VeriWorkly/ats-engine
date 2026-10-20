@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { degreeLevel } from "../../src/parser/education.js";
 import { findDateRange } from "../../src/parser/dates.js";
@@ -34,7 +34,7 @@ const rows = (text: string) =>
 
 const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 const check = (text: string, options: { region?: string; languages?: string[] } = {}) =>
-  AtsScoringService.check(text, LOCALIZED, { now: NOW, ...options });
+  score(text, LOCALIZED, { now: NOW, ...options });
 
 const HEAD = "Jane Doe\njane@example.com | 415-555-0142\n";
 const JOB = "Experience\nSenior Engineer, Acme Corp    Jan 2020 - Present\n- Built things\n";
@@ -64,7 +64,7 @@ describe("an undotted LLM is a language model unless a law school stands beside 
   });
 
   it("does not read a posting's LLM requirement as a Master's", () => {
-    const report = AtsScoringService.check(`${HEAD}\n${JOB}\n${EDU}`, DEFAULT_POLICY, {
+    const report = score(`${HEAD}\n${JOB}\n${EDU}`, DEFAULT_POLICY, {
       now: NOW,
       jobDescription:
         "Requirements\n- Hands-on experience with LLM, RAG and vector search\n- Experience deploying LLM in production",

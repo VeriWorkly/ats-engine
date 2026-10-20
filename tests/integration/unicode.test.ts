@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   parseAtsPolicy,
   parseResume,
   prepareResume,
   type AtsEnginePolicy,
+  check,
 } from "../../src/index.js";
 import { normalizeText, wordListRegex, words } from "../../src/text/text.js";
 import { properNounTokens } from "../../src/matching/vocabulary.js";
@@ -78,7 +78,7 @@ describe("word counting", () => {
   });
 
   it("gives a Hindi resume a word count", () => {
-    const report = AtsScoringService.check(
+    const report = check(
       "राहुल शर्मा\nसॉफ्टवेयर इंजीनियर के रूप में पाँच वर्षों का अनुभव।",
       DEFAULT_POLICY,
       { now: NOW },
@@ -156,7 +156,7 @@ describe("alternatives", () => {
     const policy = withPolicy((json) => {
       json.keywordMatch.alternationWords = ["or", "oder"];
     });
-    const report = AtsScoringService.check("Jane Doe\nPython developer.", policy, {
+    const report = check("Jane Doe\nPython developer.", policy, {
       jobDescription: "Requirements\nErfahrung mit Go oder Java",
       now: NOW,
     });
@@ -196,7 +196,7 @@ describe("policy patterns", () => {
     const policy = withPolicy((json) => {
       json.keywordMatch.stemming = [];
     });
-    const report = AtsScoringService.check("Jane Doe\nManaging payments.", policy, {
+    const report = check("Jane Doe\nManaging payments.", policy, {
       jobDescription: "Requirements\nmanaged payments",
       now: NOW,
     });

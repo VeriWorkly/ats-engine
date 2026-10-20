@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseAtsPolicy } from "../../src/index.js";
+import { DEFAULT_POLICY, parseAtsPolicy, check as score } from "../../src/index.js";
 import { buildVocabulary, canonicalize } from "../../src/matching/vocabulary.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -12,7 +12,7 @@ import { expectFast } from "../fixtures/timing.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const check = (resume: string, jobDescription: string, policy = DEFAULT_POLICY) =>
-  AtsScoringService.check(resume, policy, { jobDescription, now: NOW });
+  score(resume, policy, { jobDescription, now: NOW });
 
 const resume = (...bullets: string[]) =>
   [
@@ -159,7 +159,7 @@ describe("hard and soft skills in a posting", () => {
   });
 
   it("leaves both groups empty without a posting", () => {
-    const report = AtsScoringService.check(resume("Wrote reports"), DEFAULT_POLICY, { now: NOW });
+    const report = score(resume("Wrote reports"), DEFAULT_POLICY, { now: NOW });
     expect(report.missingKeywordGroups).toEqual({ hard: [], soft: [] });
     expect(report.matchedKeywordGroups).toEqual({ hard: [], soft: [] });
   });

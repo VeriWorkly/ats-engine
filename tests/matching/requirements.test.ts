@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsRequirement } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsRequirement, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -21,7 +21,7 @@ Languages
 English (native), Spanish (professional)`;
 
 const judge = (job: string, resume = RESUME, policy = DEFAULT_POLICY) =>
-  AtsScoringService.check(resume, policy, { jobDescription: job, now: NOW }).requirements;
+  check(resume, policy, { jobDescription: job, now: NOW }).requirements;
 const one = (line: string, resume?: string) =>
   judge(`Requirements\n- ${line}`, resume)[0] as AtsRequirement;
 
@@ -44,7 +44,7 @@ describe("requirements", () => {
   });
 
   it("is empty without a posting", () => {
-    expect(AtsScoringService.check(RESUME, DEFAULT_POLICY, { now: NOW }).requirements).toEqual([]);
+    expect(check(RESUME, DEFAULT_POLICY, { now: NOW }).requirements).toEqual([]);
   });
 });
 
@@ -81,11 +81,10 @@ describe("skills", () => {
 
   /** The report for a resume whose skills line is `skills`, against a posting asking `ask`. */
   const listing = (skills: string, ask: string) =>
-    AtsScoringService.check(
-      RESUME.replace("Go, Python, Kubernetes, Terraform, PostgreSQL", skills),
-      DEFAULT_POLICY,
-      { jobDescription: `Requirements\n- ${ask}`, now: NOW },
-    );
+    check(RESUME.replace("Go, Python, Kubernetes, Terraform, PostgreSQL", skills), DEFAULT_POLICY, {
+      jobDescription: `Requirements\n- ${ask}`,
+      now: NOW,
+    });
 
   it.each([
     ["HTML, CSS, JavaScript", "HTML/CSS"],

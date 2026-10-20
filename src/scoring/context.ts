@@ -152,7 +152,7 @@ export function readResume(
       },
       homoglyphWords: homoglyphWords(text),
       copiedPostingRatio: jobDescription?.trim() ? copiedPosting(text, jobDescription) : null,
-      stuffedTerms: stuffedTerms(text, lines, policy, now, parsed.name ?? "", fullCitations(cited)),
+      stuffedTerms: stuffedTerms(lines, policy, now, parsed.name ?? "", fullCitations(cited)),
       timelineIssues: timelineIssues(parsed.roles, parsed.monthsOfExperience, now),
       unsupportedSkills: unsupportedSkills(sections, parsed.skills),
       firstPersonLines: firstPersonLines(bullets, policy),

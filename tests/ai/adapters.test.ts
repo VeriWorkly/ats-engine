@@ -75,7 +75,9 @@ describe("openai-compatible request body", () => {
     });
     // json_object requests need no schema-honouring upstream, so routing is left alone.
     const plain = request({ extraBody, output: { name: "out", schema, mode: "json_object" } });
-    expect(chatCompletionBody(plain, true).provider).toEqual({ order: ["x"] });
+    expect((chatCompletionBody(plain, true) as { provider?: unknown }).provider).toEqual({
+      order: ["x"],
+    });
   });
 });
 

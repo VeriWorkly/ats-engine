@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, check, DEFAULT_POLICY, parseAtsPolicy } from "../../src/index.js";
+import { check, DEFAULT_POLICY, parseAtsPolicy } from "../../src/index.js";
 
 const RESUME = [
   "Jane Doe",
@@ -22,16 +22,12 @@ const now = new Date("2026-10-01T00:00:00Z");
 
 describe("check()", () => {
   it("scores with the default policy when none is given", () => {
-    expect(check(RESUME, undefined, { now })).toEqual(
-      AtsScoringService.check(RESUME, DEFAULT_POLICY, { now }),
-    );
+    expect(check(RESUME, undefined, { now })).toEqual(check(RESUME, DEFAULT_POLICY, { now }));
   });
 
-  it("gives the same report as AtsScoringService.check for a policy and options", () => {
+  it("gives the same report as check for a policy and options", () => {
     const policy = parseAtsPolicy({ ...DEFAULT_POLICY, version: "custom" });
     const options = { now, jobDescription: "Senior engineer with TypeScript and Kubernetes." };
-    expect(check(RESUME, policy, options)).toEqual(
-      AtsScoringService.check(RESUME, policy, options),
-    );
+    expect(check(RESUME, policy, options)).toEqual(check(RESUME, policy, options));
   });
 });

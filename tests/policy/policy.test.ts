@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   computeVerdict,
   parseAtsPolicy,
+  check,
+  type AtsResumeInput,
 } from "../../src/index.js";
 import * as ai from "../../src/ai/index.js";
 import * as document from "../../src/document/index.js";
@@ -63,7 +64,7 @@ const MINIMAL = {
     sections: { experience: "a", education: "b", skills: "c", projects: "d", other: "e" },
     titleWords: ["engineer"],
     schoolWords: ["university"],
-    degrees: { diploma: "a", associate: "b", bachelor: "c", master: "d", doctorate: "e" },
+    degrees: { "4": "a", "5": "b", "6": "c", "7": "d", "8": "e" },
   },
 };
 
@@ -282,7 +283,7 @@ describe("regex fields are validated at parse time, not at match time", () => {
         ...MINIMAL,
         resumeParse: {
           ...MINIMAL.resumeParse,
-          degrees: { ...MINIMAL.resumeParse.degrees, bachelor: "(bad" },
+          degrees: { ...MINIMAL.resumeParse.degrees, "6": "(bad" },
         },
       }),
     ).toThrow(AtsPolicyError);
@@ -357,33 +358,29 @@ describe("DEFAULT_POLICY", () => {
       "Go, TypeScript, PostgreSQL, Kubernetes, Terraform, Docker",
     ].join("\n");
 
-    const report = AtsScoringService.check(good, DEFAULT_POLICY);
+    const report = check(good, DEFAULT_POLICY);
     expect(report.parsed.roles).toHaveLength(2);
     expect(report.parsed.email).toBe("jane.doe@example.com");
-    expect(report.parsed.highestDegree).toBe("bachelor");
+    expect(report.parsed.highestIsced).toBe(6);
     expect(report.readinessScore).toBeGreaterThan(70);
 
-    const bad = AtsScoringService.check("hire me", DEFAULT_POLICY);
+    const bad = check("hire me", DEFAULT_POLICY);
     expect(bad.readinessScore).toBeLessThan(50);
     expect(computeVerdict(bad)).toBe("weak");
   });
 
   it("credits an implied capability, so the implication map is wired up", () => {
-    const report = AtsScoringService.check(
-      "jane@example.com\nSkills\nTerraform, PostgreSQL",
-      DEFAULT_POLICY,
-      { jobDescription: "Requirements\n- Infrastructure as code\n- Relational databases" },
-    );
+    const report = check("jane@example.com\nSkills\nTerraform, PostgreSQL", DEFAULT_POLICY, {
+      jobDescription: "Requirements\n- Infrastructure as code\n- Relational databases",
+    });
     expect(report.missingKeywords).not.toContain("infrastructure as code");
     expect(report.jobMatchScore).toBeGreaterThan(0);
   });
 
   it("treats an alternation as one requirement", () => {
-    const report = AtsScoringService.check(
-      "jane@example.com\nExperience\nShipped services in Go",
-      DEFAULT_POLICY,
-      { jobDescription: "Requirements\n- Go or Java" },
-    );
+    const report = check("jane@example.com\nExperience\nShipped services in Go", DEFAULT_POLICY, {
+      jobDescription: "Requirements\n- Go or Java",
+    });
     expect(report.missingKeywords).not.toContain("java");
   });
 
@@ -406,7 +403,7 @@ describe("the engine holds no state", () => {
   it("gives identical results for identical input", () => {
     const run = () =>
       JSON.stringify(
-        AtsScoringService.check(
+        check(
           "Jane Doe\njane@x.com\nExperience\nEngineer, Acme - Jan 2020 - Dec 2022",
           DEFAULT_POLICY,
           { jobDescription: "Requirements\nGo or Java" },
@@ -420,7 +417,7 @@ describe("the engine holds no state", () => {
     const resumeBefore = JSON.stringify(resume);
     const policyBefore = JSON.stringify(DEFAULT_POLICY);
 
-    AtsScoringService.check(resume, DEFAULT_POLICY);
+    check(resume, DEFAULT_POLICY);
 
     expect(JSON.stringify(resume)).toBe(resumeBefore);
     expect(JSON.stringify(DEFAULT_POLICY)).toBe(policyBefore);
@@ -428,7 +425,7 @@ describe("the engine holds no state", () => {
 
   it("survives degenerate input without throwing", () => {
     for (const resume of [null, undefined, 42, "", "   \n\n  ", {}, [], { a: { b: [] } }])
-      expect(() => AtsScoringService.check(resume, DEFAULT_POLICY)).not.toThrow();
+      expect(() => check(resume as AtsResumeInput, DEFAULT_POLICY)).not.toThrow();
   });
 
   /**
@@ -438,7 +435,7 @@ describe("the engine holds no state", () => {
   it("caps recursion depth rather than overflowing the stack", () => {
     let nested: unknown = "leaf";
     for (let depth = 0; depth < 50_000; depth += 1) nested = { value: nested };
-    expect(() => AtsScoringService.check(nested, DEFAULT_POLICY)).not.toThrow();
+    expect(() => check(nested as AtsResumeInput, DEFAULT_POLICY)).not.toThrow();
   });
 });
 

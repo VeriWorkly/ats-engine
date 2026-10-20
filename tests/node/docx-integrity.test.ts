@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { extractResume } from "../../src/node/index.js";
 import { buildDocxBody } from "../fixtures/buildDocx.js";
 
@@ -25,7 +25,7 @@ describe("hidden runs", () => {
     ["near-white on the page", p('<w:color w:val="F7F7F7"/>', KEYWORDS)],
   ])("finds text %s", async (_, body) => {
     const layout = await measure(body);
-    expect(layout).toMatchObject({ hiddenTextChars: 35, hiddenTextSample: KEYWORDS });
+    expect(layout).toMatchObject({ hiddenTextChars: 35, hiddenText: KEYWORDS });
   });
 
   it.each([
@@ -61,7 +61,7 @@ describe("hidden runs", () => {
       buildDocxBody(NAME + p('<w:color w:val="FFFFFF"/>', `${KEYWORDS} ${KEYWORDS}`), true),
       "docx",
     );
-    const rule = AtsScoringService.check(text, DEFAULT_POLICY, { layout }).rules.find(
+    const rule = check(text, DEFAULT_POLICY, { layout }).rules.find(
       (r) => r.id === "ats-v2.integrity.hiddenText",
     );
     expect(rule).toMatchObject({ passed: false, scoreImpact: 30 });

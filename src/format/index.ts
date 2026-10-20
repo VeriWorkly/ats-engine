@@ -9,7 +9,6 @@
 
 import type {
   AtsAdvice,
-  AtsDegreeLevel,
   AtsIscedLevel,
   AtsParsedCertification,
   AtsParsedDate,
@@ -145,20 +144,6 @@ export function roleSpanMonths(
       : from;
   return Math.max(0, to - from + 1);
 }
-
-/**
- * What each `AtsDegreeLevel` was called on a report.
- *
- * @deprecated Use `ISCED_LABELS`; removed in 1.0.
- */
-export const DEGREE_LABELS: Readonly<Record<AtsDegreeLevel, string>> =
-  /* @__PURE__ */ Object.freeze({
-    diploma: "Diploma",
-    associate: "Associate",
-    bachelor: "Bachelor's",
-    master: "Master's",
-    doctorate: "Doctorate",
-  });
 
 /**
  * What each ISCED 2011 level is called on a report. Short and international: "Bachelor's or

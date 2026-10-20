@@ -5,11 +5,11 @@ import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { categoryLabel } from "../../src/format/index.js";
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   parseAtsPolicy,
   prepareResume,
   type AtsResumeInput,
+  check as score,
 } from "../../src/index.js";
 import { jobTextFromHtml } from "../../src/job/index.js";
 import { BUILT_IN_LOCALES, localizePolicy, withLocales } from "../../src/locales/index.js";
@@ -31,7 +31,7 @@ const NOW = new Date("2026-09-30T00:00:00Z");
 const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 
 const check = (resume: AtsResumeInput, jobDescription?: string) =>
-  AtsScoringService.check(resume, DEFAULT_POLICY, { jobDescription, now: NOW });
+  score(resume, DEFAULT_POLICY, { jobDescription, now: NOW });
 
 const RESUME = `Jane Doe
 jane@example.com | +1 415 555 0134
@@ -307,8 +307,8 @@ describe("instructions to an AI, and honest bullets that look like one", () => {
 
 describe("month names are whole words", () => {
   const startOf = (line: string, options: { languages?: string[] } = {}) =>
-    AtsScoringService.check(`Jane Doe\nExperience\n${line}`, LOCALIZED, { now: NOW, ...options })
-      .parsed.roles[0]?.start;
+    score(`Jane Doe\nExperience\n${line}`, LOCALIZED, { now: NOW, ...options }).parsed.roles[0]
+      ?.start;
 
   it.each([
     ["Data Scientist, Novartis 2018 - 2021", { year: 2018, month: null }],
@@ -470,7 +470,7 @@ describe("ratio rules with a global flag", () => {
     const metrics = (flags: string) =>
       // A long bullet with its number at the end, then short ones with a number up front: a
       // global pattern would start the short ones past their end and miss them.
-      AtsScoringService.check(BULLETS, withFlags(flags), { now: NOW }).rules.find(
+      score(BULLETS, withFlags(flags), { now: NOW }).rules.find(
         (rule) => rule.id === "ats-v2.content.metrics",
       )?.evidence;
     expect(metrics("gi")).toBe(metrics("i"));
@@ -498,7 +498,7 @@ describe("keyword lists", () => {
         stopwords: [...DEFAULT_POLICY.keywordMatch.stopwords, "Dental"],
       },
     });
-    const report = AtsScoringService.check(`${RESUME}\n- Built event sourcing`, policy, {
+    const report = score(`${RESUME}\n- Built event sourcing`, policy, {
       now: NOW,
       jobDescription: "Requirements\n- Event Sourcing, dental",
     });
@@ -509,7 +509,7 @@ describe("keyword lists", () => {
 
 describe("region from the resume's phone, not the posting's", () => {
   it("does not take the recruiter's country", () => {
-    const report = AtsScoringService.check(RESUME.replace(/ \| \+1.*$/m, ""), LOCALIZED, {
+    const report = score(RESUME.replace(/ \| \+1.*$/m, ""), LOCALIZED, {
       now: NOW,
       jobDescription: "Requirements\n- Go\nContact: +49 30 12345678",
     });

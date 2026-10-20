@@ -143,8 +143,6 @@ export const iscedDegrees = z.object({
   "8": z.optional(regexString("degrees.8")),
 });
 
-export type IscedDegrees = z.output<typeof iscedDegrees>;
-
 /** The six CEFR levels, lowest first: the order a language requirement is judged in. */
 export const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 

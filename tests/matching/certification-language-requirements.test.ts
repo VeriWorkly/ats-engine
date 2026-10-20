@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   DEFAULT_POLICY,
   type AtsRequirement,
   type AtsResumeDocument,
+  check,
 } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
@@ -27,7 +27,7 @@ Skills
 Go, Python, AWS, Kubernetes`;
 
 const judge = (resume: string | AtsResumeDocument, ask: string, policy = DEFAULT_POLICY) =>
-  AtsScoringService.check(resume, policy, {
+  check(resume, policy, {
     jobDescription: `Requirements\n- ${ask}`,
     now: NOW,
   }).requirements[0] as AtsRequirement;
@@ -153,7 +153,7 @@ describe("a language asked for", () => {
     const resume = (level: string) =>
       `Anna Schmidt\nanna@example.de\nBerufserfahrung\nBeraterin bei Beispiel GmbH seit 04/2021\n• Leitung von Projekten\nSprachen\nDeutsch (Muttersprache), Englisch (${level})`;
     const ask = (level: string) =>
-      AtsScoringService.check(resume(level), policy, {
+      check(resume(level), policy, {
         jobDescription: "Ihr Profil\n- Verhandlungssichere Englischkenntnisse",
         now: NOW,
         languages: ["de"],

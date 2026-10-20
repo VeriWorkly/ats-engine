@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { applyVocabulary } from "../../src/locales/languages.js";
 import { cefrLevel } from "../../src/parser/languages.js";
@@ -169,8 +169,7 @@ describe("a languages line becomes rows", () => {
 
 describe("spoken languages in German and Hindi", () => {
   const read = (text: string, language: string) =>
-    AtsScoringService.check(`${HEAD}\n${text}`, LOCALES, { languages: [language], now: NOW }).parsed
-      .spokenLanguages;
+    check(`${HEAD}\n${text}`, LOCALES, { languages: [language], now: NOW }).parsed.spokenLanguages;
 
   it("reads German level words and an explicit CEFR level", () => {
     expect(

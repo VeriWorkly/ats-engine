@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   parseAtsPolicy,
   policyFingerprint,
   type AtsEnginePolicy,
+  check as score,
 } from "../../src/index.js";
 import { BUILT_IN_LOCALES, de, hi, localizePolicy, withLocales } from "../../src/locales/index.js";
 import { degreeLevel } from "../../src/parser/education.js";
@@ -15,8 +15,8 @@ import { expectFast } from "../fixtures/timing.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const P = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
-const check = (resume: string, options: Parameters<typeof AtsScoringService.check>[2] = {}) =>
-  AtsScoringService.check(resume, P, { now: NOW, ...options });
+const check = (resume: string, options: Parameters<typeof score>[2] = {}) =>
+  score(resume, P, { now: NOW, ...options });
 const localized = (languages: string[], region: string) =>
   localizePolicy(P, "x", { languages, region }).policy;
 const DE_POLICY = localized(["de"], "DE");
@@ -25,11 +25,11 @@ const HI_POLICY = localized(["hi"], "IN");
 const isced = (line: string, policy: AtsEnginePolicy = DEFAULT_POLICY) =>
   degreeLevel(line, policy)?.isced ?? null;
 const injection = (resume: string, policy = P) =>
-  AtsScoringService.check(resume, policy, { now: NOW }).rules.find(
+  score(resume, policy, { now: NOW }).rules.find(
     (rule) => rule.id === "ats-v2.integrity.promptInjection",
   );
 const requirement = (line: string, policy = DEFAULT_POLICY) =>
-  AtsScoringService.check(EN_RESUME, policy, {
+  score(EN_RESUME, policy, {
     jobDescription: `Requirements\n- ${line}`,
     now: NOW,
   }).requirements[0];
@@ -151,7 +151,7 @@ describe("bare MS and MA are a Master's only where they read as a degree", () =>
   });
 
   it("does not turn a posting's tools and units into a Master's requirement", () => {
-    const report = AtsScoringService.check(EN_RESUME, P, {
+    const report = score(EN_RESUME, P, {
       jobDescription:
         "Requirements\n- Strong knowledge of MS-SQL and MS-Excel\n- Experience with Master Data Management\n- API latency budgets under 100 ms\n",
       now: NOW,
@@ -232,7 +232,7 @@ describe("a rule's pattern is validated with its own flags", () => {
       ...DEFAULT_POLICY,
       rules: [{ ...rule, pattern: "experience", flags: "i" }],
     });
-    expect(AtsScoringService.check(resume, policy, { now: NOW }).rules[0]?.passed).toBe(true);
+    expect(score(resume, policy, { now: NOW }).rules[0]?.passed).toBe(true);
   });
 });
 
@@ -435,7 +435,7 @@ describe("French credentials, by name and by years after the baccalauréat", () 
 });
 
 describe("a French posting's requirements", () => {
-  const report = AtsScoringService.check(DE_RESUME, P, {
+  const report = score(DE_RESUME, P, {
     jobDescription: [
       "Profil recherché",
       "- 3 à 5 ans d'expérience en Java",
@@ -461,7 +461,7 @@ describe("a French posting's requirements", () => {
   // "ma" before an accented letter is a word's start, not a master's: the degree patterns ended
   // only before an ASCII letter, so "Maîtrise de React" asked for a master's degree.
   it("reads a skill a line asks a mastery of, not a degree", () => {
-    const { requirements, missingKeywords } = AtsScoringService.check(DE_RESUME, P, {
+    const { requirements, missingKeywords } = score(DE_RESUME, P, {
       jobDescription: [
         "Profil recherché",
         "- Maîtrise de React et Node.js",
@@ -478,7 +478,7 @@ describe("an inflected German adjective before a bare language name", () => {
   it.each(["Verhandlungssicheres Englisch in Wort und Schrift", "Fließendes Französisch"])(
     "reads %j as a language requirement",
     (line) => {
-      const found = AtsScoringService.check(DE_RESUME, P, {
+      const found = score(DE_RESUME, P, {
         jobDescription: `Ihr Profil\n- ${line}`,
         now: NOW,
         languages: ["de"],
@@ -508,14 +508,10 @@ describe("the Hindi language pattern is linear on a long Devanagari run", () => 
 describe("the fingerprint names the policy as applied", () => {
   it("is unchanged by packs that never apply", () => {
     const resume = "Jane Doe\njane@example.com\nExperience\nEngineer at Acme, 2019 - Present\n";
-    const plain = AtsScoringService.check(resume, DEFAULT_POLICY, { now: NOW });
-    const withPacks = AtsScoringService.check(
-      resume,
-      withLocales(DEFAULT_POLICY, { languages: [de, hi] }),
-      {
-        now: NOW,
-      },
-    );
+    const plain = score(resume, DEFAULT_POLICY, { now: NOW });
+    const withPacks = score(resume, withLocales(DEFAULT_POLICY, { languages: [de, hi] }), {
+      now: NOW,
+    });
     expect(withPacks.locale.languages).toEqual([]);
     expect(withPacks.engine.policy).toBe(plain.engine.policy);
   });

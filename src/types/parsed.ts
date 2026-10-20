@@ -6,13 +6,6 @@
  */
 export type AtsIscedLevel = 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-/**
- * The five labels the engine reported before ISCED. Derived from `isced` (2–4 → diploma).
- *
- * @deprecated Read `isced` (`AtsIscedLevel`) instead; removed in 1.0.
- */
-export type AtsDegreeLevel = "diploma" | "associate" | "bachelor" | "master" | "doctorate";
-
 /** A date as a resume states it: the month (1–12) is null when only the year is written. */
 export type AtsParsedDate = { year: number; month: number | null };
 
@@ -30,8 +23,6 @@ export type AtsParsedEducation = {
   school: string;
   credential: string;
   isced: AtsIscedLevel | null;
-  /** @deprecated Derived from `isced`; read that. */
-  level: AtsDegreeLevel | null;
   end: AtsParsedDate | null;
 };
 
@@ -110,7 +101,5 @@ export type AtsParsedResume = {
   /** Calendar months covered by at least one role, so overlapping jobs are not double counted. */
   monthsOfExperience: number | null;
   highestIsced: AtsIscedLevel | null;
-  /** @deprecated Derived from `highestIsced`; read that. */
-  highestDegree: AtsDegreeLevel | null;
   provenance: Record<AtsParsedField, AtsProvenance>;
 };

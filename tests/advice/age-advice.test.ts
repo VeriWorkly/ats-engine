@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsReport } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsReport, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -26,7 +26,7 @@ Skills
 TypeScript, Go, PostgreSQL`;
 
 const check = (text: string, region?: string): AtsReport =>
-  AtsScoringService.check(text, POLICY, { now: NOW, region });
+  score(text, POLICY, { now: NOW, region });
 const advice = (report: AtsReport, id: string) => report.advice.find((item) => item.id === id);
 
 describe("graduation year", () => {
@@ -48,7 +48,7 @@ describe("graduation year", () => {
   });
 
   it("is not given without a region", () => {
-    const report = AtsScoringService.check(resume({ graduated: 1990 }), DEFAULT_POLICY, {
+    const report = score(resume({ graduated: 1990 }), DEFAULT_POLICY, {
       now: NOW,
     });
     expect(report.locale.region).toBeNull();

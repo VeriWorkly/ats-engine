@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { jobTextFromHtml } from "../../src/job/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
@@ -157,7 +157,7 @@ describe("50 KB adversarial input", () => {
     for (const region of ["DE", "FR", "GB", "IN"])
       expectFast(
         () =>
-          AtsScoringService.check(resume, POLICY, {
+          check(resume, POLICY, {
             now: NOW,
             jobDescription,
             languages: ["de", "fr", "hi"],
@@ -175,7 +175,7 @@ describe("50 KB adversarial input", () => {
       const resume = `Jane Doe\njane@example.com\nCertifications\n${input}\nLanguages\n${input}\nSkills\nLanguages: ${input}\nCertifications: ${input}`;
       expectFast(
         () =>
-          AtsScoringService.check(resume, POLICY, {
+          check(resume, POLICY, {
             now: NOW,
             jobDescription: `Requirements\n- Fluent ${input}\n- ${input} certification`,
             languages: ["de", "fr", "hi"],
@@ -191,7 +191,7 @@ describe("50 KB adversarial input", () => {
     (_, input) => {
       expectFast(
         () =>
-          AtsScoringService.check("Jane Doe\njane@example.com", POLICY, {
+          check("Jane Doe\njane@example.com", POLICY, {
             now: NOW,
             jobDescription: `We ship from ${input}\n- Kafka\n- Go\n- SQL`,
             languages: [],

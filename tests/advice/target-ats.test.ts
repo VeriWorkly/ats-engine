@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   parseAtsPolicy,
   type AtsReport,
+  check as score,
 } from "../../src/index.js";
 
 /**
@@ -26,7 +26,7 @@ Skills
 TypeScript, Go, PostgreSQL`;
 
 const check = (targetAts?: string): AtsReport =>
-  AtsScoringService.check(RESUME, DEFAULT_POLICY, { now: NOW, targetAts });
+  score(RESUME, DEFAULT_POLICY, { now: NOW, targetAts });
 const notes = (report: AtsReport) => report.advice.filter((item) => item.kind === "ats");
 
 describe("target ATS notes", () => {

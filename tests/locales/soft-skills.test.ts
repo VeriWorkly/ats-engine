@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { applyVocabulary } from "../../src/locales/languages.js";
 import { languagePackSchema } from "../../src/locales/schema.js";
@@ -31,7 +31,7 @@ describe("soft skills from a language pack", () => {
       "- Ausgeprägte Teamfähigkeit und Kommunikationsstärke",
       "- Zuverlässigkeit und Belastbarkeit",
     ].join("\n");
-    const report = AtsScoringService.check(resume, POLICY, { jobDescription: posting, now: NOW });
+    const report = check(resume, POLICY, { jobDescription: posting, now: NOW });
     expect(report.locale.languages).toContain("de");
     const { hard, soft } = report.missingKeywordGroups;
     expect(hard).toContain("kubernetes");
@@ -47,7 +47,7 @@ describe("soft skills from a language pack", () => {
   });
 
   it("names a French posting's soft skills apart, and its missions' verbs not at all", () => {
-    const report = AtsScoringService.check(LOCALE_FIXTURES.fr[0].text, POLICY, {
+    const report = check(LOCALE_FIXTURES.fr[0].text, POLICY, {
       jobDescription: [
         "Vos missions",
         "- Concevoir les services de paiement",
@@ -81,7 +81,7 @@ describe("soft skills from a language pack", () => {
       "- नेतृत्व और टीमवर्क",
       "- समस्या समाधान की क्षमता",
     ].join("\n");
-    const report = AtsScoringService.check(resume, POLICY, { jobDescription: posting, now: NOW });
+    const report = check(resume, POLICY, { jobDescription: posting, now: NOW });
     expect(report.locale.languages).toContain("hi");
     const { hard, soft } = report.missingKeywordGroups;
     expect(hard).toContain("kubernetes");

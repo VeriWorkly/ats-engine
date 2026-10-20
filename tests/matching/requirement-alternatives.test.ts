@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsRequirement } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsRequirement, check } from "../../src/index.js";
 import { main } from "../../src/cli/main.js";
 import { BUILT_IN_LOCALES, localizePolicy, withLocales } from "../../src/locales/index.js";
 import { degreeLevel } from "../../src/parser/education.js";
@@ -37,7 +37,7 @@ const FOUR_YEARS = "Engineer, Acme Corp Jan 2022 - Present\n- Built payment serv
 const BACHELOR = "B.S. Computer Science, State University 2015";
 
 const one = (line: string, text: string, policy = DEFAULT_POLICY) =>
-  AtsScoringService.check(text, policy, { jobDescription: `Requirements\n- ${line}`, now: NOW })
+  check(text, policy, { jobDescription: `Requirements\n- ${line}`, now: NOW })
     .requirements[0] as AtsRequirement;
 
 /** Time one pattern on hostile inputs: long runs of spaces, digits, letters and separators. */
@@ -209,9 +209,9 @@ describe("an unknown region is an error, not silently ignored", () => {
       }
     })();
     for (const id of ["ES", "DE", "FR", "GB", "IN", "US"]) expect(message).toContain(id);
-    expect(() =>
-      AtsScoringService.check(resume({ roles: TEN_YEARS }), P, { region: "ES", now: NOW }),
-    ).toThrow(AtsPolicyError);
+    expect(() => check(resume({ roles: TEN_YEARS }), P, { region: "ES", now: NOW })).toThrow(
+      AtsPolicyError,
+    );
   });
 
   it("still accepts an attached region in any case", () => {

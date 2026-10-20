@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { format, resolveConfig } from "prettier";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsLayoutSignals } from "../src/index.js";
+import { check, DEFAULT_POLICY, type AtsLayoutSignals } from "../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../src/locales/index.js";
 import { fieldChecks, type FieldCheck } from "../tests/fixtures/accuracy.js";
 import { RENDERINGS, generateResumes, renderResume } from "../tests/fixtures/generatedResumes.js";
@@ -52,13 +52,13 @@ function record(set: string, corpus: string, id: string, checks: FieldCheck[]) {
 
 function checkTimed(text: string, layout?: AtsLayoutSignals) {
   const started = performance.now();
-  const report = AtsScoringService.check(text, policy, { now, layout });
+  const report = check(text, policy, { now, layout });
   timings.push(performance.now() - started);
   return report;
 }
 
 // The first call pays for compiling the policy's patterns; it is not what a server pays per resume.
-AtsScoringService.check("Jane Doe\nExperience\nEngineer, Acme 2020 - 2022", policy, { now });
+check("Jane Doe\nExperience\nEngineer, Acme 2020 - 2022", policy, { now });
 
 for (const [locale, fixtures] of Object.entries(LOCALE_FIXTURES))
   for (const fixture of fixtures)

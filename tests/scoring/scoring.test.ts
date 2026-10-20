@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_POLICY } from "../../src/index.js";
+import { check as score, DEFAULT_POLICY } from "../../src/index.js";
 import type { AtsEnginePolicy, AtsLayoutSignals, AtsResumeInput } from "../../src/index.js";
 
 const policy = {
@@ -151,11 +151,11 @@ const policy = {
     titleWords: ["engineer", "manager", "developer", "analyst", "designer"],
     schoolWords: ["university", "college", "institute"],
     degrees: {
-      diploma: "\\b(diploma|certificate)\\b",
-      associate: "(?:\\b|^)(associate(?:'?s)?|a\\.?a\\.?s?\\.?)(?![a-z])",
-      bachelor: "(?:\\b|^)(bachelor(?:'?s)?|b\\.?sc?\\.?|b\\.?a\\.?)(?![a-z])",
-      master: "(?:\\b|^)(master(?:'?s)?|m\\.?sc?\\.?|mba)(?![a-z])",
-      doctorate: "(?:\\b|^)(doctorate|ph\\.?d\\.?)(?![a-z])",
+      "4": "\\b(diploma|certificate)\\b",
+      "5": "(?:\\b|^)(associate(?:'?s)?|a\\.?a\\.?s?\\.?)(?![a-z])",
+      "6": "(?:\\b|^)(bachelor(?:'?s)?|b\\.?sc?\\.?|b\\.?a\\.?)(?![a-z])",
+      "7": "(?:\\b|^)(master(?:'?s)?|m\\.?sc?\\.?|mba)(?![a-z])",
+      "8": "(?:\\b|^)(doctorate|ph\\.?d\\.?)(?![a-z])",
     },
   },
 };
@@ -187,18 +187,10 @@ const fixture = {
   keywordMatch: { ...DEFAULT_POLICY.keywordMatch, ...policy.keywordMatch },
 } as unknown as AtsEnginePolicy;
 
-async function loadScoring() {
-  const { AtsScoringService: Engine } = await import("../../src/index.js");
-  const parsed = fixture;
-  return {
-    AtsScoringService: {
-      check: (resume: AtsResumeInput, jobDescription?: string, layout?: AtsLayoutSignals) =>
-        Engine.check(resume, parsed, { jobDescription, layout }),
-    },
-  };
-}
+const check = (resume: AtsResumeInput, jobDescription?: string, layout?: AtsLayoutSignals) =>
+  score(resume, fixture, { jobDescription, layout });
 
-function ruleFor(rules: { id: string }[], id: string) {
+function ruleFor<T extends { id: string }>(rules: T[], id: string): T {
   const rule = rules.find((r) => r.id === id);
   if (!rule) throw new Error(`Missing rule ${id} in report`);
   return rule;
@@ -206,15 +198,13 @@ function ruleFor(rules: { id: string }[], id: string) {
 
 describe("ATS deterministic scoring — policy-driven engine", () => {
   it("pulls rule content from the injected policy, not from hardcoded source", async () => {
-    const { AtsScoringService } = await loadScoring();
-    const report = AtsScoringService.check("Jane Doe jane@example.com Experience Skills");
+    const report = check("Jane Doe jane@example.com Experience Skills");
 
     expect(report.version).toBe("ats-v2");
     expect(report.rules.map((r) => r.id)).toEqual(policy.rules.map((r) => r.id));
   });
 
   it("grades word count and metric density instead of a flat pass/fail", async () => {
-    const { AtsScoringService } = await loadScoring();
     const resume = [
       "Jane Doe",
       "jane@example.com",
@@ -227,7 +217,7 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
       "JavaScript, machine learning, project management",
     ].join("\n");
 
-    const report = AtsScoringService.check(resume);
+    const report = check(resume);
 
     const length = ruleFor(report.rules, "test.content.length");
     expect(length.passed).toBe(true);
@@ -239,22 +229,20 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
   });
 
   it("flags contact info buried past the position window even though it exists", async () => {
-    const { AtsScoringService } = await loadScoring();
     const padding = "Relevant experience and accomplishments. ".repeat(40);
     const buried = `${padding}Reach me at jane@example.com for more.`;
 
-    const report = AtsScoringService.check(buried);
+    const report = check(buried);
     const position = ruleFor(report.rules, "test.contact.position");
     expect(position.passed).toBe(false);
 
     const nearTop = "jane@example.com\n" + padding;
-    const reportNearTop = AtsScoringService.check(nearTop);
+    const reportNearTop = check(nearTop);
     expect(ruleFor(reportNearTop.rules, "test.contact.position").passed).toBe(true);
   });
 
   it("penalizes generic filler phrases via the buzzword band", async () => {
-    const { AtsScoringService } = await loadScoring();
-    const report = AtsScoringService.check(
+    const report = check(
       "jane@example.com A hardworking team player who is also a team player and hardworking.",
     );
     const buzzwords = ruleFor(report.rules, "test.content.buzzwords");
@@ -263,7 +251,6 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
   });
 
   it("matches synonyms, abbreviations, and multi-word phrases across resume and job text", async () => {
-    const { AtsScoringService } = await loadScoring();
     const resume =
       "jane@example.com Built systems with JavaScript. Led project management for a cross-team initiative.";
     const jobDescription = [
@@ -274,7 +261,7 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
       "ML and public speaking.",
     ].join("\n");
 
-    const report = AtsScoringService.check(resume, jobDescription);
+    const report = check(resume, jobDescription);
 
     expect(report.jobMatchScore).not.toBeNull();
     expect(report.matchedKeywords).toContain("js");
@@ -285,7 +272,6 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
   });
 
   it("weights a required-section term above a nice-to-have term with the same resume", async () => {
-    const { AtsScoringService } = await loadScoring();
     const jobDescription = [
       "Requirements",
       "JS required.",
@@ -294,15 +280,9 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
       "ML is a plus.",
     ].join("\n");
 
-    const resumeWithNeither = AtsScoringService.check(
-      "jane@example.com Experience Skills",
-      jobDescription,
-    );
-    const resumeWithRequired = AtsScoringService.check(
-      "jane@example.com Built with JavaScript",
-      jobDescription,
-    );
-    const resumeWithPreferred = AtsScoringService.check(
+    const resumeWithNeither = check("jane@example.com Experience Skills", jobDescription);
+    const resumeWithRequired = check("jane@example.com Built with JavaScript", jobDescription);
+    const resumeWithPreferred = check(
       "jane@example.com Familiar with machine learning",
       jobDescription,
     );
@@ -314,8 +294,7 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
   });
 
   it("returns no job match score when no job description is given", async () => {
-    const { AtsScoringService } = await loadScoring();
-    const report = AtsScoringService.check("jane@example.com Experience Skills padding word count");
+    const report = check("jane@example.com Experience Skills padding word count");
 
     expect(report.jobMatchScore).toBeNull();
     expect(report.matchedKeywords).toEqual([]);
@@ -323,8 +302,7 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
   });
 
   it("still prioritizes missing parseable content the way the old engine did", async () => {
-    const { AtsScoringService } = await loadScoring();
-    const report = AtsScoringService.check("Short resume");
+    const report = check("Short resume");
 
     expect(report.readinessScore).toBeLessThan(60);
     expect(report.parsingWarnings).toHaveLength(1);
@@ -334,11 +312,10 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
 
 describe("ATS category rollup", () => {
   it("scores each category by the share of its own weight the resume kept", async () => {
-    const { AtsScoringService } = await loadScoring();
     // Contact carries two rules: email (weight 10) and position (weight 5). With no contact
     // details at all, email fails outright and position has nothing to locate, so it is dropped
     // rather than passed — the category keeps none of its 10 possible points.
-    const report = AtsScoringService.check("Experience Skills Education summary of work history");
+    const report = check("Experience Skills Education summary of work history");
 
     const contact = report.categories.find((entry) => entry.category === "contact");
     expect(contact).toMatchObject({ passed: 0, total: 1, lost: 10, possible: 10 });
@@ -349,8 +326,7 @@ describe("ATS category rollup", () => {
   });
 
   it("reports one entry per category, covering every rule exactly once", async () => {
-    const { AtsScoringService } = await loadScoring();
-    const report = AtsScoringService.check("jane@example.com Experience Skills Education");
+    const report = check("jane@example.com Experience Skills Education");
 
     expect(report.categories.map((entry) => entry.category).sort()).toEqual([
       "contact",
@@ -364,37 +340,34 @@ describe("ATS category rollup", () => {
   });
 
   it("accurately parses and matches tech tokens like .NET and CI/CD without dropping leading dots or slashes", async () => {
-    const { AtsScoringService } = await loadScoring();
     const resume =
       "jane@example.com Engineered microservices using .NET and set up CI/CD pipelines.";
     const jobDescription = ["Requirements", ".NET and CI/CD required."].join("\n");
 
-    const report = AtsScoringService.check(resume, jobDescription);
+    const report = check(resume, jobDescription);
     expect(report.matchedKeywords).toContain(".net");
     expect(report.matchedKeywords).toContain("continuous integration and deployment");
   });
 
   it("evaluates standard employment date formats", async () => {
-    const { AtsScoringService } = await loadScoring();
-    const resumeWithDates = AtsScoringService.check(
+    const resumeWithDates = check(
       "Jane Doe jane@example.com Experience Software Engineer 2021 - Present Built web apps Skills",
     );
     expect(ruleFor(resumeWithDates.rules, "test.structure.dates").passed).toBe(true);
 
-    const resumeWithoutDates = AtsScoringService.check(
+    const resumeWithoutDates = check(
       "Jane Doe jane@example.com Experience Software Engineer Built web apps Skills",
     );
     expect(ruleFor(resumeWithoutDates.rules, "test.structure.dates").passed).toBe(false);
   });
 
   it("caps recursion so a deeply nested resume object cannot overflow the stack", async () => {
-    const { AtsScoringService } = await loadScoring();
     let nested: unknown = "jane@example.com deeply buried contact detail";
     for (let depth = 0; depth < 50_000; depth += 1) nested = { value: nested };
 
-    expect(() => AtsScoringService.check(nested)).not.toThrow();
+    expect(() => check(nested as AtsResumeInput)).not.toThrow();
     // Past the depth cap the payload contributes nothing, so it scores as an empty resume
     // rather than crashing the worker.
-    expect(AtsScoringService.check(nested).wordCount).toBeLessThan(30);
+    expect(check(nested as AtsResumeInput).wordCount).toBeLessThan(30);
   });
 });

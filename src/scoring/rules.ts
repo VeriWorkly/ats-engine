@@ -293,7 +293,7 @@ export function evaluateRule(rule: AtsEngineRule, ctx: RuleContext): AtsRuleResu
     rule.kind === "bands" && isFinding(rule.metric)
       ? (ctx.findings[rule.metric]?.sample ?? "")
       : rule.kind === "layout" && rule.metric === "hiddenTextChars"
-        ? (ctx.layout?.hiddenTextSample ?? "")
+        ? (ctx.layout?.hiddenText?.slice(0, 80) ?? "")
         : "";
   return result(
     rule,

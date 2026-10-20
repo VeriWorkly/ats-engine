@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  AtsPolicyError,
-  AtsScoringService,
-  DEFAULT_POLICY,
-  type AtsReport,
-} from "../../src/index.js";
+import { AtsPolicyError, DEFAULT_POLICY, type AtsReport, check as score } from "../../src/index.js";
 import {
   BUILT_IN_LOCALES,
   atsLanguagePackJsonSchema,
@@ -18,8 +13,8 @@ import { LOCALE_FIXTURES, type LocaleFixture } from "../fixtures/locale-resumes.
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
-const check = (text: string, options: Parameters<typeof AtsScoringService.check>[2] = {}) =>
-  AtsScoringService.check(text, POLICY, { now: NOW, ...options });
+const check = (text: string, options: Parameters<typeof score>[2] = {}) =>
+  score(text, POLICY, { now: NOW, ...options });
 
 const fieldAccuracy = (report: AtsReport, fixture: LocaleFixture) => {
   const checks = fieldChecks(report, fixture);
@@ -349,13 +344,9 @@ describe("packs", () => {
   });
 
   it("leave a policy without packs exactly as fast and as it was", () => {
-    const report = AtsScoringService.check(
-      "Jane Doe\nExperience\nEngineer, Acme 2020 - 2022",
-      DEFAULT_POLICY,
-      {
-        now: NOW,
-      },
-    );
+    const report = score("Jane Doe\nExperience\nEngineer, Acme 2020 - 2022", DEFAULT_POLICY, {
+      now: NOW,
+    });
     expect(report.locale).toEqual({ languages: [], region: null });
   });
 });

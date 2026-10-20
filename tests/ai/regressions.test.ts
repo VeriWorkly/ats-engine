@@ -6,7 +6,7 @@ import { createRedaction } from "../../src/ai/redact.js";
 import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
 import { mergeGrounded, needsRepair } from "../../src/repair/merge.js";
-import { AtsScoringService } from "../../src/scoring/engine.js";
+import { check } from "../../src/scoring/engine.js";
 
 /** Bugs found in review of the AI layer. Each test failed before its fix. */
 
@@ -39,7 +39,7 @@ describe("AI layer regressions", () => {
   it("does not sell a repair that the merge cannot apply", () => {
     // Roles found, but missing employers and dates. The merge never edits rows the parser
     // found, so a paid repair here would change nothing.
-    const parsed = AtsScoringService.check(
+    const parsed = check(
       ["Experience", "Senior Engineer", "Staff Engineer", "Principal Engineer"].join("\n"),
       DEFAULT_POLICY,
     ).parsed;

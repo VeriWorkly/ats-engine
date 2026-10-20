@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   DEFAULT_POLICY,
   type AtsLayoutSignals,
   type AtsReport,
   type AtsRequirement,
+  check as score,
 } from "../../src/index.js";
 import { isOfferLine } from "../../src/matching/jobSections.js";
 import { stem } from "../../src/text/text.js";
@@ -20,7 +20,7 @@ const NOW = new Date("2026-10-05T00:00:00Z");
 const HEAD = "Jane Doe\njane@example.com | +1 415 555 0142";
 
 const check = (body: string, job?: string, layout?: AtsLayoutSignals) =>
-  AtsScoringService.check(`${HEAD}\n${body}`, DEFAULT_POLICY, {
+  score(`${HEAD}\n${body}`, DEFAULT_POLICY, {
     jobDescription: job,
     now: NOW,
     layout,
@@ -328,7 +328,6 @@ describe("a few hidden characters are layout, not hidden keywords", () => {
     pageCount: 1,
     imageCount: 0,
     hiddenTextChars: hidden.length,
-    hiddenTextSample: hidden,
     hiddenText: hidden,
   });
 

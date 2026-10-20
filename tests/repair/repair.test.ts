@@ -118,7 +118,6 @@ const emptyParsed: AtsParsedResume = {
   spokenLanguages: [],
   monthsOfExperience: null,
   highestIsced: null,
-  highestDegree: null,
   provenance: {
     name: "none",
     email: "none",
@@ -337,8 +336,8 @@ describe("merge: derived fields and provenance follow the merged values", () => 
     // Before the merge moved into the package these stayed at the deterministic values, so a
     // repaired resume showed its jobs beside "no experience" and no degree.
     expect(merged.monthsOfExperience).toBe(12);
-    expect(merged.highestDegree).toBe("bachelor");
-    expect(merged.education[0]!.level).toBe("bachelor");
+    expect(merged.highestIsced).toBe(6);
+    expect(merged.education[0]!.isced).toBe(6);
   });
 
   it("stamps filled fields as ai and leaves the rest as they were", () => {

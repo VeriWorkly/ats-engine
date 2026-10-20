@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   DEFAULT_POLICY,
   type AtsEnginePolicy,
+  type AtsLayoutSignals,
   type AtsResumeInput,
+  check as score,
 } from "../../src/index.js";
 import { prepareResume } from "../../src/input.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
@@ -29,7 +30,7 @@ const check = (
   resume: AtsResumeInput,
   jobDescription?: string,
   policy: AtsEnginePolicy = DEFAULT_POLICY,
-) => AtsScoringService.check(resume, policy, { jobDescription, now: NOW });
+) => score(resume, policy, { jobDescription, now: NOW });
 
 /**
  * Inputs that made one regex restart its scan at every position. The unbounded email pattern
@@ -50,7 +51,7 @@ function expectFastOn(policy: AtsEnginePolicy) {
     // the bug, and far enough above a busy machine (500 ms failed one with editors open).
     expectFast(
       () =>
-        AtsScoringService.check(input, policy, {
+        score(input, policy, {
           jobDescription: input.slice(0, 20_000),
           now: NOW,
         }),
@@ -81,7 +82,7 @@ describe("adversarial input", () => {
       const text = `${lead}${devanagari}\n${input}`;
       const report = expectFast(
         () =>
-          AtsScoringService.check(text, localized, {
+          score(text, localized, {
             jobDescription: text.slice(0, 20_000),
             now: NOW,
             languages: ["de", "fr", "hi"],
@@ -150,11 +151,11 @@ Mar 2019 - Present
 
 describe("degrees", () => {
   it("records a line naming two credentials at the higher one", () => {
-    const { education, highestDegree } = check(
+    const { education, highestIsced } = check(
       "Education\nDiploma, Master of Science, University of Leeds, 2016 - 2018",
     ).parsed;
-    expect(education[0]).toMatchObject({ level: "master", credential: "Master of Science" });
-    expect(highestDegree).toBe("master");
+    expect(education[0]).toMatchObject({ isced: 7, credential: "Master of Science" });
+    expect(highestIsced).toBe(7);
   });
 
   it.each([
@@ -164,20 +165,20 @@ describe("degrees", () => {
     "SSL certificate management",
     "Associate Product Manager, Acme",
   ])("does not read %j as a degree", (line) => {
-    expect(check(`Education\n${line}`).parsed.highestDegree).toBeNull();
+    expect(check(`Education\n${line}`).parsed.highestIsced).toBeNull();
   });
 
   it.each([
-    ["MS in Computer Science", "master"],
-    ["MSc Data Science", "master"],
-    ["MBA, Wharton", "master"],
-    ["BS Computer Science", "bachelor"],
-    ["B.Tech, Tech Institute", "bachelor"],
-    ["Associate of Arts", "associate"],
-    ["High School Diploma", "diploma"],
-    ["PhD, MIT", "doctorate"],
-  ])("reads %j as %s", (line, level) => {
-    expect(check(`Education\n${line}`).parsed.highestDegree).toBe(level);
+    ["MS in Computer Science", 7],
+    ["MSc Data Science", 7],
+    ["MBA, Wharton", 7],
+    ["BS Computer Science", 6],
+    ["B.Tech, Tech Institute", 6],
+    ["Associate of Arts", 5],
+    ["High School Diploma", 3],
+    ["PhD, MIT", 8],
+  ])("reads %j as ISCED %i", (line, isced) => {
+    expect(check(`Education\n${line}`).parsed.highestIsced).toBe(isced);
   });
 });
 
@@ -359,11 +360,11 @@ describe("bullets, headings and bounded scans", () => {
   });
 
   it("keeps a lone graduation year and drops Scrum Master as a degree", () => {
-    const { education, highestDegree } = check(
+    const { education, highestIsced } = check(
       "Education\nStanford University, B.S. Computer Science, 2018\nCertifications\nCertified Scrum Master",
     ).parsed;
     expect(education[0]?.end).toEqual({ year: 2018, month: null });
-    expect(highestDegree).toBe("bachelor");
+    expect(highestIsced).toBe(6);
   });
 
   it("trims punctuation from links and tolerates an untyped job description", () => {
@@ -372,7 +373,7 @@ describe("bullets, headings and bounded scans", () => {
       "https://jane.dev/",
     ]);
     expect(() =>
-      AtsScoringService.check("x", DEFAULT_POLICY, { jobDescription: 5 as unknown as string }),
+      score("x", DEFAULT_POLICY, { jobDescription: 5 as unknown as string }),
     ).not.toThrow();
   });
 
@@ -417,11 +418,8 @@ describe("a LinkedIn profile export", () => {
     "Ohio State University",
     "Bachelor of Science - BS, Computer Science · (2015 - 2019)",
   ];
-  const read = (
-    resume: AtsResumeInput,
-    layout?: Parameters<typeof AtsScoringService.check>[2]["layout"],
-  ) => {
-    const { parsed } = AtsScoringService.check(resume, DEFAULT_POLICY, { now: NOW, layout });
+  const read = (resume: AtsResumeInput, layout?: AtsLayoutSignals) => {
+    const { parsed } = score(resume, DEFAULT_POLICY, { now: NOW, layout });
     return {
       name: parsed.name,
       roles: parsed.roles.map(({ title, employer }) => ({ title, employer })),
@@ -518,8 +516,9 @@ describe("reproducibility", () => {
   it("returns the lines as read only when asked", () => {
     const text = "Jane Doe\nEngineer building developer tools for teams who ship\nevery day.";
     expect(check(text).lines).toBeUndefined();
-    expect(
-      AtsScoringService.check(text, DEFAULT_POLICY, { now: NOW, includeLines: true }).lines,
-    ).toEqual(["Jane Doe", "Engineer building developer tools for teams who ship every day."]);
+    expect(score(text, DEFAULT_POLICY, { now: NOW, includeLines: true }).lines).toEqual([
+      "Jane Doe",
+      "Engineer building developer tools for teams who ship every day.",
+    ]);
   });
 });

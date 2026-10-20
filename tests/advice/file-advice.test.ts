@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   DEFAULT_POLICY,
   type AtsCheckOptions,
   type AtsReport,
+  check as score,
 } from "../../src/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -27,7 +27,7 @@ Skills
 TypeScript, Go, PostgreSQL`;
 
 const check = (options: AtsCheckOptions = {}, resume = RESUME): AtsReport =>
-  AtsScoringService.check(resume, DEFAULT_POLICY, { now: NOW, ...options });
+  score(resume, DEFAULT_POLICY, { now: NOW, ...options });
 const advice = (report: AtsReport, id: string) => report.advice.find((item) => item.id === id);
 const named = (name: string, resume?: string) => check({ file: { name } }, resume);
 

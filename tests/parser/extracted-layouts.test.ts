@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume, check as score } from "../../src/index.js";
 
 /**
  * Layouts that real PDF exports extract to, as opposed to text written by hand.
@@ -11,7 +11,7 @@ import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.
  */
 
 const NOW = new Date("2026-09-30T00:00:00Z");
-const check = (text: string) => AtsScoringService.check(text, DEFAULT_POLICY, { now: NOW });
+const check = (text: string) => score(text, DEFAULT_POLICY, { now: NOW });
 const parse = (text: string) => parseResume(text.split("\n"), DEFAULT_POLICY, NOW);
 const failed = (text: string) => check(text).failedChecks.map((rule) => rule.id);
 

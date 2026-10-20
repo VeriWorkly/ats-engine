@@ -233,7 +233,6 @@ function hiddenSignals(runs: readonly string[]) {
   const text = runs.join(" ").replace(/\s+/g, " ").trim();
   return {
     hiddenTextChars: text.replace(/\s/g, "").length,
-    hiddenTextSample: text.slice(0, 80),
     hiddenText: text.slice(0, MAX_HIDDEN_TEXT),
   };
 }

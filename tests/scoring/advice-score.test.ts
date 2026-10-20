@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsReport } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsReport, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 
 /**
@@ -29,8 +29,8 @@ const scored = ({ advice: _advice, ...rest }: AtsReport) => JSON.stringify(rest)
 
 describe("advice and the score", () => {
   it("leaves the score, categories, failed checks and fixes byte-identical", () => {
-    const plain = AtsScoringService.check(RESUME, POLICY, { now: NOW, layout: LAYOUT });
-    const advised = AtsScoringService.check(RESUME, POLICY, {
+    const plain = check(RESUME, POLICY, { now: NOW, layout: LAYOUT });
+    const advised = check(RESUME, POLICY, {
       now: NOW,
       layout: { ...LAYOUT, encrypted: true, trackedChanges: 4, comments: 2 },
       file: { name: "Resume_final_v3 (2).pdf", bytes: 9 * 1024 * 1024, passwordProtected: true },
@@ -55,7 +55,7 @@ describe("advice and the score", () => {
   });
 
   it("scores the same as in a region that gives no age advice", () => {
-    const us = AtsScoringService.check(RESUME, POLICY, { now: NOW, region: "US" });
+    const us = check(RESUME, POLICY, { now: NOW, region: "US" });
     expect(us.advice.length).toBeGreaterThan(0);
     // The age thresholds are the only difference the advice makes; the rules are the region's.
     const withoutAge = withLocales(DEFAULT_POLICY, {
@@ -63,7 +63,7 @@ describe("advice and the score", () => {
         pack.id === "US" ? { ...pack, ageAdvice: undefined } : pack,
       ),
     });
-    const quiet = AtsScoringService.check(RESUME, withoutAge, { now: NOW, region: "US" });
+    const quiet = check(RESUME, withoutAge, { now: NOW, region: "US" });
     expect(quiet.advice).toEqual([]);
     expect(quiet.readinessScore).toBe(us.readinessScore);
     expect(JSON.stringify(quiet.rules)).toBe(JSON.stringify(us.rules));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { statesDateOfBirth } from "../../src/parser/contact.js";
 import { segmentResume } from "../../src/parser/sections.js";
@@ -33,7 +33,7 @@ const rows = (text: string) =>
 
 const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 const check = (text: string, options: { region?: string; languages?: string[] } = {}) =>
-  AtsScoringService.check(text, LOCALIZED, { now: NOW, ...options }).parsed;
+  score(text, LOCALIZED, { now: NOW, ...options }).parsed;
 
 describe("experience and skills headings beyond software's", () => {
   it("reads a fresher's internships after Education, not as education", () => {
@@ -114,7 +114,7 @@ describe("experience and skills headings beyond software's", () => {
   });
 
   it("finds the work history under Selected Experience", () => {
-    const report = AtsScoringService.check(
+    const report = score(
       "Jane Doe\njane@example.com\nSelected Experience\nSenior Engineer, Acme Corp    Jan 2020 - Present\n- Built things\nEducation\nBS Biology, State University, 2018\nSkills\nGo",
       DEFAULT_POLICY,
       { now: NOW },
@@ -642,7 +642,7 @@ describe("new shapes stay linear", () => {
 
 describe("German posting filler", () => {
   it("is not a missing keyword, while the skills and languages beside it are", () => {
-    const report = AtsScoringService.check(
+    const report = score(
       "Max Muster\nmax@example.com\nBerufserfahrung\nSoftwareentwickler, Beispiel GmbH 2019 - heute\n- Entwicklung von Microservices mit Java und Kubernetes\nAusbildung\nB.Sc. Informatik, Universität Hamburg, 2018\nKenntnisse\nJava, Python",
       LOCALIZED,
       {

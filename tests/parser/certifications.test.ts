@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { segmentResume } from "../../src/parser/sections.js";
 import { expectFast } from "../fixtures/timing.js";
@@ -45,7 +45,7 @@ describe("a certifications heading opens a section of its own", () => {
     ["Zertifizierungen", "de"],
     ["प्रमाणपत्र", "hi"],
   ])("%s in the %s pack", (heading, language) => {
-    const report = AtsScoringService.check(`${heading}\nPMP`, LOCALES, {
+    const report = check(`${heading}\nPMP`, LOCALES, {
       languages: [language],
       now: NOW,
     });
@@ -211,8 +211,7 @@ describe("a certification line becomes a row", () => {
 
 describe("certifications in German and Hindi", () => {
   const read = (text: string, language: string) =>
-    AtsScoringService.check(text, LOCALES, { languages: [language], now: NOW }).parsed
-      .certifications;
+    check(text, LOCALES, { languages: [language], now: NOW }).parsed.certifications;
 
   it("reads a German expiry and a month-first date", () => {
     expect(

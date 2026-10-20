@@ -50,8 +50,8 @@ console.log(`network  none in ${[...NETWORK_FREE].join(" ")}`);
 
 const core = await build({
   stdin: {
-    contents: `import { AtsScoringService, DEFAULT_POLICY } from "${exports["."].import}";
-      globalThis.report = AtsScoringService.check(
+    contents: `import { check, DEFAULT_POLICY } from "${exports["."].import}";
+      globalThis.report = check(
         "Jane Doe\\njane@example.com\\nExperience\\nEngineer at Acme 2019 - 2022\\n- Built services",
         DEFAULT_POLICY,
         { now: new Date("2026-01-01") },

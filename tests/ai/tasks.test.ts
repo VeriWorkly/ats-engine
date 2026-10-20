@@ -4,7 +4,7 @@ import { createAtsAi } from "../../src/ai/index.js";
 import { createRedaction } from "../../src/ai/redact.js";
 import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
-import { AtsScoringService } from "../../src/scoring/engine.js";
+import { check } from "../../src/scoring/engine.js";
 import type { AtsReport } from "../../src/types.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -23,7 +23,7 @@ const RESUME = [
 const JOB = "We need TypeScript, Kubernetes and payments experience.";
 
 function report(): AtsReport {
-  return AtsScoringService.check(RESUME, DEFAULT_POLICY, { jobDescription: JOB });
+  return check(RESUME, DEFAULT_POLICY, { jobDescription: JOB });
 }
 
 const insights = (overrides: Record<string, unknown> = {}) =>
@@ -66,7 +66,7 @@ describe("analyze", () => {
   });
 
   it("leaves the advice out, so the file name does not carry the name", async () => {
-    const withFile = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+    const withFile = check(RESUME, DEFAULT_POLICY, {
       file: { name: "Jane_Doe_Resume_final_v3 (2).pdf", format: "pdf", bytes: 1_000 },
     });
     expect(JSON.stringify(withFile.advice)).toMatch(/Jane.Doe/); // the advice quotes it
@@ -258,7 +258,7 @@ describe("redaction", () => {
 
 describe("repairParse", () => {
   const SOURCE = "Jane Doe\nSenior Engineer, Acme Corporation\nJan 2020 - Present\n";
-  const empty = AtsScoringService.check("x", DEFAULT_POLICY).parsed;
+  const empty = check("x", DEFAULT_POLICY).parsed;
 
   it("fills empty fields with grounded values and reports the ungrounded ones", async () => {
     const provider = scriptedProvider(

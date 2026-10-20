@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   computeVerdict,
   DEFAULT_POLICY,
   type AtsRequirement,
+  check as score,
 } from "../../src/index.js";
 
 /** Defects found in the final review of scoring, checks and matching, one block each. */
@@ -24,7 +24,7 @@ Skills
 Go, Python, Kubernetes, Terraform, PostgreSQL`;
 
 const check = (resume: string, jobDescription?: string) =>
-  AtsScoringService.check(resume, DEFAULT_POLICY, { now: NOW, jobDescription });
+  score(resume, DEFAULT_POLICY, { now: NOW, jobDescription });
 const one = (line: string, resume = RESUME) =>
   check(resume, `Requirements\n- ${line}`).requirements[0] as AtsRequirement;
 const rule = (resume: string, id: string, job?: string) =>
