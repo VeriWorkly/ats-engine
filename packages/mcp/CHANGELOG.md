@@ -1,5 +1,16 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.8.0
+
+### Minor Changes
+
+- ca0e088: - **Breaking:** runs engine 0.14.0. A parsed resume in `check_resume` no longer carries `highestDegree` or an education row's `level`; read `highestIsced` and `isced`.
+
+### Patch Changes
+
+- Updated dependencies [ca0e088]
+  - @veriworkly/ats-engine@0.14.0
+
 ## 0.7.0
 
 ### Minor Changes
