@@ -3,6 +3,26 @@
 Release notes are generated from `.changeset/` by `changeset version`. See
 [.changeset/README.md](.changeset/README.md) for what counts as breaking.
 
+## 0.13.0
+
+### Minor Changes
+
+- 97b2671: Hidden text is set aside by what a reader puts in the text, white text inside a visible line is cut from it, and the bundle sizes ship in the package.
+
+  - **Breaking:** the job match, the requirements and the missing keywords change for a resume with hidden text.
+    - **The layout says which of the hidden text the text holds**, as the new `AtsLayoutSignals.hiddenTextRead`: on a PDF all of it; in a Word document all but the runs a header or footer marks hidden, which its text leaves out; in an HTML resume none, as hidden elements are left out of the text. Only that text is set aside, so a visible line that repeats hidden text no reader keeps (a Word header's hidden run, a page's `display: none` block) is no longer set aside. A layout without the field (an older extractor, or a host that passes only `hiddenText`) is read as 0.12.0 reads it.
+    - **White text drawn after visible text on one line is cut from that line**, word by word, and the rest of the line stays: a white "Kafka Kubernetes" after "Senior Engineer" no longer counts. A word is cut only when every copy of it left in the kept lines, inside other words and in any case too ("Kafka-based", "kafka"), is one the hidden text owes, and a stretch under four characters, one two lines hold, or one the hidden text spells out as another copy of a line set aside (a white footer on every page, one Word header in two parts) is not cut.
+    - **Hidden text read in another order than the lines** (a second column's hidden runs first) is set aside line by line when it splits into the lines' texts one way only.
+    - No phrase is read across a line set aside or a cut, nor across a kept copy of a line whose other copies are set aside, and a requirement's evidence quotes the text without a mark where a cut was.
+    - On 6,000 generated resumes against 0.12.0, no resume is read worse: hidden-only skills matched fell from 902 to 14, and visible skills lost to hidden text from 1,267 to 43. The 14 are white text after visible text that repeats a separate hidden line word for word, which the text alone cannot tell from a line listed twice and read once; it is left, so no visible skill is cut, and the hidden-text rule still fails and caps the job match. A test now holds these figures on 600 seeded resumes, so a later change cannot raise them unnoticed.
+  - **A job posting or a JSON file is decoded as a resume's text is.** A UTF-16 posting (Notepad's "Unicode", PowerShell 5's `>`) was read as UTF-8: it matched nothing and listed its letters as missing keywords. A Windows-1252 posting lost its accented letters ("D�veloppeur"), and a `--policy` or JSON resume file saved with a byte-order mark was refused as "not valid JSON". `readJobFile` and `parseJsonFile` now read them all.
+  - **A job posting with no readable text is refused** with `AtsFileError` ("has no readable job posting text"), where `readJobFile` returned an empty posting: `ats-engine check --job` and the Action scored no job match and said nothing. The MCP server refused it already.
+  - **A Word file whose relationships part nests past eight levels is refused as unreadable.** Each level was read with every namespace prefix above it: a 26 KB file took 8 seconds to read and a 52 KB one ran out of memory. Real files nest two levels.
+  - **AI:** `analyze` redacts the resume's email addresses in one pass, where it ran the text once per distinct address: thousands of them took seconds of CPU. A model's reply is searched for a fenced JSON block without a pattern that scanned to the end of the reply from every fence left open.
+  - **The Action refuses a `min-score` the CLI refuses**: "0x32" and "1e1" were read as 50 and 10.
+  - **The bundle sizes ship in the package**, as `@veriworkly/ats-engine/sizes.json`: each subpath's size, minified and gzipped, as `npm run size` measured it for this release, with its budget. The budgets are raised ahead of need: `.` to 106 KB, `/locales` to 79.5 (room for one more language pack), `/ai` to 75, `/node` to 22.5, `withLocales` alone to 50.5.
+  - Bundle sizes (gzipped): `.` from 101.8 to 102.9 KB.
+
 ## 0.12.0
 
 ### Minor Changes
