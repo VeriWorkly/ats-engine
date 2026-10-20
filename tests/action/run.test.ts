@@ -190,6 +190,13 @@ process.stdout.write(JSON.stringify({
     expect(commands(stdout)).toEqual([]);
   });
 
+  // `Number` reads "0x32" as 50 and "1e1" as 10; the CLI refuses both, and so does the Action.
+  it.each(["0x32", "1e1", "-5", "101"])("refuses min-score %s, as the CLI does", (value) => {
+    const { status, stdout } = stubbed({ ATS_MIN_SCORE: value });
+    expect(status).toBe(1);
+    expect(stdout).toContain(`min-score must be a number from 0 to 100, not "${value}"`);
+  });
+
   it("starts no workflow command from an input", () => {
     const { status, stdout } = stubbed({ ATS_MIN_SCORE: "abc\n::warning::injected\r%0A" });
     expect(status).toBe(1);

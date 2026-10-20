@@ -29,7 +29,12 @@ function fail(message) {
 
 if (!resume) fail("The resume input is required.");
 if (!/^[\w.-]+$/.test(version)) fail(`version "${version}" is not a version or a dist-tag.`);
-const minScore = minScoreText ? Number(minScoreText) : null;
+// The CLI's rule: digits only, so "0x32" and "1e1", which `Number` reads as 50 and 10, are refused.
+const minScore = minScoreText
+  ? /^\d+(?:\.\d+)?$/.test(minScoreText)
+    ? Number(minScoreText)
+    : Number.NaN
+  : null;
 if (minScore !== null && !(minScore >= 0 && minScore <= 100))
   fail(`min-score must be a number from 0 to 100, not "${minScoreText}".`);
 
