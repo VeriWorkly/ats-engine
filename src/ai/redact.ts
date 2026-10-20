@@ -142,14 +142,17 @@ export function createRedaction(
   /** Each placeholder, the value it restores to, and the patterns that stand for it. */
   const entries: Array<{ placeholder: string; original: string; patterns: string[] }> = [];
 
-  const emails = new Set([parsed.email, ...(text.match(EMAILS) ?? [])].filter(Boolean));
-  [...emails].forEach((email, index) =>
-    entries.push({
-      placeholder: `[EMAIL_${index + 1}]`,
-      original: email,
-      patterns: [escapeRegex(email)],
-    }),
-  );
+  // Each address the resume holds, in any case, to its placeholder: replaced in one pass of
+  // `EMAILS` rather than a pattern each, which ran the text once per address (thousands of
+  // distinct ones took seconds). An address only a posting or a reply holds is not the candidate's.
+  const emails = new Map<string, string>();
+  const restoreEmails: Array<readonly [string, string]> = [];
+  for (const email of [parsed.email, ...(text.match(EMAILS) ?? [])]) {
+    if (!email || emails.has(email.toLowerCase())) continue;
+    const placeholder = `[EMAIL_${emails.size + 1}]`;
+    emails.set(email.toLowerCase(), placeholder);
+    restoreEmails.push([placeholder, email]);
+  }
 
   const name = parsed.name.trim();
   const parts = name.split(/\s+/).filter(Boolean);
@@ -231,7 +234,10 @@ export function createRedaction(
         (pattern) => [new RegExp(`${before}(?:${pattern})${after}`, "giu"), placeholder] as const,
       );
     });
-  const backward = entries.map(({ placeholder, original }) => [placeholder, original] as const);
+  const backward = [
+    ...restoreEmails,
+    ...entries.map(({ placeholder, original }) => [placeholder, original] as const),
+  ];
 
   const deep = (replace: (text: string) => string) => {
     const walk = (node: unknown): unknown => {
@@ -257,9 +263,13 @@ export function createRedaction(
   };
 
   return {
+    // Addresses first, so a name or a link inside one is not replaced into it.
     apply: deep((text) =>
       forward
-        .reduce((out, [pattern, to]) => out.replace(pattern, to), normalizeText(text))
+        .reduce(
+          (out, [pattern, to]) => out.replace(pattern, to),
+          normalizeText(text).replace(EMAILS, (email) => emails.get(email.toLowerCase()) ?? email),
+        )
         .replace(OTHER_PHONES, other),
     ),
     // Placeholders are unique bracketed tokens, so restoring them needs no boundaries.

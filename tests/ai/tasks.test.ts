@@ -205,6 +205,18 @@ describe("redaction", () => {
     expect(redaction.restore(redaction.apply(value))).toEqual(value);
   });
 
+  // A pattern for each distinct address ran the text once per address: 50,000 characters of them
+  // took 3.3 seconds. One pass now, and each still restores to itself.
+  it("redacts thousands of distinct email addresses in one pass", () => {
+    const hostile = Array.from({ length: 8_000 }, (_, i) => `u${i}@b.co`).join(" ");
+    const redaction = createRedaction(parsed, hostile);
+    // The text and the strings of a report, as `analyze` redacts them.
+    const strings = Array.from({ length: 10 }, () => hostile);
+    const redacted = expectFast(() => redaction.apply(strings), 1_000);
+    expect(redacted[0]).not.toContain("@b.co");
+    expect(redaction.restore(redacted)).toEqual(strings);
+  });
+
   it.each(["a", "a.", "a-", "1.", "é.", "a.a-", "https://a."])(
     "finds web addresses in linear time in 150,000 characters of %j",
     (shape) => {

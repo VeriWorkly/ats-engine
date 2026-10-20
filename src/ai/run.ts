@@ -172,8 +172,20 @@ function unfence(text: string): string {
   const close = text.toLowerCase().lastIndexOf("</think>");
   const answer = (close === -1 ? text : text.slice(close + "</think>".length)).trim();
   if (parses(answer)) return answer;
-  const fenced = /```[a-z]*\s*([[{][\s\S]*?[\]}])\s*```/i.exec(answer)?.[1]?.trim();
-  if (fenced && parses(fenced)) return fenced;
+  // A fence, a language name, then the block to the next fence. Found with `indexOf`, not a lazy
+  // pattern, which scanned to the end of the reply from every fence left open: 32 KB of them took
+  // 278 ms, growing with the square of the reply.
+  for (
+    let open = answer.indexOf("```"), fences = 0;
+    open !== -1 && fences < MAX_CANDIDATES;
+    open = answer.indexOf("```", open + 3), fences += 1
+  ) {
+    const start = open + 3 + /^[a-z]{0,20}/i.exec(answer.slice(open + 3, open + 23))![0].length;
+    const close = answer.indexOf("```", start);
+    if (close === -1) break;
+    const block = answer.slice(start, close).trim();
+    if (/^[[{]/.test(block) && /[\]}]$/.test(block) && parses(block)) return block;
+  }
   let tried = 0;
   for (
     let at = answer.indexOf("{");

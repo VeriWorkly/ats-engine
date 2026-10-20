@@ -68,7 +68,7 @@ function addCertifications(into: AtsParsedCertification[], rows: AtsParsedCertif
  * ("Languages: English, Python" leaves "Python"); "Languages: Go, Rust" names no language and
  * stays a skills line whole.
  */
-export function readCredentialRows(
+function readCredentialRows(
   sections: readonly ResumeSection[],
   policy: AtsEnginePolicy,
   now: Date,
