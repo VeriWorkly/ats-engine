@@ -1,12 +1,9 @@
 /**
  * @veriworkly/ats-engine/job — job posting text from a web page.
  *
- * Parsing only: no fetching. Retrieving an attacker-chosen URL safely (SSRF filtering, size and
- * time limits) is the host's job; this turns the HTML it got back into the text the matcher
- * reads. Dependency-free and runtime-agnostic.
- *
- * Every scan here is a single forward pass with `indexOf`, never a backtracking regex over the
- * page (see `./html.ts`).
+ * Parsing only: no fetching. Retrieving a URL safely (SSRF filtering, size and time limits) is
+ * the host's job. Dependency-free and runtime-agnostic. Every scan is a forward pass with
+ * `indexOf`, never a backtracking regex over the page (see `./html.ts`).
  */
 
 import { decodeEntities, htmlText, indexOfIgnoreCase } from "./html.js";
@@ -24,10 +21,7 @@ export type AtsJobPosting = {
 /** Text beyond this adds cost to every downstream step and no signal. */
 export const MAX_JOB_TEXT_CHARS = 12_000;
 
-/**
- * Plain job text, one trimmed line per non-blank line and capped — the shape every job text
- * takes before matching, whether it came from HTML, a text file or a paste.
- */
+/** Plain job text: one trimmed line per non-blank line, capped at `maxChars`. */
 export function normalizeJobText(text: string, maxChars = MAX_JOB_TEXT_CHARS): string {
   return text
     .split("\n")
@@ -40,13 +34,11 @@ export function normalizeJobText(text: string, maxChars = MAX_JOB_TEXT_CHARS): s
 /**
  * The visible text of an HTML document or fragment, one line per block, as posting text.
  *
- * Block elements become line breaks, so a posting's headings and bullets survive as lines — the
- * shape the job matcher's section detection reads — instead of collapsing into one paragraph.
- * Script, style and similar elements are dropped with their content, and so is the page's
- * furniture: navigation, cookie banners, forms, "similar jobs", hidden elements — the posting is
- * read from the page's `<main>` or `<article>` when it has one. An element left unclosed
- * drops everything after it, which on a well-formed page never happens and on a hostile one is
- * the safe direction. A `<` that cannot open a tag ("<5k") is text, as it is to a browser.
+ * Block elements become line breaks, so headings and bullets survive as lines. Script, style and
+ * the page's furniture (navigation, cookie banners, forms, "similar jobs", hidden elements) are
+ * dropped with their content; the posting is read from `<main>` or `<article>` when there is one.
+ * An element left unclosed drops everything after it. A `<` that cannot open a tag ("<5k") is
+ * text.
  */
 export function jobHtmlToText(html: string, maxChars = MAX_JOB_TEXT_CHARS): string {
   return normalizeJobText(htmlText(html, true), maxChars);
@@ -56,7 +48,9 @@ function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : value === undefined || value === null ? [] : [value];
 }
 
-/** `"JobPosting"`, or the type written as a URI or a prefixed name ("http://schema.org/JobPosting"). */
+/**
+ * `"JobPosting"`, or the type written as a URI or a prefixed name ("http://schema.org/JobPosting").
+ */
 const isType = (node: Record<string, unknown>, type: string) =>
   asArray(node["@type"]).some(
     (value) => typeof value === "string" && value.split(/[/:#]/).pop() === type,
@@ -65,8 +59,8 @@ const isType = (node: Record<string, unknown>, type: string) =>
 const isJobPosting = (node: Record<string, unknown>) => isType(node, "JobPosting");
 
 /**
- * Real JSON-LD nests a value two or three levels deep. A page author picks the depth, and an
- * unbounded walk overflowed the stack at about 10 000 levels; anything deeper is skipped.
+ * Real JSON-LD nests two or three levels; deeper is skipped, as an unbounded walk overflows the
+ * stack.
  */
 const MAX_JSON_DEPTH = 32;
 
@@ -109,8 +103,7 @@ function jsonLdNodes(html: string): Record<string, unknown>[] {
     index = close + 8;
     if (!html.slice(open, tagEnd).toLowerCase().includes("application/ld+json")) continue;
 
-    // Wrapped in CDATA for old XHTML parsers, or with raw line breaks inside its strings, which
-    // JSON does not allow and browsers' structured-data readers forgive.
+    // Strip CDATA wrappers; raw line breaks inside strings are retried below as spaces.
     const source = html
       .slice(tagEnd + 1, close)
       .trim()
@@ -123,11 +116,10 @@ function jsonLdNodes(html: string): Record<string, unknown>[] {
       try {
         parsed = JSON.parse(source.replace(/[\n\r\t]/g, " "));
       } catch {
-        continue; // a page's broken structured data is the page's problem, not a failed scan
+        continue;
       }
     }
-    // A cursor, not shift(), and a loop, not push(...spread): a page author picks the size of
-    // `@graph`, and both of those fall over (quadratic time, stack overflow) on a big one.
+    // A cursor, not shift(), and a loop, not push(...spread): both fall over on a big `@graph`.
     const queue = asArray(parsed);
     for (let at = 0; at < queue.length; at += 1) {
       const node = queue[at];
@@ -140,19 +132,12 @@ function jsonLdNodes(html: string): Record<string, unknown>[] {
   return nodes;
 }
 
-/**
- * The schema.org `JobPosting` a page publishes for search engines, if it has one.
- *
- * Most applicant-tracking hosts embed it, and it is the cleanest source there is: the
- * employer's own title and description, without the navigation, cookie banner and "similar
- * jobs" list that make up most of a page's visible text.
- */
+/** The schema.org `JobPosting` a page publishes for search engines, or null when it has none. */
 export function extractJobPosting(html: string): AtsJobPosting | null {
   const nodes = jsonLdNodes(html);
   const node = nodes.find(isJobPosting);
   if (!node) return null;
-  // The employer, given by reference ("@id") to an Organization elsewhere in the graph — or,
-  // when the reference matches nothing, the graph's first Organization.
+  // The employer may be an "@id" reference to an Organization in the graph, else its first one.
   let company = node.hiringOrganization;
   const id = (company as { "@id"?: unknown } | undefined)?.["@id"];
   if (id !== undefined && !textOf(company))
@@ -181,10 +166,7 @@ export function extractJobPosting(html: string): AtsJobPosting | null {
   };
 }
 
-/**
- * Below this a posting's description is a teaser ("See the full description below"), and the
- * requirements live in the page itself.
- */
+/** Below this a description is a teaser ("See the full description below"). */
 const MIN_POSTING_DESCRIPTION_CHARS = 200;
 
 /**

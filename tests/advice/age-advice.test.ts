@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsReport } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsReport, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * Age signals: dates and totals that let a reader work out a candidate's age. Advice where the
- * region pack says so (the US, where age bias is the concern and recruiters expect no age on a
- * resume), never in Germany or India, where a date of birth is customary; never a score change.
+ * Age signals: advice only where the region pack says so (the US), never in Germany or India; never
+ * scored.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -26,7 +25,7 @@ Skills
 TypeScript, Go, PostgreSQL`;
 
 const check = (text: string, region?: string): AtsReport =>
-  AtsScoringService.check(text, POLICY, { now: NOW, region });
+  score(text, POLICY, { now: NOW, region });
 const advice = (report: AtsReport, id: string) => report.advice.find((item) => item.id === id);
 
 describe("graduation year", () => {
@@ -48,7 +47,7 @@ describe("graduation year", () => {
   });
 
   it("is not given without a region", () => {
-    const report = AtsScoringService.check(resume({ graduated: 1990 }), DEFAULT_POLICY, {
+    const report = score(resume({ graduated: 1990 }), DEFAULT_POLICY, {
       now: NOW,
     });
     expect(report.locale.region).toBeNull();

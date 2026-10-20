@@ -1,11 +1,8 @@
 import type { AiEvalCase } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
-import { AtsScoringService } from "../../src/scoring/engine.js";
+import { check } from "../../src/scoring/engine.js";
 
-/**
- * Synthetic eval cases. Every person, employer and address here is invented — no real resume
- * belongs in this repository.
- */
+// Synthetic eval cases: every person, employer and address is invented.
 
 const STANDARD = [
   "Priya Raman",
@@ -51,7 +48,7 @@ const JOB =
   "Senior platform engineer. Kubernetes, Go and PostgreSQL required; Terraform and incident response a plus.";
 
 function report(text: string, jobDescription?: string) {
-  return AtsScoringService.check(text, DEFAULT_POLICY, { jobDescription });
+  return check(text, DEFAULT_POLICY, { jobDescription });
 }
 
 export function evalCases(): AiEvalCase[] {

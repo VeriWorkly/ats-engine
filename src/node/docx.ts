@@ -1,33 +1,24 @@
 import { crc32, inflateRawSync } from "node:zlib";
 
 /**
- * Hidden text in a Word document: the DOCX side of "white fonting".
- *
- * Text extraction reads every run in `word/document.xml` whatever its formatting, so a run an
- * author hid is read by an ATS like any other. A run counts as hidden when Word itself would not
- * show it to a reader:
+ * Hidden text in a Word document. A run is hidden when Word would not show it:
  * - marked hidden (`w:vanish`);
  * - smaller than 2pt (`w:sz` is in half-points);
- * - in white or near white, on a white background. The background is whatever shading lies
- *   under the run — its own, its paragraph's, its table cell's — else the page colour, so white
- *   text in a dark cell is not flagged. Text in a text box is not judged: its background is the
- *   shape's fill, which this does not read.
+ * - white or near white on a white background: the shading under the run (its own, its
+ *   paragraph's, its cell's), else the page colour. Text boxes are not judged: their fill is not
+ *   read.
  *
- * Character styles that hide text are not followed; direct formatting is what the tricks use.
+ * Character styles that hide text are not followed.
  */
 
 const MAX_XML_BYTES = 8 * 1024 * 1024;
 
-/**
- * What a whole DOCX may expand to. A resume with photos is a few megabytes; past this it is a
- * zip bomb, refused before `mammoth` — which inflates whatever it reads without a limit — sees it.
- */
+/** What a whole DOCX may expand to; past it is a zip bomb, refused before `mammoth` inflates it. */
 export const MAX_DOCX_EXPANDED_BYTES = 64 * 1024 * 1024;
 
 /**
- * One entry as JSZip 3.10 — `mammoth`'s reader — reads it. `body` is the compressed data;
- * `size` the uncompressed size the directory declares (JSZip keeps no data for an entry
- * declaring 0); `key` the name JSZip files it under.
+ * One entry as JSZip 3.10 (`mammoth`'s reader) reads it. `body` is the compressed data; `size` the
+ * declared uncompressed size (JSZip keeps no data for 0); `key` the name JSZip files it under.
  */
 export type ZipEntry = {
   name: string;
@@ -36,7 +27,7 @@ export type ZipEntry = {
   body: Buffer;
   size: number;
   dir: boolean;
-  /** A file whose Unix mode says folder: JSZip files it as a folder, then fails to find it. */
+  /** Unix mode says folder: JSZip files it as a folder, then fails to find it. */
   unixDir: boolean;
 };
 
@@ -46,10 +37,7 @@ const END = 0x06054b50;
 const ZIP64_LOCATOR = 0x07064b50;
 const ZIP64_END = 0x06064b50;
 
-/**
- * JSZip's `DataReader`: every index is relative to `zero` (where the archive starts, past any
- * bytes prepended to it) and every read is bounds-checked, throwing where JSZip throws.
- */
+/** JSZip's `DataReader`: indexes are relative to `zero` (the archive start) and bounds-checked. */
 class Reader {
   index = 0;
   zero = 0;
@@ -65,10 +53,7 @@ class Reader {
   skip(count: number) {
     this.setIndex(this.index + count);
   }
-  /**
-   * Little-endian, folded through 32-bit shifts as JSZip folds it: four bytes read as a signed
-   * 32-bit integer (0xFFFFFFFF is -1), and eight as their low four.
-   */
+  /** Little-endian through 32-bit shifts as JSZip does: four bytes are signed (0xFFFFFFFF is -1). */
   int(size: number) {
     this.check(this.index + size);
     let value = 0;
@@ -77,7 +62,7 @@ class Reader {
     this.index += size;
     return value;
   }
-  /** As JSZip slices: a negative size yields nothing and steps back. */
+  /** A negative size yields nothing and steps back, as in JSZip. */
   bytes(size: number) {
     this.check(this.index + size);
     const start = this.zero + this.index;
@@ -97,7 +82,7 @@ class Reader {
     this.index = current;
     return found;
   }
-  /** Over the whole file, not just its tail: JSZip does not stop at a comment's 64K. */
+  /** Over the whole file: JSZip does not stop at a comment's 64K. */
   lastIndexOf(signature: number) {
     const needle = Buffer.alloc(4);
     needle.writeUInt32LE(signature);
@@ -120,7 +105,7 @@ function readEndOfCentral(reader: Reader) {
   let offset = reader.int(4);
   reader.bytes(reader.int(2));
 
-  // Any one of the six at its maximum makes it ZIP64 — not only the three a writer sets.
+  // Any one of the six at its maximum makes it ZIP64.
   const zip64 =
     disk === 0xffff ||
     directoryDisk === 0xffff ||
@@ -137,7 +122,7 @@ function readEndOfCentral(reader: Reader) {
     reader.int(4);
     let record = reader.int(8);
     if (reader.int(4) > 1) throw new Error("Multi-volume");
-    // A record away from where its locator says is looked for: the last one in the file.
+    // A record away from its locator's offset: the last one in the file.
     if (!reader.isSignature(record, ZIP64_END)) {
       record = reader.lastIndexOf(ZIP64_END);
       if (record < 0) throw new Error("No ZIP64 end of central directory");
@@ -152,15 +137,13 @@ function readEndOfCentral(reader: Reader) {
     records = reader.int(8);
     size = reader.int(8);
     offset = reader.int(8);
-    // JSZip's loop over a record's extensible data never advances its counter: it reads until
-    // it throws, or — where a field's length steps back over itself — forever.
+    // JSZip's loop over extensible data never advances: it throws or runs forever.
     if (recordSize - 44 > 0) throw new Error("ZIP64 extensible data");
-    // The record's declared size, not its fixed one, is what JSZip expects between the
-    // directory and the end record.
+    // JSZip expects the record's declared size between the directory and the end record.
     expectedEnd = offset + size + 20 + 12 + recordSize;
   }
 
-  // Bytes before the archive shift every offset in it: the gap is where it starts.
+  // Bytes prepended to the archive shift every offset.
   const extra = end - expectedEnd;
   if (extra > 0) {
     if (!reader.isSignature(end, CENTRAL_FILE)) reader.zero = extra;
@@ -168,10 +151,10 @@ function readEndOfCentral(reader: Reader) {
   return { records, offset };
 }
 
-/** The value of an extra field JSZip reads with its own reader: the ZIP64 sizes, a Unicode path. */
+/** Extra fields by id: the ZIP64 sizes, a Unicode path. */
 type Extras = Map<number, Buffer>;
 
-/** JSZip's `findExtraFieldUnicodePath` / `…Comment`: null where it is stale or absent. */
+/** JSZip's `findExtraFieldUnicodePath` / `…Comment`: null where stale or absent. */
 function unicodeExtra(extras: Extras, id: number, original: Buffer): string | null {
   const field = extras.get(id);
   if (!field) return null;
@@ -225,7 +208,7 @@ function readLocal(reader: Reader, entry: ReturnType<typeof readCentral>): ZipEn
   reader.skip(22);
   const nameLength = reader.int(2);
   const extraLength = reader.int(2);
-  // The name JSZip files an entry under is its local header's, not its directory header's.
+  // JSZip files an entry under its local header's name.
   const nameBytes = reader.bytes(nameLength);
   reader.skip(extraLength);
   if (entry.compressedSize === -1 || entry.size === -1) throw new Error("Sizes unknown");
@@ -266,12 +249,8 @@ function resolvePath(path: string) {
 
 /**
  * The entries of a zip archive in directory order, read exactly as JSZip's `ZipEntries.load`
- * reads them; null wherever JSZip throws, or would loop.
- *
- * The expansion budget holds only over the entries JSZip will inflate, so this does not read
- * the archive its own way: every signature search, the ZIP64 switch, the shift for prepended
- * bytes and the directory walk are JSZip's, quirks included. Linear in the file: each directory
- * header advances the walk by at least 46 bytes.
+ * reads them, quirks included, so the expansion budget holds over the entries JSZip will inflate.
+ * Null wherever JSZip throws or would loop. Linear: each directory header advances 46+ bytes.
  */
 export function zipEntries(data: Uint8Array): ZipEntry[] | null {
   try {
@@ -280,7 +259,7 @@ export function zipEntries(data: Uint8Array): ZipEntry[] | null {
     reader.setIndex(offset);
     const headers: Array<ReturnType<typeof readCentral>> = [];
     while (reader.signature(CENTRAL_FILE)) headers.push(readCentral(reader));
-    // Records claimed and none found JSZip refuses; fewer than claimed it reads.
+    // JSZip refuses records claimed and none found; fewer than claimed it reads.
     if (records !== headers.length && records !== 0 && headers.length === 0)
       throw new Error("No records");
     return headers.map((header) => readLocal(reader, header));
@@ -289,33 +268,32 @@ export function zipEntries(data: Uint8Array): ZipEntry[] | null {
   }
 }
 
-/**
- * What JSZip then holds, by the name `mammoth` asks for: a later entry of a name replaces an
- * earlier one. Null where `loadAsync` fails.
- */
+/** What JSZip holds by name (a later entry replaces an earlier one); null where `loadAsync` fails. */
 export function zipFiles(data: Uint8Array): Map<string, ZipEntry> | null {
   const entries = zipEntries(data);
   if (!entries) return null;
   const files = new Map<string, ZipEntry>();
   for (const entry of entries) {
     files.set(entry.key, entry);
-    // JSZip looks the file up again under the name it meant to file it at, and throws if a
-    // folder took it.
+    // JSZip looks the file up again under its intended name, and throws if a folder took it.
     if (entry.unixDir && files.get(resolvePath(entry.name))?.dir !== false) return null;
   }
   return files;
 }
 
-/**
- * Whether this reader can follow the archive and the relationships naming its parts:
- * `withinExpansionLimit` refuses the rest.
- */
-export const readableArchive = (data: Uint8Array) => {
-  const files = zipFiles(data);
-  return !!files && !!mammothParts(files);
-};
+/** A zip archive and the parts `mammoth` reads from it, read once and passed to each check. */
+type MammothParts = NonNullable<ReturnType<typeof mammothParts>>;
 
-/** An entry's content, or null past `limit` bytes. Capped: a bomb costs the cap, not its claim. */
+export type DocxArchive = { files: Map<string, ZipEntry>; parts: MammothParts };
+
+/** The archive, or null where this reader cannot follow it or the relationships naming its parts. */
+export function openDocx(data: Uint8Array): DocxArchive | null {
+  const files = zipFiles(data);
+  const parts = files && mammothParts(files);
+  return files && parts ? { files, parts } : null;
+}
+
+/** An entry's content, or null past `limit` bytes; a bomb costs the cap, not its claimed size. */
 function inflate({ method, body, size }: ZipEntry, limit: number): Buffer | null {
   if (size === 0) return Buffer.alloc(0);
   if (method === 0) return body.length <= limit ? body : null;
@@ -326,18 +304,12 @@ function inflate({ method, body, size }: ZipEntry, limit: number): Buffer | null
   }
 }
 
-/** One file from a zip archive, as JSZip gives it to `mammoth`, or null. No dependency. */
-export function readZipEntry(data: Uint8Array, name: string): Buffer | null {
-  const entry = zipFiles(data)?.get(name);
-  return entry && !entry.dir ? inflate(entry, MAX_XML_BYTES) : null;
-}
-
 const PACKAGE_RELATIONSHIPS = "http://schemas.openxmlformats.org/package/2006/relationships";
 const MARKUP_COMPATIBILITY = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const RELATIONSHIP_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
-/** A relationships file is a few kilobytes; one past this is not followed. */
+/** A relationships file past this is not followed. */
 const MAX_RELS_BYTES = 1024 * 1024;
-/** A relationships file nests two levels, its root and its entries; one past this is refused. */
+/** A relationships file nests two levels; nesting past this is refused. */
 const MAX_RELS_DEPTH = 8;
 
 const XML_ENTITIES = new Map([
@@ -376,14 +348,12 @@ const RELS_ATTR = /\s+([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 /**
  * A relationships part as `mammoth` reads it: the targets of each type, in order, of the
  * `Relationship` elements in the package namespace directly under the root. Null for anything
- * this cannot read as `mammoth`'s parser does — a DTD, an unknown entity or prefix, unbalanced or
- * malformed tags, markup-compatibility content, or elements nested past `MAX_RELS_DEPTH` — which
- * no writer puts in such a file. Linear: each tag pattern stops at the next `<`, and each element
- * copies the prefixes in scope, so the depth is bounded too (thousands of levels each declaring a
- * prefix took seconds, then the whole heap).
+ * `mammoth`'s parser would not read the same way: a DTD, an unknown entity or prefix, unbalanced
+ * or malformed tags, markup-compatibility content, or nesting past `MAX_RELS_DEPTH`. Linear; each
+ * element copies the prefixes in scope, so depth is bounded too.
  */
 function relationshipTargets(bytes: Buffer): Map<string, string[]> | null {
-  // The decoder drops one byte-order mark and `mammoth` another.
+  // The decoder drops one byte-order mark, `mammoth` another.
   const text = new TextDecoder().decode(bytes);
   const xml = withoutMarkup(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
   const targets = new Map<string, string[]>();
@@ -405,7 +375,7 @@ function relationshipTargets(bytes: Buffer): Map<string, string[]> | null {
     }
     if (scopes.length === 1 && roots++) return null;
     if (scopes.length > MAX_RELS_DEPTH) return null;
-    // The prefixes in scope, and under "\0" the element's name, which its end tag must repeat.
+    // The prefixes in scope, and under "\0" the element name its end tag must repeat.
     const scope = new Map(scopes[scopes.length - 1]);
     scope.set("\0", name!);
     const values = new Map<string, string>();
@@ -446,21 +416,20 @@ const relationshipsOf = (path: string) => {
   return joinPath(dirname!, "_rels", `${basename}.rels`);
 };
 
-/** A page header or footer part, which `mammoth` does not read and `docxMargins` does. */
+/** A page header or footer part: `docxMargins` reads it, `mammoth` does not. */
 const HEADER_OR_FOOTER = /^word\/(?:header|footer)\d*\.xml$/;
 
 /**
- * The parts `mammoth` 1.x's `docx-reader` reads, and how many times it reads each: its content
- * types, its main document — the package's `officeDocument` relationship, else
- * `word/document.xml` — that document's relationships (twice), its styles, numbering, notes and
- * comments as those name them, and the relationships of the notes and comments. A relationship
- * may name any part, the main document itself included, and each read inflates it again. Null
- * where a relationships file cannot be read.
+ * The parts `mammoth` 1.x's `docx-reader` reads, and how many times it reads each: content types,
+ * the main document (the `officeDocument` relationship, else `word/document.xml`) and its
+ * relationships (twice), styles, numbering, notes and comments, and their relationships. A
+ * relationship may name any part, and each read inflates it again. Null where a relationships
+ * file cannot be read.
  */
 function mammothParts(files: Map<string, ZipEntry>) {
   const exists = (path: string) => files.get(path)?.dir === false;
   const reads = new Map<string, number>();
-  // The reads `mammoth` parses as XML: all but the embedded chunks, headers and footers.
+  // The reads `mammoth` parses as XML: all but chunks, headers and footers.
   const parsed = new Map<string, number>();
   const read = (path: string, xml = true) => {
     reads.set(path, (reads.get(path) ?? 0) + 1);
@@ -473,10 +442,12 @@ function mammothParts(files: Map<string, ZipEntry>) {
     const content = inflate(files.get(path)!, MAX_RELS_BYTES);
     return content && relationshipTargets(content);
   };
-  const find = (from: Map<string, string[]>, type: string, base: string, fallback: string) =>
+  const existing = (from: Map<string, string[]>, type: string, base: string) =>
     (from.get(RELATIONSHIP_TYPE + type) ?? [])
       .map((target) => joinPath(base, target).replace(/^\//, ""))
-      .find(exists) ?? fallback;
+      .filter(exists);
+  const find = (from: Map<string, string[]>, type: string, base: string, fallback: string) =>
+    existing(from, type, base)[0] ?? fallback;
 
   const packageRelationships = relationships("_rels/.rels");
   if (!packageRelationships) return null;
@@ -494,11 +465,8 @@ function mammothParts(files: Map<string, ZipEntry>) {
     read(relationshipsOf(path));
     read(path);
   }
-  // Content a web builder embeds whole (`w:altChunk`) — HTML, usually as MHT — which `mammoth`
-  // does not read: what this reads instead.
-  const chunks = (related.get(`${RELATIONSHIP_TYPE}aFChunk`) ?? [])
-    .map((target) => joinPath(base!, target).replace(/^\//, ""))
-    .filter(exists);
+  // HTML a web builder embeds whole (`w:altChunk`, usually MHT): `mammoth` skips it, this reads it.
+  const chunks = existing(related, "aFChunk", base!);
   for (const chunk of chunks) read(chunk, false);
   for (const key of files.keys()) if (HEADER_OR_FOOTER.test(key)) read(key, false);
   return {
@@ -512,19 +480,15 @@ function mammothParts(files: Map<string, ZipEntry>) {
 }
 
 /**
- * Whether the whole archive expands to at most `MAX_DOCX_EXPANDED_BYTES`. Inflates every file
- * JSZip can give `mammoth` against what is left of the budget rather than trusting the sizes
- * the archive declares, which a bomb sets to whatever passes, and charges each part as many
- * times as `mammoth` reads it. An archive this reader cannot follow is refused, not left to
- * `mammoth`: what it could not measure, `mammoth` may still inflate in full.
- *
- * Entries whose data overlap — many headers naming one body, each inflated again — are refused
- * too: no writer produces them, and they would make this check cost more than the file.
+ * Whether the archive expands to at most `MAX_DOCX_EXPANDED_BYTES`. Inflates every file against
+ * what is left of the budget instead of trusting declared sizes, charging each part as often as
+ * `mammoth` reads it. An archive this reader cannot follow is refused: `mammoth` might inflate it
+ * in full. Entries whose data overlap (many headers naming one body) are refused too, or the
+ * check would cost more than the file.
  */
-export function withinExpansionLimit(data: Uint8Array): boolean {
-  const files = zipFiles(data);
-  const parts = files && mammothParts(files);
-  if (!files || !parts) return false;
+export function withinExpansionLimit(data: Uint8Array, archive = openDocx(data)): boolean {
+  if (!archive) return false;
+  const { files, parts } = archive;
   let left = MAX_DOCX_EXPANDED_BYTES;
   let input = data.byteLength;
   for (const entry of files.values()) {
@@ -540,55 +504,38 @@ export function withinExpansionLimit(data: Uint8Array): boolean {
 }
 
 /**
- * The most XML `mammoth` is given to parse: every part it parses, each charged as often as it
- * parses it. Its parser takes up to about a second a megabyte on dense markup — a tag or a line
- * every few bytes — so this keeps the worst accepted document near two seconds. Word's own
- * templates hold under 600 KB, their resumes under 120 KB, most of it the styles part.
+ * The most XML `mammoth` is given to parse, each part charged as often as it is parsed. Its parser
+ * takes up to a second a megabyte on dense markup, so this keeps the worst accepted document near
+ * two seconds. Word's own templates hold under 600 KB.
  */
 const MAX_PARSED_XML_BYTES = 2 * 1024 * 1024;
 
 /**
- * The most the parts `mammoth` parses may hold, between them, of each of:
- * - comments, processing instructions and CDATA sections. Word writes one processing instruction
- *   a part (the `<?xml ?>` declaration) and none of the others; closed, each costs the parser
- *   little, so this only bounds what no writer produces;
+ * The most the parsed parts may hold, between them, of each of:
+ * - comments, processing instructions and CDATA sections (Word writes one `<?xml ?>` a part);
  * - distinct elements (a name in a namespace), and style, break, symbol and content-type tags
- *   whose values `mammoth` puts in a warning. It merges its warnings pairwise, so N distinct ones
- *   cost N²: 10,000 took twelve seconds. Word's templates hold under 300.
+ *   whose values `mammoth` puts in a warning. It merges warnings pairwise, so N cost N².
  */
 const MAX_MARKUP = 1_000;
 
-/**
- * The tags whose values reach a `mammoth` warning, by local name, with or without a prefix: a
- * style it does not know (`pStyle`, `rStyle`, `tblStyle`), a break or symbol it does not know,
- * an image's content type (`Default`, `Override`).
- */
+/** Tags whose values reach a `mammoth` warning: unknown styles, breaks and symbols, image content types. */
 const NAMED_TAG = /(?:^|:)(?:[A-Za-z]*Style|br|sym|Default|Override)$/;
 
-/**
- * What a DOCX upload that is not one, or not one to give `mammoth`, fails with; where `mammoth`
- * fails, its own error is kept as the cause.
- */
+/** The error for a DOCX that is not one, or not one to give `mammoth`; `mammoth`'s own is the cause. */
 export const UNREADABLE_DOCX = "The document could not be read as DOCX.";
 
 /**
- * Refuses a document before `mammoth` parses any of it: with `UNREADABLE_DOCX` where its XML
- * parser (`@xmldom/xmldom` 0.8) would not read every part in time linear in it, or its warnings
- * would cost their square; as too long past `MAX_PARSED_XML_BYTES`. Every part it parses is
- * read: content types, relationships, styles, numbering, notes, comments and the document. Run
- * after `withinExpansionLimit`, within which every part inflated.
+ * Refuses a document before `mammoth` parses any of it: `UNREADABLE_DOCX` where its XML parser
+ * (`@xmldom/xmldom` 0.8) would not read every part in linear time or its warnings would cost
+ * their square; an error past `MAX_PARSED_XML_BYTES`. Run after `withinExpansionLimit`.
  *
- * The parser goes back to the end of the part for each comment, processing instruction or CDATA
- * section that never closes, so a 1.4 KB file of `<!--` held it for two minutes. A `<` that
- * starts no tag, or a tag cut short, is an error that costs it tens of microseconds each, and a
- * document type declaration no OOXML part may hold. Each is an error `mammoth` then refuses the
- * document for, or markup no writer produces. So is a prefix bound, within a part, to a second
- * namespace: refused, each prefix names one namespace, and an element is counted once by its
- * name in it. Each tag is matched by `RELS_TAG`, which stops at the next `<`: linear, each step
- * starting where the last ended.
+ * The parser rescans to the end of the part for each comment, processing instruction or CDATA
+ * section that never closes. A `<` that starts no tag, a tag cut short, and a DTD are errors or
+ * markup no writer produces. A prefix bound to a second namespace is refused; an element is
+ * counted once by its namespace and name. Tags are matched by `RELS_TAG`, which stops at the next
+ * `<`: linear.
  */
-export function checkParsedXml(data: Uint8Array): void {
-  const files = zipFiles(data);
+export function checkParsedXml(archive: DocxArchive | null): void {
   const seen = new Set<string>();
   let markup = 0;
   let left = MAX_PARSED_XML_BYTES;
@@ -630,8 +577,8 @@ export function checkParsedXml(data: Uint8Array): void {
     }
     return true;
   };
-  for (const [path, reads] of (files && mammothParts(files))?.parsed ?? []) {
-    const entry = files!.get(path);
+  for (const [path, reads] of archive?.parts.parsed ?? []) {
+    const entry = archive!.files.get(path);
     if (entry?.dir !== false) continue;
     const content = inflate(entry, Math.floor(left / reads));
     if (!content)
@@ -658,7 +605,7 @@ const isHex = (value: string | null | undefined): value is string =>
 /** Contrast against white below 1.25:1 — white, or a grey too pale to read. */
 const nearWhite = (hex: string) => 1.05 / (luminance(hex) + 0.05) < 1.25;
 
-/** XML quotes an attribute with either `"` or `'`; a hand-edited file uses the second. */
+/** An attribute value, quoted with either `"` or `'`. */
 const attr = (attrs: string, name: string) => {
   const match = new RegExp(`w:${name}=(?:"([^"]*)"|'([^']*)')`).exec(attrs);
   return match ? (match[1] ?? match[2]!) : null;
@@ -667,7 +614,7 @@ const attr = (attrs: string, name: string) => {
 /**
  * The colour a `w:shd` paints. Its pattern (`w:val`) lays `w:color` over `w:fill`: "clear" is the
  * fill alone, "solid" the colour alone, "pctN" N% of the colour over the fill. Any other pattern,
- * or an "auto" colour under one, is "" — unknown, and white text on it is not judged.
+ * or an "auto" colour under one, is "" (unknown: white text on it is not judged).
  */
 function shading(attrs: string): string | null {
   const pattern = attr(attrs, "val") ?? "clear";
@@ -689,15 +636,11 @@ function shading(attrs: string): string | null {
     .join("");
 }
 
-/**
- * Every pattern over the XML stops at the next `<` as well as `>`: XML allows neither inside a
- * tag, and `[^>]*` let each unclosed tag in a hostile file scan to the end of the document —
- * quadratic in the 8 MB this reader accepts, and worse where two such runs were nested.
- */
+/** Patterns over the XML stop at the next `<` as well as `>`, so an unclosed tag cannot scan to the end (quadratic). */
 const TAG = /<(\/?)(w:[A-Za-z]+|wps:txbx|v:textbox)\b([^<>]*?)(\/?)>/g;
 const EXTENT = /<wp:extent\b([^<>]*)>/g;
 
-/** A drawing's printed size is in EMUs: 12,700 to the point. */
+/** Drawing sizes are in EMUs. */
 const EMU_PER_POINT = 12_700;
 const PHOTO_MIN_POINTS = 50;
 
@@ -706,13 +649,9 @@ export type DocxMeasure = {
   hiddenSample: string;
   /** All of the hidden text, in document order, to `MAX_HIDDEN_TEXT` characters. */
   hiddenText: string;
-  /**
-   * Of it, what the text holds too, to `MAX_HIDDEN_TEXT` characters: every hidden run of the body,
-   * which `mammoth` reads whatever its formatting, and a header's or footer's but those marked
-   * hidden, which `docxMargins` leaves out.
-   */
+  /** Of it, what the text holds too: every hidden body run, and header/footer runs not marked hidden. */
   hiddenTextRead: string;
-  /** Tables in the body, nested ones included: Word layouts built from tables extract out of order. */
+  /** Tables in the body, nested included. */
   tableCount: number;
   /** Pictures printed at least 50pt a side — a photo, as for a PDF. */
   imageCount: number;
@@ -723,10 +662,8 @@ export type DocxMeasure = {
 };
 
 /**
- * A tracked change: an insertion, a deletion, a move, or a formatting change (`w:rPrChange`,
- * `w:pPrChange`, …). Not the range marks around a move (`w:moveFromRangeStart`), deleted text
- * (`w:delText`) or a table's inside borders (`w:insideH`): the name must end where the tag name
- * does. Bounded, so each `<w:` costs a constant.
+ * A tracked change: an insertion, deletion, move or formatting change (`w:rPrChange`, …). Not the
+ * move range marks, `w:delText` or `w:insideH`: the name must end where the tag name does.
  */
 const REVISION = /<w:(?:ins|del|moveFrom|moveTo|[A-Za-z]{1,12}Pr(?:Ex)?Change)(?=[\s/>])/g;
 const COMMENT = /<w:comment(?=[\s/>])/g;
@@ -741,10 +678,8 @@ const MARKUP_CLOSE = new Map([
 ]);
 
 /**
- * XML without its comments, processing instructions and CDATA markup, which an XML parser reads
- * as no elements: a tag written inside them is not one. A CDATA section's text stays, escaped as
- * the text around it is. One that never closes ends the document, as it ends what a parser
- * reads. Linear: each search starts where the last one ended.
+ * XML without comments, processing instructions and CDATA markup (a tag inside them is no
+ * element). A CDATA section's text stays, escaped. One that never closes ends the document.
  */
 function withoutMarkup(xml: string): string {
   const kept: string[] = [];
@@ -766,7 +701,7 @@ function withoutMarkup(xml: string): string {
   return kept.join("");
 }
 
-/** A table being read; `outer` is what an unshaded cell of it shows, from the tables around it. */
+/** A table being read; `outer` is what its unshaded cells show, from the tables around it. */
 type OpenTable = {
   styled: boolean;
   fill: string | null;
@@ -774,14 +709,11 @@ type OpenTable = {
   outer: string | null | undefined;
 };
 
-/**
- * The shading under text in `table` when its runs have none: its cell's, else its own, else —
- * unknown in a styled table — that of the tables around it. Undefined: none, the page shows.
- */
+/** The shading under a table's unshaded runs: its cell's, its own, else (null if styled) the outer tables'. Undefined: the page shows. */
 const underTable = (table: OpenTable | undefined): string | null | undefined =>
   table && (table.cell ?? table.fill ?? (table.styled ? null : table.outer));
 
-/** What `measureDocx` throws for a main document too large to measure. */
+/** Thrown by `measureDocx` for a main document too large to measure. */
 export const UNMEASURABLE_DOCX = `The document's text expands to more than ${MAX_XML_BYTES / 1024 / 1024} MB; it is not a resume.`;
 
 /** The most hidden text kept whole, in characters. */
@@ -792,15 +724,14 @@ const xmlText = (text: string) =>
   text.replace(/&#?\w+;/g, (reference) => entity(reference) ?? reference);
 
 /**
- * The shading each paragraph style gives the paragraphs that name it: a hex colour, `null` for
- * none, or "" where its pattern leaves it unknown. Followed through `w:basedOn` (ten steps at
- * most). A style the part does not define is no style — Word gives its paragraph the defaults —
- * so it adds no shading. `xml` null: the part could not be read, and every style is unknown.
+ * The shading each paragraph style gives its paragraphs: a hex colour, `null` for none, "" where
+ * unknown. Followed through `w:basedOn` (ten steps). An undefined style adds no shading. `xml`
+ * null: the part could not be read, and every style is unknown.
  */
 function styleShading(xml: string | null): (id: string | null) => string | null {
   const styles = new Map<string, { shd: string | null | undefined; basedOn: string | null }>();
   for (let at = xml?.indexOf("<w:style ") ?? -1; xml && at >= 0;) {
-    // A style written `<w:style …/>` is empty: what follows is the next style's.
+    // `<w:style …/>` is empty: what follows is the next style's.
     const open = xml.indexOf(">", at);
     const end = xml[open - 1] === "/" ? open + 1 : xml.indexOf("</w:style>", at);
     if (open < 0 || end < 0) break;
@@ -823,16 +754,12 @@ function styleShading(xml: string | null): (id: string | null) => string | null 
       if (style.shd !== undefined) return style.shd;
       id = style.basedOn;
     }
-    // A chain that loops (A based on B based on A) or runs on past ten steps names no shading
-    // Word would show: the page shows.
+    // A looping or over-long chain names no shading: the page shows.
     return null;
   };
 }
 
-/**
- * A part's content, or null where it is damaged — which `mammoth` refuses on its own. Throws
- * `UNMEASURABLE_DOCX` where it expands past what this reads.
- */
+/** A part's content, or null where damaged (`mammoth` refuses those). Throws `UNMEASURABLE_DOCX` past `MAX_XML_BYTES`. */
 function inflatePart(entry: ZipEntry): Buffer | null {
   const content = inflate(entry, MAX_XML_BYTES);
   if (content) return content;
@@ -847,15 +774,12 @@ function inflatePart(entry: ZipEntry): Buffer | null {
   return null;
 }
 
-/** What a part's runs say: the text of its hidden ones, of those not marked hidden (`w:vanish`),
- * and its paragraphs' text without the runs marked hidden, a tab, break or carriage return each
- * as a tab or line break. */
+/** A part's hidden runs, those among them not marked `w:vanish`, and paragraph text without `w:vanish` runs. */
 type PartRuns = { hidden: string[]; shownHidden: string[]; lines: string[] };
 
 /**
- * Reads the runs of one part — the main document, a header, a footer — for those a reader of
- * the page cannot see. `page` is the page colour and `behindText` whether a shape lies behind
- * the text, both from the main document.
+ * Reads the runs of one part (document, header, footer) for those a reader cannot see. `page` is
+ * the page colour and `behindText` whether a shape lies behind the text.
  */
 function scanRuns(
   xml: string,
@@ -863,21 +787,15 @@ function scanRuns(
   page: string,
   behindText: boolean,
 ): PartRuns {
-  // One entry per open table: whether it names a table style, whose shading this does not read,
-  // the shading its own properties give every cell, and the shading of its current cell. Kept per
-  // table, not once: a table nested in a cell closes back into that cell, and a cell of its own
-  // without shading shows the cell around it. Only the innermost table changes while it is open,
-  // so what the tables around it show is taken once, when it opens: a run resolves its
-  // background in constant time however deep the nesting.
+  // One per open table. `outer` is taken once when it opens, so a run resolves its background in
+  // constant time however deep the nesting.
   const tables: OpenTable[] = [];
   let paragraphFill: string | null = null;
-  // The shading of the paragraph style the paragraph names: a heading band is often given one.
+  // The shading of the paragraph's style.
   let styleFill: string | null = null;
   let inTextBox = 0;
-  // The tracked formatting change (`w:rPrChange`, `w:pPrChange`, `w:tcPrChange`, …) being read:
-  // the properties there are what the text looked like before the change, not what it looks
-  // like. It ends with its own end tag, and at the latest where a run or paragraph opens, which
-  // none holds: a change left open cannot hide the rest of the document.
+  // The tracked formatting change being read: its properties are the old look. It ends at its own
+  // end tag, or where a run or paragraph opens, so one left open cannot hide the document.
   let change: string | null = null;
   let where: "table" | "cell" | "paragraph" | "run" | null = null;
   let run: {
@@ -927,8 +845,7 @@ function scanRuns(
     else if (tag === "w:pPr") where = open && !selfClosing ? "paragraph" : null;
     else if (tag === "w:rPr") where = open && !selfClosing ? "run" : null;
     else if (tag === "w:shd" || tag === "w:highlight") {
-      // Shading is hex, or "" where its pattern leaves it unknown; a highlight is a named colour,
-      // where only "white" leaves the page white.
+      // A highlight is a named colour: only "white" leaves the page white.
       const value = tag === "w:highlight" ? attr(attrs, "val") : null;
       const colour =
         tag === "w:shd"
@@ -948,9 +865,8 @@ function scanRuns(
       run = { vanish: false, size: null, color: null, fill: null };
       runText = "";
     } else if (tag === "w:r" && closing && run) {
-      // A cell without shading of its own shows its table's, and a table nested in a cell
-      // without either shows that cell's, outwards. In a styled table with neither, the style
-      // may shade the cell: unknown. So is the bare page under a shape behind the text.
+      // In a styled table with no shading, the style may shade the cell: unknown. So is the bare
+      // page under a shape behind the text.
       const underCell = underTable(tables.at(-1));
       const background =
         run.fill ??
@@ -983,11 +899,7 @@ function scanRuns(
   return { hidden, shownHidden, lines };
 }
 
-/**
- * The parts holding a DOCX's page headers and footers, by name, inflated: at most
- * `MAX_PARSED_XML_BYTES` between them, and a part past that is neither read nor measured. Each
- * was read up to 8 MB, as many as the archive held: seven took nine seconds. Word's are a few KB.
- */
+/** The header and footer parts by name, inflated; a part past `MAX_PARSED_XML_BYTES` between them is skipped. */
 function marginParts(files: Map<string, ZipEntry>): Array<[key: string, content: Buffer]> {
   let left = MAX_PARSED_XML_BYTES;
   const parts: Array<[string, Buffer]> = [];
@@ -1003,16 +915,13 @@ function marginParts(files: Map<string, ZipEntry>): Array<[key: string, content:
 
 /**
  * Hidden runs, tables and pictures in a DOCX's main document, or null when it has none to read.
- * The runs of its page headers and footers are judged too: an ATS reads them as well. Throws
- * `UNMEASURABLE_DOCX` when the document or its styles are there but expand past what this reads:
- * its text would still reach an ATS — padded past the limit with an XML comment — while every
- * rule that depends on these measures silently dropped out of the report.
+ * Header and footer runs are judged too. Throws `UNMEASURABLE_DOCX` when the document or its styles
+ * expand past what this reads, so the rules depending on these measures never drop out silently.
  */
-export function measureDocx(data: Uint8Array): DocxMeasure | null {
-  // The main document `mammoth` extracts, wherever the package's relationships put it.
-  const files = zipFiles(data);
-  const parts = files && mammothParts(files);
-  const entry = parts && files.get(parts.main);
+export function measureDocx(data: Uint8Array, archive = openDocx(data)): DocxMeasure | null {
+  if (!archive) return null;
+  const { files, parts } = archive;
+  const entry = files.get(parts.main);
   if (!entry || entry.dir) return null;
   const content = inflatePart(entry);
   if (!content?.length) return null;
@@ -1024,8 +933,7 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
   );
 
   const tableCount = xml.match(/<w:tbl>|<w:tbl\s/g)?.length ?? 0;
-  // Pictures, not every drawing: a text box or a shape has an extent too, and a skills text box
-  // was reported as a photo.
+  // Pictures only: a text box or shape has an extent too.
   let imageCount = 0;
   for (let at = xml.indexOf("<w:drawing"); at >= 0;) {
     const end = xml.indexOf("</w:drawing>", at);
@@ -1042,19 +950,14 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
     at = end < 0 ? -1 : xml.indexOf("<w:drawing", end);
   }
 
-  // The page colour, when the document sets one and shows it.
   const page = /<w:background\b[^<>]*w:color=["']([0-9A-Fa-f]{6})["']/.exec(xml)?.[1] ?? "FFFFFF";
-  // A shape anchored behind the text — a Word template's dark sidebar or header band — lies
-  // under text this cannot place, so text on the bare page no longer has a known background.
+  // A shape anchored behind the text (a template's sidebar or band) makes the background unknown.
   const behindText = /<wp:anchor\b[^<>]*\bbehindDoc=["'](?:1|true|on)["']/.test(xml);
 
   const hidden = scanRuns(xml, paragraphStyle, page, behindText).hidden;
-  // The hidden text the text holds: all of the body's, as `mammoth` reads every run.
   const read = [...hidden];
   let trackedChanges = count(xml, REVISION);
-  // A header's banner — a shape or picture behind its text, as Word's templates draw them — is
-  // a background this cannot read: white text on the bare page of a part that draws one is not
-  // judged.
+  // A header banner (shape or picture) is an unreadable background, as `behindText` is.
   for (const [, part] of marginParts(files)) {
     const content = withoutMarkup(part.toString("utf8"));
     trackedChanges += count(content, REVISION);
@@ -1064,7 +967,6 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
     for (const run of runs.shownHidden) read.push(run);
   }
 
-  // The comments themselves, from their own part when it is there to read.
   const commentsEntry = parts.comments ? files.get(parts.comments) : undefined;
   const commentsPart = commentsEntry && inflate(commentsEntry, MAX_XML_BYTES);
   const comments = Math.max(
@@ -1072,10 +974,11 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
     count(xml, COMMENT_REFERENCE),
   );
 
-  const decoded = xmlText(hidden.join(" ").replace(/\s+/g, " ").trim());
+  const joined = (runs: string[]) => xmlText(runs.join(" ").replace(/\s+/g, " ").trim());
+  const decoded = joined(hidden);
   return {
     hiddenText: decoded.slice(0, MAX_HIDDEN_TEXT),
-    hiddenTextRead: xmlText(read.join(" ").replace(/\s+/g, " ").trim()).slice(0, MAX_HIDDEN_TEXT),
+    hiddenTextRead: joined(read).slice(0, MAX_HIDDEN_TEXT),
     hiddenChars: decoded.replace(/\s/g, "").length,
     hiddenSample: decoded.slice(0, 80),
     tableCount,
@@ -1086,13 +989,12 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
 }
 
 /**
- * The text of a DOCX's page headers and footers, one line per paragraph or line break, each line
- * once: what `mammoth` leaves out. Contact details often sit in the header, and an ATS that reads
- * headers finds them there. Page numbers, and runs marked hidden, are left out.
+ * The text of a DOCX's page headers and footers, which `mammoth` leaves out: one line per
+ * paragraph or line break, each line once. Page numbers and hidden runs are left out.
  */
-export function docxMargins(data: Uint8Array): { header: string; footer: string } {
+export function docxMargins({ files }: DocxArchive): { header: string; footer: string } {
   const lines = { header: new Set<string>(), footer: new Set<string>() };
-  for (const [key, content] of marginParts(zipFiles(data) ?? new Map())) {
+  for (const [key, content] of marginParts(files)) {
     const { lines: paragraphs } = scanRuns(
       withoutMarkup(content.toString("utf8")),
       () => null,
@@ -1110,16 +1012,13 @@ export function docxMargins(data: Uint8Array): { header: string; footer: string 
 }
 
 /**
- * The HTML a DOCX embeds whole (`w:altChunk`), as html-docx-js and many web resume builders
- * write it: the document then holds no paragraphs of its own, and `mammoth` read it as empty.
- * An MHT chunk — the form html-docx-js writes — is read from its `<html` to its `</html>`,
- * quoted-printable decoded when it says so; RTF and other chunks are left out.
+ * The HTML a DOCX embeds whole (`w:altChunk`), which `mammoth` reads as empty. An MHT chunk is
+ * read from its `<html` to its `</html>`, quoted-printable decoded when it says so; RTF and other
+ * chunks are left out.
  */
-export function docxChunks(data: Uint8Array): string[] {
-  const files = zipFiles(data);
-  const parts = files && mammothParts(files);
-  return (parts?.chunks ?? []).flatMap((chunk) => {
-    let content = inflate(files!.get(chunk)!, MAX_XML_BYTES)?.toString("latin1") ?? "";
+export function docxChunks({ files, parts }: DocxArchive): string[] {
+  return parts.chunks.flatMap((chunk) => {
+    let content = inflate(files.get(chunk)!, MAX_XML_BYTES)?.toString("latin1") ?? "";
     if (/^MIME-Version:[^]*quoted-printable/i.test(content.slice(0, 2_000)))
       content = content
         .replace(/=\r?\n/g, "")

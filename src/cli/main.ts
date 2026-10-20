@@ -1,15 +1,4 @@
-/**
- * `ats-engine check <resume> [--job <file> | --job-url <url>] [--policy <file>] [--json] [--min-score <n>]
- * [--region <code>] [--text] [--ats <name>] [--ai …]`
- *
- * Scores a resume file (PDF, DOCX, HTML, text or Markdown, or a JSON resume document) with the
- * bundled default policy and locale packs, or with `--policy`. `--job-url` reads a posting from
- * its job board's public API (`./jobUrl.ts`), the only request made without `--ai`. `--min-score` makes it usable as a
- * CI gate: the exit code is 2 when the readiness score falls below it. `--ats` adds a vendor's
- * documented notes to the advice, which is never scored. `--ai` adds a model's analysis with the
- * user's own key; the score never depends on it. `USAGE` below is the `--help` text, and the
- * option table in README.md follows it.
- */
+/** `ats-engine check <resume> [options]`; `USAGE` below is the `--help` text, and README.md's option table follows it. */
 
 import { parseArgs } from "node:util";
 
@@ -24,7 +13,7 @@ import {
   scoreTone,
 } from "../format/index.js";
 import {
-  AtsScoringService,
+  check,
   computeVerdict,
   DEFAULT_POLICY,
   parseAtsPolicy,
@@ -67,7 +56,6 @@ import { UsageError } from "./usage.js";
 const KEY_NAMES = Object.values(PROVIDERS)
   .map((preset) => preset.keyEnv)
   .filter(Boolean);
-// Two lines in the help, so it fits a narrow terminal.
 const KEY_VARIABLES = `${KEY_NAMES.slice(0, 3).join(", ")},\n  ${KEY_NAMES.slice(3).join(", ")}`;
 
 const REGIONS = BUILT_IN_LOCALES.regions.map((pack) => pack.id).join(", ");
@@ -154,7 +142,6 @@ function render(report: AtsReport, style: Style): string {
   ];
   if (report.jobMatchScore !== null) {
     lines.push(`${style.bold("Job match")}  ${toned(report.jobMatchScore).score}`);
-    // With a posting the verdict reads the match, so it can differ from the readiness label.
     const verdict = computeVerdict(report);
     const paint = { strong: style.green, "needs-work": style.yellow, weak: style.red }[verdict];
     lines.push(`${style.bold("Verdict")}    ${paint(verdict.replace("-", " "))}`);
@@ -178,7 +165,6 @@ function render(report: AtsReport, style: Style): string {
   lines.push(field("Email", parsed.email || none));
   lines.push(field("Phone", parsed.phone || none));
   for (const role of parsed.roles.slice(0, 8)) {
-    // A role read without dates prints none, not "(null)".
     const dates = formatRoleDates(role);
     lines.push(
       field(
@@ -205,7 +191,6 @@ function render(report: AtsReport, style: Style): string {
       );
   }
 
-  // After the failed checks, under its own heading: worth knowing, never part of the score.
   if (report.advice.length) {
     lines.push("", style.bold("Advice (not scored):"));
     for (const item of report.advice) {
@@ -232,7 +217,7 @@ function renderRequirement(requirement: AtsRequirement, style: Style): string {
   return `    ${label} ${requirement.text}${preferred}${detail}`;
 }
 
-/** parseArgs' own messages talk about positional arguments; say what went wrong instead. */
+/** Replaces `parseArgs`' messages, which talk about positional arguments. */
 function parseCheckArgs(argv: string[]) {
   try {
     return parseArgs({
@@ -270,7 +255,7 @@ function parseCheckArgs(argv: string[]) {
   }
 }
 
-async function check(argv: string[], context: CliContext): Promise<number> {
+async function runCheck(argv: string[], context: CliContext): Promise<number> {
   const { values, positionals } = parseCheckArgs(argv);
   const { terminal } = context;
   const style = createStyle(values.json ? 1 : terminal.depth);
@@ -294,7 +279,7 @@ async function check(argv: string[], context: CliContext): Promise<number> {
 
   const strayAiFlag = AI_FLAGS.find((flag) => values[flag] !== undefined);
   if (strayAiFlag && !values.ai) throw new UsageError(`--${strayAiFlag} needs --ai.`);
-  // Settled before any file is read, so a missing key fails at once rather than after a parse.
+  // Before any file is read, so a missing key fails at once.
   const aiConfig = values.ai ? resolveAiConfig(values, context.env) : null;
   if (values.job !== undefined && values["job-url"] !== undefined)
     throw new UsageError("Give either --job or --job-url, not both.");
@@ -313,7 +298,6 @@ async function check(argv: string[], context: CliContext): Promise<number> {
   const targets = Object.keys(policy.advice.targets);
   if (values.ats !== undefined && !targets.includes(values.ats.toLowerCase()))
     throw new UsageError(`Unknown --ats "${values.ats}"; use one of ${targets.join(", ")}.`);
-  // A posting on a board the policy has notes on brings them, unless --ats names another.
   const targetAts =
     values.ats ?? (jobUrl && targets.includes(jobUrl.board.ats) ? jobUrl.board.ats : undefined);
 
@@ -327,7 +311,7 @@ async function check(argv: string[], context: CliContext): Promise<number> {
       : undefined;
   const jobDescription = job?.text;
   const resume = prepareResume(input);
-  const report = AtsScoringService.check(resume, policy, {
+  const report = check(resume, policy, {
     jobDescription,
     jobCompany: job?.company,
     layout,
@@ -344,8 +328,7 @@ async function check(argv: string[], context: CliContext): Promise<number> {
   let aiFailed = false;
   let ai: ReturnType<typeof aiJson> | undefined;
   if (aiConfig) {
-    // Said before anything leaves the machine, in plain text: stderr can be a file while stdout
-    // is a terminal. `analyze` redacts these; see ai/redact.ts.
+    // Printed before anything leaves the machine; `analyze` redacts these (ai/redact.ts).
     console.error(
       `\nSending the resume to ${aiConfig.provider} at ${aiConfig.host} (${aiConfig.model}) for ` +
         "analysis. Your name, email, phone number and links are replaced with placeholders first.",
@@ -364,15 +347,13 @@ async function check(argv: string[], context: CliContext): Promise<number> {
     }
   }
 
-  // JSON escapes C0 controls but not C1 (U+0080–U+009F), which a terminal can still act on.
+  // JSON escapes C0 but not C1 controls (U+0080–U+009F), which a terminal can act on.
   if (values.json) console.log(JSON.stringify(printable(ai ? { ...report, ai } : report), null, 2));
-  // The reading order, for seeing what a multi-column layout became.
   else if (values.text)
     console.log(["", style.bold("Text as read:"), ...printable(report.lines ?? [])].join("\n"));
 
   if (belowMinimum)
     console.error(`Readiness ${report.readinessScore} is below --min-score ${minScore}.`);
-  // The gate's answer is known whatever happened to the analysis, and CI acts on it.
   return belowMinimum ? 2 : aiFailed ? 1 : 0;
 }
 
@@ -384,7 +365,7 @@ function printUsage(terminal: Terminal) {
 export async function main(argv: string[], context = defaultContext()): Promise<number> {
   const [command, ...rest] = argv;
   try {
-    if (command === "check") return await check(rest, context);
+    if (command === "check") return await runCheck(rest, context);
     if (command === "--version" || command === "-v") {
       console.log(ENGINE_VERSION);
       return 0;

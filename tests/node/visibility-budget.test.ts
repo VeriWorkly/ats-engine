@@ -6,11 +6,7 @@ import { extractResume } from "../../src/node/index.js";
 import { indexDrawn, MAX_POINT_CHECKS, type Drawn } from "../../src/node/surroundings.js";
 import { buildPdf } from "../fixtures/buildPdf.js";
 
-/**
- * A crowded page cannot hold the visibility replay: the work is bounded by a count of point
- * checks, not by time, so these tests assert on the count and on the outcome. The replay's
- * budget is lowered here so the limit is reached in milliseconds on any machine.
- */
+/** A crowded page cannot hold the visibility replay: work is bounded by a count of point checks, asserted here with a lowered budget. */
 
 const TEST_BUDGET = 100_000;
 

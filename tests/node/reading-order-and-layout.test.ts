@@ -15,11 +15,6 @@ import {
 import { buildPdf, buildPdfPages, stream } from "../fixtures/buildPdf.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Regressions for the file-extraction audit: each block names the finding it protects. Invented
- * people throughout.
- */
-
 const pdf = (
   ops: string,
   ...rest: Parameters<typeof buildPdf> extends [string, ...infer R] ? R : never
@@ -33,8 +28,7 @@ const p = (value: string, runProperties = "") =>
 
 describe("PDF text is read in reading order, not paint order", () => {
   it("reads a floated date beside its title, though the page paints it first", async () => {
-    // Chrome paints `float: right` before the inline text around it: every date came out above
-    // the name, and no role was recovered.
+    // Chrome paints `float: right` before the inline text around it.
     const ops = [
       at(470, 700, "May 2020 - Present"),
       at(470, 640, "Aug 2016 - Apr 2020"),
@@ -52,8 +46,7 @@ describe("PDF text is read in reading order, not paint order", () => {
   });
 
   it("reads a block painted after the rest where it sits on the page", async () => {
-    // Relatively positioned or semi-transparent blocks are painted last: "EXPERIENCE\nEDUCATION"
-    // and then every job.
+    // Relatively positioned or semi-transparent blocks are painted last.
     const ops = [
       at(45, 760, "Tomasz Nowak", 20),
       at(45, 700, "EXPERIENCE", 12),
@@ -78,8 +71,7 @@ describe("PDF text is read in reading order, not paint order", () => {
   });
 
   it("reads a large name before the right-aligned contact block beside it", async () => {
-    // The contact block's first line sits above the name's baseline; by baseline alone the
-    // email came first and the parser took a heading for the name.
+    // The contact block's first line sits above the name's baseline.
     const ops = [
       at(47, 758, "Rahul Sharma", 24),
       at(47, 742, "Data Engineer", 10.5),
@@ -573,7 +565,7 @@ describe("a DOCX built from an embedded HTML chunk is read", () => {
 
 describe("list markers drawn as shapes are read as bullets", () => {
   it("starts a line with a small filled square just before it with a bullet", async () => {
-    // Two items of one list: a lone mark is no list (review #1 of the second pass).
+    // Two items of one list: a lone mark is no list.
     const ops = [
       at(45, 712, "Experience"),
       `40 698 3 3 re f`,
@@ -691,7 +683,7 @@ describe("the hidden-text sample reads as words", () => {
     const { layout } = await pdf(
       `${at(50, 700, "Jane Doe")}\n1 1 1 rg BT /F1 10 Tf 50 600 Td ${glyphs} ET`,
     );
-    expect(layout?.hiddenTextSample).toBe("Kubernetes Terraform");
+    expect(layout?.hiddenText).toBe("Kubernetes Terraform");
   });
 });
 
@@ -819,12 +811,11 @@ describe("letter-spaced text keeps its word breaks", () => {
 });
 
 describe("hiddenText carries all of the hidden text", () => {
-  it("holds what the 80-character sample cuts off, from a PDF and a DOCX", async () => {
+  it("holds more than 80 characters, from a PDF and a DOCX", async () => {
     const words =
       "Kubernetes Terraform Golang Rust Snowflake Databricks Kafka Spark Airflow dbt Flink Pulsar";
     const fromPdf = (await pdf(`${at(50, 700, "Jane Doe")}\n1 1 1 rg ${at(20, 600, words, 8)}`))
       .layout;
-    expect(fromPdf?.hiddenTextSample).toHaveLength(80);
     expect(fromPdf?.hiddenText).toBe(words);
     const docx = buildDocxBody(p("Jane Doe") + p(words, "<w:vanish/>"));
     const fromDocx = (await extractResume(docx, "docx")).layout;
@@ -915,9 +906,7 @@ describe("the new scans stay linear on hostile input", () => {
 
 describe("a sidebar taller than the main column is a column", () => {
   // The name and headline across the top, a sidebar that runs on below the work history beside
-  // it. Measured from the sidebar's side, under half of its text lay beside the main column, so
-  // no gutter was found: the lines were read across both columns, a role's employer became
-  // "jordan.ellery@example.com, Acme Corp", and the skills were lost.
+  // it: under half of its text lies beside the main column, yet it is a gutter.
   const sidebar = [
     [700, "CONTACT", 11],
     [684, "jordan.ellery@example.com", 8],
@@ -1026,11 +1015,8 @@ describe("a sidebar taller than the main column is a column", () => {
 });
 
 describe("a centred heading over a short block is not a second column", () => {
-  // The last page of a two-page @react-pdf resume, as pdf.js reports it: a centred "SKILLS"
-  // heading, then four short lines at the left margin, each a bold label, a colon and values.
-  // No text crosses the strip between the lines' ends and the heading, but the heading sits above
-  // the block, not beside it; read as a column of its own it came after its lines, and the
-  // parser found an empty skills section.
+  // The last page of a two-page @react-pdf resume: a centred "SKILLS" heading, then four short
+  // left-margin lines. The heading sits above the block, not beside it, so it is no column.
   const item = (str: string, size: number, x: number, y: number, width: number) => ({
     str,
     transform: [size, 0, 0, size, x, y],

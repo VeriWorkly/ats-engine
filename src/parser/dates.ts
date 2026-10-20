@@ -3,16 +3,9 @@ import type { AtsParsedDate } from "../types.js";
 import { escapeRegex, normalizeText, wordListPattern } from "../text/text.js";
 import { memo } from "../util/memo.js";
 
-/**
- * Date recognition, built from the policy's vocabulary rather than from constants in source.
- *
- * Month names and the spellings of "still here" are language-bound, so they are data. The
- * patterns are compiled per policy and memoised against it, because building six regexes for
- * every line of every resume is measurable and the policy object is stable for the life of a
- * request.
- */
+// Date patterns are built from the policy's vocabulary (month names, "present") and compiled once per policy.
 
-export type DateRange = {
+type DateRange = {
   start: AtsParsedDate | null;
   end: AtsParsedDate | null;
   current: boolean;
@@ -32,20 +25,18 @@ type DateMatchers = {
 /** A two-digit year after an apostrophe: "Jan '20". */
 const SHORT_YEAR = String.raw`['’‘]\d{2}(?!\d)`;
 
-/** A lone year range like "2019 - 2022" is ambiguous with a numeric bullet; require four digits. */
+/** A bare year needs four digits: "19 - 22" is ambiguous with a numbered list. */
 const YEAR_ONLY = /^\d{4}$/;
 
-/** A letter of any script, with its combining marks: the guard either side of a month name. */
+/** A letter of any script with its combining marks: the guard either side of a month name. */
 const LETTER = String.raw`[\p{L}\p{M}]`;
 
-/** The day of a written-out date: "15 " or "15. " before the month name, "1, " or "1 " after. */
+/** The day of a written-out date, before the month name ("15. ") or after ("1, "). */
 const DAY_BEFORE = String.raw`\d{1,2}\.?\s+`;
 const DAY_AFTER = String.raw`(?:\d{1,2},?\s+)?`;
 
 const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers => {
-  // Keys are folded the way resume text is (`normalizeText`, then lower case), because
-  // `parseDate` compares against that: a policy that spelled a month "Jan", or "फ़रवरी" with a
-  // precomposed nukta, would otherwise find the range and then fail to read it.
+  // Keys are folded like resume text (`normalizeText`, lower case), which `parseDate` compares against.
   const months = Object.fromEntries(
     Object.entries(rp.months).map(([name, month]) => [normalizeText(name).toLowerCase(), month]),
   );
@@ -56,49 +47,31 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
     .join("|")})(?!${LETTER})`;
   const separator = String.raw`\s*(?:[‐‑‒–—―−~-]|${wordListPattern(rp.rangeWords)})\s*`;
 
-  /**
-   * A single point in time, in any of the spellings a resume actually uses.
-   *
-   * Every year is fenced with `(?<!\d)` / `(?!\d)`. Without the fences "10000-20000 requests"
-   * read as the range 0000–2000, because a four-digit run could be taken from the middle of a
-   * longer number.
-   *
-   * A month name is a whole word the policy lists — "Jan", "January", "Sept" — with an
-   * optional full stop. Letters after an abbreviation used to be allowed, which read the
-   * employer in "Novartis 2018" as November and "Marketing 2019" as March; spelled-out names
-   * are listed in the policy instead. `[\s-]*` accepts "Jan-2020" and "Jan2020" as well as
-   * "Jan 2020", and the year may be two digits after an apostrophe ("Jan '20"), resolved by
-   * `findDateRange`. A season the policy lists ("Spring 2020") is a date too.
-   * A day may stand either side of the name — "15 Jan 2020", "15. Jan 2020", "June 1, 2019" —
-   * and is skipped: a range read only to the month must still be read, and is otherwise lost
-   * whole. The day before the name needs whitespace after it, so the name stays a whole word.
-   *
-   * Numeric forms, longest first: a full date with a day ("04.05.2021", "05/04/2021",
-   * "2021-05-04"), then month and year either way round ("05/2021", "05.2021", "2021-05",
-   * "2021/05"), then a bare year. A month-and-year match may not start inside a full date, or
-   * "04/05/2021" in the US would read as May.
-   */
   const seasons = Object.fromEntries(
     Object.entries(rp.seasons).map(([name, span]) => [normalizeText(name).toLowerCase(), span]),
   );
   const seasonNames = Object.keys(seasons).map(escapeRegex).join("|") || "(?!)";
   const seasonDate = String.raw`(?<!${LETTER})(?:${seasonNames})[\s-]+\d{4}(?!\d)`;
+  /**
+   * A single point in time. Years are fenced with `(?<!\d)` / `(?!\d)` ("10000-20000" is no
+   * range). A month name is a whole word the policy lists, with an optional full stop, then
+   * `[\s-]*` ("Jan-2020", "Jan2020") and a four-digit year or an apostrophe two-digit one
+   * (resolved by `findDateRange`); a listed season counts too. A day may stand either side of the
+   * name and is skipped. Numeric forms, longest first: a full date, month and year either way
+   * round (not starting inside a full date), then a bare year.
+   */
   const date = String.raw`(?:(?:(?<!\d)${DAY_BEFORE})?(?<!${LETTER})(?:${monthNames})\.?[\s-]*(?:${DAY_AFTER}\d{4}(?!\d)|${SHORT_YEAR})|${seasonDate}|(?<!\d)\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{1,2}(?!\d)|(?<![\d./-])\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}(?![\d./-])|(?<!\d)\d{4}(?!\d))`;
-  // "since 2019", "seit 03/2019": a start with no end, which is a current role.
+  // "since 2019": a start with no end is a current role.
   const since = wordListPattern(rp.sinceWords);
 
-  // The end of a range may be a year's last two digits ("2019–21"); `findDateRange` reads them
-  // only after a bare year, and against it.
+  // A range's end may be a year's last two digits ("2019–21"); `findDateRange` places them.
   const shortEnd = String.raw`\d{2}(?![\d./-])`;
 
   return {
     months,
     seasons,
-    // Global so `findDateRange` can move past a candidate that fails the sanity checks and try
-    // the next one on the same line.
-    // The second branch reads "Jan 2020 to date": there the "to" belongs to the open-ended
-    // phrase, so the separator branch consumes it and is left with "date". The last reads a
-    // season alone, "Summer 2018": a term, which ends when the season does.
+    // Global so `findDateRange` can try the next candidate on a line. The second branch reads
+    // "Jan 2020 to date" (the "to" belongs to the open-ended phrase); the last a season alone.
     range: new RegExp(
       String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})`,
       "giu",
@@ -114,9 +87,8 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
 });
 
 /**
- * One date as written. A year written in two digits ("Jan '20", or "21" ending "2019–21") comes
- * back as those two digits, for `findDateRange` to place; on its own it is no plausible year.
- * A season is read as its first month at the start of a range and its last at the end.
+ * One date as written. A two-digit year comes back as those digits for `findDateRange` to place.
+ * A season is its first month at the start of a range and its last at the end.
  */
 function parseDate(
   raw: string,
@@ -139,8 +111,7 @@ function parseDate(
 
   const month = (value: number) => (value >= 1 && value <= 12 ? value : null);
 
-  // A full date. Only its month is kept; which number that is depends on the region's order,
-  // unless one of the two is over 12 and so can only be the day.
+  // A full date: only the month is kept; which number it is depends on `dateOrder` unless one is over 12.
   const full = value.match(/^(\d{1,4})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{1,4})$/);
   if (full) {
     const [first, second, third] = full.slice(1).map(Number);
@@ -155,7 +126,7 @@ function parseDate(
   if (numeric && month(Number(numeric[1])))
     return { year: Number(numeric[2]), month: Number(numeric[1]) };
 
-  // ISO-ish "2021-03", which is how a Studio document serialises its dates, and "2021/03".
+  // "2021-03" and "2021/03".
   const iso = value.match(/^(\d{4})\s*[./-]\s*(\d{1,2})$/);
   if (iso && month(Number(iso[2]))) return { year: Number(iso[1]), month: Number(iso[2]) };
 
@@ -163,11 +134,7 @@ function parseDate(
   return null;
 }
 
-/**
- * The years a resume date can plausibly name. Anything outside is a number that happens to sit
- * either side of a dash or a "to" — "from 1000 to 5000 users" was recovered as a job running
- * from the year 1000 to the year 5000, and 24,000 months of experience with it.
- */
+// The years a date can plausibly name: "from 1000 to 5000 users" is not a job.
 const EARLIEST_YEAR = 1950;
 const YEARS_AHEAD = 10;
 
@@ -183,9 +150,8 @@ export function isPlausibleDate(date: AtsParsedDate | null, now: Date): date is 
 const ISO_DATE = /^(\d{4})(?:-(\d{1,2}))?(?:-\d{1,2})?(?:T.*)?$/;
 
 /**
- * A date from a structured document field: `YYYY-MM-DD`, `YYYY-MM` or `YYYY`, or failing that
- * any spelling the policy's own date vocabulary reads. Held to the same plausibility bounds as
- * a parsed date, so a typo'd year in an editor field is reported as missing rather than scored.
+ * A date from a structured document field: `YYYY-MM-DD`, `YYYY-MM` or `YYYY`, else any spelling
+ * the policy reads. Held to the same plausibility bounds as a parsed date.
  */
 export function parseDocumentDate(
   raw: string | undefined,
@@ -212,10 +178,19 @@ function withCentury(date: AtsParsedDate | null, latest: number): AtsParsedDate 
 }
 
 /** A two-digit end year as the first year ending in those digits on or after the start's. */
+
 function afterStart(date: AtsParsedDate | null, startYear: number): AtsParsedDate | null {
   if (!date || date.year >= 100) return date;
   const year = Math.floor(startYear / 100) * 100 + date.year;
   return { ...date, year: year < startYear ? year + 100 : year };
+}
+
+/** A date read as a range start would be: a two-digit year goes in the century keeping it within `YEARS_AHEAD`. */
+function placedStart(raw: string, rp: AtsEnginePolicy["resumeParse"], now: Date) {
+  const parsed = parseDate(raw, rp);
+  return TWO_DIGIT_YEAR.test(raw.trim())
+    ? withCentury(parsed, now.getUTCFullYear() + YEARS_AHEAD)
+    : parsed;
 }
 
 /** A missing month is read generously: January for a start, December for an end. */
@@ -224,26 +199,21 @@ function toIndex(date: AtsParsedDate, edge: "start" | "end") {
 }
 
 /**
- * The first date range on the line that reads as an actual span of time.
+ * The first date range on the line that reads as a real span of time. A candidate is skipped when
+ * either end is unreadable, a year is outside [1950, now + 10], or the range runs backwards; later
+ * candidates on the line are still tried ("Engineer 2010 · 2019 - 2022").
  *
- * A candidate is skipped rather than returned when either end is unreadable, a year falls
- * outside [1950, now + 10], or the range runs backwards. Later candidates on the same line are
- * still tried, so a header like "Engineer 2010 · 2019 - 2022" is not lost to its first number.
+ * Two-digit years are placed here: a start's in the century that keeps it at most ten years ahead
+ * of `now`, an end's in the first year on or after the start ending in those digits ("2019–21").
+ * A bare two-digit end follows only a bare year, not an unspaced hyphen when it could be a month
+ * ("2021-03"), not one landing more than `aheadYears` after `now` (an expected graduation), and
+ * not one followed by a word ("Suite 2021 - 30 Main St").
  *
- * Two-digit years are placed here: a start's ("Jan '20") in the century that keeps it no later
- * than ten years ahead of `now`, an end's in the first year on or after the start that ends in
- * those digits ("2019–21", "1998–02"). A bare two-digit end follows only a bare year, and not
- * after an unspaced hyphen when it could be a month: "2021-03" is March. Nor is it one when it
- * lands after `now` — by more than `aheadYears`, for an expected graduation ("2023–27") — or when
- * a word follows it as in an address ("Suite 2021 - 30 Main St").
+ * A season alone ("Summer 2018") counts only when the line holds no range and it stands apart
+ * (not in "Led the Fall 2021 recruiting season").
  *
- * A season alone ("Summer 2018") is read only when the line holds no range, and only at an edge
- * of the line or in a column of its own: in "Led the Fall 2021 recruiting season" or "Fall 2019
- * cohort, Acme Lab  Jan 2019 - Dec 2020" it is not the role's term.
- *
- * Read once per line in one reading of a resume (see `readingDatesAt`): the experience, education,
- * section and phone readers and the checks each ask of the same lines, and 25,000 lines of "1"
- * cost 25,000 searches each time.
+ * Cached per line within one reading of a resume (`readingDatesAt`): many readers ask of the same
+ * lines, and 25,000 short lines would cost 25,000 searches each time.
  */
 export function findDateRange(
   line: string,
@@ -264,8 +234,7 @@ type DateRangeFound = { range: DateRange; matched: string };
 
 /**
  * The lines read for dates in each reading of a resume, by the reading's own `now`, then by the
- * policy. A WeakMap on a Date made for that reading holds nothing once the reading is done, and a
- * `now` a caller keeps (or "any year") is never one: its lines are searched every time.
+ * policy. A caller's own `now` is never a key: its lines are searched every time.
  */
 const readings = new WeakMap<
   Date,
@@ -273,9 +242,9 @@ const readings = new WeakMap<
 >();
 
 /**
- * A `now` for one reading of a resume, with the same time as `now`: `findDateRange` reads each
- * line once for as long as it is passed this Date. Made fresh by each `check` and `parseResume`,
- * never kept, so what it remembers lasts one reading.
+ * A `now` for one reading of a resume, with the same time: `findDateRange` reads each line once
+ * while passed this Date. Made fresh by each `check` and `parseResume`, so the cache lasts one
+ * reading.
  */
 export function readingDatesAt(now: Date): Date {
   const reading = new Date(now.getTime());
@@ -286,11 +255,7 @@ export function readingDatesAt(now: Date): Date {
   return reading;
 }
 
-/**
- * Every date the patterns read holds two digits in a row: a four-digit year, or a two-digit one
- * after an apostrophe. A line without them holds no date, and is not searched: the patterns'
- * lookbehinds cost every position of the line, and a resume can be 25,000 one-letter lines.
- */
+/** Every date holds two digits in a row; a line without them is not searched (the lookbehinds are costly). */
 const TWO_DIGITS = /\d\d/;
 
 function searchDateRange(
@@ -304,9 +269,8 @@ function searchDateRange(
   let term: { range: DateRange; matched: string } | null = null;
 
   for (const match of line.matchAll(matchers.range)) {
-    // Group 4 is the "since 2019" branch: a start alone, which is a role still held. Group 5 is
-    // a season alone, "Summer 2018": a term that starts and ends with the season, kept for when
-    // the line holds no range.
+    // Group 4 is the "since 2019" branch (a role still held); group 5 a season alone, kept for
+    // when the line holds no range.
     if (match[5] !== undefined) {
       if (term || !standsApart(line, match.index, match[0].length)) continue;
       const start = parseDate(match[5], rp, "start");
@@ -318,10 +282,7 @@ function searchDateRange(
     const endText = match[2] ?? match[3];
     const current = match[4] !== undefined || matchers.openEnded.test(endText.trim());
     const startText = match[1] ?? match[4];
-    const parsedStart = parseDate(startText, rp);
-    const start = TWO_DIGIT_YEAR.test(startText.trim())
-      ? withCentury(parsedStart, now.getUTCFullYear() + YEARS_AHEAD)
-      : parsedStart;
+    const start = placedStart(startText, rp, now);
     const shortEnd = !current && /^\d{2}$/.test(endText.trim());
     if (shortEnd) {
       if (!YEAR_ONLY.test(startText.trim())) continue;
@@ -345,9 +306,8 @@ function searchDateRange(
 }
 
 /**
- * Every plausible date written on the line, one by one, where each stands: a certification's
- * "Issued Mar 2022 · Expires Mar 2025" holds two dates and no range. A two-digit year ("Jan
- * '20") is placed as a range's start would be.
+ * Every plausible date on the line, with where each stands ("Issued Mar 2022 · Expires Mar 2025"
+ * holds two dates and no range). A two-digit year is placed as a range's start would be.
  */
 export function findDates(
   line: string,
@@ -358,10 +318,7 @@ export function findDates(
   if (!TWO_DIGITS.test(line)) return found;
   for (const match of line.matchAll(buildMatchers(rp).single)) {
     const raw = match[0];
-    const parsed = parseDate(raw, rp);
-    const date = TWO_DIGIT_YEAR.test(raw.trim())
-      ? withCentury(parsed, now.getUTCFullYear() + YEARS_AHEAD)
-      : parsed;
+    const date = placedStart(raw, rp, now);
     if (isPlausibleDate(date, now))
       found.push({ date, index: match.index, end: match.index + raw.length });
   }
@@ -371,10 +328,7 @@ export function findDates(
 /** A word straight after a date, one space away at most: "30 Main St", not a column. */
 const WORD_AFTER = /^ ?[\p{L}]/u;
 
-/**
- * Whether the text at `index` stands apart on its line: at its start or end, give or take
- * brackets and separators, or set off by a column gap, a tab or a bar.
- */
+/** Whether the text at `index` stands apart: at the line's start or end (give or take brackets), or set off by a gap, tab or bar. */
 function standsApart(line: string, index: number, length: number) {
   const before = line.slice(0, index);
   const after = line.slice(index + length);

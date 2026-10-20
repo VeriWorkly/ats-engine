@@ -2,16 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   parseAtsPolicy,
   type AtsReport,
+  check as score,
 } from "../../src/index.js";
 
 /**
- * Notes on a named applicant tracking system: only what its vendor documents publicly, each note
- * with the page that says so, and only when the caller names the system. The engine does not
- * simulate any vendor's parser, and says nothing about one it was not asked about.
+ * Notes on a named ATS: only what its vendor documents publicly, each with its source, only when
+ * the caller names it.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -26,7 +25,7 @@ Skills
 TypeScript, Go, PostgreSQL`;
 
 const check = (targetAts?: string): AtsReport =>
-  AtsScoringService.check(RESUME, DEFAULT_POLICY, { now: NOW, targetAts });
+  score(RESUME, DEFAULT_POLICY, { now: NOW, targetAts });
 const notes = (report: AtsReport) => report.advice.filter((item) => item.kind === "ats");
 
 describe("target ATS notes", () => {

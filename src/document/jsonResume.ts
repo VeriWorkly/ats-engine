@@ -6,16 +6,9 @@ import {
   type AtsResumeDocument,
 } from "./types.js";
 
-/**
- * JSON Resume (https://jsonresume.org/schema) -> `AtsResumeDocument`.
- *
- * JSON Resume files are user-authored and loosely followed in the wild, so every field is read
- * defensively: a value of the wrong type is treated as absent rather than trusted. The schema
- * carries no section headings, so the English defaults below are used.
- *
- * Section order follows the schema's conventional print order. JSON Resume has no notion of a
- * hidden section — anything present is rendered.
- */
+// JSON Resume (https://jsonresume.org/schema) -> `AtsResumeDocument`. Files are loosely followed,
+// so every field is read defensively: a value of the wrong type is absent. The schema has no
+// section headings, so English defaults are used, in print order.
 
 type Json = Record<string, unknown>;
 
@@ -37,13 +30,9 @@ const title = {
 const isObject = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/**
- * Array reads are bounded before anything is mapped. A JSON Resume can arrive through a public
- * API, and an unbounded read would make the adapter do work proportional to an attacker's
- * array before the document limits are ever checked. Each list is cut to the limit of the
- * document field it fills — a role's highlights to `lines`, not `items` — because the schema
- * rejects an over-long list, and a file with 150 highlights is still the user's resume.
- */
+// Arrays are cut before mapping, to the limit of the document field they fill (the schema rejects
+// an over-long list), so work stays bounded however large the input is.
+
 const MAX_ITEMS = DOCUMENT_LIMITS.items;
 const MAX_LINES = DOCUMENT_LIMITS.lines;
 const MAX_KEYWORDS = DOCUMENT_LIMITS.keywords;
@@ -57,13 +46,9 @@ const objects = (value: unknown) =>
   Array.isArray(value) ? value.slice(0, MAX_ITEMS).filter(isObject) : [];
 
 /**
- * Whether an object reads as a JSON Resume.
- *
- * Keyed on what is distinctive to the schema, not on what resume formats share: `basics`,
- * `education` and `skills` appear in most of them, and a Studio-shaped document carrying those
- * three was once taken for a JSON Resume and lost its name and education to the wrong field
- * names. So a `work` array, or an education entry with an `institution`, is required, and a
- * `basics.fullName` (other formats' spelling of `basics.name`) rules it out.
+ * Whether an object reads as a JSON Resume. Keyed on what is distinctive to the schema: a `work`
+ * array or an education entry with an `institution` is required, and `basics.fullName` (another
+ * format's spelling) rules it out.
  */
 export function isJsonResume(value: unknown): value is Record<string, unknown> {
   if (!isObject(value) || "format" in value) return false;
@@ -75,7 +60,7 @@ export function isJsonResume(value: unknown): value is Record<string, unknown> {
   );
 }
 
-/** "Present" is how most hand-written files say a role is current, instead of omitting the end. */
+/** How hand-written files say a role is current instead of omitting the end. */
 const PRESENT = /^(?:present|current|now|ongoing|to date|till date)$/i;
 
 /** JSON Resume allows YYYY-MM-DD and full ISO datetimes; the document contract is YYYY-MM. */
@@ -92,6 +77,8 @@ const isCurrent = (item: Json) =>
   Boolean(str(item.startDate)) && (!str(item.endDate) || PRESENT.test(str(item.endDate)));
 
 const optional = (value: string) => value || undefined;
+
+const lineOf = (value: unknown) => (str(value) ? [str(value)] : []);
 
 /** A role with neither a title nor an employer names nothing and is dropped. */
 const identified = (role: { title: string; employer: string }) =>
@@ -110,17 +97,13 @@ function entries(
     .filter((entry) => entry.heading || entry.lines.length);
 }
 
-/**
- * A JSON Resume as an `AtsResumeDocument`, with English section titles: `work`, `volunteer`,
- * `education`, `projects`, `skills`, `certificates`, `languages` and the rest, in print order. A
- * field of the wrong type is read as absent; nothing throws.
- */
+/** A JSON Resume as an `AtsResumeDocument` with English section titles, in print order. Never throws. */
 export function fromJsonResume(json: unknown): AtsResumeDocument {
   const resume = isObject(json) ? json : {};
   const basics = isObject(resume.basics) ? resume.basics : {};
   const location = isObject(basics.location) ? basics.location : {};
 
-  // A profile with no URL is still named by its network and username ("GitHub: jdoe").
+  // A profile without a URL is named by network and username ("GitHub: jdoe").
   const links = [
     str(basics.url),
     ...objects(basics.profiles).map(
@@ -146,12 +129,11 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
     items: objects(resume.work)
       .map((work) => ({
         title: str(work.position),
-        // `company` is the pre-1.0 schema's name for it, still common in older files.
+        // `company` is the pre-1.0 schema's name.
         employer: str(work.name) || str(work.company),
         location: optional(str(work.location)),
         start: date(work.startDate),
         end: date(work.endDate),
-        // JSON Resume marks a current role by omitting the end date.
         current: isCurrent(work),
         summary: optional(str(work.summary) || str(work.description)),
         highlights: strings(work.highlights, MAX_LINES),
@@ -159,8 +141,7 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
       .filter(identified),
   });
 
-  // Volunteering is its own section, not work history: an ATS files it separately and it does
-  // not count toward years of experience, so it is rendered but never read as roles.
+  // Not work history: an ATS files volunteering separately, so it never counts toward tenure.
   add({
     kind: "other",
     title: title.volunteer,
@@ -173,10 +154,7 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
           .filter(Boolean)
           .join(" - "),
       ],
-      (item) => [
-        ...(str(item.summary) ? [str(item.summary)] : []),
-        ...strings(item.highlights, MAX_LINES),
-      ],
+      (item) => [...lineOf(item.summary), ...strings(item.highlights, MAX_LINES)],
     ),
   });
 
@@ -190,7 +168,6 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
         field: optional(str(education.area)),
         start: date(education.startDate),
         end: date(education.endDate),
-        // The grade and the courses listed, as the entry's own line.
         summary: optional(
           [str(education.score), strings(education.courses, MAX_KEYWORDS).join(", ")]
             .filter(Boolean)
@@ -245,7 +222,7 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
     items: entries(
       objects(resume.awards),
       (item) => [str(item.title), str(item.awarder), date(item.date)],
-      (item) => (str(item.summary) ? [str(item.summary)] : []),
+      (item) => lineOf(item.summary),
     ),
   });
 
@@ -255,7 +232,7 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
     items: entries(
       objects(resume.publications),
       (item) => [str(item.name), str(item.publisher), date(item.releaseDate)],
-      (item) => (str(item.summary) ? [str(item.summary)] : []),
+      (item) => lineOf(item.summary),
     ),
   });
 
@@ -283,7 +260,7 @@ export function fromJsonResume(json: unknown): AtsResumeDocument {
     items: entries(
       objects(resume.references),
       (item) => [str(item.name)],
-      (item) => (str(item.reference) ? [str(item.reference)] : []),
+      (item) => lineOf(item.reference),
     ),
   });
 

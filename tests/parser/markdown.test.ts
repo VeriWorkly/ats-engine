@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 import { check, DEFAULT_POLICY, parseResume } from "../../src/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * A resume written in Markdown, as `.md` files and resumes drafted in an editor or by an
- * assistant are: its heading marks, emphasis and link syntax are read past, not as text.
- */
+// A resume written in Markdown: heading marks, emphasis and link syntax are read past, not as text.
 
 const MARKDOWN = [
   "# Priya Raman",

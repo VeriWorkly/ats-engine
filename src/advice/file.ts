@@ -3,15 +3,10 @@ import { formatTemplate, wordListRegex } from "../text/text.js";
 import type { AtsAdvice, AtsFileInfo, AtsLayoutSignals } from "../types.js";
 import { memo } from "../util/memo.js";
 
-/**
- * File hygiene: what the file says before anyone reads it. Each piece of advice needs what it
- * reads — a name, a size, a measured signal — and is not given without it.
- */
-
 type Messages = AtsEnginePolicy["advice"]["messages"];
 type Text = Messages["fileName"];
 
-/** A file name past this is not one a person typed; the rest is not read. */
+/** The rest of a longer file name is not read. */
 const MAX_NAME = 255;
 
 const EXTENSIONS: Record<NonNullable<AtsFileInfo["format"]>, string> = {
@@ -51,8 +46,8 @@ function size(bytes: number): string {
 }
 
 /**
- * The name to suggest: the candidate's name as the parser read it, its words joined by "-", in
- * the policy's template with the file's own extension.
+ * The candidate's name as parsed, joined by "-", in the policy's template with the file's
+ * extension.
  */
 function suggestion(policy: AtsEnginePolicy, candidate: string, extension: string) {
   const words = candidate.split(/[^\p{L}\p{M}\p{N}'’]+/u).filter(Boolean);
@@ -61,9 +56,9 @@ function suggestion(policy: AtsEnginePolicy, candidate: string, extension: strin
 }
 
 /**
- * Whether a file name says whose resume it is and reads as final. Flagged: a draft mark anywhere
- * ("final", "v3", "(2)", "Copy"), or nothing but generic words and digits ("resume", "CV",
- * "Document1", "scan0001"). A name in any script with a word the lists do not know is someone's.
+ * Advice for a file name that is a draft mark anywhere ("final", "v3", "(2)") or only generic
+ * words and digits ("resume", "Document1"); null otherwise. Any other word, in any script, is
+ * taken as the candidate's.
  */
 function nameAdvice(policy: AtsEnginePolicy, file: AtsFileInfo, candidate: string) {
   const full = file.name!.slice(0, MAX_NAME);
@@ -95,7 +90,10 @@ function nameAdvice(policy: AtsEnginePolicy, file: AtsFileInfo, candidate: strin
   );
 }
 
-/** The file advice, in a fixed order: name, size, password, tracked changes, comments. */
+/**
+ * File hygiene, in a fixed order: name, size, password, tracked changes, comments. Each needs the
+ * value it reads.
+ */
 export function fileAdvice(
   policy: AtsEnginePolicy,
   file: AtsFileInfo | undefined,
@@ -117,7 +115,7 @@ export function fileAdvice(
     );
   if (file?.passwordProtected === true || layout?.encrypted === true)
     advice.push(adviceItem("file.passwordProtected", "file", messages.passwordProtected, {}));
-  // A count measured from the file quotes it; the caller's word alone has nothing to quote.
+  // A measured count is quoted; the caller's word alone has nothing to quote.
   for (const [id, text, count, said] of [
     ["file.trackedChanges", messages.trackedChanges, layout?.trackedChanges, file?.trackedChanges],
     ["file.comments", messages.comments, layout?.comments, file?.comments],

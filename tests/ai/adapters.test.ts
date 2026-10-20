@@ -75,7 +75,9 @@ describe("openai-compatible request body", () => {
     });
     // json_object requests need no schema-honouring upstream, so routing is left alone.
     const plain = request({ extraBody, output: { name: "out", schema, mode: "json_object" } });
-    expect(chatCompletionBody(plain, true).provider).toEqual({ order: ["x"] });
+    expect((chatCompletionBody(plain, true) as { provider?: unknown }).provider).toEqual({
+      order: ["x"],
+    });
   });
 });
 
@@ -144,7 +146,7 @@ describe("openai-compatible transport", () => {
   });
 
   it("keeps keys out of an error body that echoes the request", async () => {
-    // A proxy that echoes what it was sent puts the key in the body, and so in the message.
+    // A proxy that echoes the request puts the key in the error message.
     const echo = [
       "authorization: Bearer sk-invented-0123456789",
       "x-api-key: sk-ant-api03-other-key_9876543210",
@@ -164,7 +166,7 @@ describe("openai-compatible transport", () => {
   });
 
   it("keeps other providers' keys and JSON key fields out of an error body too", async () => {
-    // Keys of other services a gateway may echo: Groq, Hugging Face, xAI, Replicate, Together.
+    // Keys of other services: Groq, Hugging Face, xAI, Replicate, Together.
     const echo = JSON.stringify({
       seen: [
         "gsk_Invented0123456789",
@@ -284,7 +286,6 @@ describe("anthropic transport", () => {
     expect(await anthropic({ apiKey: "k", fetch }).complete(request())).toEqual({
       text: '{"a":1}',
       id: "msg_1",
-      // The total, with the cached part broken out: it is priced differently.
       usage: { inputTokens: 10, outputTokens: 7, cacheReadTokens: 3, cacheWriteTokens: 2 },
       finish: "stop",
     });
@@ -301,8 +302,7 @@ describe("anthropic transport", () => {
 });
 
 describe("redirects", () => {
-  // fetch drops `authorization` on a cross-origin redirect but keeps `x-api-key`, and a 307
-  // resends the body: following one hands the key and the resume to whoever answered.
+  // fetch keeps `x-api-key` across origins and a 307 resends the body.
   async function listen(handler: http.RequestListener): Promise<[http.Server, string]> {
     const server = http.createServer(handler);
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -460,8 +460,7 @@ describe("the provider's answer is read to a limit", () => {
     expect(read).not.toHaveBeenCalled();
   });
 
-  // node-fetch's body is a Node stream, a test double's a string, its headers a plain object:
-  // what has no reader or no `get` is read with `text()`, as before the limit.
+  // A body without a reader, or headers without `get`, is read with `text()`.
   it.each([
     ["a Node stream body", { body: { pipe() {} }, headers: new Map() }],
     ["a string body", { body: "{}" }],

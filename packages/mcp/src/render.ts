@@ -1,7 +1,4 @@
-/**
- * The text each tool returns for the model to read. The same facts as the structured content, in
- * the order a person reads a report: score, what failed and how to fix it, what was read.
- */
+/** The text each tool returns for the model: the structured content's facts in a report's reading order. */
 
 import type { AtsReport, AtsRequirement, AtsRubricEntry, AtsVerdict } from "@veriworkly/ats-engine";
 import {
@@ -13,7 +10,7 @@ import {
   formatTenure,
 } from "@veriworkly/ats-engine/format";
 
-/** Said in every scored answer, so the assistant does not present the score as its own opinion. */
+/** Said in every scored answer so the score is not presented as the assistant's opinion. */
 export function provenance(report: AtsReport): string {
   return (
     `Scored by the published, deterministic ATS Engine rubric (engine ${report.engine.version}, ` +
@@ -87,7 +84,6 @@ export function renderCheck(report: AtsReport, verdict: AtsVerdict, withJob: boo
   if (parsed.spokenLanguages.length)
     lines.push(`- Speaks: ${parsed.spokenLanguages.map(formatSpokenLanguage).join(", ")}`);
 
-  // Apart from the score, and said to be: none of it changes a number above.
   if (report.advice.length) {
     lines.push("", "Advice (not scored):");
     for (const item of report.advice) {

@@ -29,8 +29,7 @@ export const DEFAULT_RULES = [
     category: "contact",
     severity: "warning",
     kind: "position",
-    // No patterns: the rule locates the email and phone the parser recovered, so a phone number
-    // in any country's format counts.
+    // No patterns: locates the email and phone the parser recovered, in any country's format.
     windowFraction: 0.25,
     weight: 6,
     passEvidence: "Contact details appear near the top of the document.",
@@ -118,12 +117,8 @@ export const DEFAULT_RULES = [
     severity: "warning",
     kind: "bands",
     metric: "metricsRatio",
-    // A number that is not a date. `\d` alone counted every "Jan 2020 - Present" header as a
-    // quantified outcome, so a resume with no metrics at all still passed on its dates. Nor a
-    // name's digits ("EC2", "S3", "HTML5"; "x10" is a multiple), a bare version after a
-    // product's name ("Python 3.11", "on Windows 10.", but "Windows 400 laptops" is a count) or
-    // a standard's number ("ISO 27001", "SOC 2", "Tier 2"): a cloud engineer listing tools
-    // scored 100% with no outcome measured.
+    // A number that is not a date, a name's digits ("EC2", "HTML5"), a bare version ("Python
+    // 3.11") or a standard's number ("ISO 27001", "Tier 2"); "x10" and "Windows 400 laptops" count.
     pattern: String.raw`[$€£₹%]|(?<!\d)(?<!\d[.,])(?:(?<!\p{L})|(?<=(?<!\p{L})x))(?<!(?:iso|iec|soc|pci\s+dss|nist|tier|level)\s{1,2})(?!(?<=(?:python|java|php|ruby|swift|kotlin|angular|vue|react|node|django|rails|\.net|windows|macos|ios|android|ubuntu|rhel|office|excel|sql\s+server|oracle|mysql|postgres(?:ql)?|html|css|http|tls|oauth|ipv)\s{1,2})\d{1,2}(?:\.\d+)*(?![\d\p{L}])(?!\s{1,3}\p{L}))(?<!(?:19|20)\d{2}\s*[/.-]\s*)(?!(?:19|20)\d{2}(?!\d))(?!\d{1,2}\s*[/.-]\s*(?:19|20)\d{2}(?!\d))\d+`,
     flags: "i",
     bands: [
@@ -140,9 +135,8 @@ export const DEFAULT_RULES = [
     severity: "warning",
     kind: "bands",
     metric: "actionVerbRatio",
-    // No pattern: the verbs are `text.actionVerbs` and `text.actionVerbForms`, which a
-    // language pack extends. Worded for every language: a Hindi bullet ends with its verb, a
-    // German one may name the action as a noun ("Entwicklung von …").
+    // No pattern: the verbs are `text.actionVerbs` and `text.actionVerbForms`, which language
+    // packs extend.
     flags: "i",
     bands: [
       { upTo: 0.2, weight: 8 },
@@ -212,8 +206,7 @@ export const DEFAULT_RULES = [
     fix: "Check the dates: a role cannot start after today, and an end date left off makes jobs overlap.",
   },
   {
-    // Light: a recruiter forgives "Git" with no bullet behind it. What it says is where the
-    // resume could show its claims, which is what a per-requirement screener now looks for.
+    // Light: a recruiter forgives "Git" with no bullet behind it.
     id: "ats-v2.content.skillEvidence",
     category: "content",
     severity: "info",
@@ -243,9 +236,8 @@ export const DEFAULT_RULES = [
       "{n} {n|page is a picture|pages are pictures} with no text, so an ATS reads nothing on {n|it|them}.",
     fix: "Export the resume as a text PDF rather than scanning it or saving it as an image.",
   },
-  // Integrity. Deductions in points (`penalty`), never part of the denominator: they say what
-  // a resume does to game a screener, not how good it is, and an honest resume must score as
-  // if they did not exist. Heaviest where recruiters reject outright when they find it.
+  // Integrity. Penalties in points, outside the denominator: they say what a resume does to game
+  // a screener, not how good it is. Heaviest where recruiters reject outright.
   {
     id: "ats-v2.integrity.promptInjection",
     category: "integrity",
@@ -343,9 +335,8 @@ export const DEFAULT_RULES = [
     fix: "Name each skill where you used it. Repetition does not raise a match score in a modern ATS, and recruiters read it as stuffing.",
   },
   {
-    // Like the date of birth: convention, not parsing. An ATS reads past a photo, a recruiter
-    // in the US or UK is told to discard a resume carrying one, and in Germany it is usual.
-    // Light without a known country; the region packs turn it off or raise it.
+    // Convention, not parsing: a recruiter in the US or UK discards a resume with a photo, in
+    // Germany it is usual. Light without a known country; region packs turn it off or raise it.
     id: "ats-v2.format.photo",
     category: "format",
     severity: "info",
@@ -380,8 +371,7 @@ export const DEFAULT_RULES = [
     severity: "warning",
     kind: "parsed",
     metric: "roleCompleteness",
-    // Left out when no role was recovered: `parse.roles` reports that, and a share of nothing
-    // is no evidence.
+    // Left out when no role was recovered: a share of nothing is no evidence.
     bands: [
       { upTo: 0.6, weight: 10 },
       { upTo: null, weight: 0 },
@@ -405,10 +395,8 @@ export const DEFAULT_RULES = [
     fix: "Include a name, an email address, and a phone number as plain text.",
   },
   {
-    // Convention, not parsing: an ATS stores the date fine. Whether it belongs on the page
-    // depends on the country — expected in much of Asia, optional in Germany, a liability in
-    // the US, UK and Canada, where it invites age discrimination. Light here because the
-    // country is unknown; the region packs set it to nothing or raise it.
+    // Convention, not parsing: expected in much of Asia, a liability in the US, UK and Canada.
+    // Light without a known country; region packs set it to nothing or raise it.
     id: "ats-v2.privacy.dateOfBirth",
     category: "contact",
     severity: "info",
@@ -422,9 +410,8 @@ export const DEFAULT_RULES = [
     failEvidence: "A date of birth is stated.",
     fix: "Leave your date of birth off unless the country you are applying in expects it.",
   },
-  // Writing. Style a recruiter notices once the ATS has stored the resume, which no ATS filters
-  // on: its own category, so the categories that say whether a resume survives the ATS do not
-  // move, and light, so the score keeps meaning that. English words (`writing` in the policy):
+  // Writing: style a recruiter notices, which no ATS filters on. Its own light category so the
+  // categories that decide whether a resume survives the ATS do not move. English words:
   // dropped, not failed, for a resume read in another language.
   {
     id: "ats-v2.writing.firstPerson",

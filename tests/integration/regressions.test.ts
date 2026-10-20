@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   DEFAULT_POLICY,
   type AtsEnginePolicy,
+  type AtsLayoutSignals,
   type AtsResumeInput,
+  check as score,
 } from "../../src/index.js";
 import { prepareResume } from "../../src/input.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
@@ -15,12 +16,9 @@ import { livePolicy } from "../fixtures/livePolicy.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * Regressions found in the September 2026 audit, one test per defect.
- *
- * Every case runs against `DEFAULT_POLICY`, so this suite needs no private files and always runs
- * in CI. The adversarial-input budget also runs against the live policy when it is present,
- * because a pattern-level ReDoS in the shipped policy is the one that would actually take a
- * worker down.
+ * Regressions, one test per audit defect, against `DEFAULT_POLICY`. The adversarial-input budget
+ * also runs against the live policy when present: a ReDoS in the shipped policy is the one that
+ * takes a worker down.
  */
 
 const NOW = new Date("2026-09-30T00:00:00Z");
@@ -29,12 +27,9 @@ const check = (
   resume: AtsResumeInput,
   jobDescription?: string,
   policy: AtsEnginePolicy = DEFAULT_POLICY,
-) => AtsScoringService.check(resume, policy, { jobDescription, now: NOW });
+) => score(resume, policy, { jobDescription, now: NOW });
 
-/**
- * Inputs that made one regex restart its scan at every position. The unbounded email pattern
- * took over a second per call on the first two and a scan runs it about nine times.
- */
+/** Inputs that made one regex restart its scan at every position. */
 const ADVERSARIAL: Record<string, string> = {
   "dotted run": "a.".repeat(25_000),
   "dashed run": "a-".repeat(25_000),
@@ -45,12 +40,11 @@ const ADVERSARIAL: Record<string, string> = {
 
 function expectFastOn(policy: AtsEnginePolicy) {
   for (const [label, input] of Object.entries(ADVERSARIAL)) {
-    // A scan takes 20 to 75 ms, 70 to 215 with the locale packs, on an idle laptop; the quadratic
-    // pattern took about ten seconds. 1.5 s is the budget `adversarial.test.ts` keeps: far below
-    // the bug, and far enough above a busy machine (500 ms failed one with editors open).
+    // A scan takes 20 to 75 ms (70 to 215 with the locale packs). 1.5 s is the budget
+    // `adversarial.test.ts` keeps: far below the bug, far above a busy machine.
     expectFast(
       () =>
-        AtsScoringService.check(input, policy, {
+        score(input, policy, {
           jobDescription: input.slice(0, 20_000),
           now: NOW,
         }),
@@ -66,9 +60,8 @@ describe("adversarial input", () => {
   });
 
   it("stays bounded with the locale packs detected and applied", () => {
-    // Asked for rather than detected: the pathological run outweighs any real text, so detection
-    // rightly reads it as no language. The packs' patterns (German compounds among them) and the
-    // DE region are what scan it.
+    // Asked for, not detected: the pathological run outweighs any real text, so detection reads
+    // no language. The packs' patterns and the DE region are what scan it.
     const localized = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
     const lead = "und der das mit für von bei auf ist sind eine Berufserfahrung +49 30 12345678 ";
     const devanagari = "कार्य अनुभव शिक्षा कौशल ".repeat(20);
@@ -81,7 +74,7 @@ describe("adversarial input", () => {
       const text = `${lead}${devanagari}\n${input}`;
       const report = expectFast(
         () =>
-          AtsScoringService.check(text, localized, {
+          score(text, localized, {
             jobDescription: text.slice(0, 20_000),
             now: NOW,
             languages: ["de", "fr", "hi"],
@@ -150,11 +143,11 @@ Mar 2019 - Present
 
 describe("degrees", () => {
   it("records a line naming two credentials at the higher one", () => {
-    const { education, highestDegree } = check(
+    const { education, highestIsced } = check(
       "Education\nDiploma, Master of Science, University of Leeds, 2016 - 2018",
     ).parsed;
-    expect(education[0]).toMatchObject({ level: "master", credential: "Master of Science" });
-    expect(highestDegree).toBe("master");
+    expect(education[0]).toMatchObject({ isced: 7, credential: "Master of Science" });
+    expect(highestIsced).toBe(7);
   });
 
   it.each([
@@ -164,20 +157,20 @@ describe("degrees", () => {
     "SSL certificate management",
     "Associate Product Manager, Acme",
   ])("does not read %j as a degree", (line) => {
-    expect(check(`Education\n${line}`).parsed.highestDegree).toBeNull();
+    expect(check(`Education\n${line}`).parsed.highestIsced).toBeNull();
   });
 
   it.each([
-    ["MS in Computer Science", "master"],
-    ["MSc Data Science", "master"],
-    ["MBA, Wharton", "master"],
-    ["BS Computer Science", "bachelor"],
-    ["B.Tech, Tech Institute", "bachelor"],
-    ["Associate of Arts", "associate"],
-    ["High School Diploma", "diploma"],
-    ["PhD, MIT", "doctorate"],
-  ])("reads %j as %s", (line, level) => {
-    expect(check(`Education\n${line}`).parsed.highestDegree).toBe(level);
+    ["MS in Computer Science", 7],
+    ["MSc Data Science", 7],
+    ["MBA, Wharton", 7],
+    ["BS Computer Science", 6],
+    ["B.Tech, Tech Institute", 6],
+    ["Associate of Arts", 5],
+    ["High School Diploma", 3],
+    ["PhD, MIT", 8],
+  ])("reads %j as ISCED %i", (line, isced) => {
+    expect(check(`Education\n${line}`).parsed.highestIsced).toBe(isced);
   });
 });
 
@@ -359,11 +352,11 @@ describe("bullets, headings and bounded scans", () => {
   });
 
   it("keeps a lone graduation year and drops Scrum Master as a degree", () => {
-    const { education, highestDegree } = check(
+    const { education, highestIsced } = check(
       "Education\nStanford University, B.S. Computer Science, 2018\nCertifications\nCertified Scrum Master",
     ).parsed;
     expect(education[0]?.end).toEqual({ year: 2018, month: null });
-    expect(highestDegree).toBe("bachelor");
+    expect(highestIsced).toBe(6);
   });
 
   it("trims punctuation from links and tolerates an untyped job description", () => {
@@ -372,7 +365,7 @@ describe("bullets, headings and bounded scans", () => {
       "https://jane.dev/",
     ]);
     expect(() =>
-      AtsScoringService.check("x", DEFAULT_POLICY, { jobDescription: 5 as unknown as string }),
+      score("x", DEFAULT_POLICY, { jobDescription: 5 as unknown as string }),
     ).not.toThrow();
   });
 
@@ -386,8 +379,8 @@ describe("bullets, headings and bounded scans", () => {
 });
 
 describe("a LinkedIn profile export", () => {
-  // A sidebar (Contact, Top Skills, Languages) read before the name, and roles grouped under
-  // their employer with the time there on a line of its own.
+  // A sidebar read before the name, and roles grouped under their employer with the time there
+  // on its own line.
   const SIDEBAR = [
     "Contact",
     "jordan.ellery@example.com",
@@ -417,11 +410,8 @@ describe("a LinkedIn profile export", () => {
     "Ohio State University",
     "Bachelor of Science - BS, Computer Science · (2015 - 2019)",
   ];
-  const read = (
-    resume: AtsResumeInput,
-    layout?: Parameters<typeof AtsScoringService.check>[2]["layout"],
-  ) => {
-    const { parsed } = AtsScoringService.check(resume, DEFAULT_POLICY, { now: NOW, layout });
+  const read = (resume: AtsResumeInput, layout?: AtsLayoutSignals) => {
+    const { parsed } = score(resume, DEFAULT_POLICY, { now: NOW, layout });
     return {
       name: parsed.name,
       roles: parsed.roles.map(({ title, employer }) => ({ title, employer })),
@@ -509,7 +499,7 @@ describe("reproducibility", () => {
     const { parseAtsPolicy, policyFingerprint } = await import("../../src/index.js");
     const changed = parseAtsPolicy({ ...structuredClone(DEFAULT_POLICY), version: "ats-v2" });
     expect(policyFingerprint(changed)).toBe(policyFingerprint(DEFAULT_POLICY));
-    // A parsed policy is frozen, so the change is made to a copy.
+    // A parsed policy is frozen: change a copy.
     const edited = structuredClone(changed);
     edited.rules[0] = { ...edited.rules[0], fix: "Something else." };
     expect(policyFingerprint(parseAtsPolicy(edited))).not.toBe(policyFingerprint(DEFAULT_POLICY));
@@ -518,8 +508,9 @@ describe("reproducibility", () => {
   it("returns the lines as read only when asked", () => {
     const text = "Jane Doe\nEngineer building developer tools for teams who ship\nevery day.";
     expect(check(text).lines).toBeUndefined();
-    expect(
-      AtsScoringService.check(text, DEFAULT_POLICY, { now: NOW, includeLines: true }).lines,
-    ).toEqual(["Jane Doe", "Engineer building developer tools for teams who ship every day."]);
+    expect(score(text, DEFAULT_POLICY, { now: NOW, includeLines: true }).lines).toEqual([
+      "Jane Doe",
+      "Engineer building developer tools for teams who ship every day.",
+    ]);
   });
 });

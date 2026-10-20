@@ -1,16 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { applyVocabulary } from "../../src/locales/languages.js";
 import { languagePackSchema } from "../../src/locales/schema.js";
 import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
 
-/**
- * A language pack adds the soft skills its postings ask for, so a German or Hindi posting's
- * "Teamfähigkeit" or "नेतृत्व" is named apart and weighed as "teamwork" is. Invented people and
- * companies only.
- */
+/** A language pack adds the soft skills its postings ask for, weighed as "teamwork" is. Invented people and companies only. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -31,7 +27,7 @@ describe("soft skills from a language pack", () => {
       "- Ausgeprägte Teamfähigkeit und Kommunikationsstärke",
       "- Zuverlässigkeit und Belastbarkeit",
     ].join("\n");
-    const report = AtsScoringService.check(resume, POLICY, { jobDescription: posting, now: NOW });
+    const report = check(resume, POLICY, { jobDescription: posting, now: NOW });
     expect(report.locale.languages).toContain("de");
     const { hard, soft } = report.missingKeywordGroups;
     expect(hard).toContain("kubernetes");
@@ -47,7 +43,7 @@ describe("soft skills from a language pack", () => {
   });
 
   it("names a French posting's soft skills apart, and its missions' verbs not at all", () => {
-    const report = AtsScoringService.check(LOCALE_FIXTURES.fr[0].text, POLICY, {
+    const report = check(LOCALE_FIXTURES.fr[0].text, POLICY, {
       jobDescription: [
         "Vos missions",
         "- Concevoir les services de paiement",
@@ -81,7 +77,7 @@ describe("soft skills from a language pack", () => {
       "- नेतृत्व और टीमवर्क",
       "- समस्या समाधान की क्षमता",
     ].join("\n");
-    const report = AtsScoringService.check(resume, POLICY, { jobDescription: posting, now: NOW });
+    const report = check(resume, POLICY, { jobDescription: posting, now: NOW });
     expect(report.locale.languages).toContain("hi");
     const { hard, soft } = report.missingKeywordGroups;
     expect(hard).toContain("kubernetes");

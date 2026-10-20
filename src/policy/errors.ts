@@ -6,17 +6,8 @@ export type AtsPolicyIssue = {
 };
 
 /**
- * Raised when a supplied policy or locale pack does not satisfy the schema, and when a call names
- * a region or a target ATS the policy does not have.
- *
- * The package deliberately has no idea what an HTTP status code is: it is a library that scores
- * text, and a caller might be a server, a CLI, or a browser tab. So an invalid policy surfaces as
- * a typed error carrying the structured issues, and the host decides what that means — the server
- * maps it to a 503 and logs the offending fields, which is a policy decision that belongs to the
- * host rather than to the engine.
- *
- * `issues` is kept structured rather than pre-formatted for the same reason: the host chooses how
- * much of it to log and how much (usually none) to show a caller.
+ * Raised when a policy or locale pack fails the schema, or a call names a region, language or
+ * target ATS the policy does not have. `issues` stays structured so the host decides what to log.
  */
 export class AtsPolicyError extends Error {
   readonly issues: AtsPolicyIssue[];
@@ -28,8 +19,7 @@ export class AtsPolicyError extends Error {
 
     Object.setPrototypeOf(this, new.target.prototype);
 
-    // V8 only, and typed as such: the package compiles without Node's lib so that a build
-    // failure is what tells us if something host-specific has crept in.
+    // V8 only; typed locally because the package compiles without Node's lib.
     const capture = (Error as unknown as { captureStackTrace?: (t: object, c: unknown) => void })
       .captureStackTrace;
     if (capture) capture(this, this.constructor);

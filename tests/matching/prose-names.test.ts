@@ -5,14 +5,12 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { main } from "../../src/cli/main.js";
-import { AtsScoringService, DEFAULT_POLICY, parseAtsPolicy } from "../../src/index.js";
+import { DEFAULT_POLICY, parseAtsPolicy, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 
 /**
- * `missingKeywords` named the employer and the places a posting mentions in passing ("At
- * Freightways, we ship…" → "freightways"), and ranked them beside the skills, because a capital
- * mid-sentence read as a proper noun and a proper noun as a skill. Every posting here is
- * invented; each test says what must disappear and which real skills must stay.
+ * `missingKeywords` must not name the employer and places a posting mentions in passing ("At
+ * Freightways, we ship…"). Each test says what must disappear and which real skills must stay.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -22,7 +20,7 @@ const missing = (
   jobDescription: string,
   options: { jobCompany?: string; policy?: typeof POLICY } = {},
 ) =>
-  AtsScoringService.check(resume, options.policy ?? POLICY, {
+  check(resume, options.policy ?? POLICY, {
     jobDescription,
     jobCompany: options.jobCompany,
     now: NOW,

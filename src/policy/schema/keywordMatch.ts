@@ -3,19 +3,16 @@ import * as z from "zod/mini";
 import { regexString, term, wordList } from "../primitives.js";
 
 /**
- * What follows a UK clearance level that names one: "clearance", "vetting" or "cleared", after at
- * most three more levels in a list ("SC or DV clearance", "SC/DV clearance"). Bounded, so a
- * run of levels costs a few steps from each.
+ * What follows a UK clearance level: "clearance", "vetting" or "cleared", after at most three
+ * more levels in a list ("SC or DV clearance"). Bounded, so a run of levels costs few steps.
  */
 const UK_LEVEL_BEFORE = String.raw`(?=(?:\s*(?:/|,|or|and)\s*(?:bpss|ctc|sc|dv)){0,3}\s+(?:clearance|vetting|cleared))`;
 /** A UK level in brackets after the clearance it names: "security clearance (SC)". */
 const UK_LEVEL_AFTER = String.raw`(?<=(?:clearance|vetting)\s{0,3}\()`;
 
 /**
- * Heading patterns used to split a posting into blocks. Each block runs to the next heading, so
- * these replace the old fixed-length windows, which overshot the requirements list and promoted
- * nice-to-haves to the required weight. `excluded` blocks (about-us, benefits, EEO boilerplate)
- * are dropped from scoring entirely rather than down-weighted.
+ * Heading patterns that split a posting into blocks, each running to the next heading.
+ * `excluded` blocks (about-us, benefits, EEO boilerplate) are dropped from scoring entirely.
  */
 const jobSectionSchema = z.object({
   required: regexString("sections.required"),
@@ -31,36 +28,29 @@ export const keywordMatchSchema = z
     responsibilitiesWeight: z.number().check(z.gt(0)),
     defaultWeight: z.number().check(z.gt(0)),
     /**
-     * Multiplier applied to terms that are not recognised skills and do not read as proper nouns
-     * or acronyms in the posting. Ordinary English still counts — a posting can name a real
-     * requirement in lowercase prose — but it cannot outvote the skills the role actually asks for.
+     * Multiplier for terms that are not recognised skills and do not read as proper nouns or
+     * acronyms in the posting, so ordinary words count but cannot outvote the skills asked for.
      */
     generalTermWeight: z.number().check(z.gte(0), z.lte(1)),
     /**
-     * Soft skills ("communication", "teamwork"): what a posting asks of a person rather than of
-     * their work. A resume claims them and seldom evidences them, and an ATS's keyword match
-     * gives them little value, so each is weighed as an ordinary word (`generalTermWeight`)
-     * whatever its capitals, times this. The report lists them apart (`missingKeywordGroups`).
+     * Weight multiplier for soft skills ("communication"): a resume claims them and seldom
+     * evidences them. Each is weighed as an ordinary word (`generalTermWeight`) times this, and
+     * the report lists them apart (`missingKeywordGroups`).
      */
     softSkillWeight: z._default(z.number().check(z.gte(0), z.lte(1)), 0.4),
     /**
-     * The terms that are soft skills, folded as every term is (`synonyms`, `stemming`): "soft
-     * skills" in the report, weighed by `softSkillWeight`, never a recognised hard skill even
-     * when `phrases` or `synonyms` name them. A multi-word entry is matched as a phrase. Language
-     * packs add their own.
+     * The terms that are soft skills, folded as every term is (`synonyms`, `stemming`), never a
+     * recognised hard skill even when `phrases` or `synonyms` name them. A multi-word entry is
+     * matched as a phrase. Language packs add their own.
      */
     softSkills: z._default(z.array(term), []),
     sections: jobSectionSchema,
-    /**
-     * The words a posting offers alternatives with: "Go or Java". The missing-keyword label
-     * joins the alternatives with the word the posting itself used.
-     */
+    /** The words a posting offers alternatives with ("Go or Java"), reused in the missing-keyword label. */
     alternationWords: z._default(wordList("alternationWords"), ["or"]),
     /**
-     * Suffix rules that fold inflections together ("managing" → "manag", like "managed"),
-     * applied to every token on both sides of a match, in order, first match wins. One rule set
-     * per policy, not per language: a German rule stripping "-er" would fold "engineer" into
-     * "engine" on every English token too, so language packs do not change it.
+     * Suffix rules that fold inflections together ("managing" to "manag"), applied to every token
+     * on both sides of a match, in order, first match wins. One rule set per policy: a German
+     * "-er" rule would fold "engineer" to "engine", so language packs do not change it.
      */
     stemming: z._default(
       z.array(
@@ -74,31 +64,22 @@ export const keywordMatchSchema = z
       ),
       (
         [
-          // One family whose noun and agent forms fold with the verb: "development", "developer"
-          // and "developed" are all "develop". A general "-ment" or "-er" rule would fold
-          // "statement" into "state" and "user" into "us".
+          // "development", "developer" and "developed" fold together; a general "-ment" or "-er"
+          // rule would fold "statement" to "state".
           ["elopments", 8, "elop"],
           ["elopment", 7, "elop"],
           ["elopers", 6, "elop"],
           ["eloper", 5, "elop"],
-          // "-using" and "-used" fold as "-use" does below: "housing", "housed" and "house" to
-          // "hou", "focused" and "focus" to "focu".
+          // "-using" and "-used" fold as "-use" does below.
           ["using", 5, "u"],
           ["used", 4, "u"],
-          // A rule that gives a word back unchanged keeps the rules after it off that word: a
-          // field is not named for its object, "accounting" is not "account" nor "marketing"
-          // "market".
+          // Returned unchanged, which keeps later rules off the word: "accounting" is not "account".
           ["accounting", 0, "accounting"],
           ["marketing", 0, "marketing"],
-          // A name with ".js" is kept whole; the "s" rule below left "vue.j". It is not folded onto
-          // its plain word: "Next.js" is no "next release", "Express.js" no "expressed concerns".
-          // `synonyms` name the ones whose plain name is the framework ("Vue").
+          // Kept whole ("Next.js" is no "next release"); `synonyms` map the ones named for a framework.
           [".js", 0, ".js"],
-          // British spellings fold with American ones, each as its whole family: "modelling" and
-          // "modeling", "optimisation" and "optimization", "analysed" and "analyzed", "behaviours"
-          // and "behaviors". Every "-ise" word folds so, its own forms with it ("enterprise",
-          // "enterprises"); "-lling" only after the letters no one-syllable "-ell" word ends in,
-          // so "selling" stays "sell", and not after "c", or "excelled" would be "Excel".
+          // British spellings fold with American ones, as whole families. "-lling" only after
+          // letters no one-syllable "-ell" word ends in ("selling" stays "sell"), and not after "c".
           ["delling", 0, "del"],
           ["delled", 0, "del"],
           ["belling", 0, "bel"],
@@ -117,52 +98,42 @@ export const keywordMatchSchema = z
           ["ysing", 6, "yz"],
           ["ysed", 5, "yz"],
           ["yse", 4, "yz"],
-          // Past four letters: "hour" and "four" stay as they are.
+          // Past four letters: "hour" and "four" stay.
           ["oural", 5, "oral"],
           ["ours", 5, "or"],
           ["our", 4, "or"],
           ["ing", 6, ""],
           ["ies", 5, "y"],
           ["ed", 5, ""],
-          // "-es" is a plural ending only after s, x, ch and sh ("processes", "indexes",
-          // "searches"); elsewhere the "e" is the word's own ("databases", "pipelines"), and
-          // stripping it left "databas" beside "database".
+          // "-es" is a plural only after s, x, ch and sh; elsewhere the "e" is the word's own.
           ["sses", 5, "ss"],
           ["xes", 4, "x"],
           ["ches", 5, "ch"],
           ["shes", 5, "sh"],
-          // A singular in "-che" folds as its plural does: "cache" and "caches" to "cach".
+          // "cache" and "caches" fold together.
           ["che", 4, "ch"],
-          // "-ses" is ambiguous: "buses" is "bus" + "es", "cases" is "case" + "s". Singular and
-          // plural fold to one shorter form, so either reading meets: "bus", "buses" and "status",
-          // "statuses" lose the "s" as "cpus" does ("bu", "statu"); "cause" and "causes" fold to
-          // "cau"; "case", "cases", "gas" and "gases" to "cas" and "gas". "uses" (four letters)
-          // stays the stopword "use".
+          // "-ses" is ambiguous ("buses", "cases"): singular and plural fold to one shorter form so
+          // either reading meets. "uses" stays the stopword "use".
           ["uses", 4, "u"],
           ["use", 3, "u"],
           ["us", 2, "u"],
           ["ases", 4, "as"],
           ["ase", 3, "as"],
-          // Greek plurals in "-es" for "-is": "analysis" and "analyses" both to "analyz", as
-          // "analyse" and "analyze" are. Only the endings that are always such a pair: a general
-          // "-ses" rule would part "response" from "responses", and "-oses" "close" from "closes".
+          // Greek "-is"/"-es" pairs only: a general "-ses" rule would part "response" from "responses".
           ["ysis", 5, "yz"],
           ["yses", 5, "yz"],
           ["thesis", 6, "thes"],
           ["theses", 6, "thes"],
           ["gnosis", 6, "gnos"],
           ["gnoses", 6, "gnos"],
-          // A silent "e" goes, as "-ing" and "-ed" drop it: "nurse", "nurses", "nursing" and
-          // "nursed" all to "nurs", "price" and "pricing" to "pric", "machines" and "machine" to
-          // "machin". Only past four letters, so "note" does not become "not", nor "code" "cod".
-          // "theme" would become the stopword "them", and "these" the "thes" of "theses", so they
-          // and "-ese" ("chinese") are given back as they are.
+          // A silent "e" goes, past four letters ("note" stays). "theme", "these" and "-ese" are
+          // given back as they are.
           ["themes", 0, "theme"],
           ["es", 5, ""],
           ["theme", 0, "theme"],
           ["ese", 0, "ese"],
           ["e", 4, ""],
-          // Three letters is enough: "apis" is "api". "aws", "ios" and "css" stay as they are.
+          // Three letters is enough ("apis"); "aws", "ios" and "css" stay.
           ["s", 3, "", "ss"],
         ] as Array<[string, number, string, string?]>
       ).map(([suffix, minLength, replacement, unless]) => ({
@@ -175,22 +146,16 @@ export const keywordMatchSchema = z
     /** Endings a multi-word phrase may carry on its last word and still be the same phrase. */
     pluralSuffixes: z._default(wordList("pluralSuffixes"), ["s", "es"]),
     /**
-     * Whether the language capitalises every noun, as German does. A capital letter
-     * mid-sentence then says nothing about a word being a product or a skill, so only acronyms
-     * and inner capitals ("PostgreSQL") count as proper nouns.
+     * Whether the language capitalises every noun, as German does, so a mid-sentence capital
+     * says nothing and only acronyms and inner capitals ("PostgreSQL") count as proper nouns.
      */
     nounsCapitalized: z._default(z.boolean(), false),
     /**
      * Leave out a word the posting writes only as a name: always capitalised, mid-sentence, only
-     * in its prose, never in a list, not in this policy's vocabulary, and written the way a name
-     * is — in a run of capitalised words ("Harbor Point", "Cedar Valley Health") or after one of
-     * `cues` ("At Freightways", "the Sunbelt", "our depot"). "Written in Rust" has no such sign
-     * and keeps its word. `skills` are tools and languages spelled like ordinary words, never
-     * left out even beside a cue ("Apache Spark", "the Rust compiler").
-     *
-     * Applies to a posting with at least `minListLines` list lines (bullets, or lines under a
-     * required or preferred heading) to compare with; never where `nounsCapitalized` holds, and
-     * off in a language pack that says so.
+     * in prose, never in a list, not in this policy's vocabulary, and in a run of capitalised
+     * words or after one of `cues`. `skills` are never left out. Applies to a posting with at
+     * least `minListLines` list lines; never where `nounsCapitalized` holds, and off in a
+     * language pack that says so.
      */
     proseNames: z.prefault(
       z.object({
@@ -228,25 +193,21 @@ export const keywordMatchSchema = z
       {},
     ),
     /**
-     * How a posting states the requirements that filter before any reading: years, a degree,
-     * the right to work, a clearance, a language. Each a pattern; years and language patterns
-     * capture the number and the language in group 1. Language packs add their own.
+     * How a posting states the requirements that filter before any reading: years, a degree, the
+     * right to work, a clearance, a language. Each a pattern; years and language patterns capture
+     * the number or language in group 1. Language packs add their own.
      */
     requirements: z.prefault(
       z.object({
         yearsPatterns: z._default(z.array(regexString("requirements.yearsPatterns")), [
-          // Not an age: "at least 18 years of age", "21 years or older", "18 years old".
-          // `\s*(?:\+\s*)?`, not `\s*\+?\s*`: two adjacent `\s*` split a long run of spaces
-          // every possible way, which is quadratic.
-          // A range reads its lower end: "3-5 years", "3 to 5 years", "between 3 and 5 years".
-          // "and" joins a range only after "between": "Python 3 and 5 years" asks for five. The
-          // lookbehind follows the "and", so it runs once per "and", not once per space before it.
+          // Not an age ("18 years old"). `\s*(?:\+\s*)?`, not `\s*\+?\s*`: adjacent `\s*` is quadratic.
+          // A range reads its lower end; "and" joins one only after "between" ("Python 3 and 5
+          // years" asks for five), with the lookbehind after the "and" so it runs once per "and".
           String.raw`(?<!\d)(\d{1,2})\s*(?:\+\s*)?(?:(?:[-–]|to\s|and\s(?<=between\s+\d{1,2}\s*and\s))\s*\d{1,2}\s*)?(?:years?|yrs?)(?![\p{L}])(?![\s-]+(?:of\s+age|old|or\s+older)(?![\p{L}]))`,
-          // In words, with or without the figure: "five (5) years", "Five years", "ten (10)+
-          // years". Group 1 is the word; `numberWords` gives its value.
+          // In words, with or without the figure; group 1 is the word (`numberWords` gives its value).
           String.raw`(?<![\p{L}])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)\s*(?:\(\s*\d{1,2}\s*(?:\+\s*)?\)\s*)?(?:\+\s*)?(?:years?|yrs?)(?![\p{L}])(?![\s-]+(?:of\s+age|old|or\s+older)(?![\p{L}]))`,
         ]),
-        /** Words that let experience stand in for the stated degree: "or equivalent experience". */
+        /** Words that let experience stand in for the stated degree ("or equivalent experience"). */
         equivalence: z._default(wordList("requirements.equivalence"), [
           String.raw`or\s+equivalent`,
           String.raw`equivalent\s+(?:practical\s+|work\s+)?experience`,
@@ -256,7 +217,7 @@ export const keywordMatchSchema = z
           String.raw`authori[sz]ed\s+to\s+work`,
           String.raw`work\s+authori[sz]ation`,
           String.raw`right\s+to\s+work`,
-          // Sponsorship of a visa, not of an event: "securing event sponsorship" is sales.
+          // Visa sponsorship, not event sponsorship.
           String.raw`(?:visa|work|immigration|employment)\s+sponsorship`,
           String.raw`(?:requires?|requiring|needs?|needing)\s+sponsorship`,
           String.raw`work\s+permit`,
@@ -265,21 +226,17 @@ export const keywordMatchSchema = z
           String.raw`permanent\s+resident`,
         ]),
         /**
-         * What a statement about the right to work says, beyond that it is one. A line that
-         * `noSponsorship` ("no sponsorship required", "does not require visa sponsorship") is
-         * read without those words first, so their "no" and "not" are not its negation. What is
-         * left `needsSponsorship` ("will require H-1B sponsorship") never shows the right to
-         * work, and shows its absence where the posting rules sponsorship out (a line of the
-         * posting `noSponsorship` matches, or `needsSponsorship` without `sponsorshipOffered`:
-         * "Candidates requiring sponsorship are ineligible"); what is left with a `negation`
-         * shows nothing.
+         * What a statement about the right to work says. A line matching `noSponsorship` is read
+         * without those words first, so their "no" and "not" are not its negation. `needsSponsorship`
+         * never shows the right to work, and shows its absence where the posting rules sponsorship
+         * out (`noSponsorship`, or `needsSponsorship` without `sponsorshipOffered`); what is left
+         * with a `negation` shows nothing.
          */
         needsSponsorship: z._default(wordList("requirements.needsSponsorship"), [
           String.raw`(?:requires?|requiring|needs?|needing|will\s+(?:require|need))\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\s+){0,3}sponsorship`,
           String.raw`sponsorship\s+(?:is\s+)?(?:required|needed)`,
         ]),
-        // Only words about sponsorship between the "not" and it: "not authorized to work without
-        // sponsorship" keeps its "not".
+        // Only words about sponsorship between the "not" and it.
         noSponsorship: z._default(wordList("requirements.noSponsorship"), [
           String.raw`(?:no|without)\s+(?:(?:an?|any|further|future|h-?1b|visa|work|employment|immigration)\s+){0,3}sponsorship`,
           String.raw`(?:not|never|\p{L}+n['’]t)\s+(?:(?:currently|presently|now|ever|be|been|eligible|for|offer\p{L}*|provid\p{L}*|requir\p{L}*|need\p{L}*|an?|any|h-?1b|visa|work|employment|immigration|future)\s+){0,4}sponsor(?:ship)?`,
@@ -287,11 +244,9 @@ export const keywordMatchSchema = z
           String.raw`sponsorship\s+(?:is\s+)?not\s+(?:required|needed|available|offered|provided)`,
         ]),
         /**
-         * Words saying a posting offers sponsorship to who needs it ("Visa sponsorship is
-         * available for candidates who need sponsorship", "We welcome applicants who require
-         * sponsorship"), read in the clause naming the need. Without one there, or with a
-         * `negation` in the line, a posting naming a need for sponsorship turns it away
-         * ("Candidates requiring sponsorship are ineligible; benefits available").
+         * Words saying a posting offers sponsorship to who needs it, read in the clause naming the
+         * need. Without one there, or with a `negation` in the line, a posting naming a need for
+         * sponsorship turns it away.
          */
         sponsorshipOffered: z._default(wordList("requirements.sponsorshipOffered"), [
           "available",
@@ -301,7 +256,7 @@ export const keywordMatchSchema = z
           String.raw`offer(?:s|ed|ing)`,
           String.raw`(?:will|can|may|do|does)\s+sponsor`,
         ]),
-        /** Words that say a statement is not so: "Not authorized to work", "no active clearance". */
+        /** Words that say a statement is not so ("Not authorized to work", "no active clearance"). */
         negation: z._default(wordList("requirements.negation"), [
           "not",
           "no",
@@ -314,10 +269,9 @@ export const keywordMatchSchema = z
           String.raw`\p{L}+n['’]t`,
         ]),
         /**
-         * Words that say a clearance or a citizenship is not held yet, or any more: "eligible
-         * for", "pending", "able to obtain", "former", "expired". Not for the right to work
-         * itself: "eligible to work in the US" states it. Read past a semicolon about a clearance
-         * ("Secret clearance; expired 2021"), where a `negation` is not ("…; no incidents").
+         * Words that say a clearance or citizenship is not held yet, or any more ("eligible for",
+         * "pending", "former"). Not for the right to work itself. Read past a semicolon about a
+         * clearance, where a `negation` is not.
          */
         notHeld: z._default(wordList("requirements.notHeld"), [
           "eligible",
@@ -329,9 +283,8 @@ export const keywordMatchSchema = z
           String.raw`former(?:ly)?`,
         ]),
         /**
-         * Citizenship, and the permanent residence that is not it: an ask for `citizenship`
-         * that does not also accept `residence` is met by citizenship alone, and a green card
-         * says the candidate does not hold it. Only U.S. citizenship by default.
+         * Citizenship, and the permanent residence that is not it: an ask for `citizenship` that
+         * does not also accept `residence` is not met by a green card. U.S. citizenship by default.
          */
         citizenship: z._default(wordList("requirements.citizenship"), [
           String.raw`(?:us|u\.s\.|united\s+states)\s+citizen(?:ship)?`,
@@ -341,18 +294,17 @@ export const keywordMatchSchema = z
           String.raw`green\s+card`,
           String.raw`(?:lawful\s+)?permanent\s+residen(?:t|cy|ce)`,
         ]),
-        // Qualified, never bare: "customs clearance" is logistics, not a security vetting.
+        // Qualified, never bare: "customs clearance" is logistics.
         clearance: z._default(wordList("requirements.clearance"), [
           String.raw`(?:security|confidential|secret|top\s+secret|ts/sci|ts|sci|dv|sc|ctc|bpss|government|federal)\s+clearance`,
           String.raw`ts(?:\s*/\s*|-)sci`,
         ]),
         /**
-         * Clearance levels, lowest first. A level asked is met by it or any above it; the lowest
-         * a posting names is its bar ("Secret or Top Secret"). The first pattern list that
-         * matches, from the highest down, names a line's level: "Top Secret" is not also
-         * "Secret". "TS" is Top Secret only beside "clearance". The UK's levels come before the
-         * US ones, a ladder of their own: a US level asked is not met by a UK one, and a UK level
-         * asked is met by a US one, as an ask that names no level is.
+         * Clearance levels, lowest first. A level asked is met by it or any above it; the lowest a
+         * posting names is its bar. The first pattern list that matches, from the highest down,
+         * names a line's level. "TS" is Top Secret only beside "clearance". UK levels come before
+         * US ones, a ladder of their own: a US level asked is not met by a UK one, a UK level asked
+         * is met by a US one.
          */
         clearanceLevels: z._default(
           z.array(
@@ -366,9 +318,7 @@ export const keywordMatchSchema = z
               name: "BPSS",
               patterns: ["bpss", String.raw`baseline\s+personnel\s+security\s+standard`],
             },
-            // "CTC", "SC" and "DV" only beside what they name, alone or in a list ("SC or DV
-            // clearance", "security clearance (SC)"): not "CTC up to 30 LPA" (pay), "Charleston,
-            // SC" or a "Diversity Visa (DV)".
+            // "CTC", "SC" and "DV" only beside what they name, not "Charleston, SC" or "CTC up to 30 LPA".
             {
               name: "CTC",
               patterns: [
@@ -413,12 +363,10 @@ export const keywordMatchSchema = z
           String.raw`(?:fluent|fluency|proficien(?:t|cy)|native|business[\s-]level|working\s+proficiency|professional\s+proficiency)\s+(?:in\s+|with\s+)?(\p{L}+)`,
         ]),
         /**
-         * A language's name in other languages, keyed to its English name, lowercase: a German
-         * posting asks for "Englisch", the resume says "English". Language packs fill it in.
-         *
-         * Also the list of what *is* a language: a `languagePatterns` capture becomes a language
-         * requirement only when it is a key or a value here, so "proficient in Python" is judged
-         * as the skill it names. The English names map to themselves.
+         * A language's name in other languages, keyed to its English name, lowercase ("Englisch" to
+         * "english"). Language packs fill it in. Also the list of what is a language: a
+         * `languagePatterns` capture is a language requirement only when it is a key or value
+         * here, so "proficient in Python" stays a skill. English names map to themselves.
          */
         languageNames: z._default(
           z.record(z.string().check(z.minLength(1)), z.string().check(z.minLength(1))),
@@ -478,10 +426,7 @@ export const keywordMatchSchema = z
       }),
       {},
     ),
-    /**
-     * Number words a years pattern may capture instead of a figure: "five years". Also never
-     * keywords: "five" is not a skill a candidate is missing.
-     */
+    /** Number words a years pattern may capture instead of a figure. Never keywords. */
     numberWords: z._default(z.record(term, z.number().check(z.int(), z.gt(0))), {
       one: 1,
       two: 2,
@@ -499,11 +444,9 @@ export const keywordMatchSchema = z
       twenty: 20,
     }),
     /**
-     * Words that make an activity or a credential part of a requirement, so a requirement is not
-     * met by its object alone: "mentoring engineers" by an engineering title, "AWS
-     * certification" by "deployed on AWS". Each group is one ask, met by any of its words; a
-     * `sameLine` group must appear on a resume line that also names the requirement's skill
-     * (the certificate *in* AWS).
+     * Words that make an activity or credential part of a requirement, so its object alone does
+     * not meet it ("mentoring engineers", "AWS certification"). Each group is one ask, met by any
+     * of its words; a `sameLine` group must share a resume line with the requirement's skill.
      */
     qualifiers: z._default(
       z.array(
@@ -518,7 +461,7 @@ export const keywordMatchSchema = z
           sameLine: false,
         },
         { words: ["leading", "lead", "led", "leadership"], sameLine: false },
-        // Not "management": "project management tools" names a field, not managing people.
+        // Not "management": "project management tools" is a field.
         { words: ["managing", "manage", "managed", "manager"], sameLine: false },
         {
           words: ["certification", "certified", "certificate", "certifications", "certificates"],
@@ -527,10 +470,7 @@ export const keywordMatchSchema = z
         { words: ["license", "licence", "licensed", "licensure"], sameLine: true },
       ],
     ),
-    /**
-     * What marks a clause of a requirement as optional: "Bachelor's degree required; MBA a
-     * plus". The clause is read as preferred and does not raise the level the line asks for.
-     */
+    /** What marks a clause of a requirement as optional ("MBA a plus"): read as preferred, it does not raise the level asked. */
     preferredMarkers: z._default(wordList("preferredMarkers"), [
       String.raw`a\s+plus`,
       String.raw`is\s+a\s+plus`,
@@ -541,22 +481,15 @@ export const keywordMatchSchema = z
       "ideally",
       String.raw`an\s+advantage`,
     ]),
-    /**
-     * Text in a posting that is never a keyword: a "City, ST" location. Compiled
-     * case-sensitively and globally; each must be linear on hostile input.
-     */
+    /** Text in a posting that is never a keyword (a "City, ST" location). Compiled case-sensitively and globally; each must be linear on hostile input. */
     ignorePatterns: z._default(z.array(regexString("ignorePatterns")), [
       String.raw`(?<![\p{L}])\p{Lu}[\p{L}'.-]{0,30}(?:\s\p{Lu}[\p{L}'.-]{0,30}){0,2},\s{0,3}(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(?![\p{L}\p{N}/+#])`,
-      // Without the comma, only where an address ends — the line, a stop or a ZIP code: "Office
-      // in Boston MA", "Cambridge MA 02139". Not "Requires MS in Computer Science", where the
-      // state code is a degree.
+      // Without the comma, only where an address ends (line, stop or ZIP); not "Requires MS in CS".
       String.raw`(?<![\p{L}])\p{Lu}\p{Ll}[\p{L}'.-]{0,30}(?:\s\p{Lu}\p{Ll}[\p{L}'.-]{0,30}){0,2}\s(?:AL|AK|AZ|AR|CA|CO|CT|DE|DC|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)(?=\s{0,3}(?:$|[.,;:)|]|\d{5}(?!\d)))`,
     ]),
     /**
-     * What a posting offers rather than asks: "Salary range $175,000 – $215,000", "Benefits:
-     * health, dental". A line that opens with one of these as its label ("Benefits:", "Pay
-     * range"), or names one beside an amount of money, is not a requirement. Only then, so
-     * "Compensation analysis experience" and "Equity research" stay requirements.
+     * What a posting offers rather than asks ("Salary range $175,000", "Benefits:"). A line opening
+     * with one as its label, or naming one beside an amount of money, is not a requirement.
      */
     offerWords: z._default(wordList("offerWords"), [
       "salary",
@@ -571,19 +504,15 @@ export const keywordMatchSchema = z
       String.raw`stock\s+options`,
     ]),
     /**
-     * The last labels of a web address written without "https://" or "www." (lower case): a
-     * host of three labels or more ending in one ("jobs.example.com/rust", "careers.acme.co.uk")
-     * is a link, not a keyword. A dotted name ending in another ("System.Text.Json",
-     * "org.springframework.boot") stays a keyword.
+     * The last labels of a web address written without a scheme or "www." (lower case): a host of
+     * three labels or more ending in one is a link, not a keyword ("System.Text.Json" stays one).
      */
     linkDomains: z._default(wordList("linkDomains"), [
       "com",
       "org",
       "co",
       "dev",
-      // Also the last word of a package's name ("Microsoft.Graph.Net", "akka.stream.io",
-      // "com.example.app", and before a slash: "akka.stream.io/Kafka"): a link only with a path
-      // of two parts or more after it ("boards.greenhouse.io/acme/jobs").
+      // Also a package name's last word: a link only with a path of two parts or more after it.
       String.raw`(?:net|io|ai|app)(?=/[^\s/]+/)`,
       "edu",
       "gov",
@@ -599,10 +528,7 @@ export const keywordMatchSchema = z
       "eu",
       "nl",
     ]),
-    /**
-     * Labels of a line that states a nationality, never a language: "Nationality: German",
-     * "Staatsangehörigkeit: deutsch". Such a line is no evidence of speaking the language.
-     */
+    /** Labels of a line that states a nationality, never a language ("Nationality: German"). */
     nationalityLabels: z._default(wordList("nationalityLabels"), [
       "nationality",
       "citizenship",
@@ -613,12 +539,7 @@ export const keywordMatchSchema = z
     synonyms: z.record(term, term),
     /**
      * One-way skill implications, applied to the resume only: holding the key demonstrates the
-     * values. Terraform *is* infrastructure as code; PostgreSQL *is* a relational database. Plain
-     * token equality reported those as gaps and told the candidate to add words describing work
-     * the resume already evidenced.
-     *
-     * Deliberately not symmetric. "Terraform" implies "infrastructure as code"; the reverse does
-     * not hold, and inferring it would credit the candidate with a tool they never named.
+     * values (Terraform implies infrastructure as code). Not symmetric.
      */
     implies: z.record(term, z.array(term)),
     phrases: z.array(term),
@@ -626,13 +547,8 @@ export const keywordMatchSchema = z
   })
   .check(
     z.superRefine((km, ctx) => {
-      /**
-       * A multi-word term only ever becomes a single token by matching the phrase list first. One
-       * that appears in `implies` or `synonyms` but not in `phrases` therefore never resolves: the
-       * posting scatters it into unrelated single words and the implication silently does nothing.
-       * Catching it here turns a quiet scoring hole into a startup failure naming the term.
-       */
-      // A multi-word soft skill is matched as a phrase too.
+      // A multi-word term only becomes one token by matching `phrases`, so one in `implies` or
+      // `synonyms` but not in `phrases` never resolves; softSkills are matched as phrases too.
       const phrases = new Set([...km.phrases, ...km.softSkills]);
       const multiWord = new Set<string>();
 

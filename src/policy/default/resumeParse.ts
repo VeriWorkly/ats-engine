@@ -1,15 +1,13 @@
 /**
  * What follows a bare two-letter form that is a US state code rather than a degree, when no
- * comma comes before it: a ZIP code ("Boston MA 02115"), a year ("Medford MA 2016", "Boston
- * MA, 2015") or a month and year ("Chestnut Hill, MA Sep 2014"). A degree is followed by its
+ * comma comes before it: a ZIP code, a year, or a month and year. A degree is followed by its
  * subject instead ("MS Computer Science, 2016"); "USA", "or" and "and" are not one.
  */
 const STATE_CODE_AFTER = String.raw`\s+\d{5}(?!\d)|(?:,\s*|\s+)\d{4}(?!\d)|\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4}(?!\d)`;
 /**
- * After a comma, a bare form is a degree only when its subject follows ("Stanford University, MS
- * in Computer Science", "University of Chicago, MA Economics", "Harvard, MA (Economics)"); at
- * the end of the line, or before a ZIP code, a year or another comma, it is the state of the
- * city before it ("Cambridge, MA", "Boston, MA 02115"). Decided by what follows, not by the comma.
+ * After a comma, a bare form is a degree only when its subject follows ("University of Chicago,
+ * MA Economics"); at the end of the line, or before a ZIP code, a year or another comma, it is
+ * the state of the city before it ("Cambridge, MA").
  */
 const SUBJECT_AFTER = String.raw`\s+(?!(?:or|and|usa?)(?![a-z]))\p{L}|\s*\(`;
 /** "MS Excel", "MS Teams": Microsoft, not a Master's. */
@@ -21,42 +19,24 @@ const LAW_CONTEXT = String.raw`(?<!\p{L})(?:laws?|universit(?:y|ies)|college|sch
 const DEGREE_POSITION = String.raw`\s*[,()]|\s+(?:19|20)\d{2}(?!\d)|\s*$`;
 
 /**
- * "LLM" undotted is the Master of Laws only where a degree stands — before a comma, a bracket, a
- * year, "in" or the end of the line — and with a law school or university on the line, before it
- * or after ("LLM, National Law School", "Harvard Law School, LLM 2015"). Position alone was not
- * enough: "experience with LLM, RAG and vector search" and "deploying LLM in production" are a
- * large language model, and so is "LLM-based code review". Each side's search is bounded.
+ * "LLM" undotted is the Master of Laws only where a degree stands (before a comma, a bracket, a
+ * year, "in" or the end of the line) and with a law school or university on the line, before or
+ * after. Position alone would match "experience with LLM, RAG" and "LLM-based code review". Each
+ * side's search is bounded.
  */
 const LLM_DEGREE = String.raw`llm(?=${DEGREE_POSITION}|\s+in\s)(?:(?=[^\n]{0,80}?${LAW_CONTEXT})|(?<=${LAW_CONTEXT}[^\n]{0,80}llm))`;
-/**
- * "J.D." is a degree where one stands, or beside a law school; initials are not ("J. D.
- * Salinger", "J.D. Power").
- */
+/** "J.D." is a degree where one stands, or beside a law school; not "J. D. Salinger", "J.D. Power". */
 const JD_DEGREE = String.raw`j\.\s?d\.?(?=${DEGREE_POSITION})|j\.d\.?(?:(?=[^\n]{0,80}?${LAW_CONTEXT})|(?<=${LAW_CONTEXT}[^\n]{0,80}j\.d\.?))`;
 
-/**
- * The community policy's parsing vocabulary. Month names and the words for "still here" are
- * the schema's defaults, so they are not repeated here.
- */
+/** The community policy's parsing vocabulary. Month names and "still here" words are the schema's defaults. */
 export const DEFAULT_RESUME_PARSE = {
-  // The experience headings of every field, not only software's: a nurse's "Clinical
-  // Experience", a fresher's "Internships", an academic's "Research Experience" and "Academic
-  // Appointments". A heading the policy does not know is read as part of the section above it,
-  // so a fresher's internships under an unknown heading after Education were read as education.
-  // The "other" headings include the ones an academic or executive CV adds, so that grants,
-  // courses and board seats below the work history are not read as jobs, and "Contact", which a
-  // two-column resume prints above the name. Education goes by other names too ("Academic
-  // Background", "Educational Qualifications"); unknown, its degrees were folded into the section
-  // above and lost. Certifications and licences ("Licenses & Certifications", "Licensure") and
-  // spoken languages have kinds of their own, read as rows; their headings are the schema's
-  // defaults (`sections.certifications`, `sections.languages`), so a licence's dates are never
-  // read as a job. "Top Skills" is the skills heading of a LinkedIn profile export's sidebar.
-  // Unknown, a heading after Skills was read as skills too, with every line under it: "Selected
-  // Experience", "Tech Stack", "Side Projects", "Professional Summary" and "Volunteer
-  // Experience" are common enough to know. Volunteer work is "other", as "Volunteering" was, so
-  // it adds no months to the work history. A word that is also a skill ("Leadership", "Open
-  // Source"), a role's title ("Volunteer Firefighter") or a line of a role ("Tools:") is not a
-  // heading alone.
+  // Experience headings of every field (a nurse's "Clinical Experience", a fresher's
+  // "Internships"). A heading the policy does not know is read as part of the section above it,
+  // so "other" also holds academic and executive CV headings (grants, board seats) and "Contact".
+  // Certification and language headings are the schema's defaults. "Top Skills" is a LinkedIn
+  // export sidebar heading. Volunteer work is "other": it adds no months to the work history. A
+  // word that is also a skill ("Leadership"), a role's title or a line of a role ("Tools:") is
+  // not a heading alone.
   sections: {
     experience: String.raw`^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment|selected|additional|other|military|freelance)\s+)?(?:experience|employment|history)|^internships?|^academic\s+(?:appointments|positions)|^professional\s+background`,
     education: String.raw`^educational\s+(?:background|qualifications?|history|details)|^education|^academic\s+(?:background|qualifications?|history|record|credentials)`,
@@ -92,12 +72,9 @@ export const DEFAULT_RESUME_PARSE = {
     "professor",
     "lecturer",
     "researcher",
-    // Beyond the office: without these, "Deloitte, Accountant" and "Target - Cashier" were read
-    // with the employer as the title. Words that are also surnames ("Nurse", "Teller", "Clerk",
-    // "Writer", "Tutor", "Lawyer", "Mechanic", "Teacher", "Driver", "Cook", "Baker") are left
-    // out: a name holding one was not taken as the name. "Mercy Hospital, Registered Nurse" and
-    // "Lincoln High School, Teacher" are read by their employer's word instead
-    // (`organisationWords`).
+    // Beyond the office ("Deloitte, Accountant"). Words that are also surnames ("Nurse",
+    // "Teacher", "Cook") are left out, or a name holding one was not taken as the name; those
+    // roles are read by their employer's word instead (`organisationWords`).
     "instructor",
     "counsell?or",
     "therapist",
@@ -131,24 +108,17 @@ export const DEFAULT_RESUME_PARSE = {
     "polytechnic",
     "seminary",
   ],
-  // Bare MA and MS are the ambiguous two-letter forms: they are also US state codes ("Cambridge,
-  // MA"; see STATE_CODE_AFTER and SUBJECT_AFTER above, which tell the two apart by what
-  // follows), and "MS" before a product name is Microsoft. No state is BA or BS, so those read
-  // as degrees wherever they stand. Dotted and
-  // spelled-out forms stay unconditional. "Associate" alone is a job title, not a degree, and
-  // "certificate" alone is as likely to be an SSL certificate as a credential.
-  // A bare MS/MA is also not one after a number ("900 ms"), before a hyphen ("MS-Excel") or a ZIP
-  // code ("Boston MA 02115"), or as a salutation before a name ("Ms. Priya"); the pattern is
-  // matched case-insensitively, so the salutation is told apart by its dot, not its capital.
-  // "Master Data Management" is a discipline, not a degree.
-  // "Secondary School Certificate" is India's Class X (level 2, the IN region's), and "High
-  // School (Class X)" names that same exam, so neither is claimed at level 3 here.
-  // J.D. and M.D. are professional doctorates, which ISCED 2011 places at level 7 with the
-  // master's, not at the research doctorate's 8. Both are matched dotted only, because
-  // "MD" is Maryland and "JD" a job description. "MFA" undotted is multi-factor authentication.
-  // Keyed by ISCED 2011 level. Level 3 is a school-leaving qualification; level 4 is any other
-  // diploma or certificate, so its pattern steps around the school ones, which would otherwise
-  // be recorded at the higher level.
+  // Bare MA and MS are also US state codes (see STATE_CODE_AFTER and SUBJECT_AFTER) and "MS"
+  // before a product is Microsoft. Not a degree after a number ("900 ms"), before a hyphen
+  // ("MS-Excel"), before a ZIP code, or as the salutation "Ms."; matched case-insensitively, so
+  // the salutation is told by its dot. BA and BS read as degrees anywhere. Dotted and spelled-out
+  // forms stay unconditional. "Associate" and "certificate" alone are not degrees; "Master Data
+  // Management" is a discipline. "Secondary School Certificate" is India's Class X (level 2, the
+  // IN region's), so neither it nor "High School (Class X)" is claimed at level 3.
+  // J.D. and M.D. are level 7 in ISCED 2011, matched dotted only ("MD" is Maryland, "JD" a job
+  // description); "MFA" undotted is multi-factor authentication.
+  // Keyed by ISCED 2011 level. Level 4 is any diploma or certificate that is not a school one,
+  // so its pattern steps around level 3's.
   degrees: {
     "3": String.raw`(?:\b|^)((?:high\s+school(?!\s*\(\s*class\s+(?:x|10)(?:th)?(?![a-z]))|secondary\s+school(?!\s+certificate))(?:\s+(?:diploma|certificate))?|g\.?e\.?d\.?|a[\s-]levels?)(?![\p{L}\p{M}])`,
     "4": String.raw`(?:\b|^)((?<!(?:high|secondary)\s+school\s+)diploma|(?:graduate\s+)?certificate\s+(?:in|of)\b)(?![\p{L}\p{M}])`,

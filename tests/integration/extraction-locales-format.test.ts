@@ -5,11 +5,11 @@ import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { categoryLabel } from "../../src/format/index.js";
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   parseAtsPolicy,
   prepareResume,
   type AtsResumeInput,
+  check as score,
 } from "../../src/index.js";
 import { jobTextFromHtml } from "../../src/job/index.js";
 import { BUILT_IN_LOCALES, localizePolicy, withLocales } from "../../src/locales/index.js";
@@ -22,16 +22,13 @@ import { buildDocxBody } from "../fixtures/buildDocx.js";
 import { buildPdf, text } from "../fixtures/buildPdf.js";
 import { expectFast, expectFastAsync } from "../fixtures/timing.js";
 
-/**
- * Regressions found in the October 2026 audit, one block per finding. Numbers are AUDIT.md's.
- * Every case runs against `DEFAULT_POLICY`, so the suite needs no private files.
- */
+/** Regressions, one block per audit finding (numbers are AUDIT.md's), against `DEFAULT_POLICY`. */
 
 const NOW = new Date("2026-09-30T00:00:00Z");
 const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 
 const check = (resume: AtsResumeInput, jobDescription?: string) =>
-  AtsScoringService.check(resume, DEFAULT_POLICY, { jobDescription, now: NOW });
+  score(resume, DEFAULT_POLICY, { jobDescription, now: NOW });
 
 const RESUME = `Jane Doe
 jane@example.com | +1 415 555 0134
@@ -102,7 +99,7 @@ describe("DOCX XML scans", () => {
   });
 
   it("still counts a photo and a hidden run", () => {
-    // A picture: a drawing with an image in it (a text box has an extent too, and is not one).
+    // A picture: a drawing with an image in it (a text box is not one).
     const photo =
       '<w:p><w:r><w:drawing><wp:inline><wp:extent cx="1270000" cy="1270000"/><a:graphic><a:graphicData><pic:pic><pic:blipFill><a:blip r:embed="rId9"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
     const hidden = "<w:p><w:r><w:rPr><w:vanish/></w:rPr><w:t>Kafka</w:t></w:r></w:p>";
@@ -220,7 +217,7 @@ describe("column gaps in uploaded files", () => {
 });
 
 describe("text on a gradient", () => {
-  // A dark-blue linear gradient across the top of the page, as design tools draw a banner.
+  // A dark-blue linear gradient across the top of the page, as a banner.
   const SHADING =
     "/Shading<</Sh0<</ShadingType 2/ColorSpace/DeviceRGB/Coords[0 0 612 0]/Function<</FunctionType 2/Domain[0 1]/C0[0.05 0.1 0.3]/C1[0.1 0.2 0.5]/N 1>>>>>>";
   const BODY = "0 g BT /F1 11 Tf 50 600 Td (Senior Engineer at Acme Corporation since 2019) Tj ET";
@@ -307,8 +304,8 @@ describe("instructions to an AI, and honest bullets that look like one", () => {
 
 describe("month names are whole words", () => {
   const startOf = (line: string, options: { languages?: string[] } = {}) =>
-    AtsScoringService.check(`Jane Doe\nExperience\n${line}`, LOCALIZED, { now: NOW, ...options })
-      .parsed.roles[0]?.start;
+    score(`Jane Doe\nExperience\n${line}`, LOCALIZED, { now: NOW, ...options }).parsed.roles[0]
+      ?.start;
 
   it.each([
     ["Data Scientist, Novartis 2018 - 2021", { year: 2018, month: null }],
@@ -388,15 +385,14 @@ describe("visibility replay on a crowded page", () => {
 
   it("replays a crowded page far faster than the full scan it replaced", () => {
     const page = crowdedPage(20_000);
-    // The grid replay takes ~0.5 s on a desktop and ~3 s on a GitHub runner; the full scan it
-    // replaced took 5.5 s and ~16 s. On a fixed page, more shapes do put more of them over each
-    // run, so the work still grows with density; the point-check budget bounds the worst case.
+    // The grid replay takes ~0.5 s on a desktop and ~3 s on a runner. Work still grows with
+    // density; the point-check budget bounds the worst case.
     expectFast(() => measureVisibility(ops, page, PAGE), 8_000);
   }, 30_000);
 });
 
 describe("the visibility index answers as a full scan does", () => {
-  /** The rule before the index: every drawn thing checked against the point. */
+  /** Every drawn thing checked against the point. */
   function scan(drawn: Drawn[], [x, y]: [number, number], order: number) {
     const inside = (d: Drawn) => x >= d.box[0] && x <= d.box[2] && y >= d.box[1] && y <= d.box[3];
     const below = drawn.filter((d) => d.order < order && inside(d));
@@ -468,9 +464,9 @@ describe("ratio rules with a global flag", () => {
       ),
     });
     const metrics = (flags: string) =>
-      // A long bullet with its number at the end, then short ones with a number up front: a
-      // global pattern would start the short ones past their end and miss them.
-      AtsScoringService.check(BULLETS, withFlags(flags), { now: NOW }).rules.find(
+      // A long bullet with its number at the end, then short ones with it up front: a global
+      // pattern would miss the short ones.
+      score(BULLETS, withFlags(flags), { now: NOW }).rules.find(
         (rule) => rule.id === "ats-v2.content.metrics",
       )?.evidence;
     expect(metrics("gi")).toBe(metrics("i"));
@@ -498,7 +494,7 @@ describe("keyword lists", () => {
         stopwords: [...DEFAULT_POLICY.keywordMatch.stopwords, "Dental"],
       },
     });
-    const report = AtsScoringService.check(`${RESUME}\n- Built event sourcing`, policy, {
+    const report = score(`${RESUME}\n- Built event sourcing`, policy, {
       now: NOW,
       jobDescription: "Requirements\n- Event Sourcing, dental",
     });
@@ -509,7 +505,7 @@ describe("keyword lists", () => {
 
 describe("region from the resume's phone, not the posting's", () => {
   it("does not take the recruiter's country", () => {
-    const report = AtsScoringService.check(RESUME.replace(/ \| \+1.*$/m, ""), LOCALIZED, {
+    const report = score(RESUME.replace(/ \| \+1.*$/m, ""), LOCALIZED, {
       now: NOW,
       jobDescription: "Requirements\n- Go\nContact: +49 30 12345678",
     });
@@ -605,8 +601,7 @@ Analyst, Globex 07/15/2015 - 03/31/2018`;
 
 describe("a page with more hidden runs than a spread can take", () => {
   it("still reports the hidden text rather than dropping the measurement", async () => {
-    // 250 000 one-glyph runs at 1pt: past V8's argument limit for `push(...array)`, whose
-    // RangeError the page's catch used to turn into "visibility not measured".
+    // 250 000 one-glyph runs at 1pt: past V8's argument limit for `push(...array)`.
     const visible = "0 g BT /F1 11 Tf 50 750 Td (Jane Doe, Senior Engineer at Acme) Tj ET";
     const hidden = `BT /F1 1 Tf 50 700 Td ${"(x) Tj ".repeat(250_000)}ET`;
     const { layout } = await extractResume(buildPdf(`${visible}\n${hidden}`), "pdf");

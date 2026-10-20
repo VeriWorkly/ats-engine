@@ -1,9 +1,8 @@
 /** The community policy's job-matching vocabulary and weights. */
 export const DEFAULT_KEYWORD_MATCH = {
-  // Round, obviously-illustrative numbers. They encode only the ordering the engine needs — a
-  // stated requirement outranks the body, which outranks a nice-to-have, and ordinary English is
-  // discounted against a recognised skill. The *tuned* values are calibration and stay private;
-  // anything here that happened to match them would be shipping the moat in the demo.
+  // Round illustrative numbers encoding only the ordering the engine needs: a stated requirement
+  // outranks the body, which outranks a nice-to-have; ordinary English is discounted against a
+  // recognised skill.
   requiredWeight: 2,
   preferredWeight: 0.5,
   responsibilitiesWeight: 0.5,
@@ -12,16 +11,13 @@ export const DEFAULT_KEYWORD_MATCH = {
   // A soft skill weighs this much of an ordinary word: 0.1 of a recognised skill.
   softSkillWeight: 0.4,
   sections: {
-    // "Minimum qualifications", "Basic Qualifications", "Must-haves", "What you bring", "About
-    // you", "Skills and Qualifications", "What we're looking for": a posting whose required
-    // heading went unread lost every required item, and its heading words became keywords.
-    // "Skills" only as the whole heading: "Skills you'll gain" are not asked.
+    // Required-heading variants ("Minimum qualifications", "What you bring", "About you").
+    // "Skills" only as the whole heading: "Skills you'll gain" is not asked.
     required: String.raw`^(?:(?:minimum|basic|required|essential|key|core)\s+)?(?:requirements|qualifications)|^(?:(?:required|key|core)\s+)?skills(?:\s+(?:and|&)\s+(?:qualifications|requirements|experience))?\s*$|^(?:what\s+you.{0,3}ll\s+need|what\s+you\s+(?:bring|need|have)|what\s+we(?:.{0,3}re|\s+are)\s+looking\s+for|must[\s-]+haves?|about\s+you|your\s+profile|who\s+you\s+are|you\s+have|you\s+bring)`,
     preferred: String.raw`^(?:nice[\s-]+to[\s-]+haves?|preferred|bonus|desirable|desired|plus)`,
     responsibilities: String.raw`^(?:responsibilities|what\s+you.{0,3}ll\s+do|the\s+role|about\s+the\s+role)`,
-    // "About Acme Robotics" is the employer's own section; its name is never a keyword. "About
-    // you" (required) and "About the role" (responsibilities) are matched before this. What the
-    // job will teach ("Skills you'll gain", "What you'll learn") is not asked of anyone.
+    // "About <employer>" is the employer's own section, never a keyword; "About you" and "About
+    // the role" match before this. What the job will teach ("What you'll learn") is not asked.
     excluded: String.raw`^(?:about\s+(?:us|the\s+(?:team|company))|benefits|perks|(?:what\s+)?we\s+offer|skills\s+you(?:.{0,3}ll|\s+will)\s+(?:gain|learn|develop|build)|what\s+you(?:.{0,3}ll|\s+will)\s+learn|equal\s+opportunity|our\s+values|why\s+join|about\s+(?!(?:you|your|the|this)(?![\p{L}]))[\p{L}\p{N}&.'-]{1,40}(?:\s+[\p{L}\p{N}&.'-]{1,40}){0,3})`,
   },
   stopwords: [
@@ -107,8 +103,7 @@ export const DEFAULT_KEYWORD_MATCH = {
     "want",
     "plus",
     "must",
-    // Function words. Terms of one or two letters are already dropped unless they are a
-    // named skill, but the longer ones and the posting filler below still reached the report.
+    // Function words; terms of one or two letters are already dropped unless a named skill.
     "a",
     "an",
     "as",
@@ -213,16 +208,14 @@ export const DEFAULT_KEYWORD_MATCH = {
     node: "node.js",
     reactjs: "react",
     "react.js": "react",
-    // A ".js" name whose plain name is the framework; "Next.js" and "Express.js" stay whole, as
-    // "next" and "express" are ordinary words.
+    // ".js" names whose plain name is the framework stay whole.
     "vue.js": "vue",
     "nuxt.js": "nuxt",
     // AngularJS, not Angular, its successor.
     "angular.js": "angularjs",
     "full-stack": "full stack",
     fullstack: "full stack",
-    // A soft skill's other spellings, so "communicating" in a posting meets "communication" on a
-    // resume. Each is a soft skill, never a hard one (see `softSkills`).
+    // A soft skill's other spellings; each is a soft skill, never a hard one (see `softSkills`).
     communicate: "communication",
     communicates: "communication",
     communicated: "communication",
@@ -246,20 +239,11 @@ export const DEFAULT_KEYWORD_MATCH = {
     "team-player": "team player",
     "growth-mindset": "growth mindset",
   },
-  // What a posting asks of the person rather than of their work. They weigh `softSkillWeight` of
-  // an ordinary word and the report lists them apart. Placed by one test: does a resume evidence
-  // it with an outcome, or only claim it? Borderline terms stay hard skills:
-  // - "mentoring" and "coaching": a duty with an object a resume shows ("Mentored four
-  //   engineers"); the requirements judge already holds a mentoring ask to a line that shows it.
-  // - "project management": a discipline with methods, tools and certifications (PMP, PRINCE2).
-  // - "negotiation": in the roles that name it (sales, procurement) the job itself, measured in
-  //   deals and terms; a soft discount would hide a sales resume's real gap.
-  // - "customer service", "presentation", "creative", "prioritization": a trade, a deliverable,
-  //   a marketing noun ("ad creative"), a product manager's method ("backlog prioritization").
-  // - "integrity", "resilience", "reliability": engineering asks ("data integrity", "system
-  //   resilience") as often as traits.
-  // "leadership" and "stakeholder management" are soft: postings ask for them in every field,
-  // and "led a team of five" is evidence of leading, which stays the requirements judge's work.
+  // What a posting asks of the person rather than of their work, weighed `softSkillWeight` of an
+  // ordinary word and listed apart in the report. Borderline terms that a resume evidences with
+  // an outcome stay hard skills: "mentoring", "coaching", "project management", "negotiation",
+  // "customer service", "presentation", "creative", "prioritization", "integrity", "resilience",
+  // "reliability". "leadership" and "stakeholder management" are soft: asked in every field.
   softSkills: [
     "communication",
     "interpersonal",
@@ -302,11 +286,10 @@ export const DEFAULT_KEYWORD_MATCH = {
     mysql: ["relational database", "sql"],
     react: ["javascript"],
     typescript: ["javascript"],
-    // A role is experience in its field: a teacher's years are years in education.
+    // A role is experience in its field.
     teacher: ["education"],
     nurse: ["healthcare"],
-    // A software engineer's work is software development, though the role never says
-    // "developed"; an engineer of another kind (sales, civil) is not.
+    // A software engineer's work is software development; other kinds of engineer are not.
     "software engineer": ["software", "engineer", "development"],
   },
   phrases: [

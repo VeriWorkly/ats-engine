@@ -1,22 +1,11 @@
 import * as z from "zod/mini";
 
 /**
- * The JSON Schema a task asks the model for, derived from the zod schema that parses the reply.
- *
- * The two are not the same shape and cannot be. The parse schema is lenient — every field
- * nullable and optional, so a model that omits half its output still parses into empty values —
- * while strict structured outputs require every property in `required`, forbid extra properties,
- * and reject length and range constraints. So the request schema is generated from the parse
- * schema and then tightened:
- *
+ * The strict JSON Schema sent to the model, generated from the lenient zod parse schema:
  * - every object lists all its properties as required and sets `additionalProperties: false`;
  * - optionality is carried by `null`, written as `type: [X, "null"]`;
- * - array items are asked for as non-null — tolerating a null item is the parser's leniency, not
- *   something to invite;
- * - length, size and range keywords are dropped; the parse schema still enforces them.
- *
- * Generating it means a field added to the parse schema is asked for without anyone editing a
- * second copy. It used to be a hand-written twin held in step by a test.
+ * - array items are non-null;
+ * - length, size and range keywords are dropped (the parse schema still enforces them).
  */
 
 type Node = Record<string, unknown>;

@@ -8,17 +8,12 @@ import {
   MAX_EXTRACTED_CHARS,
   normalizeExtractedText,
 } from "../../src/node/extract.js";
-import { measureColumns } from "../../src/node/layout.js";
+import { findGutter } from "../../src/node/layout.js";
 import { optional } from "../../src/node/peer.js";
 import { buildDocx } from "../fixtures/buildDocx.js";
 import { buildPdf, LEFT_COLUMN, RIGHT_COLUMN, ruledTable, text } from "../fixtures/buildPdf.js";
 
-/**
- * Exercises the real PDF parser on generated PDFs. These are the checks the
- * marketing copy has always claimed and the engine could never actually perform — the old
- * format rules looked for box-drawing glyphs that no extractor emits — so they are worth
- * asserting end to end rather than against a mock.
- */
+/** The real PDF parser on generated PDFs, end to end rather than against a mock. */
 describe("PDF layout detection", () => {
   const extract = (ops: string) => extractResume(buildPdf(ops), "pdf");
 
@@ -33,10 +28,8 @@ describe("PDF layout detection", () => {
   }, 60_000);
 
   it("flags a two-column layout whose columns share baselines, and reads it a column at a time", async () => {
-    // Both columns written on the same baselines, which made the extracted text interleave: each
-    // line carried a fragment of the left column and a fragment of the right. The text is now
-    // read by position, a column at a time; the layout is still flagged, because an ATS that
-    // reads line by line still interleaves it.
+    // Both columns share baselines: the text is read a column at a time, but the layout is still
+    // flagged because an ATS reading line by line interleaves it.
     const ops = LEFT_COLUMN.flatMap((line: string, index: number) => [
       text(45, 720 - index * 26, line),
       text(340, 720 - index * 26, RIGHT_COLUMN[index]),
@@ -51,15 +44,8 @@ describe("PDF layout detection", () => {
     expect(lines.slice(LEFT_COLUMN.length)).toEqual(RIGHT_COLUMN);
   }, 60_000);
 
-  /**
-   * The case the previous text-based detector could not see at all.
-   *
-   * Visually this is the same two-column page, but the content stream emits the whole left
-   * column before the right, so the extracted characters come out in a perfectly linear order
-   * and nothing in the text betrays the layout. It is still a two-column resume, and an ATS
-   * that maps fields by position still reads it wrong. Measuring the page's geometry rather
-   * than its character stream is what makes it visible.
-   */
+  // The content stream emits the whole left column before the right: the text is linear, only the
+  // page geometry shows two columns.
   it("flags a two-column layout even when the text still extracts in reading order", async () => {
     const ops = [
       ...LEFT_COLUMN.map((line: string, index: number) => text(45, 720 - index * 26, line)),
@@ -69,14 +55,13 @@ describe("PDF layout detection", () => {
     const { text: extracted, layout } = await extract(ops);
 
     expect(layout?.columnRatio).toBeGreaterThanOrEqual(0.4);
-    // Proof the text alone gives nothing away: the first line reads as ordinary prose.
+    // The text alone gives nothing away.
     expect(extracted.split("\n")[0]).not.toContain("Certifications");
   }, 60_000);
 
   it("does not mistake right-aligned dates for a second column", async () => {
-    // The commonest single-column resume shape: content on the left, a date pinned right on the
-    // same line. There is a real vertical channel between them, but the dates are tab stops of
-    // the lines they end, not a column: the page passes the column rule (its band is 0.15).
+    // Content left, a date pinned right on the same line: a channel, but the dates are tab stops
+    // (the page passes the column rule; its band is 0.15).
     const ops = LEFT_COLUMN.flatMap((line: string, index: number) => [
       text(45, 720 - index * 26, line),
       text(470, 720 - index * 26, "2021"),
@@ -95,8 +80,7 @@ describe("PDF layout detection", () => {
   it("reports the table count even when the document is too short to measure columns", async () => {
     const { layout } = await extract(ruledTable(2, 2));
 
-    // Null rather than zero: not measurable is not the same as measured and clean, and the
-    // column rule is dropped from the report rather than passing by default.
+    // Null, not zero: not measurable is not measured and clean.
     expect(layout?.columnRatio).toBeNull();
     expect(layout?.tableCount).toBeGreaterThanOrEqual(1);
   }, 60_000);
@@ -112,14 +96,13 @@ describe("resume extraction", () => {
       "Senior Engineer, Acme & Co",
       "2019 - 2023",
     ]);
-    // No page geometry, so columns stay unmeasured; what the XML says is measured.
+    // No page geometry, so columns stay unmeasured.
     expect(layout).toEqual({
       columnRatio: null,
       tableCount: 0,
       pageCount: 0,
       imageCount: 0,
       hiddenTextChars: 0,
-      hiddenTextSample: "",
       hiddenText: "",
       hiddenTextRead: "",
       trackedChanges: 0,
@@ -132,13 +115,12 @@ describe("resume extraction", () => {
       Buffer.from("Zoë Müller\nIngenieurin  \t bei\u0000 Acme"),
       "text",
     );
-    // A run of blanks with a tab in it stays one tab: the parser's column-gap signal.
+    // A run of blanks with a tab stays one tab: the parser's column-gap signal.
     expect(result).toEqual({ text: "Zoë Müller\nIngenieurin\tbei Acme" });
   });
 
   it("leaves the caller's buffer intact, so the same bytes can be read again", async () => {
-    // pdf.js detaches the memory it is handed. A pass that shared the caller's bytes broke the
-    // second pass (geometry came back null) and anything the caller did with the buffer after.
+    // pdf.js detaches the memory it is handed.
     const pdf = buildPdf(ruledTable(4, 3));
     const first = await extractResume(pdf, "pdf");
     const second = await extractResume(pdf, "pdf");
@@ -156,8 +138,7 @@ describe("a missing PDF or DOCX reader", () => {
   const { peerDependencies } = JSON.parse(readFileSync(new URL("package.json", root), "utf8")) as {
     peerDependencies: Record<string, string>;
   };
-  // What to install, at the versions the engine accepts: pdfjs-dist is pinned exactly, and a
-  // bare `pdf-parse` would take whatever major is latest.
+  // pdfjs-dist is pinned exactly; a bare `pdf-parse` would take the latest major.
   const specs = [
     `pdf-parse@${peerDependencies["pdf-parse"]!.replace(/^\^(\d+).*/, "$1")}`,
     `pdfjs-dist@${peerDependencies["pdfjs-dist"]}`,
@@ -215,6 +196,8 @@ describe("detectResumeFormat", () => {
 });
 
 describe("measureColumns", () => {
+  const measureColumns = (runs: Parameters<typeof findGutter>[0], width: number) =>
+    findGutter(runs, width)?.ratio ?? null;
   const run = (left: number, right: number, mass = 10) => ({ left, right, mass });
 
   it("reports nothing for a page too sparse to judge", () => {

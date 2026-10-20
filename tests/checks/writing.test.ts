@@ -11,7 +11,7 @@ import {
   tenseMismatches,
   weakOpeners,
 } from "../../src/checks/writing.js";
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { segmentResume } from "../../src/parser/sections.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -136,7 +136,7 @@ describe("50 KB adversarial input", () => {
     (_, input) => {
       const resume = `Jane Doe\njane@example.com\nExperience\nEngineer at Acme Jan 2019 - Present\n• ${input}\n• ${input}\nEngineer at Globex 2015 - 2018\n• ${input}`;
       expectFast(() => {
-        AtsScoringService.check(resume, P, {
+        check(resume, P, {
           now: new Date("2026-10-01T00:00:00Z"),
           languages: [],
         });

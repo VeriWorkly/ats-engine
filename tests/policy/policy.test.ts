@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   computeVerdict,
   parseAtsPolicy,
+  check,
+  type AtsResumeInput,
 } from "../../src/index.js";
 import * as ai from "../../src/ai/index.js";
 import * as document from "../../src/document/index.js";
@@ -22,14 +23,7 @@ const isDeepFrozen = (value: unknown, seen = new Set<unknown>()): boolean => {
   return Object.isFrozen(value) && Object.values(value).every((item) => isDeepFrozen(item, seen));
 };
 
-/**
- * The policy contract, from the package's side.
- *
- * `engine-policy.test.ts` in the server covers the other half — that an invalid policy refuses
- * the boot and surfaces as a 503. What is covered here is what the library itself promises:
- * `parseAtsPolicy` is pure, it throws a typed error carrying the structured issues, and a policy
- * it accepts cannot then blow up at match time.
- */
+/** The policy contract: `parseAtsPolicy` is pure, throws a typed error with structured issues, and accepts only policies that cannot fail at match time. */
 
 const MINIMAL = {
   version: "ats-v2",
@@ -63,7 +57,7 @@ const MINIMAL = {
     sections: { experience: "a", education: "b", skills: "c", projects: "d", other: "e" },
     titleWords: ["engineer"],
     schoolWords: ["university"],
-    degrees: { diploma: "a", associate: "b", bachelor: "c", master: "d", doctorate: "e" },
+    degrees: { "4": "a", "5": "b", "6": "c", "7": "d", "8": "e" },
   },
 };
 
@@ -89,11 +83,7 @@ describe("parseAtsPolicy", () => {
     expect(policy.rules).toHaveLength(1);
   });
 
-  /**
-   * The engine caches what it compiles from a policy against the policy object itself, so a
-   * policy changed after it was parsed would be read with patterns compiled before the change.
-   * Frozen, the change throws (test files are modules, so strict) instead of going unread.
-   */
+  /** Compiled patterns are cached against the policy object, so a parsed policy is frozen: a change throws instead of going unread. */
   it("returns a frozen policy, so a host that changes it throws", () => {
     const policy = parseAtsPolicy(MINIMAL);
     expect(isDeepFrozen(policy)).toBe(true);
@@ -144,11 +134,7 @@ describe("parseAtsPolicy", () => {
     }
   });
 
-  /**
-   * A policy can come from a host's JSON file, so its depth is not ours to choose. Nested past
-   * any real policy it is refused like any other bad policy, not with a stack overflow, both
-   * where the schema reads and in a key the schema drops.
-   */
+  /** A policy can come from a host's JSON file: one nested past any real policy is refused, not a stack overflow, in the schema and in a key it drops. */
   it("refuses a policy nested 10,000 deep with AtsPolicyError", () => {
     for (const make of [(inner: unknown) => ({ a: inner }), (inner: unknown) => [inner]]) {
       let nested: unknown = "leaf";
@@ -218,10 +204,7 @@ describe("parseAtsPolicy", () => {
     });
   }
 
-  /**
-   * A multi-word term only becomes a single token by matching the phrase list first, so one
-   * referenced by `implies` or `synonyms` but absent from `phrases` silently never resolves.
-   */
+  /** A multi-word term in `implies` or `synonyms` but absent from `phrases` would never resolve. */
   it("rejects a multi-word term that could never match", () => {
     expect(() =>
       parseAtsPolicy({
@@ -236,12 +219,7 @@ describe("parseAtsPolicy", () => {
   });
 });
 
-/**
- * A policy that validates must not be able to throw at match time. Before these guards a
- * malformed pattern passed `z.string().min(1)` and raised `SyntaxError` on the first request
- * that evaluated the rule — a healthy process serving a broken endpoint, which is the exact
- * failure the boot-time check exists to prevent.
- */
+/** A policy that validates must not be able to throw at match time. */
 describe("regex fields are validated at parse time, not at match time", () => {
   it("rejects a pattern that does not compile", () => {
     expect(() => parseAtsPolicy(withRule({ ...presenceRule, pattern: "([unclosed" }))).toThrow(
@@ -282,7 +260,7 @@ describe("regex fields are validated at parse time, not at match time", () => {
         ...MINIMAL,
         resumeParse: {
           ...MINIMAL.resumeParse,
-          degrees: { ...MINIMAL.resumeParse.degrees, bachelor: "(bad" },
+          degrees: { ...MINIMAL.resumeParse.degrees, "6": "(bad" },
         },
       }),
     ).toThrow(AtsPolicyError);
@@ -304,11 +282,7 @@ describe("regex fields are validated at parse time, not at match time", () => {
   });
 });
 
-/**
- * The shipped default has to actually work, or the package's first-run experience is a crash.
- * It is also the one policy a consumer gets without writing anything, so it carries the
- * package's claim that it is usable standalone.
- */
+/** The shipped default has to work standalone. */
 describe("DEFAULT_POLICY", () => {
   it("validates against the schema it is published beside", () => {
     expect(() => parseAtsPolicy(DEFAULT_POLICY)).not.toThrow();
@@ -357,40 +331,33 @@ describe("DEFAULT_POLICY", () => {
       "Go, TypeScript, PostgreSQL, Kubernetes, Terraform, Docker",
     ].join("\n");
 
-    const report = AtsScoringService.check(good, DEFAULT_POLICY);
+    const report = check(good, DEFAULT_POLICY);
     expect(report.parsed.roles).toHaveLength(2);
     expect(report.parsed.email).toBe("jane.doe@example.com");
-    expect(report.parsed.highestDegree).toBe("bachelor");
+    expect(report.parsed.highestIsced).toBe(6);
     expect(report.readinessScore).toBeGreaterThan(70);
 
-    const bad = AtsScoringService.check("hire me", DEFAULT_POLICY);
+    const bad = check("hire me", DEFAULT_POLICY);
     expect(bad.readinessScore).toBeLessThan(50);
     expect(computeVerdict(bad)).toBe("weak");
   });
 
   it("credits an implied capability, so the implication map is wired up", () => {
-    const report = AtsScoringService.check(
-      "jane@example.com\nSkills\nTerraform, PostgreSQL",
-      DEFAULT_POLICY,
-      { jobDescription: "Requirements\n- Infrastructure as code\n- Relational databases" },
-    );
+    const report = check("jane@example.com\nSkills\nTerraform, PostgreSQL", DEFAULT_POLICY, {
+      jobDescription: "Requirements\n- Infrastructure as code\n- Relational databases",
+    });
     expect(report.missingKeywords).not.toContain("infrastructure as code");
     expect(report.jobMatchScore).toBeGreaterThan(0);
   });
 
   it("treats an alternation as one requirement", () => {
-    const report = AtsScoringService.check(
-      "jane@example.com\nExperience\nShipped services in Go",
-      DEFAULT_POLICY,
-      { jobDescription: "Requirements\n- Go or Java" },
-    );
+    const report = check("jane@example.com\nExperience\nShipped services in Go", DEFAULT_POLICY, {
+      jobDescription: "Requirements\n- Go or Java",
+    });
     expect(report.missingKeywords).not.toContain("java");
   });
 
-  /**
-   * The tuned weights are private. If the default ever matches them it means the calibration
-   * leaked into a package that is meant to be publishable.
-   */
+  /** The tuned weights are private: the default must not match them. */
   it("does not ship the private calibration weights", () => {
     const km = DEFAULT_POLICY.keywordMatch;
     expect([
@@ -406,7 +373,7 @@ describe("the engine holds no state", () => {
   it("gives identical results for identical input", () => {
     const run = () =>
       JSON.stringify(
-        AtsScoringService.check(
+        check(
           "Jane Doe\njane@x.com\nExperience\nEngineer, Acme - Jan 2020 - Dec 2022",
           DEFAULT_POLICY,
           { jobDescription: "Requirements\nGo or Java" },
@@ -420,7 +387,7 @@ describe("the engine holds no state", () => {
     const resumeBefore = JSON.stringify(resume);
     const policyBefore = JSON.stringify(DEFAULT_POLICY);
 
-    AtsScoringService.check(resume, DEFAULT_POLICY);
+    check(resume, DEFAULT_POLICY);
 
     expect(JSON.stringify(resume)).toBe(resumeBefore);
     expect(JSON.stringify(DEFAULT_POLICY)).toBe(policyBefore);
@@ -428,17 +395,14 @@ describe("the engine holds no state", () => {
 
   it("survives degenerate input without throwing", () => {
     for (const resume of [null, undefined, 42, "", "   \n\n  ", {}, [], { a: { b: [] } }])
-      expect(() => AtsScoringService.check(resume, DEFAULT_POLICY)).not.toThrow();
+      expect(() => check(resume as AtsResumeInput, DEFAULT_POLICY)).not.toThrow();
   });
 
-  /**
-   * `resume` is attacker-controlled and the body parser allows 4 MB, so unbounded recursion over
-   * it is a stack overflow away from taking out every request sharing the worker.
-   */
+  /** `resume` is attacker-controlled: recursion over it must not overflow the stack. */
   it("caps recursion depth rather than overflowing the stack", () => {
     let nested: unknown = "leaf";
     for (let depth = 0; depth < 50_000; depth += 1) nested = { value: nested };
-    expect(() => AtsScoringService.check(nested, DEFAULT_POLICY)).not.toThrow();
+    expect(() => check(nested as AtsResumeInput, DEFAULT_POLICY)).not.toThrow();
   });
 });
 

@@ -11,33 +11,25 @@ export type ResumeSectionKind =
 /** `headed`: opened by a heading, as opposed to the lines above the first one. */
 export type ResumeSection = { kind: ResumeSectionKind; lines: string[]; headed: boolean };
 
-/**
- * A line that reads as a section heading rather than body copy: short, and not punctuated like
- * a sentence. Deliberately generous on width (up to eight words) so real-world variants —
- * "Professional Experience", "Core Technical Competencies" — still register, while prose that
- * merely mentions the word ("8 years of experience in education technology") does not.
- */
+/** A line short enough (up to eight words) and unpunctuated enough to be a heading, not body copy. */
 export function isHeadingLine(line: string) {
   const trimmed = line.trim();
   if (!trimmed || trimmed.length > 80) return false;
-  // "।" (danda) ends a sentence in Hindi as "." does in English.
+  // "।" (danda) ends a Hindi sentence.
   if (/[.,;।]$/u.test(trimmed)) return false;
   return trimmed.split(/\s+/).length <= 8;
 }
 
 /**
- * The section a line opens, if it is a heading, and any content written after a colon on it.
- *
- * Shared by the resume and job segmenters so both read headings the same way. A pattern
- * matching the start of the line is not enough on its own:
- * - "Skills: Python, Java" is a heading *and* content — the part after the colon is kept.
- * - "History of Art BA" and "Experienced Python developer" start like a heading but continue as
- *   prose, so whatever follows the match must be empty or read as more title words:
- *   capitalised ("Work Experience Summary") or a connector ("Skills & Tools").
- * - "Education Program Manager, Khan Academy" is capitalised throughout but is a role: a comma
- *   or a digit after the match rules a heading out.
- * - "Education Officer", "Skills Trainer", "Experience Designer" are job titles: a job-title word
- *   after the match rules a heading out, when the matchers carry the policy's title words.
+ * The section a line opens, if it is a heading, and any content after a colon on it. Shared by
+ * the resume and job segmenters. A pattern matching the line's start is not enough:
+ * - "Skills: Python, Java" is a heading and content; the part after the colon is kept.
+ * - "History of Art BA" continues as prose, so what follows the match must be empty or more title
+ *   words: capitalised ("Work Experience Summary") or a connector ("Skills & Tools").
+ * - "Education Program Manager, Khan Academy" is a role: a comma or digit after the match rules a
+ *   heading out.
+ * - "Education Officer" is a job title: a title word after the match rules a heading out, when
+ *   the matchers carry the policy's title words.
  *
  * `tail` is what follows the heading words ("Summary" in "Work Experience Summary"); empty for a
  * bare heading.
@@ -77,18 +69,16 @@ export const headingConnector = memo(
 );
 
 function isTitleTail(tail: string, head: string, connector: RegExp) {
-  // The match ended mid-word: "Experience|d", or a Devanagari word whose vowel sign follows.
+  // The match ended mid-word (including before a Devanagari vowel sign).
   if (/^[\p{L}\p{M}\p{N}]/u.test(tail)) return false;
-  // A heading names a section; it has no employer after a comma and no dates. Those are what a
-  // role line carries, and "Education Coordinator, Acme  2019 - Present" is one. A count in
-  // brackets is the heading's own — "Experience (10+ Years)" — unless it is a year.
+  // A heading has no employer after a comma and no dates (a role line does). A count in brackets
+  // ("Experience (10+ Years)") is the heading's own, unless it is a year.
   if (tail.includes(",") || /\p{N}/u.test(tail.replace(/\([^()]*\)/g, ""))) return false;
   if (/(?<!\p{N})(?:19|20)\p{N}{2}(?!\p{N})/u.test(tail)) return false;
-  // An all-lowercase heading carries no capitalisation signal, so its tail cannot be judged.
+  // An all-lowercase heading gives no capitalisation signal to judge its tail by.
   if (!/\p{Lu}/u.test(head)) return true;
-  // A heading is in title case ("Skills & Tools") or sentence case ("Education and
-  // certifications"); a capitalised word after a lowercase one is prose: "History of Art BA",
-  // "Experience in Python".
+  // Title case ("Skills & Tools") or sentence case ("Education and certifications"); a capitalised
+  // word after a lowercase one is prose ("Experience in Python").
   const words = tail.trim().split(/\s+/).filter(Boolean);
   return (
     words.every((word) => connector.test(word) || /^[\p{Lu}\p{N}(]/u.test(word)) ||
@@ -107,7 +97,7 @@ const matchersOf = memo((rp: AtsEnginePolicy["resumeParse"]): SectionMatchers =>
     { kind: "education", re: policyRegex(rp.sections.education, "i") },
     { kind: "skills", re: policyRegex(rp.sections.skills, "i") },
     { kind: "projects", re: policyRegex(rp.sections.projects, "i") },
-    // Defaulted by the schema; a policy object built by hand, unparsed, may not have them.
+    // Schema-defaulted; a hand-built unparsed policy may lack them.
     { kind: "certifications", re: policyRegex(rp.sections.certifications ?? "(?!)", "i") },
     { kind: "languages", re: policyRegex(rp.sections.languages ?? "(?!)", "i") },
     { kind: "other", re: policyRegex(rp.sections.other, "i") },
@@ -129,20 +119,16 @@ export function sectionKind(line: string, policy: AtsEnginePolicy) {
   return classifyHeading(line, sectionMatchers(policy))?.kind ?? null;
 }
 
-/**
- * A heading with its content after a colon — "Languages: English (native)" — as the kind it
- * names and that content; null for a bare heading or any other line.
- */
+/** A heading with content after a colon ("Languages: English (native)") as its kind and content; else null. */
 export function labelledLine(line: string, policy: AtsEnginePolicy) {
   const heading = classifyHeading(line, sectionMatchers(policy));
   return heading?.rest ? { kind: heading.kind, rest: heading.rest } : null;
 }
 
 /**
- * Whether the line is a section heading and nothing more — "experience", "skills: Go" — rather
- * than one that only opens with a heading word. A lowercase line carries no capitalisation to
- * tell "education" the heading from "education technology" ending a wrapped sentence, so only
- * the bare word is certain.
+ * Whether the line is a heading and nothing more ("experience", "skills: Go"), not one that only
+ * opens with a heading word. A lowercase line cannot tell "education" from "education technology"
+ * ending a wrapped sentence, so only the bare word is certain.
  */
 export function isBareSectionHeading(line: string, policy: AtsEnginePolicy) {
   const colon = line.indexOf(":");
@@ -161,22 +147,17 @@ export function headedKinds(sections: readonly ResumeSection[]) {
 const LETTERS = /^\p{L}+$/u;
 
 /**
- * A letter-spaced line read back as words, or null when the line is not one.
+ * A letter-spaced line read back as words, or null when the line is not one. Wide tracking on a
+ * heading extracts one word per glyph (PDF text has no words; extractors split above ~0.06em):
+ * - Wide tracking splits every glyph ("E X P E R I E N C E", kerned pairs left joined):
+ *   recognised by shape alone (every fragment one or two letters, nearly all one), which leaves
+ *   initials ("J R R Tolkien") alone.
+ * - Tracking near the threshold splits some pairs ("SU MMARY"), which also looks like an ordinary
+ *   all-caps line ("JANE DOE"): read back only when the result is a heading and the line as
+ *   written is not.
  *
- * Heading tracking — the wide letter spacing design templates put on "EXPERIENCE" — extracts as
- * one word per glyph, because PDF text has no words, only positioned glyphs, and an extractor
- * calls any gap wider than a fraction of the font size a space. Measured on react-pdf output,
- * pdf.js, Poppler and PDFBox all split above about 0.06em. Two shapes come out:
- * - Wide tracking splits every glyph: "E X P E R I E N C E", with kerned pairs ("AT") left
- *   joined. Recognised by shape alone — every fragment one or two letters, nearly all one — which
- *   leaves initials ("J R R Tolkien") alone.
- * - Tracking near the threshold splits only some pairs: "SU MMARY", "WOR K EXPE RIENCE". That is
- *   also exactly what an ordinary all-caps line ("JANE DOE") looks like, so it is read back only
- *   when the result is a section heading and the line as written is not.
- *
- * Either way the word gaps are usually lost too — the space glyph extracts as one more single
- * space — so "WORKEXPERIENCE" is cut at the fragment gap that makes it a heading. Runs of two or more
- * spaces, where an extractor kept them, are taken as the word gaps they are.
+ * Word gaps are usually lost too, so "WORKEXPERIENCE" is cut at the fragment gap that makes it a
+ * heading. Runs of two or more spaces, where kept, are the word gaps.
  */
 function despace(line: string, matchers: SectionMatchers): string | null {
   if (line.length > 80) return null;
@@ -191,12 +172,11 @@ function despace(line: string, matchers: SectionMatchers): string | null {
   if (!glyphPerWord && (line !== line.toUpperCase() || classifyHeading(line, matchers)))
     return null;
 
-  // A tab is a word gap too: the PDF reader prints a wide gap as one.
+  // A tab is a word gap too.
   const words = line.split(/\s{2,}|\t/).map((word) => word.replace(/\s+/g, ""));
   const joined = words.join(" ");
   if (classifyHeading(joined, matchers)) return joined;
-  // The lost word gap is one of the gaps the extractor printed, never inside a fragment: cut
-  // anywhere, "SKILL SET" read as "SKILLS ET" and "LANGUAGE SKILLS" as "LANGUAGES KILLS".
+  // The lost word gap is one of the printed gaps, never inside a fragment ("SKILLS ET" is wrong).
   let cut = 0;
   if (words.length === 1)
     for (const fragment of fragments.slice(0, -1)) {
@@ -208,12 +188,9 @@ function despace(line: string, matchers: SectionMatchers): string | null {
 }
 
 /**
- * The resume's lines with letter-spaced ones read back as words, and how many there were.
- *
- * Run before anything reads the lines, so the heading, the parser and the content rules all see
- * "EXPERIENCE". The count is reported separately because recovering the heading is this
- * parser's generosity, not every ATS's: one that keeps the spaces files the whole section under
- * no heading at all, and that is worth a warning even though the report itself reads fine.
+ * The resume's lines with letter-spaced ones read back as words, and how many there were. Run
+ * first, so every reader sees "EXPERIENCE". The count is reported because another ATS may keep
+ * the spaces and file the section under no heading.
  */
 export function despaceLines(lines: string[], policy: AtsEnginePolicy) {
   const matchers = sectionMatchers(policy);
@@ -227,12 +204,12 @@ export function despaceLines(lines: string[], policy: AtsEnginePolicy) {
   return { lines: read, spaced };
 }
 
-/** Only to tell a date from other numbers: a heading has no "now" to hold a year against. */
+/** A far `now`, only to tell a date from other numbers. */
 const UNBOUNDED = new Date(Date.UTC(9000, 0, 1));
 
 const UNKNOWN = { kind: "other", rest: "", tail: "" } as const;
 
-/** Headings never read as a line of a role for how they are set. */
+/** Headings never read as a line of a role, however they are set. */
 const SECTIONS_OF_THEIR_OWN = new Set<ResumeSectionKind>([
   "experience",
   "education",
@@ -243,12 +220,10 @@ const SECTIONS_OF_THEIR_OWN = new Set<ResumeSectionKind>([
 const HEADING_WORDS = /^\p{L}+(?:[ &/-]+\p{L}+){0,3}$/u;
 
 /**
- * The lines that are headings the policy does not know ("VOLUNTEER WORK", "Community
- * Involvement"), told by looking like the headings it does know: in capitals where every known
- * heading is, or with every word capitalised where every known heading is, and holding no
- * job-title, school or degree word. Used only to close an Education section, and only when
- * nothing between the line and the next known heading names a degree, or a school outside a job
- * line, so that a field of study on a line of its own never cuts off a degree below it.
+ * Headings the policy does not know ("VOLUNTEER WORK"), told by looking like the known ones (in
+ * capitals, or every word capitalised, where every known heading is) and holding no job-title,
+ * school or degree word. Used only to close an Education section, and only when nothing before the
+ * next known heading names a degree or a school outside a job line.
  */
 function unknownHeadings(
   lines: readonly string[],
@@ -273,8 +248,7 @@ function unknownHeadings(
       : null;
   if (!style) return found;
 
-  // Scanned from the end, carrying the next known heading and the next line about schooling, so
-  // each candidate is answered in one step.
+  // Scanned from the end, carrying the next known heading and schooling line, so each candidate is O(1).
   let nextSchooling = Infinity;
   let nextHeading = Infinity;
   for (let at = lines.length - 1; at >= 0; at -= 1) {
@@ -300,38 +274,29 @@ function unknownHeadings(
 }
 
 /**
- * Splits the resume at its headings.
+ * Splits the resume at its headings. Every heading ends the previous block, including "other"
+ * ones ("Awards"), so a list below the last job is not read as work history.
  *
- * Every heading terminates the previous block, including the ones read as nothing more than
- * "other" — "Awards", "Publications". Without that, a list sitting below the last job would be
- * read as part of the work history and every line in it examined for a date range.
- *
- * Except inside Skills: there "Languages: TypeScript, Go" is a category of skills, not the
- * Languages section, so a heading word with content after its colon stays a skills line (the
- * parser still reads it for spoken languages). A bare "Languages" on its own line still opens a
- * section.
+ * Except inside Skills: "Languages: TypeScript, Go" there is a category of skills, so a heading
+ * word with content after its colon stays a skills line. A bare "Languages" still opens a section.
  *
  * A heading in the left gutter, level with its section's first line ("EXPERIENCE⇥Senior
  * Engineer, Acme"), opens its section with the rest of the line as that first line.
  *
- * A heading word with a word after it that joins no heading ("Experience Strategist") over a
- * line of bare dates is a role, not a heading. And an Education section is closed by a heading the policy
- * does not know, so the roles under "Volunteer Work" are not read as schools (`unknownHeadings`).
+ * A heading word plus a word that joins no heading ("Experience Strategist") over bare dates is a
+ * role. Education is closed by a heading the policy does not know (`unknownHeadings`).
  */
 export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeSection[] {
   const matchers = sectionMatchers(policy);
-  // Bare dates, with letters around them for no more than a word: "Volunteer⇥Jan 2016 - Dec 2019".
+  // Bare dates, with at most a word around them ("Volunteer⇥Jan 2016 - Dec 2019").
   const bareDates = (line: string) => {
     const found = findDateRange(line, policy.resumeParse, UNBOUNDED);
     return found && !/\p{L}{3}/u.test(line.replace(found.matched, " "));
   };
-  // "EXPERIENCE⇥Senior Engineer, Acme": a heading in the left gutter, level with the first line
-  // of its section, which the PDF reader joined to it with a tab. A bare heading in the first
-  // cell is the heading, and the rest of the line is the section's first line, on a page that
-  // sets its headings there: two or more, and more than stand on lines of their own. Elsewhere a
-  // heading word in a first cell is a role's title ("Volunteer⇥Red Cross⇥2016 - 2019"), a line
-  // of a role ("Leadership⇥Led 5 engineers") or a row of a skills table. Beside bare dates it is
-  // a title wherever it stands.
+  // A bare heading in a line's first (tab-joined) cell is the heading, the rest the section's first
+  // line, on a page that sets two or more headings there and more than stand alone. Elsewhere it
+  // is a role's title ("Volunteer⇥Red Cross⇥2016 - 2019"), a role line or a skills table row;
+  // beside bare dates always a title.
   const cells = lines.map((line) => {
     const tab = line.indexOf("\t");
     const cell = tab === -1 ? null : classifyHeading(line.slice(0, tab), matchers);
@@ -341,19 +306,18 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
   const plain = lines.map((line, at) => {
     const heading = classifyHeading(line, matchers);
     if (!heading?.tail) return heading;
-    // More heading words ("& Certifications", "and Leadership", "Summary") make a longer heading.
+    // More heading words ("& Certifications", "Summary") make a longer heading.
     const [first] = heading.tail.split(/\s+/);
     if (matchers.connector.test(first) || classifyHeading(heading.tail, matchers)) return heading;
-    // Any other word over a line of bare dates is a job title the policy does not list: no section
-    // opens on dates alone, and "Work Experience Highlights" opens on a role.
+    // Any other word over bare dates is an unlisted job title: no section opens on dates alone.
     return bareDates(lines[at + 1] ?? "") ? null : heading;
   });
   const inGutter = cells.filter(Boolean).length;
   const gutter = inGutter >= 2 && inGutter > plain.filter((h, at) => h && !cells[at]).length;
   const headings = plain.map((heading, at) => (gutter && cells[at]) || heading);
   const gutters = (at: number) => gutter && cells[at] !== null;
-  // Whether the heading at `at` is set as the page's other headings are: in capitals where they
-  // all are, every word capitalised where they all are, with a colon only where they all have one.
+  // Whether a heading is set like the page's other headings: capitals, capitalised words, or a
+  // colon, where they all are.
   const own = lines.flatMap((line, at) => (headings[at] && !gutters(at) ? [line] : []));
   const styles = [
     (line: string) => !line.includes(":"),
@@ -371,8 +335,7 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
       (style, at) => style(line) || counts[at]! - +style(line) < own.length - 1 || own.length < 2,
     );
   const unknown = unknownHeadings(lines, headings, matchers, policy);
-  // Whether a dated line that is not a bullet comes after each line before the next heading:
-  // computed once, the first time it is asked.
+  // Whether a dated non-bullet line follows each line before the next heading; computed lazily.
   let dated: boolean[] | undefined;
   const datedAfter = (at: number) => {
     if (!dated) {
@@ -386,12 +349,10 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
     }
     return dated[at];
   };
-  // A list under a role, then the next role: a heading of two words or more, bullets right
-  // under it, and a job title on the lines from the first one that is not a bullet to its dates,
-  // before any heading, known or not ("Key Projects" over "- Ledger rewrite" over "Engineer,
-  // Globex Inc⇥2016 - 2019"). A projects section opens on a project ("Ledger Rewrite⇥2018"), or
-  // names none with a job title; a bare "PROJECTS" or "SKILLS" opens its section, whatever is
-  // dated in it ("Lead Maintainer, Kubernetes SIG"), as one does over "LEADERSHIP".
+  // A list under a role, then the next role: a heading of two words or more with bullets right
+  // under it and a job title between the first non-bullet line and its dates, before any heading
+  // ("Key Projects" / "- Ledger rewrite" / "Engineer, Globex Inc⇥2016 - 2019"). A bare "PROJECTS"
+  // or "SKILLS" opens its section whatever is dated in it.
   const roleAfterList = (at: number) => {
     if (!/\S\s+\S/u.test(lines[at]!.trim()) || !BULLET.test(lines[at + 1] ?? "")) return false;
     for (
@@ -410,28 +371,23 @@ export function segmentResume(lines: string[], policy: AtsEnginePolicy): ResumeS
   let current: ResumeSection = { kind: "other", lines: [], headed: false };
 
   for (const [at, line] of lines.entries()) {
-    // A heading the policy does not know closes Education, and Skills when what is under it is
-    // dated, as roles and activities are; a category of skills on its own line is not.
+    // An unknown heading closes Education, and Skills when what is under it is dated.
     const heading =
       headings[at] ??
       (unknown.has(at) &&
       (current.kind === "education" || (current.kind === "skills" && datedAfter(at)))
         ? UNKNOWN
         : null);
-    // Inside Skills, a heading with content is a category of skills ("Languages: TypeScript"); in
-    // the gutter, any but the work history and education is ("Languages⇥TypeScript, Go").
+    // Inside Skills, a heading with content is a skills category; in the gutter, any but experience and education.
     const category =
       heading?.rest &&
       current.kind === "skills" &&
       heading.kind !== "skills" &&
       (!gutters(at) || (heading.kind !== "experience" && heading.kind !== "education"));
-    // Inside the work history or the projects, with a dated line after it before the next
-    // heading, a heading is a line of the role when it names skills with content after it
-    // ("Technologies: React" over the next role), is not set as the page's headings are ("Key
-    // Projects:", "Tech Stack" or "Accomplishments" under a role, on a page of headings in
-    // capitals), or heads a list of skills or projects over the next role ("KEY PROJECTS", "TECH
-    // STACK"). The work history, education and certifications are never a role's lines, however
-    // they are set: "Education" on a page of headings in capitals opens Education.
+    // Inside experience or projects, with a dated line after it before the next heading, a heading
+    // is a line of the role when it names skills with content ("Technologies: React"), is not set
+    // like the page's headings, or heads a skills or projects list over the next role. Experience,
+    // education and certifications are never a role's lines.
     const inRole =
       headings[at] &&
       !gutters(at) &&

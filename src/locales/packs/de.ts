@@ -2,16 +2,12 @@ import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
 /**
- * German (Deutsch).
- *
- * Two things set German apart from the English base, and the pack is built around them:
- * - Compounds. A title or a school is usually one word with the telling part at its end —
- *   "Softwareentwickler", "Musikhochschule" — so those entries allow a word to run up to 30
- *   letters into them, where an English entry must start the word.
- * - Nominal style. A German bullet opens with a noun as often as a verb ("Entwicklung von …",
- *   "Leitung des …"), and penalising that would mark down every German resume, so the nouns of
- *   doing count as action verbs.
- * Every noun is capitalised, so capitals say nothing about a word being a product name.
+ * German (Deutsch). Built around two traits:
+ * - Compounds: a title or school is one word with the telling part at its end ("Musikhochschule"),
+ *   so those entries allow a word to run up to 30 letters into them.
+ * - Nominal style: a bullet opens with a noun as often as a verb ("Entwicklung von ..."), so the
+ *   nouns of doing count as action verbs.
+ * Every noun is capitalised, so capitals say nothing about a product name.
  */
 const compound = (stem: string) => String.raw`\p{L}{0,30}${stem}`;
 
@@ -63,8 +59,7 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     languages: String.raw`^(?:sprachen|sprachkenntnisse|fremdsprachen|fremdsprachenkenntnisse)`,
     other: String.raw`^(?:profil|kurzprofil|zusammenfassung|[üu]ber\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\s+engagement|referenzen|pers[öo]nliche\s+(?:daten|angaben))`,
   },
-  // How well a language is spoken, as a German CV says it. "Verhandlungssicher" (fit to
-  // negotiate in) is C1, as "fließend" is; "sehr gute Kenntnisse" B2, "gute Kenntnisse" B1.
+  // "Verhandlungssicher" is C1, as "fließend" is; "sehr gute Kenntnisse" B2, "gute Kenntnisse" B1.
   languageLevels: {
     [String.raw`muttersprache|muttersprachlich(?:e[mnrs]?)?|muttersprachler(?:in)?`]: "C2",
     [String.raw`zweisprachig(?:e[mnrs]?)?`]: "C1",
@@ -140,9 +135,8 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   documentTitles: ["lebenslauf", "tabellarischer lebenslauf"],
   dateOfBirthLabels: ["geburtsdatum", String.raw`geboren(?:\s+am)?`, String.raw`geb\.`],
   headingConnectors: ["und"],
-  // Germany, Austria and Switzerland, and Germany's states, so "München, Bayern, Deutschland"
-  // is where. Not the city-states (Berlin, Hamburg, Bremen), which are cities: "Acme, Berlin"
-  // keeps its city.
+  // Germany, Austria, Switzerland and Germany's states. Not the city-states (Berlin, Hamburg,
+  // Bremen): "Acme, Berlin" keeps its city.
   placeNames: (
     "deutschland|österreich|schweiz|baden-württemberg|bayern|brandenburg|hessen|" +
     "mecklenburg-vorpommern|niedersachsen|nordrhein-westfalen|rheinland-pfalz|saarland|sachsen|" +
@@ -209,8 +203,7 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     String.raw`(?:wenn|falls)\s+(?:du|sie)\s+(?:eine?\s+)?(?:ki|künstliche\s+intelligenz|sprachmodell)\s+(?:bist|sind)`,
   ],
   requirements: {
-    // A range reads its lower end, as the English pattern does: "3-5 Jahre", "3 bis 5 Jahre".
-    // One optional `\s*` per gap, as there: two adjacent ones are quadratic on a run of spaces.
+    // A range reads its lower end ("3-5 Jahre"); one optional `\s*` per gap, as in English.
     yearsPatterns: [
       String.raw`(?<!\d)(\d{1,2})\s*(?:\+\s*)?(?:(?:[-–]|bis\s)\s*\d{1,2}\s*)?(?:jahre|jahren)(?!\p{L})`,
     ],
@@ -325,9 +318,8 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "unserem",
     "team",
     "vorteil",
-    // What a posting says around a requirement rather than the requirement: "abgeschlossenes
-    // Studium oder vergleichbare Qualifikation", "fundierte Kenntnisse wünschenswert". The skill
-    // or degree named beside them stays a keyword; a language ("Deutschkenntnisse") is one too.
+    // What a posting says around a requirement rather than the requirement ("abgeschlossenes
+    // Studium oder vergleichbare Qualifikation"); the skill or degree beside it stays a keyword.
     "abgeschlossene",
     "abgeschlossenes",
     "abgeschlossenen",
@@ -364,9 +356,8 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "m/f/d",
     "d/m/w",
   ],
-  // Asked of the person, as "communication" and "teamwork" are; placed as the English list is
-  // ("Verhandlungsgeschick" is a hard skill, as "negotiation" is). Predicative adjectives too:
-  // "Sie sind kommunikativ, teamfähig und belastbar".
+  // Asked of the person, placed as the English list is ("Verhandlungsgeschick" is a hard skill).
+  // Predicative adjectives too ("Sie sind kommunikativ, teamfähig").
   softSkills: [
     "kommunikationsfähigkeit",
     "kommunikationsstärke",

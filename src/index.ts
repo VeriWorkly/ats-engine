@@ -1,13 +1,11 @@
 /**
  * @veriworkly/ats-engine — deterministic resume scoring.
  *
- * A resume in (text, a structured document, or text plus layout signals), a report out. The
- * package holds no I/O, no authentication, no HTTP, and no state: extracting text from a PDF,
- * calling a model, and deciding who may see what are the host's job, which is what keeps this
- * runnable in a browser as well as on a server.
- *
- * Everything language-bound — month names, degree spellings, section headings, stopwords, title
- * words, action verbs — lives in the policy rather than in this source.
+ * A resume in (text, a structured document, or text plus layout signals), a report out. No I/O,
+ * authentication, HTTP or state: extracting text, calling a model and deciding who may see what
+ * are the host's job, so this runs in a browser as well as on a server. Everything
+ * language-bound (month names, degree spellings, headings, stopwords, action verbs) lives in the
+ * policy.
  *
  * Subpaths:
  * - `/document` (building structured input), `/format` (display helpers) and `/job` (job text
@@ -24,7 +22,6 @@ export type {
   AtsAdvice,
   AtsCategoryScore,
   AtsCefrLevel,
-  AtsDegreeLevel,
   AtsFileInfo,
   AtsIscedLevel,
   AtsKeywordGroups,
@@ -58,8 +55,7 @@ export * from "./document/index.js";
 
 // Scoring
 export { parseQuality, parseResume } from "./parser/index.js";
-export { check } from "./check.js";
-export { AtsScoringService, type AtsCheckOptions } from "./scoring/engine.js";
+export { check, type AtsCheckOptions } from "./scoring/engine.js";
 export type { AtsLocale, AtsLocaleOptions } from "./locales/resolve.js";
 export { computeVerdict, VERDICT_BANDS, type AtsVerdict } from "./scoring/verdict.js";
 export { policyRubric, type AtsRubricEntry } from "./scoring/rubric.js";

@@ -1,25 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  AtsScoringService,
-  DEFAULT_POLICY,
-  policyRubric,
-  type AtsReport,
-} from "../../src/index.js";
+import { DEFAULT_POLICY, policyRubric, type AtsReport, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import type { AtsEnginePolicy } from "../../src/policy/schema.js";
 import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
 
 /**
- * The writing rules: style a recruiter notices once the ATS has read the resume. Their own
- * category, so the categories that say whether a resume survives the ATS do not move; English
- * only, and dropped for a resume read in another language or with nothing to judge.
+ * The writing rules, in their own category so the categories that say whether a resume survives
+ * the ATS do not move. English only; dropped for another language or with nothing to judge.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 const check = (text: string, policy: AtsEnginePolicy = DEFAULT_POLICY, jobDescription?: string) =>
-  AtsScoringService.check(text, policy, { now: NOW, jobDescription });
+  score(text, policy, { now: NOW, jobDescription });
 const rule = (report: AtsReport, id: string) =>
   report.rules.find((r) => r.id === `ats-v2.writing.${id}`);
 const writingRules = (report: AtsReport) => report.rules.filter((r) => r.category === "writing");
@@ -36,7 +30,7 @@ const IDS = [
   "dateFormats",
 ];
 
-/** An invented person, written the way a careful editor would leave it. */
+/** An invented person, written carefully. */
 const WELL_WRITTEN = `Priya Raman
 priya.raman@example.com | +1 312 555 0199 | Chicago, IL
 Summary
@@ -312,8 +306,7 @@ describe("when the writing rules stand down", () => {
     expect(writingRules(report)).toHaveLength(IDS.length);
   });
 
-  // An invented person, in a language no pack reads: judged by English rules, every bullet
-  // "opens with no action verb" and the dates "are written two ways".
+  // A language no pack reads is judged by English rules: every bullet "opens with no action verb".
   const SPANISH = `Lucía Fernández Ruiz
 lucia.fernandez@example.es | +34 612 345 678 | Madrid
 Perfil
@@ -347,7 +340,7 @@ Go, Java, Kubernetes, PostgreSQL`;
     (_, text) => expect(writingRules(check(text))).toEqual([]),
   );
 
-  // Invented people. Terse English bullets, with Spanish names of places, employers and schools.
+  // Terse English bullets with Spanish names of places, employers and schools.
   it.each([
     [
       "El Paso",
@@ -414,17 +407,15 @@ Go, Java, Kubernetes, PostgreSQL`;
 });
 
 /**
- * Every category but `writing`, as the engine scored these fixtures before the writing rules
- * existed (score/lost/possible/passed/total). The writing rules sit in their own category so
- * that none of these moves; only the readiness total, which now weighs `writing` too, may.
+ * Every category but `writing` (score/lost/possible/passed/total); only the readiness total may
+ * move.
  */
 const BEFORE_WRITING: Record<string, string> = {
   "en-us-classic":
     "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "en-us-stacked":
     "parse:100/0/53/4/4 contact:100/0/20/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
-  // Read in the GB region since it was added, which weighs a stated date of birth as the US does
-  // (contact 24, not 20); the writing rules still move none of it.
+  // The GB region weighs a stated date of birth as the US does (contact 24, not 20).
   "en-uk-pipes":
     "parse:100/0/53/4/4 contact:100/0/24/3/3 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
   "en-us-at-and-since":

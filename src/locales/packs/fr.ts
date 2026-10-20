@@ -2,18 +2,15 @@ import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
 /**
- * French (Français).
- *
- * What sets a French CV apart from the English base, and what the pack is built around:
- * - Accents come and go. A CV typed on an English keyboard writes "Experience professionnelle",
- *   "Competences", "fevrier", so headings, months and level words take both spellings.
- * - Nominal style, as in German: a French bullet opens with a noun of doing as often as with a
- *   verb ("Développement d'une API…", "Mise en place de…", "Gestion de…"), so those nouns count
- *   as action verbs.
- * - The apostrophe is typed straight or curly ("aujourd'hui", "aujourd’hui"); both are listed.
- * French national credentials (baccalauréat, BTS, DUT, BUT, "Bac+5") belong to the FR region
- * pack, since a baccalauréat is a bachelor's degree in Québec. The words every French-speaking
- * country uses for a degree (licence, doctorat, diplôme d'ingénieur) are here.
+ * French (Français). Built around three traits:
+ * - Accents come and go on an English keyboard ("Competences", "fevrier"), so headings, months
+ *   and level words take both spellings.
+ * - Nominal style, as in German ("Développement d'une API...", "Gestion de..."), so those nouns
+ *   count as action verbs.
+ * - The apostrophe is typed straight or curly; both are listed.
+ * National credentials (baccalauréat, BTS, DUT, BUT, "Bac+5") belong to the FR region pack, since
+ * a baccalauréat is a bachelor's degree in Québec; the words every French-speaking country uses
+ * for a degree (licence, doctorat, diplôme d'ingénieur) are here.
  */
 const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 const e = "[eéèê]";
@@ -74,8 +71,7 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     languages: String.raw`^(?:langues(?:\s+${e}trang[eè]res)?|comp${e}tences\s+linguistiques)`,
     other: String.raw`^(?:profil(?:\s+professionnel)?|r${e}sum${e}(?:\s+professionnel)?|[àa]\s+propos(?:\s+de\s+moi)?|objectif(?:\s+professionnel)?|centres?\s+d['’]int${e}r[eê]ts?|loisirs|int${e}r[eê]ts|activit${e}s(?:\s+extra[\s-]?professionnelles)?|b${e}n${e}volat|engagements?(?:\s+associatifs)?|publications|r${e}f${e}rences|distinctions|prix(?:\s+et\s+distinctions)?|informations\s+personnelles|coordonn${e}es|divers)`,
   },
-  // How well a language is spoken, as a French CV says it. "Bilingue" and "courant" are C1, as
-  // "fließend" is; "bon niveau" B2, "intermédiaire" B1, "scolaire" and "notions" A2.
+  // "Bilingue" and "courant" are C1, as "fließend" is; "bon niveau" B2, "intermédiaire" B1.
   languageLevels: {
     [String.raw`langue\s+maternelle|maternelle`]: "C2",
     [String.raw`bilingue`]: "C1",
@@ -185,8 +181,7 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   documentTitles: [String.raw`curriculum\s+vit[aæ]e`],
   dateOfBirthLabels: [String.raw`date\s+de\s+naissance`, String.raw`n${e}e?\s+le`],
   headingConnectors: ["et", "de", "des", "du", String.raw`d['’]\p{L}+`],
-  // France's regions and the French-speaking countries, so "Lyon, Auvergne-Rhône-Alpes, France"
-  // is where. No cities.
+  // France's regions and the French-speaking countries. No cities.
   placeNames: (
     "france|belgique|suisse|luxembourg|québec|canada|maroc|tunisie|algérie|sénégal|" +
     "île-de-france|auvergne-rhône-alpes|bourgogne-franche-comté|bretagne|centre-val de loire|" +
@@ -296,10 +291,8 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
       turc: "turkish",
     },
   },
-  // How any French-speaking posting asks for a degree. "Bac+N" is the `FR` region's too (an
-  // English resume from France writes it), and here for a French posting read under another
-  // region. A baccalauréat named for its field is Québec's bachelor's ("baccalauréat en
-  // informatique"); France names its baccalauréat for a stream.
+  // "Bac+N" is the `FR` region's too, and here for a French posting read under another region.
+  // A baccalauréat named for its field is Québec's bachelor's; France names it for a stream.
   degrees: {
     "5": word(String.raw`bac\s*\+\s*2`),
     "6": word(

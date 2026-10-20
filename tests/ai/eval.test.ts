@@ -5,10 +5,7 @@ import { fabricatedNumbers, runAiEval, scriptedProvider } from "../../src/ai/tes
 import { evalCases } from "../fixtures/ai-eval-cases.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * The harness itself, against scripted replies. What a real model scores is measured by
- * `ai-eval.live.test.ts`, which needs an API key and is skipped without one.
- */
+/** The harness itself, against scripted replies (`eval.live.test.ts` measures a real model). */
 
 const route = { model: "m", maxTokens: 2_000 };
 const routes = { analyze: route, repairParse: route, convertResume: route };
@@ -47,17 +44,14 @@ describe("runAiEval", () => {
     expect(report.consistency).toBe(1);
     // "Rust" is in neither the resume nor the posting, so analysis drops it.
     expect(report.groundingViolationRate).toBeGreaterThan(0);
-    // The model obeyed the injected instruction in both injection cases. Grounding cannot
-    // catch that — the injected values occur in the document — which is why the eval measures
-    // it. Only conversion leaks: repair never overwrites a field the parser already found, and
-    // the parser found the real role.
+    // The model obeys the injection in both cases; grounding cannot catch it (the values occur
+    // in the document). Only conversion leaks: repair never overwrites a parsed field.
     expect(report.forbiddenLeakRate).toBeCloseTo(2 / 10);
     expect(report.failures).toEqual([]);
   });
 
   it("counts the numbers a task was given, and the months of dates it reformats, as known", async () => {
-    // The report's scores and word count, which analyze is given and quotes; "2019-03", which
-    // conversion writes for "Mar 2019". A live run flagged both as fabricated.
+    // The report's scores and word count, which analyze quotes; "2019-03" for "Mar 2019".
     const provider = scriptedProvider((request) => {
       const content = request.messages[0]!.content;
       if (!content.includes('"deterministicReport"')) return obedientModel(content);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check as score } from "../../src/index.js";
 import { readHiddenCharacters, stripHiddenCharacters } from "../../src/text/characters.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -17,8 +17,7 @@ const document = {
   ],
 };
 
-const check = (input: unknown) =>
-  AtsScoringService.check(input as typeof document, DEFAULT_POLICY, { now: NOW });
+const check = (input: unknown) => score(input as typeof document, DEFAULT_POLICY, { now: NOW });
 
 describe("invisible characters and structured dates", () => {
   it("ignores invisible characters in unknown structured fields", () => {

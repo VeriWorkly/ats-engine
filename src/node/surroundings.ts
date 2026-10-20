@@ -30,9 +30,8 @@ const GRID = 8;
 
 /**
  * Exact point checks one page may cost, across all its runs. The grid keeps an ordinary page far
- * below this — 20 000 scattered shapes and runs take about 7 million — but shapes and runs
- * packed into one cell still meet each other pairwise: 40 000 of each took 20 seconds. Past the
- * budget the page is not measured, which the caller reports as such rather than as clean.
+ * below this, but shapes and runs packed into one cell still meet pairwise. Past the budget the
+ * page is not measured, which the caller reports as such rather than as clean.
  */
 export const MAX_POINT_CHECKS = 40_000_000;
 
@@ -46,14 +45,11 @@ type Cell = {
 };
 
 /**
- * The surroundings of any point, from a coarse grid over the page.
- *
- * Checking every run against every shape was O(runs × shapes) — 20 000 of each took five
- * seconds — on a page whose size the file's author chooses. Each cell keeps the shapes that
- * cover it whole (answered by order alone) apart from those that only overlap it (checked
- * exactly), so a run meets only the shapes near it. The grid spans every run's centre as well as
- * the page, so a point is never clamped into a cell it is not in. `budget` is the exact point
- * checks allowed before it throws; tests lower it to reach the limit in milliseconds.
+ * The surroundings of any point, from a coarse grid over the page, so a run meets only the shapes
+ * near it. Each cell keeps the shapes that cover it whole (answered by order alone) apart from
+ * those that only overlap it (checked exactly). The grid spans every run's centre as well as the
+ * page, so a point is never clamped into a cell it is not in. `budget` is the exact point checks
+ * allowed before it throws.
  */
 export function indexDrawn(
   drawn: readonly Drawn[],
@@ -78,13 +74,12 @@ export function indexDrawn(
     firstFullImage: Infinity,
     lastOpaqueFull: -Infinity,
   }));
-  // A hair of slack, so a box whose edge falls on a cell's edge is never taken to contain a
-  // point it misses by a rounding error.
+  // Slack, so a box edge on a cell edge is not taken to contain a point it misses by rounding.
   const slack = 1e-6 * Math.max(width, height);
   let checks = 0;
   for (const item of drawn) {
     const [x0, y0, x1, y1] = item.box;
-    // A box with a NaN corner contains nothing, and is left out.
+    // A box with a NaN corner contains nothing.
     if (![x0, y0, x1, y1].every(Number.isFinite)) continue;
     for (let r = row(y0); r <= row(y1); r += 1)
       for (let c = column(x0); c <= column(x1); c += 1) {

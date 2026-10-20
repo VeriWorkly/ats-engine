@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  AtsPolicyError,
-  AtsScoringService,
-  DEFAULT_POLICY,
-  type AtsReport,
-} from "../../src/index.js";
+import { AtsPolicyError, DEFAULT_POLICY, type AtsReport, check as score } from "../../src/index.js";
 import {
   BUILT_IN_LOCALES,
   atsLanguagePackJsonSchema,
@@ -18,8 +13,8 @@ import { LOCALE_FIXTURES, type LocaleFixture } from "../fixtures/locale-resumes.
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
-const check = (text: string, options: Parameters<typeof AtsScoringService.check>[2] = {}) =>
-  AtsScoringService.check(text, POLICY, { now: NOW, ...options });
+const check = (text: string, options: Parameters<typeof score>[2] = {}) =>
+  score(text, POLICY, { now: NOW, ...options });
 
 const fieldAccuracy = (report: AtsReport, fixture: LocaleFixture) => {
   const checks = fieldChecks(report, fixture);
@@ -73,8 +68,8 @@ describe("detection", () => {
     expect(report.locale.languages).toEqual([]);
   });
 
-  // Invented people. French names of employers and schools ("du", "et", "des") are as many
-  // French words as a short French CV has, but fewer than the English around them.
+  // Invented people. French employer and school names hold as many French words as a short
+  // French CV, but fewer than the English around them.
   it.each([
     [
       "New York",
@@ -124,8 +119,8 @@ describe("detection", () => {
     expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
   });
 
-  // More French words than English, from one paragraph, yet English throughout the rest: read with
-  // the French pack's words, but not as French dates, and still judged as English writing.
+  // More French words than English, from one paragraph, yet English throughout the rest: read
+  // with the French pack's words, but not as French dates, and still judged as English writing.
   it("reads a resume that is English too as English, whatever its French summary", () => {
     const report = check(
       [
@@ -152,8 +147,7 @@ describe("detection", () => {
     expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
   });
 
-  // The other way round: German or Hindi bullets keep their country's dates and rules under English
-  // headings or an English summary, as before the base's own words were counted.
+  // German or Hindi bullets keep their country's dates and rules under English headings or summary.
   const BECKER = [
     "Jonas Becker",
     "jonas.becker@example.de | Berlin",
@@ -221,14 +215,13 @@ describe("detection", () => {
   it("reads with exactly the locale a host asks for", () => {
     const report = check(LOCALE_FIXTURES["en-IN"][1].text, { region: "IN" });
     expect(report.locale).toEqual({ languages: [], region: "IN" });
-    // The region's credentials and date order now apply.
+    // The region's credentials and date order apply.
     expect(report.parsed.education[1]).toMatchObject({ isced: 6 });
     expect(report.parsed.roles[0].start).toEqual({ year: 2018, month: 4 });
     expect(check(LOCALE_FIXTURES.de[0].text, { languages: [] }).locale.languages).toEqual([]);
   });
 
-  // A language asked for by an id no pack has was dropped without a word: "DE" read a German
-  // resume with no German at all, its roles lost and the English writing rules judging it.
+  // A language asked for by an id no pack has is refused, not read as the base.
   it("reads a language asked for in any case, and refuses one no pack has", () => {
     const german = LOCALE_FIXTURES.de[0].text;
     expect(check(german, { languages: ["DE"] }).locale.languages).toEqual(["de"]);
@@ -327,7 +320,7 @@ describe("packs", () => {
     expect(Object.isFrozen(POLICY)).toBe(true);
     expect(Object.isFrozen(POLICY.locales.languages[0])).toBe(true);
     expect(() => POLICY.locales.regions.pop()).toThrow(TypeError);
-    // And the policy a resume is read with, which is cached and shared by every resume like it.
+    // The policy a resume is read with is cached and shared by every resume like it.
     const localized = localizePolicy(POLICY, "Berufserfahrung", { region: "DE" }).policy;
     expect(localized).not.toBe(POLICY);
     expect(Object.isFrozen(localized)).toBe(true);
@@ -349,13 +342,9 @@ describe("packs", () => {
   });
 
   it("leave a policy without packs exactly as fast and as it was", () => {
-    const report = AtsScoringService.check(
-      "Jane Doe\nExperience\nEngineer, Acme 2020 - 2022",
-      DEFAULT_POLICY,
-      {
-        now: NOW,
-      },
-    );
+    const report = score("Jane Doe\nExperience\nEngineer, Acme 2020 - 2022", DEFAULT_POLICY, {
+      now: NOW,
+    });
     expect(report.locale).toEqual({ languages: [], region: null });
   });
 });

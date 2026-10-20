@@ -2,13 +2,10 @@ import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
 /**
- * Hindi (हिन्दी), in Devanagari.
- *
- * Recognised by script, not by word list: a resume with a fair share of Devanagari is read with
- * this pack whatever English terms it carries, which most do. Hindi is verb-final ("टीम का
- * नेतृत्व किया" — "led the team"), so an action verb counts anywhere in a line, and the script has
- * no capitals, so specificity comes from the skill vocabulary alone. Indian-English credentials
- * (B.Tech, Class XII) belong to the IN region pack, because English resumes carry them too.
+ * Hindi (हिन्दी), in Devanagari. Recognised by script, not by word list: a resume with a fair
+ * share of Devanagari is read with this pack whatever English terms it carries. Hindi is
+ * verb-final, so an action verb counts anywhere in a line, and the script has no capitals.
+ * Indian-English credentials (B.Tech, Class XII) belong to the IN region pack.
  */
 const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 

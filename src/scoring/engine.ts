@@ -4,6 +4,7 @@ import { localizePolicy, type AtsLocaleOptions } from "../locales/resolve.js";
 import { computeJobMatch } from "../matching/jobMatch.js";
 import { judgeRequirements, withHeadings, type HeadedSection } from "../matching/requirements.js";
 import { readingDatesAt } from "../parser/dates.js";
+import { DEFAULT_POLICY } from "../policy/default.js";
 import { policyFingerprint } from "../policy/fingerprint.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { BULLET_PREFIX, normalizeText } from "../text/text.js";
@@ -12,59 +13,52 @@ import { ENGINE_VERSION } from "../version.js";
 import { rollUpCategories } from "./categories.js";
 import { readResume } from "./context.js";
 import { scoreRules, strengthsOf } from "./score.js";
+import { caughtGaming } from "./verdict.js";
 
-/**
- * Postings past this are cut: every step that reads a posting is linear in it, and a real one
- * is a few thousand characters. The AI tasks cut at the same length.
- */
+/** Postings past this are cut: every step that reads a posting is linear in it. */
 const MAX_JOB_DESCRIPTION_CHARS = 20_000;
 
-/** Format metrics that measure how the text extracts, as opposed to choices like length. */
+/** Format metrics that measure how the text extracts, not choices like length. */
 const EXTRACTION_METRICS = new Set(["columnRatio", "tableCount", "letterSpacedLines"]);
 
-/** Enough for any resume; a document past it is not one. */
 const MAX_REPORTED_LINES = 500;
 /** Tries `hiddenCover` makes before leaving the hidden lines to the claiming. */
 const MAX_COVER_STEPS = 200_000;
 /**
- * Where a line or part of one was set aside, between the text kept on either side: no phrase is
- * read across it, single words read the same, and it is taken out of the evidence quoted. An
- * invisible separator, which the text a resume is read from never holds (`normalizeText` strips
- * it).
+ * Marks where text was set aside, so no phrase is read across the gap. An invisible separator
+ * that `normalizeText` strips from every resume.
  */
 const BREAK = "\u2063";
 
+const readAll = () => (line: string) => line as string | undefined;
+
 /**
- * What of each resume line is visible: not the text the file's layout reports as hidden (white on
- * white, a 1pt font, off the page). The extractor reports the hidden text in full up to 5,000
- * characters (`hiddenText`), or, from an older extractor, its first 80 (`hiddenTextSample`); a
- * line is set aside when the hidden text contains it, or, that text being cut, when the line
- * begins with it. The integrity cap on the job match covers whatever is past the cut.
+ * What of each resume line is visible: not the text the layout reports as hidden (white on
+ * white, a 1pt font, off the page). The extractor reports it in full up to 5,000 characters
+ * (`hiddenText`); a line is set aside when the hidden text contains it, or, that text being cut,
+ * when the line begins with it. The integrity cap on the job match covers what is past the cut.
  *
- * Each stretch of hidden text sets aside one line. When the hidden text splits into the lines'
- * texts one way only, lines of those texts are set aside (`hiddenCover`), so a visible line across
- * two hidden ones stays. Else, or when the hidden text is cut, the longest lines claim theirs
- * first: a visible "Kubernetes" skill stays when the hidden text is "Kubernetes Terraform Kafka",
- * which the hidden line of that text claims whole. A line is kept only when every letter of every
- * place the hidden text holds it lies inside text already claimed, so a visible line across two
- * hidden ones never frees them. Hidden text then left over sits inside a visible line, a white
- * "Kafka Kubernetes" after "Senior Engineer": when the layout says which hidden text the lines
- * hold (`hiddenTextRead`), it is cut from the one kept line holding it, and stays when none or two
- * do, word by word (`cutLeftovers`). Only that text is set aside or cut: hidden text the lines do
- * not hold (a Word header's hidden run, an HTML resume's hidden element) is not read by an ATS
- * and costs no visible line. A line under four characters is never set aside, either way, nor a
- * stretch under four cut. Returns, for each pass over the lines, what to read of each: its text, a
- * text with the hidden part cut (marked by `BREAK`), or `undefined`, set aside.
+ * When the hidden text splits into the lines' texts one way only, those lines are set aside
+ * (`hiddenCover`), so a visible line across two hidden ones stays. Else, or when the text is cut,
+ * the longest lines claim theirs first: a visible "Kubernetes" skill stays when the hidden text
+ * is "Kubernetes Terraform Kafka", which the hidden line of that text claims whole. A line is
+ * kept only when every letter of every place the hidden text holds it lies inside claimed text.
+ * Hidden text left over sits inside a visible line ("Kafka Kubernetes" after "Senior Engineer"):
+ * when the layout says which hidden text the lines hold (`hiddenTextRead`), it is cut from the
+ * one kept line holding it, word by word, and stays when none or two do (`cutLeftovers`). Hidden
+ * text the lines do not hold (a Word header's hidden run) costs no visible line. A line under
+ * four characters is never set aside, nor a stretch under four cut. Returns, per pass over the
+ * lines, what to read of each: its text, the text with the hidden part cut (marked by `BREAK`),
+ * or `undefined`, set aside.
  */
 function visibleLines(layout: AtsLayoutSignals | undefined, lines: readonly string[]) {
   const inLines = layout?.hiddenTextRead;
   const full = inLines !== undefined || layout?.hiddenText !== undefined;
-  const hidden = normalizeText(inLines ?? layout?.hiddenText ?? layout?.hiddenTextSample ?? "")
+  const hidden = normalizeText(inLines ?? layout?.hiddenText ?? "")
     .replace(/\s+/g, " ")
     .trim();
   const textOf = (line: string) => line.replace(BULLET_PREFIX, "").replace(/\s+/g, " ").trim();
-  if (!hidden || !layout?.hiddenTextChars)
-    return () => (line: string) => line as string | undefined;
+  if (!hidden || !layout?.hiddenTextChars) return readAll;
   const cut = hidden.length >= (full ? 5_000 : 80);
   const texts = lines.map(textOf);
   // For each text, its copies (counted in reading order) set aside (`undefined`) or cut (the text
@@ -126,9 +120,9 @@ function visibleLines(layout: AtsLayoutSignals | undefined, lines: readonly stri
   function cutLeftovers() {
     const kept = [...texts.keys()].filter((line) => !read.get(texts[line]!)?.has(copyOf[line]!));
     const joined = kept.map((line) => texts[line]).join("\n");
-    // The texts of the lines set aside. Where the hidden text spells one out whole around a stretch
-    // left over, that stretch is another copy of that line, listed twice but read once (a white
-    // footer on every page, one Word header in two parts), not hidden text inside a visible line.
+    // Texts of the lines set aside. A stretch left over that the hidden text spells out whole as
+    // one of them is another copy of that line (a white footer on every page), not hidden text
+    // inside a visible line.
     const aside = [...new Set(texts.filter((text, line) => read.get(text)?.has(copyOf[line]!)))];
     const copyOfAside = (at: number, stretch: string) =>
       aside.some((text) => {
@@ -143,8 +137,7 @@ function visibleLines(layout: AtsLayoutSignals | undefined, lines: readonly stri
     for (let at = 0, k = 0; k < kept.length; at += texts[kept[k++]!]!.length + 1) starts.push(at);
     let steps = 0;
     const edge = (c: string | undefined) => c === undefined || c === " " || c === "\n";
-    // Where `word` stands in `text`, from `from`, between word ends; -1 when it does not, or past
-    // the budget.
+    // Where `word` stands in `text` from `from`, between word ends; -1 if absent or over budget.
     const wordAt = (text: string, word: string, from: number) => {
       let at = text.indexOf(word, from);
       while (at >= 0 && !(edge(text[at - 1]) && edge(text[at + word.length]))) {
@@ -153,8 +146,8 @@ function visibleLines(layout: AtsLayoutSignals | undefined, lines: readonly stri
       }
       return at;
     };
-    // Of each word, lower-cased: the copies the hidden text holds that no line set aside or cut
-    // has taken, and the copies the kept lines hold, anywhere in them.
+    // Per lower-cased word: copies the hidden text holds that no line has taken (`owed`), and
+    // copies the kept lines hold anywhere in them (`held`).
     const owed = new Map<string, number>();
     const owe = (words: readonly string[], by: number) => {
       for (const word of words) owed.set(word, (owed.get(word) ?? 0) + by);
@@ -249,11 +242,10 @@ function copies(texts: readonly string[]) {
 }
 
 /**
- * For each pass over the lines, what to read of each: `read` names, by text and copy, a line set
- * aside (`undefined`) or the text read instead. Each pass counts its own copies, in reading order.
- * A kept copy of a text whose other copies are set aside is read apart, between `BREAK`s: which
- * copy was the hidden one is not known for sure, and two kept hidden lines side by side must not
- * be read as one phrase ("Built Python Machine" / "Learning Spark Jobs").
+ * Per pass over the lines, what to read of each: `read` names, by text and copy, a line set aside
+ * (`undefined`) or the text read instead. A kept copy of a text whose other copies are set aside
+ * is read apart between `BREAK`s: which copy was hidden is unknown, and two kept hidden lines
+ * side by side must not read as one phrase.
  */
 function readFilter(
   read: ReadonlyMap<string, ReadonlyMap<number, string | undefined>>,
@@ -280,16 +272,13 @@ type CoverState = { stretches: number; lines: number; step: CoverStep | undefine
 
 /**
  * Lines whose texts are the pieces of the one way `hidden` splits into the lines' texts, or
- * `undefined` when it splits none or more ways: split two ways, a phrase could sit in either
- * ("Go Machine" / "Learning" or "Go" / "Machine Learning"), and which lines hold it is not known.
- * In reading order when the pieces' lines run in it, the set in the fewest stretches of
- * consecutive lines, then of the fewest lines, then the latest: hidden text is drawn in a few
- * blocks, often after the visible text. When they do not (a second column's hidden runs read
- * first), for each piece's text as many of its lines as the split takes, those beside a line of a
- * text next to it in the split first, then the latest. Each line is tried only where `hidden`
- * holds its text between word ends, and past `MAX_COVER_STEPS` such tries (thousands of one line
- * over a repeating hidden text) there is no answer, and the claiming in `visibleLines` decides: a
- * count, not a clock, so the same file is read the same way on any machine.
+ * `undefined` when it splits none or more ways (split two ways, a phrase could sit in either
+ * line). In reading order when the pieces' lines run in it: the set in the fewest stretches of
+ * consecutive lines, then the fewest lines, then the latest. Otherwise, for each piece's text as
+ * many of its lines as the split takes, those beside a line of a neighbouring text first, then
+ * the latest. Each line is tried only where `hidden` holds its text between word ends; past
+ * `MAX_COVER_STEPS` tries there is no answer and the claiming in `visibleLines` decides (a count,
+ * not a clock, so any machine reads a file the same way).
  */
 function hiddenCover(hidden: string, texts: readonly string[]): number[] | undefined {
   let steps = 0;
@@ -323,8 +312,8 @@ function hiddenCover(hidden: string, texts: readonly string[]): number[] | undef
     !other ||
     stretches < other.stretches ||
     (stretches === other.stretches && lines <= other.lines);
-  // By the position each set has covered up to: those whose last line is the line before, and
-  // the others, a new line after them opening a new stretch. A later set wins a tie.
+  // By the position each set has covered up to: those ending at the line before, and the others
+  // (a new line opens a new stretch). A later set wins a tie.
   let adjacent = new Map<number, CoverState>();
   const apart = new Map<number, CoverState>([[0, { stretches: 0, lines: 0, step: undefined }]]);
   for (const [line, text] of texts.entries()) {
@@ -386,14 +375,14 @@ export type AtsCheckOptions = {
   /** Enables job match scoring. Read up to its first 20 000 characters. */
   jobDescription?: string | undefined;
   /**
-   * The employer that posted the job, when the host knows it (the `company` of `/job`'s
-   * `extractJobPosting`). Every word of it is left out of the job-match keywords.
+   * The employer that posted the job (`extractJobPosting`'s `company`); its words are left out of
+   * the job-match keywords.
    */
   jobCompany?: string | undefined;
   /**
-   * Layout signals from a file upload (`extractResume`): page geometry, hidden text, and what the
-   * file advice reads (an encrypted PDF, a Word document's tracked changes and comments). Absent
-   * for pasted text and structured documents; the layout rules then drop out.
+   * Layout signals from a file upload (`extractResume`): page geometry, hidden text and what the
+   * file advice reads. Absent for pasted text and structured documents; the layout rules then
+   * drop out.
    */
   layout?: AtsLayoutSignals | undefined;
   /**
@@ -402,175 +391,150 @@ export type AtsCheckOptions = {
    */
   now?: Date | undefined;
   /**
-   * Return the text as the engine read it, one entry per line (`report.lines`). Off by default:
-   * it is the resume's full text. Worth showing a candidate, because reading order — not columns
-   * as such — is what breaks a multi-column layout, and it is visible only here.
+   * Return the text as the engine read it, one entry per line (`report.lines`). Off by default: it
+   * is the full text.
    */
   includeLines?: boolean | undefined;
   /**
-   * What the host knows of the uploaded file — its name, size, format, a password, tracked
-   * changes, comments — for the file advice in `report.advice`. Never scored. Absent for pasted
-   * text.
+   * What the host knows of the uploaded file, for the file advice in `report.advice`. Never scored.
    */
   file?: AtsFileInfo | undefined;
   /**
-   * An applicant tracking system the resume is headed for, by its id in the policy
-   * (`advice.targets`: "greenhouse", "lever", "taleo" in the community policy). Adds that
-   * vendor's documented notes to `report.advice`, each with its source; never scored. Throws
-   * `AtsPolicyError` for an id the policy has no notes on.
+   * An applicant tracking system the resume is headed for, by its id in `advice.targets`
+   * ("greenhouse", "lever", "taleo" in the community policy). Adds that vendor's documented notes
+   * to `report.advice`; never scored. Throws `AtsPolicyError` for an unknown id.
    */
   targetAts?: string | undefined;
 } & AtsLocaleOptions;
 
-/** The scorer behind `check`. `AtsScoringService.check` gives the same report, until 1.0. */
-export class AtsScoringService {
-  /**
-   * Scores a resume against a policy.
-   *
-   * The policy is a parameter rather than something this module fetches: loading it is I/O and
-   * caching it is state, and a library that scores text should do neither. The report is a pure
-   * function of (resume, policy, options).
-   *
-   * `resume` may be raw input or a `PreparedResume`. Throws `AtsInputError` for a structured
-   * document that fails validation.
-   *
-   * When locale packs are attached to the policy (`withLocales`), the resume and the posting are
-   * read in the languages they are detected as, and in one region; `report.locale` says which.
-   */
-  static check(
-    resume: AtsResumeInput | PreparedResume,
-    basePolicy: AtsEnginePolicy,
-    options: AtsCheckOptions = {},
-  ): AtsReport {
-    const { layout } = options;
-    // This check's own: the lines it reads for dates are read once for as long as it lasts.
-    const now = readingDatesAt(options.now ?? new Date());
-    // Untyped callers send anything; only a string is a posting.
-    // Normalised as the resume is: a no-break space or a zero-width space pasted from a careers
-    // page split "Machine learning" and "Kubernetes" into words no resume had.
-    const jobDescription =
-      typeof options.jobDescription === "string"
-        ? normalizeText(options.jobDescription.slice(0, MAX_JOB_DESCRIPTION_CHARS))
-        : undefined;
-    // Refused before any work, as an unknown region is.
-    const target = targetOf(basePolicy, options.targetAts);
-    const prepared = prepareResume(resume);
-    const { policy, locale, resumeLanguages } = localizePolicy(
-      basePolicy,
-      jobDescription === undefined ? prepared.text : `${prepared.text}\n${jobDescription}`,
-      options,
-      prepared.text,
-    );
+/**
+ * Scores a resume against a policy: the bundled default when none is given.
+ *
+ * The report is a pure function of (resume, policy, options); pass `options.now` to pin the date
+ * tenure and recency are counted to. Throws `AtsInputError` for a structured document that fails
+ * validation, and `AtsPolicyError` for a `region` or `targetAts` the policy does not have.
+ */
+export function check(
+  resume: AtsResumeInput | PreparedResume,
+  basePolicy: AtsEnginePolicy = DEFAULT_POLICY,
+  options: AtsCheckOptions = {},
+): AtsReport {
+  const { layout } = options;
+  const now = readingDatesAt(options.now ?? new Date());
+  // Untyped callers send anything; only a string is a posting. Normalised like the resume, so a
+  // pasted no-break or zero-width space cannot split a word.
+  const jobDescription =
+    typeof options.jobDescription === "string"
+      ? normalizeText(options.jobDescription.slice(0, MAX_JOB_DESCRIPTION_CHARS))
+      : undefined;
+  // Refused before any work, like an unknown region.
+  const target = targetOf(basePolicy, options.targetAts);
+  const prepared = prepareResume(resume);
+  const { policy, locale, resumeLanguages } = localizePolicy(
+    basePolicy,
+    jobDescription === undefined ? prepared.text : `${prepared.text}\n${jobDescription}`,
+    options,
+    prepared.text,
+  );
 
-    const { ctx, lines, sections, parsed } = readResume(prepared, policy, {
-      jobDescription,
-      layout,
-      now,
-      languages: resumeLanguages,
-    });
-    const { active, results, readinessScore } = scoreRules(policy.rules, ctx);
-    const failedChecks = results.filter((rule) => !rule.passed);
-    const metricOf = new Map(
-      active.map((rule) => [rule.id, "metric" in rule ? String(rule.metric) : ""]),
-    );
+  const { ctx, lines, sections, parsed } = readResume(prepared, policy, {
+    jobDescription,
+    layout,
+    now,
+    languages: resumeLanguages,
+  });
+  const { active, results, readinessScore } = scoreRules(policy.rules, ctx);
+  const failedChecks = results.filter((rule) => !rule.passed);
+  const metricOf = new Map(
+    active.map((rule) => [rule.id, "metric" in rule ? String(rule.metric) : ""]),
+  );
 
-    // Hidden text is no evidence of fit: the match and the requirements read only what a reader
-    // sees. And when the resume was caught gaming the screener (an integrity error), the match
-    // is held to the readiness score that carries the deduction, as the verdict already is.
-    // Only text the policy's hidden-text rule fails is set aside: below its threshold a few
-    // hidden characters are layout, and the rule says so by passing.
-    const hiddenRule = active.find((rule) => metricOf.get(rule.id) === "hiddenTextChars");
-    const hiding = !hiddenRule || failedChecks.some((rule) => rule.id === hiddenRule.id);
-    const visible = hiding
-      ? visibleLines(layout, lines)
-      : () =>
-          (line: string): string | undefined =>
-            line;
-    // Where a line was set aside, a `BREAK` between the lines kept on either side of it: setting
-    // it aside must not join them into a phrase ("Machine" / "Science Spark" / "Learning" is not
-    // "Machine Learning"). Words read the same; only a phrase across the gap is not.
-    const keep = visible();
-    const shown: string[] = [];
-    let changed = false;
-    let gap = false;
-    for (const line of lines) {
-      const kept = keep(line);
-      if (kept === undefined) {
-        gap = changed = true;
-        continue;
-      }
-      if (kept !== line) changed = true;
-      shown.push(gap && shown.length ? `${BREAK} ${kept}` : kept);
-      gap = false;
+  // The match and requirements read only what a reader sees. Text is set aside only when the
+  // hidden-text rule fails: below its threshold a few hidden characters are layout.
+  const hiddenRule = active.find((rule) => metricOf.get(rule.id) === "hiddenTextChars");
+  const hiding = !hiddenRule || failedChecks.some((rule) => rule.id === hiddenRule.id);
+  const visible = hiding ? visibleLines(layout, lines) : readAll;
+  // A `BREAK` between the lines kept either side of one set aside, so they do not join into a
+  // phrase.
+  const keep = visible();
+  const shown: string[] = [];
+  let changed = false;
+  let gap = false;
+  for (const line of lines) {
+    const kept = keep(line);
+    if (kept === undefined) {
+      gap = changed = true;
+      continue;
     }
-    const headed = withHeadings(lines, sections);
-    const inSections = visible();
-    const shownSections: HeadedSection[] = changed
-      ? headed.map((section) => ({
-          ...section,
-          lines: section.lines.flatMap((line) => inSections(line) ?? []),
-        }))
-      : headed;
-    const jobMatch = computeJobMatch(
-      changed ? shown.join(" ").replace(/\s+/g, " ").trim() : ctx.text,
-      jobDescription,
-      policy,
-      parsed.highestIsced,
-      options.jobCompany,
-    );
-    const caught = failedChecks.some(
-      (rule) => rule.category === "integrity" && rule.severity === "error",
-    );
-    const jobMatchScore =
-      caught && jobMatch.score !== null ? Math.min(jobMatch.score, readinessScore) : jobMatch.score;
-
-    return {
-      version: policy.version,
-      readinessScore,
-      jobMatchScore,
-      matchedKeywords: jobMatch.matched,
-      missingKeywords: jobMatch.missing,
-      matchedKeywordGroups: jobMatch.matchedGroups,
-      missingKeywordGroups: jobMatch.missingGroups,
-      // What stops an ATS reading the document: every parse check, and the format checks that
-      // measure how the text extracts (columns, tables, letter spacing). Length and a photo are
-      // format choices, not reading problems, and stay out. Matched on category and metric rather
-      // than a substring of the rule id, which is only a naming convention.
-      parsingWarnings: failedChecks
-        .filter(
-          (rule) =>
-            rule.category === "parse" ||
-            (rule.category === "format" && EXTRACTION_METRICS.has(metricOf.get(rule.id) ?? "")),
-        )
-        .map((rule) => rule.evidence),
-      strengths: strengthsOf(active, results),
-      failedChecks,
-      prioritizedFixes: [...failedChecks]
-        .sort((a, b) => b.scoreImpact - a.scoreImpact)
-        .slice(0, 6)
-        .map((rule) => rule.fix),
-      rules: results,
-      categories: rollUpCategories(active, results),
-      checksPassed: results.length - failedChecks.length,
-      checksTotal: results.length,
-      wordCount: ctx.wordCount,
-      parsed,
-      locale,
-      engine: { version: ENGINE_VERSION, policy: policyFingerprint(policy) },
-      requirements: judgeRequirements(jobDescription, shownSections, parsed, policy, now).map(
-        (requirement) =>
-          changed
-            ? {
-                ...requirement,
-                evidence: requirement.evidence.map((line) =>
-                  line.replaceAll(BREAK, " ").replace(/\s+/g, " ").trim(),
-                ),
-              }
-            : requirement,
-      ),
-      // Read after the score is final, from nothing the score reads: advice cannot move it.
-      advice: adviceFor(policy, { parsed, lines, now, file: options.file, layout, target }),
-      ...(options.includeLines && { lines: lines.slice(0, MAX_REPORTED_LINES) }),
-    };
+    if (kept !== line) changed = true;
+    shown.push(gap && shown.length ? `${BREAK} ${kept}` : kept);
+    gap = false;
   }
+  const headed = withHeadings(lines, sections);
+  const inSections = visible();
+  const shownSections: HeadedSection[] = changed
+    ? headed.map((section) => ({
+        ...section,
+        lines: section.lines.flatMap((line) => inSections(line) ?? []),
+      }))
+    : headed;
+  const jobMatch = computeJobMatch(
+    changed ? shown.join(" ").replace(/\s+/g, " ").trim() : ctx.text,
+    jobDescription,
+    policy,
+    parsed.highestIsced,
+    options.jobCompany,
+  );
+  // A resume caught gaming the screener has its match held to the readiness score.
+  const jobMatchScore =
+    caughtGaming(failedChecks) && jobMatch.score !== null
+      ? Math.min(jobMatch.score, readinessScore)
+      : jobMatch.score;
+
+  return {
+    version: policy.version,
+    readinessScore,
+    jobMatchScore,
+    matchedKeywords: jobMatch.matched,
+    missingKeywords: jobMatch.missing,
+    matchedKeywordGroups: jobMatch.matchedGroups,
+    missingKeywordGroups: jobMatch.missingGroups,
+    // What stops an ATS reading the document: parse checks and the format checks that measure
+    // extraction. Length and a photo are format choices and stay out.
+    parsingWarnings: failedChecks
+      .filter(
+        (rule) =>
+          rule.category === "parse" ||
+          (rule.category === "format" && EXTRACTION_METRICS.has(metricOf.get(rule.id) ?? "")),
+      )
+      .map((rule) => rule.evidence),
+    strengths: strengthsOf(active, results),
+    failedChecks,
+    prioritizedFixes: [...failedChecks]
+      .sort((a, b) => b.scoreImpact - a.scoreImpact)
+      .slice(0, 6)
+      .map((rule) => rule.fix),
+    rules: results,
+    categories: rollUpCategories(active, results),
+    checksPassed: results.length - failedChecks.length,
+    checksTotal: results.length,
+    wordCount: ctx.wordCount,
+    parsed,
+    locale,
+    engine: { version: ENGINE_VERSION, policy: policyFingerprint(policy) },
+    requirements: judgeRequirements(jobDescription, shownSections, parsed, policy, now).map(
+      (requirement) =>
+        changed
+          ? {
+              ...requirement,
+              evidence: requirement.evidence.map((line) =>
+                line.replaceAll(BREAK, " ").replace(/\s+/g, " ").trim(),
+              ),
+            }
+          : requirement,
+    ),
+    // Read after the score is final, from nothing the score reads: advice cannot move it.
+    advice: adviceFor(policy, { parsed, lines, now, file: options.file, layout, target }),
+    ...(options.includeLines && { lines: lines.slice(0, MAX_REPORTED_LINES) }),
+  };
 }

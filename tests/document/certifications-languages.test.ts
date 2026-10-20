@@ -3,22 +3,19 @@ import { describe, expect, it } from "vitest";
 import {
   ATS_DOCUMENT_FORMAT,
   AtsInputError,
-  AtsScoringService,
   DEFAULT_POLICY,
   fromJsonResume,
   renderResumeDocument,
   type AtsResumeDocument,
+  check,
 } from "../../src/index.js";
 
-/**
- * Structured input names its certifications and languages in fields, so the parsed record takes
- * them from there (provenance `structured`): a document's own sections, a JSON Resume's
- * `certificates` and `languages`, and an `other` section titled as one. Invented people only.
- */
+// Structured input takes certifications and languages from its fields (provenance `structured`):
+// a document's own sections, a JSON Resume's `certificates` and `languages`, or an `other` section titled as one.
 
 const NOW = new Date("2026-09-30T00:00:00Z");
-const parsed = (input: Parameters<typeof AtsScoringService.check>[0]) =>
-  AtsScoringService.check(input, DEFAULT_POLICY, { now: NOW }).parsed;
+const parsed = (input: Parameters<typeof check>[0]) =>
+  check(input, DEFAULT_POLICY, { now: NOW }).parsed;
 
 const DOCUMENT: AtsResumeDocument = {
   format: ATS_DOCUMENT_FORMAT,
@@ -95,7 +92,7 @@ describe("a document's certifications and languages sections", () => {
       ...DOCUMENT,
       sections: [{ kind: "languages", title: "Languages", items: [{ level: "C1" }] }],
     };
-    expect(() => AtsScoringService.check(bad, DEFAULT_POLICY, { now: NOW })).toThrow(AtsInputError);
+    expect(() => check(bad, DEFAULT_POLICY, { now: NOW })).toThrow(AtsInputError);
   });
 
   it("are read from an other section titled as one", () => {

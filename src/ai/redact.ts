@@ -2,27 +2,13 @@ import { escapeRegex, normalizeText } from "../text/text.js";
 import type { AtsParsedResume } from "../types.js";
 
 /**
- * Contact-detail redaction for tasks that do not need to know who the candidate is.
- *
- * Analysis judges the content of a resume; the candidate's name, email, phone number and links
- * add nothing to it and are the details least worth handing to a third party. (A postal address
- * is not recognised, so it is not redacted.) They are swapped for
- * placeholders before the request leaves and swapped back in the reply, so a recommendation that
- * mentions them still reads correctly.
- *
- * Best effort by design, and limited to values that are unambiguous: what the parser extracted
- * (name, email, phone, links) plus any further email address, whose grammar cannot be confused
- * with anything else. The name is also caught as "Doe, Jane", with or without a middle initial,
- * and inside a web address built from it ("janedoe.dev", "x.com/janedoe"), where the whole address
- * is replaced. The phone number is caught by its national number whatever separates its digits,
- * dialled as "+44 20…", "0044 20…", "011 44 20…" or "020…". Any other run of 9 or more digits that
- * opens with "+" or a trunk "0" is a phone too, read by the parser or not; digit runs in general
- * are *not* swept — "2019 - 2023" has the shape of a phone number, and so has "01/2020 - 12/2023",
- * which is left alone as a range of dates. Not caught: a first name used on its own,
- * initials ("J. Doe"), a handle written another way ("jane_doe"). Replacement is whole-word, so a
- * three-letter name does not rewrite the inside of another word, and a "name" the parser also read
- * as a job title is left alone — swapping a title for [NAME] would cost the analysis more than it
- * hides. Tasks that must recover these values (parse repair, conversion) do not redact at all.
+ * Swaps the candidate's contact details for placeholders before a request leaves and back in the
+ * reply. Best effort, limited to unambiguous values: what the parser extracted (name, email,
+ * phone, links), any email address, the name as "Doe, Jane" or inside a web address built from
+ * it, the phone by its national number however dialled, and any other run of 9+ digits opening
+ * with "+" or a trunk "0" (date ranges are left alone). Not caught: a postal address, a lone
+ * first name, initials, a differently written handle. Replacement is whole-word, and a "name"
+ * the parser also read as a job title is left alone.
  */
 export type Redaction = {
   /** Replaces contact details in every string inside `value`. */
@@ -31,23 +17,11 @@ export type Redaction = {
   restore<T>(value: T): T;
 };
 
-/**
- * Any email address: the parser's own grammar (`EMAIL`), with a domain in any script
- * ("jane@exämple.de"), which an ATS need not read but a provider would. Bounded as `EMAIL` is,
- * and with its local part: letters in any script and an apostrophe ("zoë.müller@firma.de",
- * "o'connor.pat@example.com"), so no part of one is sent.
- */
+/** Any email address: the parser's `EMAIL` grammar, with a domain and local part in any script and apostrophes. */
 const EMAILS =
   /(?<![\p{L}\p{M}\p{N}._%+-]|[\p{L}\p{M}\p{N}]['’])[\p{L}\p{M}\p{N}._%+-][\p{L}\p{M}\p{N}._%+'’-]{0,63}@[\p{L}\p{N}-]{1,63}(?:\.[\p{L}\p{N}-]{1,63}){0,8}\.\p{L}{2,24}(?![\p{L}\p{N}_])/giu;
 
-/**
- * A web address with or without a scheme: "janedoe.dev", "x.com/janedoe", "https://…".
- *
- * Linear: a match starts only where a label starts, and a host is at most eight labels of at most
- * 63 characters (DNS allows no longer label), so each start reads a bounded stretch. Unbounded,
- * every letter of "aaaa…" or "a.a.a.…" started a scan to the end of the run: 150,000 characters
- * took 50 seconds.
- */
+/** A web address with or without a scheme ("janedoe.dev", "x.com/janedoe"); bounded labels keep it linear. */
 const ADDRESS =
   /(?<![\p{L}\p{N}-])(?:https?:\/\/)?(?:[\p{L}\p{N}-]{1,63}\.){1,8}\p{L}{2,63}(?:\/[^\s|,;()<>]*)?/giu;
 
@@ -55,37 +29,24 @@ const ADDRESS =
 const PHONE_GAP = String.raw`[\s().\-/‐‑‒–—]*`;
 
 /**
- * A phone number the parser did not read, as one under a policy without its country's region:
- * 9 or more digits on one line that open with "+" or a trunk "0" ("020 7946 0958", "(02) 9876
- * 5432"), up to three of `PHONE_GAP`'s characters between two. It may follow a label's dot or a
- * comma ("Tel.07912…", "M.+44…", "…0958,07912…"), not a letter or a digit, a slash or a dash (a
- * web address's path, "/id/0412345678"), or a digit and a dot, which make it part of a figure
- * ("3.0123456789"). A year never opens with "+" or "0", so "2019 - 2023" is
- * not one. And a North American number, a second one the parser did not take ("Home: (415)
- * 555-0199"), by its own shape: the area code in brackets, or set off as the other groups are
- * ("415-555-0199", "415.555.0199"). However many digits, so numbers side by side on one line
- * ("0412 345 678 / 02 9876 5432") are one placeholder rather than one and part of the next. Not
- * caught: a number glued to letters ("Tel07912345678"), or a "+" with a space after it ("+ 44").
- * Linear: a gap never holds a digit and is bounded, and a match starts only where a run of digits
- * does, or after a space within one, and then takes the run to its end.
+ * A phone number the parser did not read: 9+ digits on one line opening with "+" or a trunk "0"
+ * ("020 7946 0958"), up to three `PHONE_GAP` characters between digits; or a North American
+ * number by its shape ("(415) 555-0199", "415-555-0199"). It may follow a label's dot or comma,
+ * not a letter, digit, slash, dash or a digit and a dot ("3.0123456789"). Not caught: a number
+ * glued to letters, or "+ 44". Linear: gaps never hold a digit and are bounded.
  */
 const OTHER_PHONES =
   /(?<![\p{L}\p{N}+_@#=/-]|\p{N}\.)(?:(?:\+|(?=\(?0))\(?\d(?:[ \t().\-/‐‑‒–—]{0,3}\d){8,}|(?:1[-. ])?(?:\(\d{3}\)[ \t]?\d{3}[-. \t]|\d{3}([-.])\d{3}\1)\d{4})(?!\p{N}|[./-]\d)/gu;
 
-/**
- * A month and its year, or a day too ("01/2020", "05.2019", "06/15/2019"), after the dash or
- * slash that joins it to the date before it ("01/2020 - 12/2023", "… / 07/2021 - …").
- */
+/** A month and year, or a day too ("01/2020", "06/15/2019"), after the dash or slash joining it to the previous date. */
 const DATE = new RegExp(
   String.raw`(?:[ \t]*[-–—/][ \t]*)?\d{1,2}(?:[./-]\d{1,2})?[ \t]*[./\-–—]?[ \t]*(?:19|20)\d\d`,
   "uy",
 );
 
 /**
- * Whether a match is only dates: one or a list of them, in brackets or not, with at most a one-
- * or two-digit figure after them ("01/2020 - 12/2023 (3 yrs)"). Wholly, so a number with a
- * year-like group ("+31 6 2012 3456", "06 1987 6543") is still a number. Each date is read where
- * the last one ended, so this is linear in the match.
+ * Whether a match is wholly dates, with at most a one- or two-digit figure after them, so a
+ * number with a year-like group ("+31 6 2012 3456") is still a number. Linear in the match.
  */
 function onlyDates(match: string): boolean {
   let at = match.startsWith("(") ? 1 : 0;
@@ -98,16 +59,9 @@ function onlyDates(match: string): boolean {
 }
 
 /**
- * The digits that may name the line wherever it is dialled from (its national number), longest
- * first, each at least seven. "+44 20 7946 0958" and "020 7946 0958" are both 2079460958.
- *
- * A number written with its country code ("+44", "0044") is the digits after the code, read as
- * the group of one to three digits the number opens with; a trunk "(0)" is dropped (Italy's
- * leading zero is part of the number and stays: "+39 06…" is 06…). Written without a break after
- * the code ("+442079460958"), the code could be one, two or three digits: each reading of nine
- * digits or more is tried, so a short run inside the number ("55550132") is not taken for it. No
- * table of codes is needed. A number written nationally loses its trunk zeros, and ten digits at
- * most cover a North American "1-".
+ * The national number(s) of a phone, each at least seven digits: "+44 20 7946 0958" and
+ * "020 7946 0958" are both 2079460958. A trunk "(0)" is dropped (Italy's "+39 06…" keeps its
+ * zero); with no break after the code ("+442079460958") one to three digit codes are each tried.
  */
 function nationalNumbers(phone: string): string[] {
   const written = phone.replace(/\(0\)/, " ");
@@ -142,9 +96,8 @@ export function createRedaction(
   /** Each placeholder, the value it restores to, and the patterns that stand for it. */
   const entries: Array<{ placeholder: string; original: string; patterns: string[] }> = [];
 
-  // Each address the resume holds, in any case, to its placeholder: replaced in one pass of
-  // `EMAILS` rather than a pattern each, which ran the text once per address (thousands of
-  // distinct ones took seconds). An address only a posting or a reply holds is not the candidate's.
+  // One pass of `EMAILS` over the text, not a pattern per address (thousands took seconds).
+  // An address only a posting or a reply holds is not the candidate's.
   const emails = new Map<string, string>();
   const restoreEmails: Array<readonly [string, string]> = [];
   for (const email of [parsed.email, ...(text.match(EMAILS) ?? [])]) {
@@ -156,15 +109,13 @@ export function createRedaction(
 
   const name = parsed.name.trim();
   const parts = name.split(/\s+/).filter(Boolean);
-  // Two characters are a whole Chinese or Korean name ("李明"), but in Latin script too short to
-  // replace safely ("Al" in "Algorithms").
+  // Two characters are a whole Chinese or Korean name, but too short in Latin script ("Al").
   const named =
     (name.length >= 3 || (name.length === 2 && /[\p{sc=Han}\p{sc=Hangul}]/u.test(name))) &&
     !parsed.roles.some((role) => role.title.trim().toLowerCase() === name.toLowerCase());
 
   const links = new Set(parsed.links.map((link) => link.trim()).filter((link) => link.length >= 3));
-  // An address built from the name names the person as surely as the name does. Five letters at
-  // least, so a short name does not take "carolina.edu" for "Li Na".
+  // An address built from the name identifies the person; five letters at least ("carolina.edu" is not "Li Na").
   const squashedName = squash(name);
   if (named && squashedName.length >= 5)
     for (const [address] of text.matchAll(ADDRESS))
@@ -179,13 +130,9 @@ export function createRedaction(
 
   const phone = parsed.phone.trim();
   if (phone.replace(/\D/g, "").length >= 7) {
-    // As the parser read it, or as its national number with any separators ("415.555.0199",
-    // "020–7946–0958"), after a country code ("+44", "0044", "+44 (0)"), a trunk zero ("020",
-    // "(020)") or a North American "1-". A country code follows "+" or an exit prefix ("00", or
-    // "011" from North America, "0011" from Australia, "010" from Japan), so the "3." of a
-    // numbered list is not one, and an exit prefix counts only with a code and the number after
-    // it. Linear: each digit is a literal, the gaps between them never hold a digit, and there are
-    // at most four numbers to try.
+    // As written, or as its national number with any separators, after a country code, a trunk
+    // zero or a North American "1-". A country code follows "+" or an exit prefix (00, 011, 0011,
+    // 010), so a numbered list's "3." is not one.
     const numbers = nationalNumbers(phone).map((number) => [...number].join(PHONE_GAP));
     const prefix = String.raw`(?:(?:\+|00|0011|011|010)${PHONE_GAP}\d{1,3}${PHONE_GAP}(?:0${PHONE_GAP})?|[01]${PHONE_GAP})?`;
     entries.push({
@@ -199,8 +146,7 @@ export function createRedaction(
   }
 
   if (named) {
-    // Any spacing between letters, as a letter-spaced header ("J A N E   D O E") extracts, but a
-    // space between the parts: "Tim Ely" is not "timely".
+    // Any spacing between letters ("J A N E   D O E"), but a space between the parts: "Tim Ely" is not "timely".
     const first = nameLetters(parts[0]!);
     const last = nameLetters(parts[parts.length - 1]!);
     const patterns = [parts.map(nameLetters).join(String.raw`\s+`)];
@@ -212,10 +158,7 @@ export function createRedaction(
     entries.push({ placeholder: "[NAME]", original: name, patterns });
   }
 
-  // Longest original first, so an email or an address is replaced before a name it contains.
-  // Case-insensitive, on text normalised as the engine reads it (no-break spaces, soft hyphens,
-  // ligatures). A name glued into an address that was not caught is left whole rather than cut
-  // into "[NAME].dev".
+  // Longest original first, so an email or address is replaced before a name it contains.
   const forward = [...entries]
     .sort((a, b) => b.original.length - a.original.length)
     .flatMap(({ placeholder, patterns }) => {

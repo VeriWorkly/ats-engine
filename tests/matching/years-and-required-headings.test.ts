@@ -1,20 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsRequirement } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsRequirement, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { policyRegex } from "../../src/policy/regex.js";
 import { stem } from "../../src/text/text.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Defects in the job match and the requirements judge, one block each. Invented people only.
- */
+/** Defects in the job match and the requirements judge, one block each. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const HEAD = "Jane Doe\njane@example.com | +1 415 555 0142";
 
 const check = (body: string, job: string, now = NOW) =>
-  AtsScoringService.check(`${HEAD}\n${body}`, DEFAULT_POLICY, { jobDescription: job, now });
+  score(`${HEAD}\n${body}`, DEFAULT_POLICY, { jobDescription: job, now });
 const judge = (body: string, job: string, now = NOW) => check(body, job, now).requirements;
 const one = (body: string, ask: string, now = NOW) =>
   judge(body, `Requirements\n- ${ask}`, now)[0] as AtsRequirement;
@@ -199,11 +197,10 @@ describe("stemming", () => {
 
 describe("one- and two-letter skills", () => {
   it("does not read a middle initial as R", () => {
-    const report = AtsScoringService.check(
-      "Jane R. Doe\njane@example.com\nSkills\nPython",
-      DEFAULT_POLICY,
-      { jobDescription: "Requirements\n- Experience with R", now: NOW },
-    );
+    const report = score("Jane R. Doe\njane@example.com\nSkills\nPython", DEFAULT_POLICY, {
+      jobDescription: "Requirements\n- Experience with R",
+      now: NOW,
+    });
     expect(report.requirements[0]).toMatchObject({ status: "missing", evidence: [] });
     expect(report.matchedKeywords).not.toContain("r");
   });
@@ -264,13 +261,13 @@ describe("hidden text", () => {
     tableCount: 0,
     pageCount: 1,
     hiddenTextChars: 24,
-    hiddenTextSample: "Kubernetes Terraform Kafka",
+    hiddenText: "Kubernetes Terraform Kafka",
   };
   const text = `${HEAD}\nExperience\nEngineer, Acme Corp Jan 2019 - Present\n- Built payment services in Go\nKubernetes Terraform Kafka`;
   const job = "Requirements\n- Kubernetes\n- Terraform\n- Go";
 
   it("does not count white-on-white keywords toward the match or as evidence", () => {
-    const report = AtsScoringService.check(text, DEFAULT_POLICY, {
+    const report = score(text, DEFAULT_POLICY, {
       jobDescription: job,
       layout,
       now: NOW,
@@ -282,7 +279,7 @@ describe("hidden text", () => {
   });
 
   it("reads the same line as evidence when it is visible", () => {
-    const report = AtsScoringService.check(text, DEFAULT_POLICY, { jobDescription: job, now: NOW });
+    const report = score(text, DEFAULT_POLICY, { jobDescription: job, now: NOW });
     expect(report.requirements.map((r) => r.status)).toEqual(["met", "met", "met"]);
   });
 });
@@ -475,7 +472,7 @@ describe("evidence lines", () => {
 
   it("never takes a nationality as proof of a language", () => {
     const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
-    const found = AtsScoringService.check(
+    const found = score(
       `${HEAD}\nPersönliche Daten\nStaatsangehörigkeit: deutsch\nSprachen\nEnglisch (fließend)`,
       policy,
       { jobDescription: "Ihr Profil\n- Sehr gute Deutschkenntnisse", now: NOW, languages: ["de"] },
@@ -560,7 +557,7 @@ describe("the new patterns stay linear", () => {
     for (const text of HOSTILE) {
       expectFast(
         () =>
-          AtsScoringService.check(`${HEAD}\nSkills\nPython`, DEFAULT_POLICY, {
+          score(`${HEAD}\nSkills\nPython`, DEFAULT_POLICY, {
             jobDescription: `Requirements\n- ${text}`,
             now: NOW,
           }),

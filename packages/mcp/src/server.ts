@@ -268,11 +268,7 @@ function checkResult(report: AtsReport, withJob: boolean) {
 
 type Answer = { text: string; data: Record<string, unknown> };
 
-/**
- * A tool's answer, or its failure as a tool error the assistant can read and act on. A mistake
- * in the call is said plainly; anything else is also logged to stderr (never stdout, which is the
- * protocol's).
- */
+/** A tool's answer, or its failure as a tool error; a non-user error is also logged to stderr (stdout is the protocol's). */
 async function answer(run: () => Promise<Answer>): Promise<CallToolResult> {
   try {
     const { text, data } = await run();
@@ -414,8 +410,7 @@ export function createServer(): McpServer {
     (args) =>
       answer(async () => {
         const { report, layout } = await score(args, true);
-        // The hidden text the lines hold repeats `hiddenText` on a PDF: up to 5,000 characters the
-        // model would read twice and has no use for.
+        // Drops `hiddenTextRead`: up to 5,000 characters that repeat `hiddenText`.
         const { hiddenTextRead: _read, ...measured } = layout ?? {};
         const lines = report.lines ?? [];
         const warnings = report.parsingWarnings.map((warning) => `- ${warning}`);

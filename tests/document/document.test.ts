@@ -3,19 +3,19 @@ import { describe, expect, it } from "vitest";
 import {
   ATS_DOCUMENT_FORMAT,
   AtsInputError,
-  AtsScoringService,
   DEFAULT_POLICY,
   fromJsonResume,
   isJsonResume,
   prepareResume,
   renderResumeDocument,
   type AtsResumeDocument,
+  check as score,
 } from "../../src/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 const NOW = new Date("2026-09-30T00:00:00Z");
-const check = (input: Parameters<typeof AtsScoringService.check>[0], jobDescription?: string) =>
-  AtsScoringService.check(input, DEFAULT_POLICY, { jobDescription, now: NOW });
+const check = (input: Parameters<typeof score>[0], jobDescription?: string) =>
+  score(input, DEFAULT_POLICY, { jobDescription, now: NOW });
 
 const DOCUMENT: AtsResumeDocument = {
   format: ATS_DOCUMENT_FORMAT,
@@ -86,7 +86,7 @@ describe("structured document input", () => {
         current: false,
       },
     ]);
-    expect(parsed.education[0]).toMatchObject({ school: "State University", level: "bachelor" });
+    expect(parsed.education[0]).toMatchObject({ school: "State University", isced: 6 });
     expect(parsed.skills).toEqual(["TypeScript", "Go"]);
     expect(parsed.monthsOfExperience).toBe(124);
     expect(parsed.provenance).toEqual({
@@ -112,7 +112,7 @@ describe("structured document input", () => {
   });
 
   it("scores the same as the JSON-serialised document does not", () => {
-    // The Studio bug this path replaces: a stringified document has no headings and no roles.
+    // A stringified document has no headings and no roles.
     const structured = check(DOCUMENT);
     const stringified = check(JSON.stringify(DOCUMENT));
     expect(structured.readinessScore).toBeGreaterThan(stringified.readinessScore);
@@ -274,7 +274,7 @@ describe("JSON Resume", () => {
       start: { year: 2013, month: 12 },
     });
     expect(parsed.roles[1]).toMatchObject({ employer: "Hooli", end: { year: 2013, month: 11 } });
-    expect(parsed.highestDegree).toBe("bachelor");
+    expect(parsed.highestIsced).toBe(6);
   });
 
   it("reads a malformed file as empty rather than throwing", () => {
@@ -340,8 +340,7 @@ describe("JSON Resume through the engine's front door", () => {
   });
 
   it("is not triggered by a document in another format that shares its section names", () => {
-    // Shaped like a Studio resume: basics, education and skills, but none of what is distinctive
-    // to JSON Resume. Taking it for one read the name and education from the wrong fields.
+    // Has basics, education and skills but nothing distinctive to JSON Resume.
     const studioShaped = {
       basics: { fullName: "Jane Doe", email: "jane@x.com" },
       experience: [{ company: "Acme", role: "Engineer" }],

@@ -9,7 +9,7 @@ import {
 } from "../../src/job/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/** Bugs found in review of `/job`. Each test failed before its fix. */
+/** Regressions in `/job`. */
 
 const ld = (data: unknown) => `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
 const LONG = "Build and run the data platform. ".repeat(12);

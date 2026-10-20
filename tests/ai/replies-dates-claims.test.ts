@@ -9,13 +9,13 @@ import type { LlmProvider } from "../../src/ai/provider.js";
 import { createRedaction } from "../../src/ai/redact.js";
 import { main } from "../../src/cli/main.js";
 import { PLAIN } from "../../src/cli/terminal.js";
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { mergeGrounded, writtenYears, type AtsRepairCandidate } from "../../src/repair/merge.js";
 import { expectFastAsync } from "../fixtures/timing.js";
 
 const NOW = new Date("2026-06-01");
-const empty = AtsScoringService.check("", DEFAULT_POLICY, { now: NOW }).parsed;
+const empty = check("", DEFAULT_POLICY, { now: NOW }).parsed;
 
 describe("repair: a role is current when its own range says so", () => {
   const current = (
@@ -121,7 +121,7 @@ describe("analyze: a punctuated name is still a claim", () => {
       }),
     };
     const ai = createAtsAi({ provider, routes: { analyze: { model: "m", maxTokens: 100 } } });
-    const report = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+    const report = check(RESUME, DEFAULT_POLICY, {
       jobDescription: JOB,
       now: NOW,
     });
@@ -137,9 +137,8 @@ describe("reasoning-model replies", () => {
       provider: { complete: async () => ({ text, finish: "stop" }) },
       routes: { analyze: { model: "m", maxTokens: 100 } },
     });
-    return (
-      await ai.analyze({ resumeText: "x", report: AtsScoringService.check("x", DEFAULT_POLICY) })
-    ).result.explanation;
+    return (await ai.analyze({ resumeText: "x", report: check("x", DEFAULT_POLICY) })).result
+      .explanation;
   };
 
   it.each([
@@ -156,8 +155,7 @@ describe("reasoning-model replies", () => {
     expect(await read(text)).toBe("Fine.");
   });
 
-  // A lazy pattern scanned to the end of the reply from every fence left open, growing with the
-  // square of the reply; a reply may run to 4 MB.
+  // Unclosed fences must not make the scan quadratic; a reply may run to 4 MB.
   it("refuses a reply of open fences in bounded time", async () => {
     const text = `${"```{".repeat(60_000)}${INSIGHTS}`;
     await expectFastAsync(

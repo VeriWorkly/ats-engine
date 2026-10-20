@@ -30,29 +30,19 @@ import type { AtsLayoutSignals, AtsParsedResume } from "../types.js";
 import { memo } from "../util/memo.js";
 import type { RuleContext } from "./rules.js";
 
-/**
- * Lines that carry substantive content, which both ratio metrics divide by.
- *
- * On a resume written in bullets, that is the bullets: they are what "open each bullet with a
- * verb" and "quantify outcomes" are about, and counting the lines around them too — headers,
- * contact rows, a summary — graded a resume on how many of those it had. A two-line PDF header
- * row was enough to flip the verb check on an otherwise identical resume.
- *
- * Without bullets (prose, or a list whose markers did not survive extraction) it falls back to
- * full sentences: lines naming a content verb or running to four words, as opposed to headings,
- * short skill tags and layout debris. The verb list comes from `policy.text.contentLineVerbs`,
- * so a policy in another language brings its own.
- */
 const MIN_BULLETS = 3;
+
+/**
+ * Content lines, which both ratio metrics divide by: the bullets when there are any, else full
+ * sentences (a content verb from `policy.text.contentLineVerbs`, or four words), not headings,
+ * skill tags or layout debris.
+ */
 const contentLineTest = memo((text: AtsEnginePolicy["text"]) => {
   const verbs = wordListRegex(text.contentLineVerbs);
   return (line: string) => verbs.test(line) || line.split(/\s+/).length >= 4;
 });
 
-/**
- * The bullets: the lines with a list marker or, where the markers were lost in extraction, the
- * sentences under each dated role, as the bullets were. Empty when there are neither.
- */
+/** List-marked lines or, if extraction lost the markers, the sentences under each dated role. */
 function bulletsOf(lines: string[], policy: AtsEnginePolicy, cited: Set<string>) {
   const bullets = lines.filter((line) => BULLET.test(line) && !cited.has(line));
   return bullets.length >= MIN_BULLETS ? bullets : roleBodyLines(lines, policy);
@@ -77,12 +67,8 @@ export type ReadResume = {
 };
 
 /**
- * Everything the rules read about one resume, read once.
- *
- * The lines are read before anything else sees them — wrapped lines rejoined, letter-spaced ones
- * read back — and segmented once, so the word count, the parser, the heading rules, the skills
- * check and the requirements all agree on what a line and a section are. The same pass gives the
- * report's recovered fields: a structured document is read from its fields, text is parsed.
+ * Everything the rules read about one resume, read once, so every check agrees on what a line and
+ * a section are. A structured document is read from its fields, text is parsed.
  */
 export function readResume(
   prepared: PreparedResume,
@@ -96,10 +82,7 @@ export function readResume(
     jobDescription?: string;
     layout?: AtsLayoutSignals;
     now: Date;
-    /**
-     * The attached language packs the resume itself is written in, or "und" for a language the
-     * policy has no vocabulary for; see `RuleContext.languages`.
-     */
+    /** Language packs the resume is written in, or "und"; see `RuleContext.languages`. */
     languages?: readonly string[];
   },
 ): ReadResume {
@@ -109,8 +92,6 @@ export function readResume(
   const parsed = prepared.document
     ? parseResumeDocument(prepared.document, policy, now)
     : parseReadLines(lines, policy, now, sections);
-  // The writing rules read bullets only: a summary paragraph is not one, nor a contact row, nor
-  // a citation.
   const cited = citationLines(lines, policy);
   const bullets = bulletsOf(lines, policy, cited);
   const roles = roleBlocks(sections, policy);
@@ -132,12 +113,10 @@ export function readResume(
     },
     findings: {
       injectionPhrases: injectionPhrases(
-        // By line: a quote is excused by the word on its own line that says it was caught.
+        // By line: a quote is excused by a word on its own line saying it was caught.
         lines.join("\n"),
-        // Text no reader sees: smuggled in tag characters, hidden by the layout, or in the file's
-        // metadata, where no quote excuses it. And lines opening with "#" as written: the line
-        // reader drops a Markdown heading's marks, and "### System:" is a prompt delimiter with
-        // them.
+        // Text no reader sees (no quote excuses it), plus "#" lines as written: the line reader
+        // drops a heading's marks, and "### System:" is a prompt delimiter.
         [
           prepared.hidden.smuggled,
           layout?.hiddenText ?? "",
@@ -152,7 +131,7 @@ export function readResume(
       },
       homoglyphWords: homoglyphWords(text),
       copiedPostingRatio: jobDescription?.trim() ? copiedPosting(text, jobDescription) : null,
-      stuffedTerms: stuffedTerms(text, lines, policy, now, parsed.name ?? "", fullCitations(cited)),
+      stuffedTerms: stuffedTerms(lines, policy, now, parsed.name ?? "", fullCitations(cited)),
       timelineIssues: timelineIssues(parsed.roles, parsed.monthsOfExperience, now),
       unsupportedSkills: unsupportedSkills(sections, parsed.skills),
       firstPersonLines: firstPersonLines(bullets, policy),

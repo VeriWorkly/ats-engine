@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 
-const name = (text: string) => AtsScoringService.check(text, DEFAULT_POLICY).parsed.name;
+const name = (text: string) => check(text, DEFAULT_POLICY).parsed.name;
 
 describe("the name when a sidebar is read first", () => {
   const sidebar = [
@@ -65,10 +65,7 @@ describe("the name when a sidebar is read first", () => {
     ].join("\n");
 
   it("reads a LinkedIn export's name, and its top skills without it", () => {
-    const { parsed } = AtsScoringService.check(
-      linkedIn(["Kubernetes", "TypeScript", "PostgreSQL"]),
-      DEFAULT_POLICY,
-    );
+    const { parsed } = check(linkedIn(["Kubernetes", "TypeScript", "PostgreSQL"]), DEFAULT_POLICY);
     expect(parsed.name).toBe("Jordan Ellery");
     expect(parsed.skills).toEqual(["Kubernetes", "TypeScript", "PostgreSQL"]);
   });
@@ -96,7 +93,7 @@ describe("the name when a sidebar is read first", () => {
       "Senior Software Engineer at Acme Corp",
       headline,
     );
-    const { parsed } = AtsScoringService.check(text, DEFAULT_POLICY);
+    const { parsed } = check(text, DEFAULT_POLICY);
     expect(parsed.name).toBe("Jordan Ellery");
     expect(parsed.skills).toEqual(["Machine Learning", "Kubernetes"]);
   });
@@ -155,7 +152,7 @@ describe("the name when a sidebar is read first", () => {
       "Jan 2020 - Present",
       "- Built churn models",
     ].join("\n");
-    expect(AtsScoringService.check(text, DEFAULT_POLICY).parsed.skills).toEqual([
+    expect(check(text, DEFAULT_POLICY).parsed.skills).toEqual([
       "Machine Learning",
       "Data Science",
       "Python",
@@ -174,7 +171,7 @@ describe("the name when a sidebar is read first", () => {
     ["SKILLS\nPython", "CERTIFICATIONS\nAWS Certified\nSolutions Architect"],
     ["LANGUAGES\nEnglish", "SUMMARY\nData scientist.\nPROJECTS\nCredit Risk Model\nLead Analyst"],
   ])("reads the name over its email under %j, not a name over a title under %j", (list, rest) => {
-    const { parsed } = AtsScoringService.check(listFirst(list, rest), DEFAULT_POLICY);
+    const { parsed } = check(listFirst(list, rest), DEFAULT_POLICY);
     expect(parsed.name).toBe("Jane Doe");
     expect(parsed.skills).not.toContain("Jane Doe");
   });
@@ -196,7 +193,7 @@ describe("the name when a sidebar is read first", () => {
   });
 
   it("keeps the certifications under the name's list heading", () => {
-    const { parsed } = AtsScoringService.check(
+    const { parsed } = check(
       listFirst("SKILLS\nPython", "CERTIFICATIONS\nAWS Certified\nSolutions Architect"),
       DEFAULT_POLICY,
     );
@@ -209,7 +206,7 @@ describe("the name when a sidebar is read first", () => {
   it("does not cut a list at its first row read as the name", () => {
     const text =
       "SKILLS\nPython\nKubernetes\nCERTIFICATIONS\nGoogle Cloud\nProfessional Cloud Architect\nJane Doe\njane@example.com\nEXPERIENCE\nSoftware Engineer, Acme Corp    2019 – 2022\n• Built things";
-    const { parsed } = AtsScoringService.check(text, DEFAULT_POLICY);
+    const { parsed } = check(text, DEFAULT_POLICY);
     expect(parsed.certifications.map((cert) => cert.name)).toEqual(
       expect.arrayContaining(["Google Cloud", "Professional Cloud Architect"]),
     );
@@ -229,7 +226,7 @@ describe("a role row whose title and dates both wrap", () => {
       "Systems\t2008",
       "- Built the booking platform used by 40 resorts.",
     ].join("\n");
-    const { roles } = AtsScoringService.check(text, DEFAULT_POLICY, {
+    const { roles } = check(text, DEFAULT_POLICY, {
       now: new Date("2024-01-01"),
     }).parsed;
     expect(roles).toHaveLength(2);

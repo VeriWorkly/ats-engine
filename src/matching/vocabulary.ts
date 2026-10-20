@@ -24,10 +24,9 @@ export type Vocabulary = {
 const TRAILING = /(?<![./])[./]+$/;
 
 /**
- * A link, from its scheme on ("https://careers.example.com/jobs/123"), or without one from
- * "www." or a host of three labels or more ending in one of `linkDomains` ("jobs.example.com/
- * rust"). Never a skill. A name of two labels ("Node.js/React") or ending otherwise
- * ("System.Text.Json") is not one. Linear: a host starts only where a label starts, and is at
+ * A link, from its scheme on ("https://careers.example.com/jobs/123"), or from "www." or a host
+ * of three labels or more ending in one of `linkDomains`. Never a skill; "Node.js/React" and
+ * "System.Text.Json" are not links. Linear: a host starts only where a label starts, and is at
  * most eight labels of 63 characters.
  */
 const linkOf = memo(
@@ -39,11 +38,10 @@ const linkOf = memo(
 );
 
 /**
- * The words a token stands for, each with its offset in the token. A slash joins words a
- * posting asks for together ("HTML/CSS", "Python/Django", "C#/.NET"), so each is a word of its
- * own. A term the policy names with its slash ("CI/CD", "TCP/IP") or lists as a stopword
- * ("n/a") stays whole, and so does a token with a part that is no word ("OS/2", "24/7") or
- * opens with a digit ("S/4HANA"): a product's name, not two skills.
+ * The words a token stands for, each with its offset in the token. A slash joins words asked
+ * together ("HTML/CSS"), so each is a word of its own. A term the policy names with its slash
+ * ("CI/CD") or lists as a stopword ("n/a") stays whole, as does a token with a part that is no
+ * word ("OS/2", "24/7") or opens with a digit ("S/4HANA").
  */
 export function slashParts(token: string, vocab: Vocabulary): Array<[string, number]> {
   const whole = token.toLowerCase().replace(TRAILING, "");
@@ -64,8 +62,7 @@ export function slashParts(token: string, vocab: Vocabulary): Array<[string, num
 }
 
 /**
- * Folds a raw word to the same canonical key `extractVocabulary` would file it under, so
- * alternation detection and term lookup agree on what counts as "the same skill".
+ * Folds a raw word to the canonical key `extractVocabulary` files it under, or null for a stopword.
  */
 export function canonicalize(raw: string, km: AtsEnginePolicy["keywordMatch"], vocab: Vocabulary) {
   const word = raw.toLowerCase().replace(TRAILING, "");
@@ -75,7 +72,7 @@ export function canonicalize(raw: string, km: AtsEnginePolicy["keywordMatch"], v
   return mapped.includes(" ") ? mapped : stem(mapped, km.stemming);
 }
 
-/** The policy's term maps, folded once per policy (see `memo`). */
+/** The policy's term maps, folded once per policy. */
 export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocabulary => {
   const stopwords = new Set<string>();
   // A number word ("five years") is part of a years ask, never a keyword of its own.
@@ -99,8 +96,7 @@ export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocab
     ),
   };
 
-  // Soft skills fold as every term does: "communicating" (a synonym of "communication") and
-  // "communications" (stemmed) are the one soft skill.
+  // Soft skills fold as every term does, so "communicating" and "communications" are one.
   const phrases = new Set(km.phrases);
   for (const skill of km.softSkills) {
     const token = canonicalize(skill, km, vocabulary);
@@ -112,20 +108,17 @@ export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocab
     }
   }
 
-  // Everything else the policy names explicitly — phrases plus both sides of the synonym map —
-  // is a known skill by construction. Anything else has to earn the classification at match time.
+  // Everything else the policy names (phrases, both sides of the synonym map) is a known skill.
   for (const phrase of km.phrases) if (!softTokens.has(phrase)) skillTokens.add(phrase);
   for (const [abbreviation, canonical] of Object.entries(km.synonyms)) {
     const token = canonical.includes(" ") ? canonical : stem(canonical, km.stemming);
-    // "communicates" stems to the key "communicate", a soft skill's spelling too.
+    // "communicates" stems to "communicate", a soft skill's spelling too.
     if (softTokens.has(token)) continue;
     skillTokens.add(stem(abbreviation, km.stemming));
     skillTokens.add(token);
   }
 
-  // Both sides of the implication map are folded through the same canonicalisation the term
-  // maps use, so "PostgreSQL" -> "relational database" lines up with whatever spelling the
-  // posting happened to use.
+  // Both sides of the implication map are canonicalised like the term maps.
   for (const [skill, capabilities] of Object.entries(km.implies)) {
     const from = canonicalize(skill, km, vocabulary);
     if (!from) continue;
@@ -138,10 +131,8 @@ export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocab
 });
 
 /**
- * Each phrase's pattern, compiled once. Keyed on the plural-suffix list — the only other input to
- * the pattern — rather than on `keywordMatch`, because the requirements judge passes a copy of
- * it with a filtered phrase list, and that copy shares this array. Recompiling every phrase on
- * every call cost more than the matching: a 400-phrase policy doubled the time of a check.
+ * Each phrase's pattern, compiled once. Keyed on the plural-suffix list, not `keywordMatch`: the
+ * requirements judge passes a copy with a filtered phrase list that shares this array.
  */
 const phrasesOf = memo<readonly string[], Map<string, RegExp>>(() => new Map());
 
@@ -149,9 +140,7 @@ function phrasePattern(phrase: string, pluralSuffixes: readonly string[]) {
   const patterns = phrasesOf(pluralSuffixes);
   let re = patterns.get(phrase);
   if (!re) {
-    // A trailing plural on the last word still refers to the same concept, and postings write
-    // it either way ("relational database" / "relational databases"). Without this the phrase
-    // fails to match and its words scatter into unrelated single terms.
+    // A trailing plural on the last word is the same concept ("relational databases").
     re = new RegExp(
       `(?<![${WORD_CHARS}_])${escapeRegex(phrase)}(?:${pluralSuffixes.join("|")})?(?![${WORD_CHARS}_])`,
       "giu",
@@ -165,13 +154,8 @@ function phrasePattern(phrase: string, pluralSuffixes: readonly string[]) {
 
 /**
  * Maps text to canonical term -> term metadata. Multi-word skills collapse to one token,
- * synonyms and abbreviations fold to a shared canonical form, and single words are lightly
- * stemmed so inflections line up.
- *
- * Phrase occurrences are consumed *by character span* rather than by word. Suppressing the
- * component words globally meant a resume containing "machine learning" no longer matched a
- * posting that used "learning" and "machine" separately — the words were struck from the whole
- * document because they happened to appear inside a phrase elsewhere in it.
+ * synonyms fold to a canonical form, single words are lightly stemmed. Phrase occurrences are
+ * consumed by character span, not by word, so "learning" still matches outside "machine learning".
  */
 export function extractVocabulary(
   text: string,
@@ -180,17 +164,16 @@ export function extractVocabulary(
 ) {
   const lower = text.toLowerCase();
   const map = new Map<string, Term>();
-  // Character mask marking spans already claimed by a multi-word phrase.
+  // Spans already claimed by a multi-word phrase.
   const claimed = new Uint8Array(lower.length);
-  // And the links, where neither a phrase ("a/b" in "https://x.com/a/b") nor a word is read.
+  // Links, where neither a phrase nor a word is read.
   const linked = new Uint8Array(lower.length);
   if (lower.includes("."))
     for (const link of lower.matchAll(linkOf(km)))
       linked.fill(1, link.index, link.index + link[0].length);
 
   for (const phrase of [...km.phrases, ...vocab.softPhrases]) {
-    // Most of a large phrase list is absent from any one text, and a substring test is far
-    // cheaper than compiling and running a Unicode-boundary pattern the first time.
+    // Most phrases are absent: a substring test is far cheaper than a Unicode-boundary pattern.
     if (!lower.includes(phrase.toLowerCase())) continue;
     const re = phrasePattern(phrase, km.pluralSuffixes);
     let match: RegExpExecArray | null;
@@ -202,11 +185,11 @@ export function extractVocabulary(
     }
   }
 
-  // Cloned rather than reused: a module-level /g/ regex carries `lastIndex` across calls.
+  // Cloned: a module-level /g/ regex carries `lastIndex` across calls.
   const tokenRe = new RegExp(VOCABULARY_TOKEN.source, "gu");
   let match: RegExpExecArray | null;
 
-  // Offsets in `lower` are offsets in `text` only when lower-casing kept the length.
+  // Offsets in `lower` are offsets in `text` only if lower-casing kept the length.
   const sameOffsets = lower.length === text.length;
 
   while ((match = tokenRe.exec(lower))) {
@@ -218,10 +201,9 @@ export function extractVocabulary(
     const raw = word.replace(TRAILING, "");
     if (!raw || vocab.stopwords.has(raw) || vocab.stopwords.has(stem(raw, km.stemming))) return;
 
-    // A word of one or two letters is a skill only as one is written: with a capital ("R",
-    // "Go", "AI"), and a single letter not followed by a full stop, which makes it an initial
-    // ("Jane R. Doe"). Lower case it is ordinary prose: "I go to every meeting". Letters
-    // without case (most scripts besides Latin, Greek and Cyrillic) carry no such signal.
+    // A one- or two-letter word is a skill only with a capital ("R", "Go", "AI"), and a single
+    // letter only without a full stop ("Jane R. Doe" is an initial). Uncased scripts carry no
+    // such signal.
     let shortSkill = false;
     if (raw.length <= 2 && /^\p{L}+$/u.test(raw) && raw.toUpperCase() !== raw && sameOffsets) {
       const written = text.slice(index, index + raw.length);
@@ -244,11 +226,7 @@ export function extractVocabulary(
   return map;
 }
 
-/**
- * The resume's literal terms plus everything they demonstrate. Matching against this rather
- * than the literal set is what stops the report telling a candidate who listed Terraform that
- * they are missing "infrastructure as code".
- */
+/** The resume's literal terms plus everything they imply (Terraform: "infrastructure as code"). */
 export function resumeCapabilities(resumeTerms: Map<string, Term>, vocab: Vocabulary) {
   const capabilities = new Set(resumeTerms.keys());
   for (const token of resumeTerms.keys())
@@ -257,15 +235,10 @@ export function resumeCapabilities(resumeTerms: Map<string, Term>, vocab: Vocabu
 }
 
 /**
- * Tokens written with a capital letter somewhere other than the start of a sentence, plus
- * short all-caps runs. Used as a specificity signal: "Kubernetes", "PostgreSQL", "Go", "AWS"
- * are proper nouns or acronyms and are almost always the actual skill; "payments", "ownership",
- * "familiarity" are not. Cheap and needs no corpus.
- *
- * In a language that capitalises every noun (`nounsCapitalized`, German) a leading capital is
- * no signal at all — "Erfahrung" would rank beside "Kubernetes" — so only acronyms and inner
- * capitals ("PostgreSQL", "JavaScript", "iOS") count there. A script without case gives no
- * signal either way; its specificity comes from the policy's skill vocabulary alone.
+ * Tokens written with a capital letter other than at the start of a sentence, plus short all-caps
+ * runs: a specificity signal ("Kubernetes", "PostgreSQL", "AWS" are almost always the skill).
+ * Where every noun is capitalised (`nounsCapitalized`), only acronyms and inner capitals
+ * ("PostgreSQL", "iOS") count; an uncased script gives no signal.
  */
 export function properNounTokens(originalText: string, nounsCapitalized = false) {
   const proper = new Set<string>();
@@ -273,9 +246,8 @@ export function properNounTokens(originalText: string, nounsCapitalized = false)
   let match: RegExpExecArray | null;
 
   while ((match = re.exec(originalText))) {
-    // A compound and each of its parts ("HTML/CSS", "HTML", "CSS"), whichever the vocabulary
-    // reads it as. A part after a slash does not open a sentence, and one written with a
-    // capital says the first is a name too: "Java/Kotlin" opening a line names Java.
+    // A compound and each of its parts ("HTML/CSS", "HTML", "CSS"). A part after a slash does not
+    // open a sentence, and a capitalised one says the first is a name too ("Java/Kotlin").
     const parts = match[0].includes("/") ? [match[0], ...match[0].split("/")] : [match[0]];
     const named =
       !opensSentence(originalText, match.index) ||
@@ -293,9 +265,8 @@ export function properNounTokens(originalText: string, nounsCapitalized = false)
 }
 
 /**
- * Whether the word at `index` opens a sentence or a line. Backs past spaces and list markers to
- * the previous sentence boundary or line break, so an indented bullet ("      - Proficient")
- * still opens a sentence. Reads at most 40 characters back.
+ * Whether the word at `index` opens a sentence or a line, looking back at most 40 characters past
+ * spaces and list markers.
  */
 export function opensSentence(text: string, index: number) {
   return /(?:^|[.!?:\n])[^\p{L}\p{N}]*$/u.test(text.slice(Math.max(0, index - 40), index));

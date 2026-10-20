@@ -33,7 +33,6 @@
             "school": "State University",
             "credential": "BSc",
             "isced": 6,
-            "level": "bachelor",
             "end": {
               "year": 2016,
               "month": null
@@ -48,7 +47,6 @@
         "spokenLanguages": [],
         "monthsOfExperience": 81,
         "highestIsced": 6,
-        "highestDegree": "bachelor",
         "provenance": {
           "name": "parser",
           "email": "parser",

@@ -4,17 +4,9 @@ import { fileURLToPath } from "node:url";
 import { parseAtsPolicy, type AtsEnginePolicy } from "../../src/index.js";
 
 /**
- * The real, private, gitignored scoring policy — or `null` when it is not present.
- *
- * Resolved from this file rather than the working directory, which differs depending on whether
- * a suite is run from the repo root or from the package. The path is three levels up rather than
- * the four it was in `apps/server/tests/ats`, because the suites that read it now live one
- * directory shallower.
- *
- * Suites that use this skip themselves when it is absent, so a checkout that legitimately does
- * not have the policy still runs green. `livePolicyLoadError` exists so a suite can prove it is
- * actually running rather than quietly skipping — a skip that nobody notices is how a
- * calibration suite stops catching anything.
+ * The real, private, gitignored scoring policy, or `null` when absent. Resolved from this file,
+ * not the working directory. Suites using it skip when it is absent; `livePolicyLoadError` lets a
+ * suite prove it is running rather than quietly skipping.
  */
 // `ATS_ENGINE_POLICY` points at it from anywhere; the default is the monorepo's .private folder.
 const policyPath =

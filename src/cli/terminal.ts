@@ -1,10 +1,6 @@
 /**
- * Colour and the banner, for people reading the CLI in a terminal.
- *
- * Colour follows the usual conventions: `NO_COLOR` turns it off, `FORCE_COLOR` turns it on (into
- * a pipe too), and otherwise it is on only when the terminal reports colour. The banner goes only
- * to an interactive terminal outside CI, so a script, a pipe or a CI log reads exactly the plain
- * text it always did.
+ * Colour and the banner. `NO_COLOR` turns colour off, `FORCE_COLOR` on, otherwise it follows the
+ * terminal. The banner goes only to an interactive terminal outside CI.
  */
 
 import { ENGINE_VERSION } from "../version.js";
@@ -20,7 +16,7 @@ export type Terminal = {
   columns: number;
 };
 
-/** The part of `tty.WriteStream` this module reads; a pipe or a file has only `isTTY: false`. */
+/** The part of `tty.WriteStream` this module reads. */
 export type OutputStream = {
   isTTY?: boolean;
   columns?: number;
@@ -33,7 +29,7 @@ export type Env = Readonly<Record<string, string | undefined>>;
 export const PLAIN: Terminal = { depth: 1, interactive: false, columns: 80 };
 
 export function colorDepth(stream: OutputStream, env: Env): ColorDepth {
-  // no-color.org: any non-empty value disables colour, and wins over everything else.
+  // no-color.org: any non-empty value disables colour.
   if (env.NO_COLOR) return 1;
   const force = env.FORCE_COLOR;
   if (force !== undefined) {
@@ -48,7 +44,7 @@ export function colorDepth(stream: OutputStream, env: Env): ColorDepth {
 export function detectTerminal(stream: OutputStream, env: Env): Terminal {
   return {
     depth: colorDepth(stream, env),
-    // CI services set CI=true; "false" or "0" is someone saying this is not CI.
+    // "false" or "0" says this is not CI.
     interactive: stream.isTTY === true && (!env.CI || /^(?:false|0)$/i.test(env.CI)),
     columns: stream.columns || 80,
   };
@@ -113,11 +109,7 @@ function gradient(depth: ColorDepth, row: number): string {
   return "94";
 }
 
-/**
- * The VERIWORKLY wordmark with a tagline, or a single line when the terminal is too narrow for
- * the 80-column wordmark. A terminal exactly 80 wide gets the single line: some consoles wrap a
- * line that fills the last column, which would break every row of the wordmark in two.
- */
+/** The wordmark with a tagline, or one line when the terminal is not wider than it (a full last column wraps in some consoles). */
 export function banner(terminal: Terminal): string {
   const style = createStyle(terminal.depth);
   const tagline = `ATS Engine v${ENGINE_VERSION} · see your resume the way an ATS reads it`;

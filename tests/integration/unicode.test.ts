@@ -2,20 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   AtsPolicyError,
-  AtsScoringService,
   DEFAULT_POLICY,
   parseAtsPolicy,
   parseResume,
   prepareResume,
   type AtsEnginePolicy,
+  check,
 } from "../../src/index.js";
 import { normalizeText, wordListRegex, words } from "../../src/text/text.js";
 import { properNounTokens } from "../../src/matching/vocabulary.js";
 
-/**
- * The Unicode core: text in any script reads the way ASCII English always has. Nothing here
- * needs a language pack — these are the grammar-level guarantees every locale builds on.
- */
+/** The Unicode core: text in any script reads as ASCII English does, with no language pack. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const nameOf = (text: string) => parseResume(text.split("\n"), DEFAULT_POLICY, NOW).name;
@@ -56,13 +53,12 @@ describe("normalisation", () => {
 
 describe("word counting", () => {
   it("counts words in any script", () => {
-    // Every word, as a word processor counts them: "के" (two code units) is a word like "of".
+    // Every word counts: "के" (two code units) is a word like "of".
     expect(words("सॉफ्टवेयर इंजीनियर के रूप में अनुभव")).toHaveLength(6);
     expect(words("Erfahrung für Kunden über Jahre")).toHaveLength(5);
   });
 
   it("counts every English word, short ones and numbers included", () => {
-    // Counting only runs of three letters read a 270-word resume as 198 (audit, October 2026).
     expect(words("Built a CI/CD pipeline in Go for 3 teams")).toEqual([
       "built",
       "a",
@@ -78,7 +74,7 @@ describe("word counting", () => {
   });
 
   it("gives a Hindi resume a word count", () => {
-    const report = AtsScoringService.check(
+    const report = check(
       "राहुल शर्मा\nसॉफ्टवेयर इंजीनियर के रूप में पाँच वर्षों का अनुभव।",
       DEFAULT_POLICY,
       { now: NOW },
@@ -120,7 +116,6 @@ describe("word boundaries in any script", () => {
     expect(verbs.test("Ich führte das Team")).toBe(true);
     expect(verbs.test("Ich habe es geführte")).toBe(false);
     expect(verbs.test("पाँच वर्षों का अनुभव।")).toBe(true);
-    // What the ASCII boundary did with the same words.
     expect(/\b(?:führte|अनुभव)\b/iu.test("पाँच वर्षों का अनुभव।")).toBe(false);
   });
 
@@ -156,7 +151,7 @@ describe("alternatives", () => {
     const policy = withPolicy((json) => {
       json.keywordMatch.alternationWords = ["or", "oder"];
     });
-    const report = AtsScoringService.check("Jane Doe\nPython developer.", policy, {
+    const report = check("Jane Doe\nPython developer.", policy, {
       jobDescription: "Requirements\nErfahrung mit Go oder Java",
       now: NOW,
     });
@@ -196,7 +191,7 @@ describe("policy patterns", () => {
     const policy = withPolicy((json) => {
       json.keywordMatch.stemming = [];
     });
-    const report = AtsScoringService.check("Jane Doe\nManaging payments.", policy, {
+    const report = check("Jane Doe\nManaging payments.", policy, {
       jobDescription: "Requirements\nmanaged payments",
       now: NOW,
     });

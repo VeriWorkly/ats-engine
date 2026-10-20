@@ -1,8 +1,6 @@
-// Writes dist/policy.schema.json, the JSON Schema of a scoring policy, from the zod schema that
-// `parseAtsPolicy` validates with. Run by `npm run build`, after the compile. A host points a
-// policy file's `$schema` at it for editor completion; `parseAtsPolicy` stays the authority,
-// since it also compiles the patterns and checks rule ids are unique, which a schema cannot say.
-// It is a file, not a module export, so no bundle grows by it.
+// Writes dist/policy.schema.json from the zod schema `parseAtsPolicy` validates with, for editor
+// completion via a policy file's `$schema`. Run by `npm run build`, after the compile.
+// `parseAtsPolicy` stays the authority: it also compiles patterns and checks rule ids are unique.
 import { readFileSync, writeFileSync } from "node:fs";
 import * as z from "zod/mini";
 
@@ -24,7 +22,7 @@ const schema = {
 };
 delete schema.$schema;
 
-// Compact: an editor needs no indentation, and an indented copy adds 140 KB to the package.
+// Compact: an indented copy adds 140 KB to the package.
 writeFileSync(
   "dist/policy.schema.json",
   `${JSON.stringify({ $schema: generated.$schema, ...schema })}\n`,

@@ -13,15 +13,9 @@ import { memo } from "../util/memo.js";
 import { ANY_YEAR, readsAsSentence } from "./bullets.js";
 import { NO_FINDING, quote, type Finding } from "./finding.js";
 
-/**
- * Writing style, as a recruiter reads it once the ATS has stored the resume: bullets in the
- * first person or the passive voice, duties where actions belong, a tense that does not fit the
- * role, bullets too long or too many, the same opening word again and again, dates written two
- * ways. Each check returns null — its rule dropped — when there is nothing for it to judge.
- *
- * The words are the policy's (`writing`); each check reads a line word by word or tests a
- * pattern anchored to one word or to the line's start, so every one is linear in its input.
- */
+// Writing-style checks. Each returns null (its rule dropped) when there is nothing to judge. The
+// words are the policy's (`writing`); each check reads word by word or tests a pattern anchored
+// to one word or the line's start, so every one is linear in its input.
 
 /** One role in the work history: its dated line, its dates as written, and its bullets. */
 export type RoleBlock = { header: string; dates: string; current: boolean; bullets: string[] };
@@ -45,8 +39,8 @@ const matchers = memo((writing: Writing) => ({
 const body = (line: string) => line.replace(BULLET_PREFIX, "").trim();
 
 /**
- * A token as a word: cut to 40 characters first (no word is longer, and a 50 KB token must not
- * be scanned twice), then without the punctuation around it.
+ * A token as a word: cut to 40 characters first (a 50 KB token must not be scanned twice), then
+ * trimmed of punctuation.
  */
 const asWord = (token: string) =>
   token
@@ -64,10 +58,8 @@ function countLines(lines: readonly string[], matches: (line: string) => boolean
 }
 
 /**
- * The roles of the Experience section, each with the bullets under it until the next dated line.
- * Where the section has list markers the bullets are the marked lines; where extraction lost
- * them, the lines written as sentences (`readsAsSentence`), as `roleBodyLines` reads them. A
- * role's dates and whether it is current are read from its dated line as the parser reads them.
+ * The roles of the Experience section, each with the bullets under it until the next dated line:
+ * the marked lines, or where extraction lost the markers, the sentences (`readsAsSentence`).
  */
 export function roleBlocks(sections: readonly ResumeSection[], policy: AtsEnginePolicy) {
   const lines = sections
@@ -126,9 +118,8 @@ export function longBullets(lines: readonly string[], policy: AtsEnginePolicy) {
 }
 
 /**
- * Bullets whose first verb is in the wrong tense for their role: past in the role held now,
- * present in one that has ended. A bullet opening with a word in neither list ("Payments:", "Cut",
- * a noun) is not judged; with none judged at all, there is nothing to report.
+ * Bullets in the present tense in a role that has ended. A bullet opening with a word in neither
+ * list ("Payments:", "Cut") is not judged; with none judged, null.
  */
 export function tenseMismatches(blocks: readonly RoleBlock[], policy: AtsEnginePolicy) {
   const m = matchers(policy.writing);
@@ -139,9 +130,7 @@ export function tenseMismatches(blocks: readonly RoleBlock[], policy: AtsEngineP
     const present = m.presentVerb.test(word);
     return past === present ? null : past ? "past" : "present";
   };
-  // Only a past role is judged: its work is over, so "Manage the data warehouse" misreads it.
-  // The current role may be written either way — "Lead the team" for what is ongoing, "Built
-  // the fraud service" for what is finished — and resumes rightly do both.
+  // The current role may rightly be written in either tense, so only past roles are judged.
   let judged = 0;
   const wrong: string[] = [];
   for (const block of blocks) {
@@ -157,10 +146,7 @@ export function tenseMismatches(blocks: readonly RoleBlock[], policy: AtsEngineP
   return wrong.length ? { value: wrong.length, sample: quote(wrong[0]) } : NO_FINDING;
 }
 
-/**
- * Roles with fewer or more bullets than the policy's range. A role with none is left out: an
- * early role named in a line is what the length rule advises.
- */
+/** Roles with fewer or more bullets than the policy's range; a role with none is left out. */
 export function bulletsPerRole(blocks: readonly RoleBlock[], policy: AtsEnginePolicy) {
   const { min, max } = policy.writing.bulletsPerRole;
   const counted = blocks.filter((block) => block.bullets.length > 0);
@@ -206,8 +192,7 @@ const MONTH_YEAR = /(?<!\d)\d{1,2}([./-])\d{4}(?!\d)/u;
 const YEAR_MONTH = /(?<!\d)\d{4}([./-])(\d{1,2})(?!\d)/gu;
 
 /**
- * The format family a role's dates are written in: a month by name ("Jan 2020", "Summer 2018"),
- * a month by number in one layout ("03/2021", "2021-03"), or years alone ("2019 – 2021").
+ * The format a role's dates are written in: month by name, by number in one layout, or years alone.
  */
 function dateFamily(dates: string, policy: AtsEnginePolicy) {
   if (namedMonth(policy.resumeParse).test(dates)) return "named";

@@ -1,17 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume, check as score } from "../../src/index.js";
 
-/**
- * Layouts that real PDF exports extract to, as opposed to text written by hand.
- *
- * Every input here is what pdf.js produced from one of Studio's templates (or a shape common in
- * design-tool exports), trimmed to the lines that matter. Each one used to lose a field the
- * resume plainly has.
- */
+// Layouts that real PDF exports extract to (pdf.js output, trimmed to the lines that matter).
 
 const NOW = new Date("2026-09-30T00:00:00Z");
-const check = (text: string) => AtsScoringService.check(text, DEFAULT_POLICY, { now: NOW });
+const check = (text: string) => score(text, DEFAULT_POLICY, { now: NOW });
 const parse = (text: string) => parseResume(text.split("\n"), DEFAULT_POLICY, NOW);
 const failed = (text: string) => check(text).failedChecks.map((rule) => rule.id);
 
@@ -286,8 +280,8 @@ Founder & Developer - VeriWorkly
 });
 
 describe("a heading in the left gutter, on the line of its first entry", () => {
-  // A moderncv-style page prints each heading in a narrow left column, level with the first line
-  // of its section; the PDF reader joins the two with a tab.
+  // A moderncv-style page prints each heading in a left column; the PDF reader joins it to the
+  // section's first line with a tab.
   const GUTTER = `${HEAD}EXPERIENCE\tSenior Software Engineer, Acme Corp\tJan 2020 - Present
 - Built a billing service handling two million requests a day
 Software Engineer, Globex Inc\tJun 2016 - Dec 2019
@@ -335,9 +329,7 @@ EDUCATION\tB.S. Computer Science, Ohio State University\t2012 - 2016
     ]);
   });
 
-  // A page whose headings stand on lines of their own puts none in the gutter: a heading word in
-  // a first cell there is a role's title or a line of the role, with a right-aligned date or a
-  // DOCX tab after it.
+  // With headings on lines of their own, a heading word in a first cell is a role's title or a role line.
   const roleWith = (row: string, heading = (h: string) => h) =>
     parse(`${HEAD}${heading("EXPERIENCE")}
 Senior Engineer, Acme Corp\tJan 2020 - Present
@@ -379,7 +371,7 @@ B.S. Mathematics, Ohio State University, 2012
       const parsed = parse(
         `${HEAD}EXPERIENCE\nSenior Engineer, Acme Corp\tJan 2020 - Present\nSKILLS\nProgramming\tPython, Go\n${row}\nCloud\tAWS, GCP\n`,
       );
-      // The skills line reader keeps a row's label with its first skill, as it did before.
+      // The skills line reader keeps a row's label with its first skill.
       expect(parsed.skills).toEqual(expect.arrayContaining(["Go", "GCP"]));
     },
   );

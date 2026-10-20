@@ -7,13 +7,11 @@ import { cut, normalizeText } from "./text/text.js";
 import { ENGLISH_ISSUES } from "./util/issues.js";
 
 /**
- * What the engine accepts as a resume.
- *
- * - `string` — plain text, as extracted from a file or pasted.
+ * What the engine accepts as a resume:
+ * - `string` — plain text, extracted or pasted.
  * - `AtsResumeDocument` — structured data, recognised by its `format` field.
  * - a JSON Resume (jsonresume.org) — recognised by its shape and read as structure.
- * - any other object — flattened to text, keys on their own lines. Kept for callers that send
- *   an arbitrary JSON document; structured callers should send an `AtsResumeDocument`.
+ * - any other object — flattened to text, keys on their own lines.
  */
 export type AtsResumeInput = string | AtsResumeDocument | Record<string, unknown>;
 
@@ -32,11 +30,9 @@ export class AtsInputError extends Error {
 const PREPARED = Symbol("ats-engine.prepared");
 
 /**
- * A resume read once and ready to score. `text` is the canonical text the rules and any AI pass
- * read; `document` is the validated structure when the input was one.
- *
- * Produced only by `prepareResume`. A host that needs a report and an AI pass hands this same
- * object to both, rather than letting each walk a document that may be megabytes of JSON.
+ * A resume read once and ready to score; produced only by `prepareResume`. `text` is the
+ * canonical text the rules and any AI pass read; `document` the validated structure, if any.
+ * Hand the same object to a report and an AI pass instead of walking the input twice.
  */
 export type PreparedResume = {
   readonly text: string;
@@ -46,19 +42,11 @@ export type PreparedResume = {
   readonly [PREPARED]: true;
 };
 
-/**
- * `resume` can be caller-controlled JSON nested as deeply as a body limit allows, so the walk is
- * depth-capped: unbounded recursion over it is a stack overflow away from failing every request
- * that shares the process. Real documents nest about four levels.
- */
+// Caller-controlled JSON can nest as deep as a body limit allows: cap the walk against stack overflow.
 const MAX_FLATTEN_DEPTH = 24;
 const MAX_TEXT_CHARS = 50_000;
 
-/**
- * Keys are emitted on their own line so a heading-like key ("experience") reads as a section
- * heading. Stops early once the text budget is spent, so a huge document costs its cap, not its
- * size.
- */
+/** Keys go on their own line so "experience" reads as a heading. Stops at the text budget. */
 function flatten(value: unknown): string {
   const parts: string[] = [];
   let length = 0;
@@ -88,10 +76,9 @@ function flatten(value: unknown): string {
 }
 
 /**
- * Whether a declared document is too large to be worth validating: an array past every limit,
- * or more nodes than the largest legal document holds. zod parses each array element before it
- * checks the array's length, so without this a 4 MB body of a million empty items cost twenty
- * seconds of CPU just to be rejected. Walks at most `MAX_NODES` nodes.
+ * Whether a declared document is too large to validate: an array past every limit, or more nodes
+ * than the largest legal document. zod parses each array element before checking the length, so
+ * a million empty items would cost seconds of CPU just to be rejected. Walks at most `MAX_NODES`.
  */
 const MAX_NODES = 200_000;
 const MAX_ARRAY = Math.max(...Object.values(DOCUMENT_LIMITS).filter((n) => n < 1_000));
@@ -105,8 +92,7 @@ function isOversized(value: unknown): boolean {
       if (node.length > MAX_ARRAY) return true;
       for (const item of node) stack.push(item);
     } else if (node && typeof node === "object") {
-      // Keys counted one at a time, never materialised: an object with a million keys stops
-      // at MAX_NODES instead of allocating them all first.
+      // Counted one at a time, never materialised, so a million keys stop at MAX_NODES.
       for (const key in node) {
         if (++nodes > MAX_NODES) return true;
         stack.push((node as Record<string, unknown>)[key]);
@@ -154,9 +140,7 @@ export function prepareResume(input: unknown): PreparedResume {
     document = validDocument(input);
     text = renderResumeDocument(document);
   } else if (isJsonResume(input)) {
-    // The adapter reads defensively and cuts every array to its field's limit, so its output
-    // should validate and the schema pass only cuts over-long strings to size. Should it not,
-    // the caller gets the same typed error a declared document would, never a raw ZodError.
+    // The adapter's output should validate; if not, the caller gets `AtsInputError`, not a ZodError.
     document = validDocument(fromJsonResume(input));
     text = renderResumeDocument(document);
   } else {
@@ -167,8 +151,7 @@ export function prepareResume(input: unknown): PreparedResume {
 
   return Object.freeze({
     text: canonical,
-    // Count what the engine will actually read. Structured inputs are first validated/rendered,
-    // so stripped unknown keys cannot smuggle invisible characters into the score.
+    // Count what the engine reads: structured inputs are rendered first, so stripped unknown keys cannot smuggle characters.
     hidden: readHiddenCharacters(
       typeof input === "string" ? cut(input, MAX_TEXT_CHARS * 2) : canonical,
     ),

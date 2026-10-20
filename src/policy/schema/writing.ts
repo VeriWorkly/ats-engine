@@ -3,20 +3,15 @@ import * as z from "zod/mini";
 import { wordList } from "../primitives.js";
 
 /**
- * What the writing rules read (`checks/writing.ts`): style a recruiter notices once the ATS has
- * read the resume — bullets in the first person or the passive voice, duties instead of actions,
- * a tense that does not fit the role. English vocabulary: the rules that read it carry
- * `languages: ["en"]` and are dropped for a resume read in any other language, so a language
- * pack has nothing to add here until it brings rules of its own.
- *
- * Every list is matched against whole words, case-insensitively; entries may be small patterns,
- * as in every other word list.
+ * Style a recruiter notices (`checks/writing.ts`). English vocabulary: its rules carry
+ * `languages: ["en"]` and are dropped for other languages. Lists match whole words,
+ * case-insensitively; entries may be small patterns.
  */
 export const writingSchema = z.prefault(
   z.object({
     /**
-     * A bullet speaking in the first person. "I" is not read before a dot or slash and a letter:
-     * "i.e." and "I/O" are not pronouns. "us" is left out for "US".
+     * First-person words. "I" is skipped before a dot or slash and a letter ("i.e.", "I/O");
+     * "us" is omitted for "US".
      */
     firstPersonPronouns: z._default(wordList("writing.firstPersonPronouns"), [
       String.raw`I(?![./&]\p{L})`,
@@ -38,10 +33,7 @@ export const writingSchema = z.prefault(
       "is",
       "are",
     ]),
-    /**
-     * Shapes of a regular past tense or past participle, matched against a whole word: "-ed",
-     * with at least two letters before it ("used", not "red") and not "-eed" ("need", "speed").
-     */
+    /** Regular past forms as whole-word patterns: "-ed" after two letters, not "-eed". */
     pastForms: z._default(wordList("writing.pastForms"), [String.raw`\p{L}{2,}(?<!e)ed`]),
     /** A word that may stand between the auxiliary and the participle: "was quickly adopted". */
     adverbForms: z._default(wordList("writing.adverbForms"), [String.raw`\p{L}{2,}ly`]),
@@ -98,10 +90,7 @@ export const writingSchema = z.prefault(
       String.raw`involved\s+in`,
       String.raw`in\s+charge\s+of`,
     ]),
-    /**
-     * Past tenses that do not end in "-ed", for a bullet's first word. Words that read as past
-     * and present alike ("cut", "set", "read") are in neither list, so they are never judged.
-     */
+    /** Past tenses not ending in "-ed", for a bullet's first word. Ambiguous words ("cut") are in neither list. */
     pastTenseVerbs: z._default(wordList("writing.pastTenseVerbs"), [
       "led",
       "built",
@@ -141,10 +130,7 @@ export const writingSchema = z.prefault(
       "understood",
       "withdrew",
     ]),
-    /**
-     * Present tenses a bullet opens with: the base form and, where it is not as often a plural
-     * noun ("reports", "tests"), the third person.
-     */
+    /** Present tenses a bullet opens with: the base form, and the third person unless often a plural noun. */
     presentTenseVerbs: z._default(wordList("writing.presentTenseVerbs"), [
       "lead",
       "leads",
@@ -255,6 +241,5 @@ export const writingSchema = z.prefault(
     /** This many bullets in a row opening with the same word is a run. */
     repeatedOpenerRun: z._default(z.number().check(z.int(), z.gte(2)), 3),
   }),
-  // `prefault`, as `text`: a policy written before these existed still parses, with the defaults.
   {},
 );

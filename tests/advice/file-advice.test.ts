@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   DEFAULT_POLICY,
   type AtsCheckOptions,
   type AtsReport,
+  check as score,
 } from "../../src/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * File hygiene: what the file itself says before anyone reads it — its name, its size, a
- * password, tracked changes and comments left in. Advice, not scored, and only when the caller
- * says what the file was: pasted text has no file to judge.
+ * File hygiene (name, size, password, tracked changes, comments): advice, not scored, only when the
+ * caller describes the file.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -27,7 +26,7 @@ Skills
 TypeScript, Go, PostgreSQL`;
 
 const check = (options: AtsCheckOptions = {}, resume = RESUME): AtsReport =>
-  AtsScoringService.check(resume, DEFAULT_POLICY, { now: NOW, ...options });
+  score(resume, DEFAULT_POLICY, { now: NOW, ...options });
 const advice = (report: AtsReport, id: string) => report.advice.find((item) => item.id === id);
 const named = (name: string, resume?: string) => check({ file: { name } }, resume);
 
@@ -53,7 +52,7 @@ describe("file name", () => {
     expect(item).toMatchObject({ kind: "file" });
     expect(item!.evidence).toContain(`"${name}"`);
     for (const mark of marks) expect(item!.evidence).toContain(`"${mark}"`);
-    // The suggestion uses the name the parser read, and keeps the file's extension.
+    // The suggestion uses the parsed name and keeps the extension.
     expect(item!.fix).toContain(`Jane-Doe-Resume${name.slice(name.lastIndexOf("."))}`);
   });
 

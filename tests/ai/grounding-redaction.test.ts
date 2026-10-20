@@ -4,14 +4,11 @@ import { anthropic } from "../../src/ai/anthropic.js";
 import { createAtsAi } from "../../src/ai/index.js";
 import { openAiCompatible } from "../../src/ai/openai-compatible.js";
 import { scriptedProvider } from "../../src/ai/testing/index.js";
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { groundingWords, isGrounded, normalizeForGrounding } from "../../src/repair/grounding.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Defects found in the final review of the AI layer, one block each. Every model reply is
- * scripted; no network.
- */
+/** Every model reply is scripted; no network. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const route = { model: "m", maxTokens: 100 };
@@ -91,7 +88,7 @@ describe("analyze keeps contact details out of the request", () => {
       "Engineer, Acme 2019 - 2023",
       "- JANE DOE led the platform team; Jane Doe also wrote jane@ac­me.com",
     ].join("\n");
-    const report = AtsScoringService.check(resumeText, DEFAULT_POLICY, { now: NOW });
+    const report = check(resumeText, DEFAULT_POLICY, { now: NOW });
     const provider = scriptedProvider(JSON.stringify({ explanation: "ok" }));
     const ai = createAtsAi({ provider, routes: { analyze: route } });
     await ai.analyze({ resumeText, report });
@@ -101,7 +98,7 @@ describe("analyze keeps contact details out of the request", () => {
   });
 
   it("keeps no suggestion naming a term outside the posting, even inside a list", async () => {
-    const report = AtsScoringService.check("Jane Doe\nPython developer", DEFAULT_POLICY, {
+    const report = check("Jane Doe\nPython developer", DEFAULT_POLICY, {
       now: NOW,
     });
     const reply = JSON.stringify({
@@ -122,7 +119,7 @@ describe("analyze keeps contact details out of the request", () => {
     const items = ["Kubernetes / Haskell", "Kubernetes | Erlang", "Kubernetes · Haskell"];
     const reply = JSON.stringify({ keywordOpportunities: [...items, "CI/CD"] });
     const jobDescription = "Requirements\n- Kubernetes and CI/CD";
-    const report = AtsScoringService.check("Jane Doe\nPython developer", DEFAULT_POLICY, {
+    const report = check("Jane Doe\nPython developer", DEFAULT_POLICY, {
       now: NOW,
       jobDescription,
     });

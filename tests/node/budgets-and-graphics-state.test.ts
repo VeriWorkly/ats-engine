@@ -11,8 +11,7 @@ import { main } from "../../src/cli/main.js";
 import { htmlText } from "../../src/job/html.js";
 import {
   measureDocx,
-  readableArchive,
-  readZipEntry,
+  openDocx,
   withinExpansionLimit,
   zipEntries,
   zipFiles,
@@ -28,10 +27,6 @@ import {
 } from "../fixtures/buildDocx.js";
 import { buildPdf, buildPdfPages, stream } from "../fixtures/buildPdf.js";
 import { expectFast, expectFastAsync } from "../fixtures/timing.js";
-
-/**
- * The `/node`, `/job` and CLI findings of the October review, each reproduced before its fix.
- */
 
 const KEYWORDS = "Kubernetes Terraform Kafka GraphQL Rust";
 const KEYWORD_CHARS = KEYWORDS.replace(/\s/g, "").length;
@@ -74,7 +69,7 @@ describe("the DOCX expansion budget cannot be stepped around", () => {
 
   it("refuses an archive it cannot follow rather than handing it on", () => {
     const broken = Buffer.from(buildDocxBody(BODY));
-    // The directory claims to run past the record that ends it: the archive cannot be walked.
+    // The directory claims to run past the record that ends it.
     broken.writeUInt32LE(broken.length, broken.length - 22 + 16);
     expect(withinExpansionLimit(broken)).toBe(false);
   });
@@ -263,8 +258,7 @@ describe("table detection reads only the measured pages", () => {
 });
 
 describe("PDF reading stops at a page cap", () => {
-  // Reading stopped only at the character cap, which empty pages never reach: 5 000 of them held
-  // extraction for 11 seconds, 50 000 for nine minutes, from a file of a few hundred kilobytes.
+  // Reading stopped only at the character cap, which empty pages never reach.
   it("reads a few thousand empty pages in the time of a resume, and still counts them", async () => {
     const pages = [line(700, "Jane Doe Senior Engineer at Acme Corporation since 2019")];
     for (let page = 1; page < 5_000; page += 1) pages.push("");
@@ -276,9 +270,8 @@ describe("PDF reading stops at a page cap", () => {
 });
 
 describe("a page's images are decoded before the next page is read", () => {
-  // pdf.js decodes every image whether or not anyone asks, and a page left before its images are
-  // decoded leaves them decoding behind it: six pages with a 48 MP photo each held 1.4 GB after
-  // the document had been read. So the wait covers an image with no mask of its own too.
+  // pdf.js decodes every image, and a page left early leaves them decoding behind it: the wait
+  // covers an unmasked image too.
   it("leaves an unmasked image decoded when it returns", async () => {
     const pdf = buildPdf(
       `${line(700, "Jane Doe Senior Engineer at Acme")}\nq 100 0 0 120 450 600 cm /Im1 Do Q`,
@@ -314,8 +307,7 @@ describe("a page's images are decoded before the next page is read", () => {
 });
 
 describe("DOCX headers and footers share one budget", () => {
-  // Each header was read up to 8 MB, and as many as the archive held, twice: seven of 7.5 MB
-  // from a 163 KB file took nine seconds, past the two the parse budget keeps a document near.
+  // Seven 7.5 MB headers from a 163 KB file would take nine seconds, past the parse budget.
   it("reads a document padded with large headers in the time of a resume", async () => {
     const filler = marginXml("hdr", "<w:p><w:r><w:t>a</w:t></w:r></w:p>".repeat(220_000));
     const headers: Array<[string, string]> = [
@@ -379,7 +371,7 @@ describe("the CLI prints a role without dates", () => {
 
 describe("a malformed DOCX", () => {
   it("fails with a clear message, keeping mammoth's as the cause", async () => {
-    // A later entry of the same name is the one JSZip reads: here, not XML at all.
+    // A later entry of the same name is the one JSZip reads: here, not XML.
     const docx = buildDocxBody(BODY, false, [["word/document.xml", "garbage"]]);
     const failure = await extractResume(docx, "docx").catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(Error);
@@ -399,7 +391,7 @@ describe("a '>' inside a quoted attribute does not end the tag", () => {
     ['<p><img alt="a > b">Hello</p>', "Hello"],
     ["<p><a title='x>y' href=\"/\">Hello</a></p>", "Hello"],
     ['<p><a title = "x>y">Hello</a></p>', "Hello"],
-    // Unquoted values, and a quote that does not open a value, are as before.
+    // Unquoted values, and a quote that does not open a value.
     ['<p><a href=/x title=a">Hello</a></p>', "Hello"],
   ])("in %s", (html, expected) => {
     expect(htmlText(html).trim()).toBe(expected);
@@ -641,10 +633,7 @@ function toZip64(docx: Buffer, fields: EndField[]) {
 
 const DOCUMENT = "word/document.xml";
 
-/**
- * The reviewer's first bomb: a disk number of 0xFFFF sends JSZip to ZIP64 records hidden in the
- * end record's comment, which place the directory on a bomb this reader never saw.
- */
+/** A disk number of 0xFFFF sends JSZip to ZIP64 records hidden in the end record's comment, placing the directory on a bomb. */
 function hiddenDirectoryBomb(bomb: Buffer, size: number) {
   const benign = Buffer.from(documentXml("<w:p><w:r><w:t>Jane</w:t></w:r></w:p>"));
   const parts: Buffer[] = [];
@@ -679,10 +668,7 @@ function hiddenDirectoryBomb(bomb: Buffer, size: number) {
   return Buffer.concat(parts);
 }
 
-/**
- * The reviewer's second: a ZIP64 record padded away from the end record, which JSZip reads as
- * bytes prepended to the archive, landing it on a directory hidden in the padding.
- */
+/** A ZIP64 record padded away from the end record: JSZip reads the gap as prepended bytes, landing on a directory hidden in it. */
 function paddedRecordBomb(bomb: Buffer, size: number) {
   const benign = Buffer.from(documentXml(""));
   const padding = 4096;
@@ -912,7 +898,7 @@ describe("zip-bomb check bypass: the expansion budget reads the directory JSZip 
     const docx = archive([
       { name: `./${DOCUMENT}`, content: documentXml(`<w:p>${whiteRun(KEYWORDS)}</w:p>`) },
     ]);
-    expect(readZipEntry(docx, DOCUMENT)).not.toBeNull();
+    expect(zipFiles(docx)?.has(DOCUMENT)).toBe(true);
     expect(measureDocx(docx)?.hiddenChars).toBe(KEYWORD_CHARS);
   });
 
@@ -1077,7 +1063,7 @@ describe("nested tables and markup outside the elements stay linear", () => {
   const timed = (data: Buffer) => expectFast(() => measureDocx(data), 2000);
 
   it("resolves a run's background in constant time under deeply nested tables", () => {
-    // Quadratic, this walked 60,000 tables for each of 60,000 runs: tens of seconds.
+    // Quadratic if each run walks every table.
     const body = `${BODY}${"<w:tbl>".repeat(60_000)}${"<w:r></w:r>".repeat(60_000)}`;
     const measured = timed(buildDocxBody(body));
     expect(measured?.tableCount).toBe(60_000);
@@ -1154,7 +1140,7 @@ describe("the parts measured are the parts mammoth reads", () => {
     ]);
 
   describe("the expansion budget charges a part each time mammoth reads it", () => {
-    // 11 MB of comment after the document: read once it is within the budget, six times not.
+    // 11 MB of comment after the document: within the budget read once, not six times.
     const padded = `${documentXml(BODY)}<!--${" ".repeat(11 * 1024 * 1024)}-->`;
     const RELATED = ["styles", "numbering", "footnotes", "endnotes", "comments"];
     const main = rels(["officeDocument", DOCUMENT]);
@@ -1235,8 +1221,7 @@ describe("the parts measured are the parts mammoth reads", () => {
       expect(layout?.hiddenTextChars).toBe(KEYWORD_CHARS);
     });
 
-    // Each level copies the prefixes in scope: 10,000 levels each declaring one took 8 seconds of a
-    // 26 KB file, and 20,000 the whole heap. Nested past what any writer writes, it is refused.
+    // Each level copies the prefixes in scope: nesting past what any writer writes is refused.
     it("refuses a relationships file nested thousands of levels deep, in bounded time", () => {
       let open = "";
       let close = "";
@@ -1246,7 +1231,7 @@ describe("the parts measured are the parts mammoth reads", () => {
       }
       const deep = `<Relationships xmlns="${PACKAGE}"><Relationship Id="a" Type="${TYPES}officeDocument" Target="word/document.xml"/>${open}${close}</Relationships>`;
       const data = buildDocxBody(BODY, true, [["_rels/.rels", deep]]);
-      expectFast(() => readableArchive(data), 500);
+      expectFast(() => openDocx(data), 500);
     });
 
     it("falls back to word/document.xml when the target is missing", () => {
@@ -1257,10 +1242,9 @@ describe("the parts measured are the parts mammoth reads", () => {
 });
 
 describe("the XML mammoth parses is checked before it parses any of it", () => {
-  // Its XML parser (`@xmldom/xmldom` 0.8) and its list of warnings take seconds to minutes over
-  // markup that never closes, `<` that starts no tag, thousands of distinct names it warns about,
-  // or more XML than a resume holds. A real Word document, comments and processing instructions
-  // included, still reads.
+  // The XML parser and warning list are quadratic over markup that never closes, `<` that starts
+  // no tag, thousands of distinct warned names, or more XML than a resume holds. A real Word
+  // document, comments and processing instructions included, still reads.
   const RESUME = [
     "Jane Doe",
     "jane@example.com",
@@ -1285,15 +1269,14 @@ describe("the XML mammoth parses is checked before it parses any of it", () => {
 
   describe("markup that never closes", () => {
     it("refuses a 1 KB document of unclosed comments", async () => {
-      // 25,000 `<!--` deflate to about a kilobyte; mammoth's parser searched to the end of the
-      // part for each one's `-->`: 2.8 s here, 25 s at 50,000, two minutes at 100,000.
+      // 25,000 `<!--` deflate to about a kilobyte; the parser searches to the end for each `-->`.
       const data = buildDocxBody(RESUME + "<!--".repeat(25_000), true);
       expect(data.length).toBeLessThan(1_200);
       await refusedFast(data);
     });
 
     it("refuses unclosed processing instructions", async () => {
-      // Each `<?x ` copied the part up to it into a new node: 9 s at 10,000.
+      // Each `<?x ` copies the part up to it into a new node.
       await refusedFast(buildDocxBody(RESUME + "<?x ".repeat(10_000), true));
     });
 
@@ -1321,7 +1304,7 @@ describe("the XML mammoth parses is checked before it parses any of it", () => {
   });
 
   describe("warnings mammoth merges pairwise", () => {
-    // Each distinct warning is compared with every other: 10,000 cost 12 s.
+    // Each distinct warning is compared with every other.
     const many = (unit: (index: number) => string) =>
       Array.from({ length: 6_000 }, (_, index) => unit(index)).join("");
 
@@ -1333,7 +1316,7 @@ describe("the XML mammoth parses is checked before it parses any of it", () => {
         (index: number) => `<w:p><w:pPr><w:pStyle w:val="S${index}"/></w:pPr></w:p>`,
       ],
       ["break types", (index: number) => `<w:r><w:br w:type="t${index}"/></w:r>`],
-      // The same tags in the default namespace, with no prefix to know them by: 17 s at 20,000.
+      // The same tags in the default namespace, with no prefix.
       [
         "unprefixed break types",
         (index: number) => `<w:r xmlns="${W}"><br w:type="t${index}"/></w:r>`,
@@ -1347,8 +1330,8 @@ describe("the XML mammoth parses is checked before it parses any of it", () => {
     });
 
     it("refuses a prefix bound again, within a part, to another namespace", async () => {
-      // 120 names under 120 namespaces through one prefix: 14,400 distinct warnings from 240
-      // names and namespaces. 4 s here, 136 s at 240 of each. No writer rebinds a prefix.
+      // 120 names under 120 namespaces through one prefix: 14,400 distinct warnings. No writer
+      // rebinds a prefix.
       let body = "";
       for (let space = 0; space < 120; space += 1)
         for (let name = 0; name < 120; name += 1)
@@ -1368,8 +1351,7 @@ describe("the XML mammoth parses is checked before it parses any of it", () => {
   });
 
   it("ignores a style map embedded in the document", async () => {
-    // `mammoth` applied it: "p => !" dropped every paragraph, and 200,000 rules over 50,000
-    // paragraphs took over five minutes.
+    // `mammoth` applied it: "p => !" dropped every paragraph, and many rules over many paragraphs are slow.
     const data = buildDocxBody(RESUME, true, [["mammoth/style-map", "p => !"]]);
     expect((await extractResume(data, "docx")).text).toContain("Engineer at Acme 2019 - 2022");
   });

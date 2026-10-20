@@ -10,58 +10,36 @@ import {
 import { isSectionHeading, sectionKind } from "./sections.js";
 import { memo } from "../util/memo.js";
 
-/**
- * Contact recovery.
- *
- * The email and link patterns stay in source rather than in the policy: they match address
- * grammars (RFC-ish email, URL) rather than any language's vocabulary, so they do not move when
- * the resume is written in another language. The policy owns words; this owns punctuation.
- * Phone numbers are country-shaped, not language-shaped, and are read in `phone.ts`.
- */
+// Email and link patterns match address grammars, not vocabulary, so they live here, not in the policy.
 
 /**
- * Bounded on purpose. The unbounded form (`[A-Z0-9._%+-]+@[A-Z0-9.-]+`) restarts its scan at
- * every position of a long run like "a.a.a.…", which is quadratic: a 50k-character input took
- * over a second per call, and a scan evaluates this pattern about nine times. The lookbehind
- * anchors a match to the start of a local-part run, and the lengths are RFC 5321's own limits.
- *
- * The local part may hold Latin letters with their accents and an apostrophe
- * ("josé.garcía@correo.es", "o'connor.pat@example.com"), as mail servers take them; not an
- * apostrophe first, which is a quote ("'pat@example.com'"). One after a letter belongs to the
- * run, so a match never starts inside it. Not letters of another script, which is how a label
- * glued to the address is written ("邮箱jane@x.com", "Почтаjane@x.com").
+ * An email address, bounded to stay linear (the unbounded form is quadratic on "a.a.a.…"): the
+ * lookbehind anchors a match at the start of a local-part run, and lengths are RFC 5321's limits.
+ * The local part may hold accented Latin letters and an apostrophe ("o'connor.pat@example.com"),
+ * but not first (a quote), and not letters of another script (a glued label: "邮箱jane@x.com").
  */
 export const EMAIL =
   /(?<![\p{sc=Latn}\p{M}\p{N}._%+-]|[\p{sc=Latn}\p{M}\p{N}]['’])[\p{sc=Latn}\p{M}\p{N}._%+-][\p{sc=Latn}\p{M}\p{N}._%+'’-]{0,63}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/iu;
 /**
- * A web address: with a scheme or "www.", a profile on a site resumes link to without either
- * ("dribbble.com/jane", "orcid.org/0000-…"), or a personal site on `.dev`, a top-level domain
- * that names nothing but websites ("janedoe.dev"). Not one inside an email address.
+ * A web address: with a scheme or "www.", a profile on a site resumes link to ("dribbble.com/jane"),
+ * or a personal `.dev` site. Not one inside an email address.
  */
 export const LINK =
   /(?:https?:\/\/|www\.)[^\s|,]+|(?:linkedin\.com|github\.com|gitlab\.com|bitbucket\.org|dribbble\.com|behance\.net|orcid\.org|medium\.com|stackoverflow\.com|kaggle\.com|scholar\.google\.com)\/[^\s|,]+|(?<![\w.@/-])[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9][a-z0-9-]{0,62}){0,3}\.dev(?![\w@-])(?:\/[^\s|,]*)?/gi;
 
-/** A LinkedIn profile's address, which a LinkedIn export prints in its contact block. */
+/** A LinkedIn profile's address, printed in a LinkedIn export's contact block. */
 const LINKEDIN_PROFILE = /linkedin\.com\/in\//i;
 
-/**
- * A word of a name: capitalised in a script with case ("Jane", "DOE", "O'Brien", "F."), or any
- * word in a script without one (Devanagari, Arabic, Han), where capitals carry no signal.
- */
+/** A word of a name: capitalised in a script with case ("O'Brien", "F."), or any word in a script without. */
 const NAME_WORD = /^(?:\p{Lu}|\p{Lo})[\p{L}\p{M}'’.-]*$/u;
 
-/** A credential after a name: short, and read as an abbreviation — two capitals or a full stop. */
+/** A credential after a name: short, an abbreviation (two capitals or a full stop). */
 const isPostNominal = (token: string) =>
   /^[\p{L}.]{2,8}$/u.test(token) && (token.includes(".") || /\p{Lu}[\p{L}.]*\p{Lu}/u.test(token));
 
 /**
- * The line without the credentials after the name: "Jane Doe, PhD", "Raj Patel, M.D., CPA", and
- * the parts cut ("PhD"; "M.D.", "CPA"), or none.
- *
- * Walks the comma-separated parts from the end and stops at the first that is not all
- * credentials, so each part is read once. It was a regex repeating a group of letters, which
- * tried every partition of a letter run that did not end the line: a 60-byte name line held the
- * thread for seconds, and each further letter multiplied that.
+ * The line without the credentials after the name ("Jane Doe, PhD"), and the parts cut. Walks the
+ * comma-separated parts from the end, each read once (a regex repeating a letter group backtracks).
  */
 function withoutPostNominals(line: string) {
   const parts = line.split(",");
@@ -69,7 +47,7 @@ function withoutPostNominals(line: string) {
   let stripped = false;
   while (cut > 1) {
     const tokens = parts[cut - 1].trim().split(/\s+/).filter(Boolean);
-    // An empty part is only a trailing comma ("Jane Doe, PhD, "); anywhere else it ends the run.
+    // An empty part is only a trailing comma; elsewhere it ends the run.
     if (tokens.length === 0 ? cut !== parts.length : !tokens.every(isPostNominal)) break;
     stripped ||= tokens.length > 0;
     cut -= 1;
@@ -88,10 +66,8 @@ const birthPattern = memo(
 );
 
 /**
- * Whether the resume states a date of birth: one of the policy's labels with a date or a year
- * after it on the same line ("Date of birth: 04.05.1990", "Born 1990"). The date is what
- * separates the personal detail from "a born leader with 8 years of experience" or "born and
- * raised in Chennai, 2 kids": any other number is not one.
+ * Whether the resume states a date of birth: a policy label with a date or year after it on the
+ * same line ("Born 1990"). The date separates it from "a born leader with 8 years of experience".
  */
 export function statesDateOfBirth(lines: string[], policy: AtsEnginePolicy) {
   const re = birthPattern(policy.resumeParse);
@@ -106,15 +82,13 @@ const nameVocabulary = memo(
   }),
 );
 
-/** Where a contact line puts one detail after the next: "Jane Doe | jane@… | 415-…". */
-// Each run of spaces is matched from its start: from inside it, a long run with no separator
-// after it would be rescanned from every position.
+/** Where a contact line puts one detail after the next. Spaces match from the start of their run to stay linear. */
 const CONTACT_SEPARATOR = /(?<!\s)\s*[|·•,]\s*|\t|\s{2,}|(?<!\s)\s+[–—-]\s+/;
 
 /**
- * The part of a line that could be the name: after a "Name:" label, and on a contact line that
- * also holds an email or a number, the part before the first separator (`split`), with the part
- * after it when that separator is a comma (`tail`: "NY" in "New York, NY | jane@…").
+ * The part of a line that could be the name: after a "Name:" label, and on a contact line with an
+ * email or number, the part before the first separator (`split`), plus the part after a comma
+ * (`tail`: "NY" in "New York, NY | jane@…").
  */
 function nameCandidate(line: string, label: RegExp) {
   const value = line.replace(label, "");
@@ -127,22 +101,16 @@ function nameCandidate(line: string, label: RegExp) {
 }
 
 /**
- * The candidate's name, taken from the top of the document.
+ * The candidate's name, from the first few lines: the first that reads like a person, not a
+ * contact detail or job title. Not finding one usually means the name is in an image.
  *
- * An ATS reads the name from the header block, so this looks only at the first few lines and
- * takes the first that reads like a person rather than a contact detail or a job title. Getting
- * this wrong is cheap — it is reported, not scored on its content — but not finding one at all
- * is worth knowing, because it usually means the name is inside an image or a text box.
+ * A name is two to five name words, lowercase particles allowed between them ("Ludwig van
+ * Beethoven"), credentials after a comma left off, an all-caps banner allowed. A single word
+ * qualifies only as the very first line (a mononym), never as a section heading or the
+ * document's title ("Resume").
  *
- * A name is two to five name words, with lowercase particles allowed between them ("Ludwig van
- * Beethoven") and credentials after a comma left off ("Jane Doe, PhD"). An all-caps banner
- * qualifies. A single word qualifies only as the very first line — that is where a mononym
- * ("Suharto") sits, and anywhere lower a lone capitalised word is far more likely a heading — and
- * never when it is a section heading or the document's own title ("Resume").
- *
- * `headlined` says the name was read over a headline further down, or over its email under a
- * list heading ("SKILLS" over "Python" over "Jane Doe"), where a sidebar read before
- * the main column leaves it.
+ * `headlined`: the name was read over a headline further down, or over its email under a list
+ * heading, where a sidebar read before the main column leaves it.
  */
 export function findName(
   lines: string[],
@@ -152,16 +120,14 @@ export function findName(
   const trimmed = lines.map((line) => line.trim()).filter(Boolean);
   const titleWords = titleWordsOf(policy);
   const { code, postNominal } = placeWords(policy);
-  // A comma tail of state codes and no credential: "New York, NY", "Austin, TX 78701". "MD" is
-  // both, and read as the credential.
+  // A comma tail of state codes and no credential ("Austin, TX 78701"); "MD" reads as the credential.
   const isPlaceTail = (tail: readonly string[]) =>
     tail.length > 0 &&
     tail.every((part) => code.test(part.replace(/\s\d{5}(?:-\d{4})?$/u, ""))) &&
     !tail.some((part) => postNominal.test(part));
 
-  // A letter-spaced name can reach us with its word gap lost ("J A N E D O E" read as "JANEDOE":
-  // a shadowed heading is one text run, and the PDF keeps no wider space between the words). When
-  // the email's name parts spell it exactly ("jane.doe@…"), it is split where they split.
+  // A letter-spaced name can lose its word gap ("JANEDOE"); when the email's name parts spell it
+  // exactly ("jane.doe@…"), split it where they split.
   const emailParts =
     trimmed
       .slice(0, 12)
@@ -172,7 +138,6 @@ export function findName(
       .filter((part) => /^\p{L}{2,}$/u.test(part)) ?? [];
   const spelledByEmail = (text: string) => {
     if (emailParts.length < 2) return text;
-    // "JANEDOE", or still letter-spaced: "J A N E D O E".
     const letters = text.split(/\s+/);
     const word = letters.every((letter) => [...letter].length === 1) ? letters.join("") : text;
     if (/\s/.test(word) || emailParts.join("").toLowerCase() !== word.toLowerCase()) return text;
@@ -194,31 +159,26 @@ export function findName(
     const cut = withoutPostNominals(candidate.text);
     const name = spelledByEmail(cut.text.trim());
     const place = isPlaceTail(candidate.split ? candidate.tail : cut.tail);
-    // "New York, NY | jane@…" opens a contact line with the city, not the name.
+    // "New York, NY | jane@…" opens with the city, not the name.
     if (candidate.split && place) return null;
     const words = name.split(/\s+/);
     const named = words.filter((word) => !particles.test(word));
-    // A name shares a line with the contact details only at the top, and is two words or more:
-    // further down, "San Francisco, CA | 415-555-0142" is an address.
+    // A name shares a line with contact details only at the top, in two words or more.
     if (candidate.split && (!firstLine || named.length < 2)) return null;
     if (named.length === 0 || named.length > 5 || words.length > 7) return null;
     if (!named.every((word) => NAME_WORD.test(word))) return null;
     // Particles sit between the words they join, never at the ends.
     if (particles.test(words[0]) || particles.test(words[words.length - 1])) return null;
     if (named.length === 1 && index > 0) return null;
-    // A headline ("Senior Software Engineer") has the shape of a name, and is what this used to
-    // return when the real name was in an image.
+    // A headline ("Senior Software Engineer") has the shape of a name.
     if (isSectionHeading(name, policy) || titleWords.test(name)) return null;
-    // "Jane Doe, PhD" loses its credential; "San Francisco, CA" loses its state the same way, and
-    // is a place, the weakest reading of all.
+    // "San Francisco, CA" loses its state like a credential, and is a place: the weakest reading.
     return { name, cut: cut.text.trim() !== candidate.text.trim(), place };
   };
 
-  // A name directly above a headline ("LUCAS MOREAU" over "Senior Product Designer") is the
-  // name, wherever the reading order put it: a sidebar read first pushes it below the contact
-  // block, out of the first few lines. Never from the work history, where "Acme Corporation"
-  // over "Senior Engineer" has the same shape. A headline may run on after the title it opens
-  // with ("Senior Engineer at Acme Corp | Building payment systems"): the title is what is judged.
+  // A name directly above a headline ("LUCAS MOREAU" over "Senior Product Designer") is the name
+  // wherever the reading order put it, never from the work history. A headline may run on after
+  // its title ("Senior Engineer at Acme Corp | Building payment systems"): the title is judged.
   const headlined = () => {
     for (const [index, line] of trimmed.slice(0, 40).entries()) {
       if (sectionKind(line, policy) === "experience") break;
@@ -233,11 +193,9 @@ export function findName(
     return exported();
   };
 
-  // A LinkedIn export read sidebar first (its contact block with the profile's address, then
-  // "Top Skills" and its rows): the name is over the headline, and the headline over where the
-  // person is, whatever the headline says ("Helping fintechs ship faster | Payments"). Only
-  // under the skills heading that follows the address, and before any other heading; never an
-  // organisation's or a school's name ("Rice University").
+  // A LinkedIn export read sidebar first (profile address, then "Top Skills" and its rows): the
+  // name is over the headline, and the headline over where the person is. Only under the skills
+  // heading after the address and before any other heading; never an organisation's name.
   const exported = () => {
     const profile = trimmed.slice(0, 40).findIndex((line) => LINKEDIN_PROFILE.test(line));
     if (profile === -1) return "";
@@ -258,22 +216,18 @@ export function findName(
     return "";
   };
 
-  // Only lines above that cannot be the name: the document's title, a section heading. A name
-  // with its credentials cut ("Priya Raman, MBA") is still the name at the top, over any company
-  // above a title further down; one whose cut tail is a state ("San Francisco, CA") is a place,
-  // taken only when no other name is found.
-  // A name under a sidebar's list heading ("Top Skills" over "Machine Learning") is more likely
-  // one of its rows, so a name over a headline further down comes first; one over the email
-  // ("Python" / "Jane Doe" / "jane@example.com") is the name, before any further down.
+  // Only lines above that cannot be the name: the title, a section heading. A name with credentials
+  // cut is still the name; one whose cut tail is a state is a place, taken only when no other name
+  // is found. Under a sidebar's list heading a name is more likely one of its rows, so a name over
+  // a headline further down comes first; one over the email is the name, before any further down.
   let onlyHeadingsAbove = true;
   let place = "";
   let listed = false;
-  // The kind of the last heading: a name over an email is the name under a list ("SKILLS"), not
-  // under "REFERENCES", where it is a referee's.
+  // The last heading's kind: a name over an email is the name under a list, not a referee's.
   let under: string | null = null;
   let row = "";
   for (const [index, line] of trimmed.slice(0, 6).entries()) {
-    // The work history is never the header block, whatever is missing above it.
+    // The work history is never the header block.
     const kind = sectionKind(line, policy);
     if (kind === "experience") break;
     listed ||= kind !== null && kind !== "other";

@@ -1,10 +1,5 @@
 #!/usr/bin/env node
-/**
- * `npx -y @veriworkly/ats-engine-mcp`: the ATS Engine MCP server over stdio.
- *
- * stdout carries the protocol and nothing else, so anything that would print to it — a library's
- * stray `console.log` — goes to stderr instead.
- */
+/** `npx -y @veriworkly/ats-engine-mcp`: the ATS Engine MCP server over stdio. stdout is the protocol's: stray `console.log` goes to stderr. */
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 

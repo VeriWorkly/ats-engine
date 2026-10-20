@@ -1,19 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsReport } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsReport, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { VERDICT_BANDS, computeVerdict } from "../../src/scoring/verdict.js";
 import { words } from "../../src/text/text.js";
 
-/**
- * Scoring rules and checks fixed after the October 2026 audit, one block per finding. Every
- * resume here is an invented person at an invented company.
- */
+/** Scoring rules and checks, one block per audit finding. Every resume is invented. */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
-const check = (text: string, options: Parameters<typeof AtsScoringService.check>[2] = {}) =>
-  AtsScoringService.check(text, DEFAULT_POLICY, { now: NOW, ...options });
+const check = (text: string, options: Parameters<typeof score>[2] = {}) =>
+  score(text, DEFAULT_POLICY, { now: NOW, ...options });
 const rule = (report: AtsReport, id: string) =>
   report.rules.find((result) => result.id === `ats-v2.${id}`);
 
@@ -59,7 +56,7 @@ describe("action verbs", () => {
       /^(Lead|Achieved|Cut|Hired|Closed|Exceeded) (.*)$/gm,
       "Responsible for $2",
     );
-    // Six bullets, none with a verb: 0%, not a share diluted or inflated by the header rows.
+    // Six bullets, none with a verb: 0%, not diluted by the header rows.
     expect(rule(check(duties), "content.verbs")?.evidence).toMatch(/^Only 0%/);
   });
 
@@ -96,7 +93,7 @@ Ausbildung
 M.Sc. Informatik, Technische Universität Berlin, 2019
 Kenntnisse
 Go, Kubernetes, PostgreSQL`;
-    const report = AtsScoringService.check(resume, LOCALIZED, { now: NOW });
+    const report = score(resume, LOCALIZED, { now: NOW });
     expect(rule(report, "content.verbs")).toMatchObject({ passed: true });
   });
 });

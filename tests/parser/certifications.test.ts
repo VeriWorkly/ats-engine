@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { segmentResume } from "../../src/parser/sections.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Certifications and licences read as rows of their own — name, issuer, date earned, date of
- * expiry — the way Textkernel and Affinda file them, so a posting asking for "AWS
- * certification" can be answered from a row rather than from a word somewhere in the text.
- * Invented people only.
- */
+// Certifications and licences read as rows: name, issuer, date earned, date of expiry.
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const LOCALES = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -45,7 +40,7 @@ describe("a certifications heading opens a section of its own", () => {
     ["Zertifizierungen", "de"],
     ["प्रमाणपत्र", "hi"],
   ])("%s in the %s pack", (heading, language) => {
-    const report = AtsScoringService.check(`${heading}\nPMP`, LOCALES, {
+    const report = check(`${heading}\nPMP`, LOCALES, {
       languages: [language],
       now: NOW,
     });
@@ -211,8 +206,7 @@ describe("a certification line becomes a row", () => {
 
 describe("certifications in German and Hindi", () => {
   const read = (text: string, language: string) =>
-    AtsScoringService.check(text, LOCALES, { languages: [language], now: NOW }).parsed
-      .certifications;
+    check(text, LOCALES, { languages: [language], now: NOW }).parsed.certifications;
 
   it("reads a German expiry and a month-first date", () => {
     expect(

@@ -1,18 +1,13 @@
 /**
- * The visible text of an HTML page, by forward scans with `indexOf` — never a backtracking regex
- * over the page: the input is a page someone else wrote, up to megabytes long, and a pattern like
- * `<[^>]+>` is quadratic on a page of unclosed `<` — 40 KB of them took 660 ms, so a 2 MB page
- * would hold a server worker for the better part of an hour.
- *
- * Internal: `/job` normalises this into posting text, and the DOCX reader keeps its tabs.
+ * The visible text of an HTML page, by forward scans with `indexOf`, never a backtracking regex:
+ * the page is someone else's and `<[^>]+>` is quadratic on a page of unclosed `<`.
  */
 
 import { own } from "../util/own.js";
 
 /**
  * Named entities: the Latin-1 range and the punctuation, currency and arrows postings use. Names
- * are case-sensitive ("Eacute" is not "eacute"). A letter with an accent ("uuml", "Eacute",
- * "scaron") is composed from the letter and the accent rather than listed.
+ * are case-sensitive; accented letters ("uuml", "Eacute") are composed, not listed.
  */
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 // U+00A0 to U+00BF, in order; "nbsp" is read as a plain space.
@@ -55,16 +50,14 @@ export function decodeEntities(text: string): string {
   });
 }
 
-/** Elements whose content is never visible text. A document's head is not one of them: its end
- * tag is optional, and what it holds (title, style, script) is dropped on its own. */
+/** Elements whose content is never visible text; not `head`, whose end tag is optional. */
 const HIDDEN = new Set("script style noscript template svg title".split(" "));
 /** Elements whose content is text up to their first end tag: a "<main" in a script is no tag. */
 const RAW = new Set("script style title textarea noscript xmp".split(" "));
 
 /**
- * A page's furniture rather than its posting: navigation, sidebars, forms and their controls,
- * dialogs. `header` and `footer` too, unless the text was narrowed to `main` or `article`,
- * where they hold the posting's own title.
+ * A page's furniture: navigation, sidebars, forms, dialogs. Also `header` and `footer`, unless
+ * narrowed to `main` or `article`.
  */
 const CHROME = new Set("nav aside form select button dialog".split(" "));
 
@@ -74,22 +67,24 @@ const CHROME = new Set("nav aside form select button dialog".split(" "));
  * so it stays linear.
  */
 const HIDING = String.raw`hidden=|style=.*(?:display:none|opacity:0(?:\.0*)?(?:;|!|$))`;
-/** On a job page, also an ARIA role of furniture, `aria-hidden`, `visibility: hidden`, and an
- * `id` or `class` naming a cookie banner or a list of other jobs. */
+/**
+ * On a job page, also an ARIA role of furniture, `aria-hidden`, `visibility: hidden`, and an `id`
+ * or `class` naming a cookie banner or other jobs.
+ */
 const PAGE_HIDING = new RegExp(
   `^(?:${HIDING}|style=.*visibility:hidden|aria-hidden=true$|role=(?:navigation|banner|contentinfo|complementary|dialog|alertdialog|search)$|(?:id|class)=.*(?:cookie|consent|gdpr|similar|related))`,
 );
-/** In a document, also text under 2px or 2pt, or `visibility: hidden` — which an element inside
- * may undo, so these hide only an element with no elements of its own. */
+/**
+ * In a document, also text under 2px or 2pt, or `visibility: hidden`; an inner element may undo
+ * these, so they hide only a leaf.
+ */
 const DOCUMENT_HIDING = new RegExp(`^(?:${HIDING})`);
 const LEAF_HIDING =
   /^style=.*(?:visibility:hidden|font-size:(?:0(?:\.0*)?(?:[a-z]+|%)?|[01](?:\.\d{1,6})?p[xt])(?:;|!|$))/;
 
 /**
- * Phrasing elements: they style a run of text without breaking it, so where text touches them
- * they become nothing — "Node<span>.js</span>" is "Node.js", "<b>Type</b>Script" is
- * "TypeScript", "C<sup>++</sup>" is "C++". Between two sibling elements, and for any other tag
- * that is not a block, they are a space.
+ * Phrasing elements style a run of text without breaking it: where text touches them they become
+ * nothing ("Node<span>.js</span>" is "Node.js"); between sibling elements they are a space.
  */
 const INLINE = new Set(
   "a abbr b bdi bdo cite code del dfn em font i ins kbd mark q s samp small span strike strong sub sup time tt u var wbr".split(
@@ -112,11 +107,8 @@ const tagName = (tag: string) => TAG_NAME.exec(tag)?.[1]?.toLowerCase() ?? "";
 const asciiLower = (code: number) => (code >= 65 && code <= 90 ? code + 32 : code);
 
 /**
- * `indexOf` ignoring ASCII case, searching the original string.
- *
- * Lowercasing the page and searching the copy is wrong: `toLowerCase` can change a string's
- * length ("İ" lowercases to two code units), so a position found in the copy points somewhere
- * else in the original. `needle` must be ASCII and is short, so this stays linear in practice.
+ * `indexOf` ignoring ASCII case, on the original string: `toLowerCase` can change its length
+ * ("İ"), so a position in a lowercased copy would point elsewhere. `needle` must be ASCII.
  */
 export function indexOfIgnoreCase(
   haystack: string,
@@ -138,7 +130,9 @@ export function indexOfIgnoreCase(
   return -1;
 }
 
-/** HTML opens a tag only when `<` is followed by a letter, `/`, `!` or `?`; otherwise it is text. */
+/**
+ * HTML opens a tag only when `<` is followed by a letter, `/`, `!` or `?`; otherwise it is text.
+ */
 function opensTag(html: string, at: number): boolean {
   const next = asciiLower(html.charCodeAt(at + 1));
   return (next >= 97 && next <= 122) || next === 47 || next === 33 || next === 63;
@@ -149,8 +143,7 @@ const isSpace = (char: string | undefined) =>
 
 /**
  * The `>` that ends the tag opened at `open`, or -1. A quoted attribute value may hold a `>`
- * (`<img alt="a > b">`), so one is skipped whole, as a browser does; a quote opens a value only
- * right after `=`. One forward pass: each character is looked at once.
+ * (`<img alt="a > b">`) and is skipped whole; a quote opens a value only right after `=`.
  */
 function tagEnd(html: string, open: number): number {
   for (let at = open + 1; at < html.length; at += 1) {
@@ -179,8 +172,8 @@ function findTag(html: string, prefix: string, from: number, before?: number): n
 
 /**
  * Each tag from `from` on, as [where it opens, past its `>`, its lowercased name, whether it is
- * an end tag]. Comments are skipped, and so is the content of a raw-text element (`RAW`), which
- * holds no tags. Stops at a tag that never closes. One forward pass.
+ * an end tag]. Skips comments and the content of raw-text elements (`RAW`); stops at a tag that
+ * never closes.
  */
 function* tagsFrom(html: string, from: number): Generator<[number, number, string, boolean]> {
   for (let at = html.indexOf("<", from); at !== -1;) {
@@ -201,14 +194,13 @@ function* tagsFrom(html: string, from: number): Generator<[number, number, strin
 }
 
 /**
- * Where the `name` element whose start tag ends at `from` ends: past its end tag, or — for one
- * whose end tag HTML lets an author omit — where the next tag that ends it starts. Elements of
- * the same name inside it are counted, so an `<svg>` nested in another does not end the outer
- * one early; a raw-text element ends at its first end tag. One that never closes runs to the
- * end. Linear in what it skips.
+ * Where the `name` element whose start tag ends at `from` ends: past its end tag, or where the
+ * next tag that implies it starts, for elements whose end tag may be omitted. Same-name elements
+ * inside are counted; a raw-text element ends at its first end tag; one that never closes runs
+ * to the end.
  *
  * A paragraph ends at a block that opens or an element that closes around it; a list item at
- * the next item of its list or the list's end: `<p hidden>Two<p>Three` hides "Two" alone.
+ * the next item or the list's end: `<p hidden>Two<p>Three` hides "Two" alone.
  */
 function skipElement(html: string, name: string, from: number): number {
   if (RAW.has(name)) {
@@ -235,8 +227,7 @@ function skipElement(html: string, name: string, from: number): number {
 
 /**
  * The first `<main>`, else the one `<article>` outside navigation, sidebars and other articles,
- * where a page has exactly one: a list of related jobs as cards is no posting. Tags in scripts
- * and comments are not counted.
+ * when a page has exactly one (a list of related jobs as cards is no posting).
  */
 function landmark(html: string): number {
   let [article, articles, nested, furniture] = [-1, 0, 0, 0];
@@ -273,24 +264,16 @@ const VOID = new Set("br hr img input meta link".split(" "));
 export type HtmlReading = { text: string; hidden: string[]; tables: number };
 
 /**
- * The visible text of an HTML document or fragment, one line per block, entities decoded and
- * whitespace as the page had it.
+ * The visible text of an HTML document or fragment, one line per block, entities decoded.
+ * Block elements become line breaks; phrasing elements join the text around them. Script, style,
+ * the title and similar elements are dropped with their content, and an element left unclosed
+ * drops everything after it. A `<` that cannot open a tag ("<5k") is text.
  *
- * Block elements become line breaks, so headings and bullets survive as lines instead of
- * collapsing into one paragraph; phrasing elements (`b`, `span`, `sup`, …) join the text
- * around them. Script, style, the document's title and similar elements are dropped with their
- * content; an element left unclosed drops everything after it, which on a well-formed page never
- * happens and on a hostile one is the safe direction. A `<` that cannot open a tag ("<5k") is
- * text, as it is to a browser.
+ * `page`: a whole web page read for its posting: narrowed to `<main>` or the one `<article>`,
+ * with navigation, forms, dialogs, cookie banners, "similar jobs" and hidden elements dropped.
  *
- * `page`: the input is a whole web page, read for the posting on it. The text is narrowed to its
- * `<main>` (or its one `<article>`) when it has one, and navigation, sidebars, forms, dialogs,
- * cookie banners, "similar jobs" lists and elements hidden by `hidden`, `aria-hidden` or an
- * inline `display: none` are dropped.
- *
- * `document`: the input is a resume. Elements a reader cannot see — `hidden`, `display: none`,
- * `opacity: 0`, text under 2px — are dropped and their text kept in `hidden`; nothing is
- * furniture.
+ * `document`: a resume. Elements a reader cannot see (`hidden`, `display: none`, `opacity: 0`,
+ * text under 2px) are dropped and their text kept in `hidden`; nothing is furniture.
  */
 export function readHtml(html: string, mode?: "page" | "document"): HtmlReading {
   let chrome = new Set(mode === "page" ? [...CHROME, "header", "footer"] : []);
@@ -308,8 +291,7 @@ export function readHtml(html: string, mode?: "page" | "document"): HtmlReading 
   let tables = 0;
   let index = 0;
 
-  // Where the text since the last tag began.
-  let text = 0;
+  let text = 0; // where the text since the last tag began
   while (index < html.length) {
     const open = html.indexOf("<", index);
     if (open === -1) {
@@ -331,7 +313,7 @@ export function readHtml(html: string, mode?: "page" | "document"): HtmlReading 
     }
 
     const close = tagEnd(html, open);
-    if (close === -1) break; // an unclosed tag: nothing after it is renderable text
+    if (close === -1) break;
     const tag = html.slice(open, close + 1);
     const name = tagName(tag);
     const starts = html[open + 1] !== "/";
@@ -341,8 +323,7 @@ export function readHtml(html: string, mode?: "page" | "document"): HtmlReading 
       if (!tag.endsWith("/>")) index = skipElement(html, name, index);
       continue;
     }
-    // An element hidden by its attributes; one whose size or visibility hides it only when it
-    // holds text alone, its end tag the next tag: an element inside may set its own.
+    // Hidden by its attributes; size or visibility hides only a leaf (its end tag the next tag).
     const next = html.indexOf("<", index);
     if (
       starts &&
@@ -360,10 +341,7 @@ export function readHtml(html: string, mode?: "page" | "document"): HtmlReading 
       continue;
     }
     if (starts && name === "table") tables += 1;
-    // A list item keeps its marker, so it reads as the bullet it is — to a resume's content
-    // rules, and to a posting's heading detection, which must not take an item for a heading.
-    // A phrasing tag that text touches joins it; between two sibling elements — skill tags,
-    // "<span>Spark</span><span>Kafka</span>" — it is still a space.
+    // A list item keeps its marker, so it is never taken for a heading.
     if (name === "li" && starts) out.push("\n• ");
     else out.push(BLOCK.has(name) ? "\n" : INLINE.has(name) && open > text ? "" : " ");
     text = index;

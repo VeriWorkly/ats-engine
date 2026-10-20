@@ -1,12 +1,9 @@
-/**
- * Column detection from positioned text runs. Pure arithmetic, kept apart from the PDF reader so
- * it can be tested without one.
- */
+/** Column detection from positioned text runs: pure arithmetic, apart from the PDF reader. */
 
 /**
- * A run of text on a page, by horizontal extent and how many characters it carries. `row` groups
- * the runs printed on one line (any value, compared by identity) and `size` is their font size:
- * together they tell a date pinned to the right margin from a second column.
+ * A run of text on a page, by horizontal extent and character count. `row` groups the runs of one
+ * line (compared by identity) and `size` is their font size: together they tell a date pinned to
+ * the right margin from a second column.
  */
 export type PositionedRun = {
   left: number;
@@ -14,23 +11,16 @@ export type PositionedRun = {
   mass: number;
   row?: unknown;
   size?: number;
-  /** Whether its text could be a tab stop's — a date or a place has a digit or a comma — rather
-   * than a word of a second column. Unknown is taken as could. */
+  /** Whether its text could be a tab stop's (a date or place has a digit or comma). Unknown is taken as could. */
   stop?: boolean;
-  /** Its baseline, top of the page first. Given, a side whose text lies above or below all of
-   * the other side's is not a column beside it. */
+  /** Its baseline, top of the page first. Given, a side wholly above or below the other is not a column beside it. */
   y?: number;
 };
 
-/** The best gutter: the share of text beyond it, where it is, and whether right-aligned runs
- * on the left side's lines were read as tab stops rather than as column text. */
+/** The best gutter: the share of text beyond it, its position, and whether right-aligned runs were read as tab stops. */
 export type Gutter = { ratio: number; split: number; tabs: boolean };
 
-/**
- * Below this many positioned text runs a page carries no usable layout signal. Set low on
- * purpose: a sparse page cannot produce a false column reading, because the balance term below
- * needs real text on both sides of the gutter before it reports anything.
- */
+/** Below this many runs a page carries no layout signal. Low on purpose: a sparse page needs real text on both sides to report a gutter. */
 const MIN_ITEMS_FOR_COLUMN_SIGNAL = 12;
 
 /** Candidate gutters are searched across the middle of the page, in 4pt steps. */
@@ -40,40 +30,13 @@ const GUTTER_STEP = 4;
 /** Points from the page's right text edge within which a run is right-aligned to it. */
 const FLUSH = 3;
 /** Characters of right-hand text a tab stop holds at most: a date, a place, not a paragraph. */
-const TAB_STOP_CHARS = 40;
+export const TAB_STOP_CHARS = 40;
 
 /**
- * Finds the most balanced vertical channel that no text crosses, and reports how much of the
- * page's text sits on the thinner side of it.
- *
- * This measures the layout itself rather than a side effect of it. Inferring columns from the
- * extracted character stream can only ever see a two-column page whose columns happen to share
- * text lines; a PDF that emits its left column in full and then its right — equally unreadable
- * to a parser that maps fields by position — produces a perfectly linear stream.
- *
- * Reported as a share rather than a boolean because the shape matters: a balanced two-column
- * resume lands near 0.5, a narrow sidebar near 0.2, and right-aligned dates in an otherwise
- * single-column layout near 0.1. Those are three different amounts of trouble, and the policy
- * bands grade them separately.
- *
- * The share is measured in characters rather than in text runs: a column of four-digit years is
- * a tenth of the page's text. And text right of the gutter on a line that also has text left of
- * it, in the same size, is a tab stop rather than a column when those lines all end flush with
- * the right margin: "City, ST · Jan 2021 – Present" after every job title, with short bullets
- * under it, measured 0.26 — a sidebar's share — on a single-column resume. A second column's
- * lines are ragged, or long, or mostly on baselines of their own — a right-aligned sidebar ends
- * every line flush — so it still counts when some of its baselines happen to match the first's.
- *
- * `min(left, right)` covers the other end: a page whose lines are simply shorter than the
- * candidate split has no text at all on the far side, so the share is zero and no gutter is
- * reported. Returns `null` when the page has too little text to say.
- */
-/**
- * Whether the text left and right of `split` sits side by side: at least half the thinner
- * side's characters lie between the other side's first and last baselines. A centred heading
- * over a block of short lines leaves an empty strip down the page too, but it is above the
- * block, not beside it, and read as a column of its own it came after the lines it heads.
- * Without baselines, as with a caller that has none, the sides are taken as beside.
+ * Whether the text left and right of `split` sits side by side: at least half the thinner side's
+ * characters lie between the other side's first and last baselines. A centred heading over short
+ * lines leaves an empty strip too, but above the block, not beside it. Without baselines the
+ * sides are taken as beside.
  */
 function besideEachOther(rows: Iterable<PositionedRun[]>, split: number): boolean {
   const sides = [
@@ -97,10 +60,9 @@ function besideEachOther(rows: Iterable<PositionedRun[]>, split: number): boolea
     side.runs.filter((run) => run.y! >= other.top - 1 && run.y! <= other.bottom + 1);
   const mass = (runs: PositionedRun[]) => runs.reduce((sum, run) => sum + run.mass, 0);
   const beside = inside(thin, thick);
-  // Or the thicker side lies within the thinner one's, with more than one run of it beside: a
-  // main column beside a sidebar that runs on below it, under a name across the top. Such a
-  // sidebar carries an eighth of the page's text or more; a contact block, a year and a page
-  // number right-aligned on a one-column page carry less.
+  // Or the thicker side lies within the thinner one's, with more than one run beside: a main
+  // column beside a sidebar that runs on below it. Such a sidebar carries an eighth of the text or
+  // more; a right-aligned contact block or page number carries less.
   return (
     mass(beside) >= thin.mass / 2 ||
     (mass(inside(thick, thin)) >= thick.mass / 2 &&
@@ -109,6 +71,15 @@ function besideEachOther(rows: Iterable<PositionedRun[]>, split: number): boolea
   );
 }
 
+/**
+ * Finds the most balanced vertical channel that no text crosses, and reports the share of the
+ * page's text on its thinner side: near 0.5 for balanced columns, 0.2 for a sidebar, 0.1 for
+ * right-aligned dates, graded separately by the policy bands. Measured in characters, not runs.
+ * Text right of the gutter on a line that also has same-size text left of it is a tab stop, not a
+ * column, when those lines all end flush with the right margin ("City, ST · Jan 2021 – Present"
+ * after each job title). A second column's lines are ragged, long, or on baselines of their own.
+ * Returns `null` when the page has too little text to say.
+ */
 export function findGutter(runs: readonly PositionedRun[], pageWidth: number): Gutter | null {
   if (runs.length < MIN_ITEMS_FOR_COLUMN_SIGNAL || pageWidth <= 0) return null;
 
@@ -133,8 +104,8 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
     let straddling = 0;
     let left = 0;
     let right = 0;
-    // Lines with text on both sides in one size; how many end at the margin, and how many hold a
-    // few words on the right; their right text; lines with text on the right alone.
+    // Lines with text on both sides in one size: how many end at the margin, how many hold a few
+    // words on the right, their right text; and lines with text on the right alone.
     let shared = 0;
     let flush = 0;
     let short = 0;
@@ -168,19 +139,15 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
 
     if (!besideEachOther(rows.values(), split)) continue;
 
-    // Tab stops: flush right, each beside text on its left, and a date or a place — a few
-    // characters with a digit or a comma. A right side of words — a sidebar's skills, its email
-    // — or with more lines of its own than lines it shares is a column whose baselines happen to
-    // meet the other's.
+    // Tab stops: flush right, beside text on the left, a few characters with a digit or comma. A
+    // right side of words, or with more lines of its own than it shares, is a column.
     const tabs = shared > 0 && flush >= 0.8 * shared && short >= 0.8 * shared && rightOnly < shared;
     if (tabs) right -= sharedRight;
     if (straddling > straddleAllowance || left + right === 0) continue;
     found.push({ ratio: Math.min(left, right) / (left + right), split, tabs, straddling });
   }
 
-  // The share is the best one found; where the text is split to be read is, among the splits
-  // that come close to it, the one fewest runs cross, so a line is read whole only when it has
-  // to be.
+  // The share is the best found; the split is, among those close to it, the one fewest runs cross.
   const ratio = found.reduce((most, gutter) => Math.max(most, gutter.ratio), 0);
   let best: Gutter & { straddling: number } = {
     ratio,
@@ -192,7 +159,3 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
     if (gutter.ratio >= ratio - 0.05 && gutter.straddling < best.straddling) best = gutter;
   return { ratio, split: best.split, tabs: best.tabs };
 }
-
-/** `findGutter`'s share alone: 0 when no gutter is found, `null` when the page cannot say. */
-export const measureColumns = (runs: readonly PositionedRun[], pageWidth: number) =>
-  findGutter(runs, pageWidth)?.ratio ?? null;

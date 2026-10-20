@@ -7,7 +7,7 @@ import {
   MAX_DOCX_EXPANDED_BYTES,
   MAX_HIDDEN_TEXT,
   measureDocx,
-  readableArchive,
+  openDocx,
   UNMEASURABLE_DOCX,
   UNREADABLE_DOCX,
   withinExpansionLimit,
@@ -19,13 +19,11 @@ import { extractPdf } from "./pdf.js";
 /**
  * Resume text and page geometry from an uploaded file.
  *
- * PDF needs `pdf-parse` and `pdfjs-dist`, DOCX needs `mammoth`. They are optional peer
- * dependencies, loaded only when a document of that format arrives, so a host that reads only
- * one format installs only what it reads.
+ * PDF needs `pdf-parse` and `pdfjs-dist`, DOCX needs `mammoth`: optional peers, loaded only when
+ * a document of that format arrives.
  *
- * In-process and CPU-bound: a pathological PDF can occupy the thread for seconds. A server
- * should run this in a process it can kill (see `@veriworkly/ats-engine/node/child`); a CLI or
- * a batch job can call it directly.
+ * In-process and CPU-bound: a pathological PDF can occupy the thread for seconds. A server should
+ * run this in a process it can kill (see `@veriworkly/ats-engine/node/child`).
  */
 
 /** `html`: a resume saved as a web page, read for its visible text rather than its markup. */
@@ -60,11 +58,8 @@ export function detectResumeFormat(fileName: string, mimeType = ""): AtsResumeFo
 }
 
 /**
- * Strips NULs and collapses runs of blanks and blank lines, so the scorer sees clean lines.
- *
- * A run holding a tab becomes one tab rather than a space: a tab is the column gap a Word table
- * of contents or a text export puts between a job title and its employer, and the parser splits
- * the two there. Collapsing it to a space merged them into one title on every upload.
+ * Strips NULs and collapses runs of blanks and blank lines. A run holding a tab becomes one tab,
+ * not a space: a tab is the column gap the parser splits a title from its employer at.
  */
 export function normalizeExtractedText(text: string): string {
   return text
@@ -76,10 +71,8 @@ export function normalizeExtractedText(text: string): string {
 }
 
 /**
- * A text file's characters: UTF-16 by its byte-order mark, else UTF-8 — and, where the bytes are
- * not UTF-8, Windows-1252, the encoding Notepad and Word's "plain text" wrote for years. Decoding
- * those as UTF-8 turned every accented letter and curly quote into "�"; decoding a whole UTF-8
- * file as Windows-1252 for one stray byte in it turned every "é" into "Ã©".
+ * A text file's characters: UTF-16 by its byte-order mark, else UTF-8, and Windows-1252 where the
+ * bytes are not UTF-8. A UTF-8 file with a stray byte is not decoded wholesale as Windows-1252.
  */
 export function decodeText(data: Uint8Array): string {
   const [first, second] = data;
@@ -94,9 +87,8 @@ export function decodeText(data: Uint8Array): string {
   }
   if (stray > multibyte) return cp1252(data);
   if (!stray) return new TextDecoder().decode(data);
-  // Bytes that are not UTF-8 among many that are — one stray byte pasted into a UTF-8 file — are
-  // each written as their Windows-1252 character in UTF-8, and the whole decoded once: a decode
-  // per stray byte took 37 seconds on 20 MB of them.
+  // Stray bytes are each written as their Windows-1252 character in UTF-8 and the whole is
+  // decoded once: a decode per stray byte is quadratic.
   const out = new Uint8Array(data.length + stray * 2);
   let [start, written] = [0, 0];
   const copy = (end: number) => {
@@ -113,15 +105,14 @@ export function decodeText(data: Uint8Array): string {
     out.set(CP1252_UTF8[data[at]! - 0x80]!, written);
     written += CP1252_UTF8[data[at]! - 0x80]!.length;
     start = at += 1;
-    // Each run after a stray byte was decoded on its own, which drops a byte-order mark at its start.
+    // A byte-order mark right after a stray byte is dropped, as decoding the run alone would.
     if (data[at] === 0xef && data[at + 1] === 0xbb && data[at + 2] === 0xbf) start = at += 3;
   }
   copy(data.length);
   return new TextDecoder().decode(out.subarray(0, written));
 }
 
-/** Node decodes "windows-1252" as Latin-1, leaving 0x80-0x9F as control characters: those are
- * Windows-1252's curly quotes, dashes, euro sign and the rest. */
+/** Node decodes "windows-1252" as Latin-1, leaving 0x80-0x9F as controls: map them to Windows-1252's. */
 const cp1252 = (data: Uint8Array) =>
   new TextDecoder("latin1")
     .decode(data)
@@ -155,34 +146,26 @@ const CP1252_UTF8 = /* @__PURE__ */ [
 const HREF = /<a href="([^"<>]*)"/g;
 
 async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
-  if (!readableArchive(data)) throw new Error(UNREADABLE_DOCX);
-  if (!withinExpansionLimit(data))
+  const archive = openDocx(data);
+  if (!archive) throw new Error(UNREADABLE_DOCX);
+  if (!withinExpansionLimit(data, archive))
     throw new Error(
       `The document expands to more than ${MAX_DOCX_EXPANDED_BYTES / 1024 / 1024} MB; it is not a resume.`,
     );
-  // Measured first: a document whose text cannot be measured is refused before `mammoth` reads
-  // it, rather than read with every layout rule silently dropped. A Word document has no page
-  // geometry, so columns stay unmeasured; what its XML says — tables, pictures, hidden runs — is
-  // read directly.
+  // Measured first: a document that cannot be measured is refused before `mammoth` reads it.
+  // There is no page geometry, so columns stay unmeasured.
   let measured: ReturnType<typeof measureDocx> = null;
   try {
-    measured = measureDocx(data);
+    measured = measureDocx(data, archive);
   } catch (error) {
     if ((error as Error).message === UNMEASURABLE_DOCX) throw error;
-    // An archive this reader cannot follow otherwise yields no signals, not a failed upload.
+    // Any other failure yields no signals, not a failed upload.
   }
-  // Before `mammoth` parses a part: its XML parser takes seconds to minutes over markup that
-  // never closes, or over more XML than a resume holds, and a CLI or a server reading in-process
-  // cannot stop it.
-  checkParsedXml(data);
+  // Before `mammoth` parses: its XML parser takes minutes over markup that never closes.
+  checkParsedXml(archive);
   const mammoth = await optional(() => import("mammoth"), "mammoth");
-  // Through HTML rather than mammoth's raw text: Word keeps bullets as list numbering, not as
-  // characters, and the raw text drops them, which read every bulleted DOCX resume as prose.
-  // Images become empty tags instead of the embedded base64 mammoth writes by default.
-  // A style map the file carries (`mammoth/style-map`) is not applied: it can drop paragraphs
-  // an ATS reads, and its rules are matched against every paragraph unchecked.
-  // A malformed file fails inside mammoth with whatever its parser hit — "Cannot read properties
-  // of null" — which says nothing to the person who uploaded it.
+  // Through HTML, not raw text, which drops Word's list bullets. Images become empty tags, and an
+  // embedded style map is ignored: it can drop paragraphs an ATS reads.
   const { value: html } = await mammoth
     .convertToHtml(
       { buffer: Buffer.from(data) },
@@ -194,12 +177,10 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
     .catch((cause: unknown) => {
       throw new Error(UNREADABLE_DOCX, { cause });
     });
-  // What `mammoth` leaves out and an ATS that reads the whole file sees: the page header (often
-  // the name and contact details) before the body, the footer after it, HTML embedded whole, and
-  // the targets of links whose text is only "LinkedIn".
-  // An embedded page is read as a resume page is: what its markup hides is left out, and counted.
-  const { header, footer } = docxMargins(data);
-  const chunks = docxChunks(data).map((chunk) => readHtml(chunk, "document"));
+  // What `mammoth` leaves out: header, footer, embedded HTML (read as a resume page, hidden
+  // elements counted), and link targets.
+  const { header, footer } = docxMargins(archive);
+  const chunks = docxChunks(archive).map((chunk) => readHtml(chunk, "document"));
   const value = withLinks(
     [header, htmlText(html), ...chunks.map((chunk) => chunk.text), footer].join("\n"),
     [...html.matchAll(HREF)].map(([, href]) => decodeEntities(href!)),
@@ -214,40 +195,31 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
       pageCount: 0,
       imageCount: measured.imageCount,
       ...hiddenSignals([measured.hiddenText, ...chunked]),
-      // What the text holds of it: the document's own, not an embedded page's hidden elements,
-      // which `readHtml` leaves out of the text.
+      // Only the document's own: `readHtml` leaves an embedded page's hidden elements out of the text.
       hiddenTextRead: measured.hiddenTextRead,
-      // Counted whole: the document's hidden text above is cut to its first 5,000 characters.
+      // Counted whole: `hiddenText` is cut to `MAX_HIDDEN_TEXT`.
       hiddenTextChars: measured.hiddenChars + hiddenSignals(chunked).hiddenTextChars,
-      // Left in by an editor: advice on the file, never scored.
       trackedChanges: measured.trackedChanges,
       comments: measured.comments,
     },
   };
 }
 
-/**
- * Hidden text as the layout reports it: every run, whitespace collapsed, joined in reading order.
- */
+/** Hidden text as the layout reports it: runs joined, whitespace collapsed. */
 function hiddenSignals(runs: readonly string[]) {
   const text = runs.join(" ").replace(/\s+/g, " ").trim();
   return {
     hiddenTextChars: text.replace(/\s/g, "").length,
-    hiddenTextSample: text.slice(0, 80),
     hiddenText: text.slice(0, MAX_HIDDEN_TEXT),
   };
 }
 
-/**
- * A resume saved as a web page: the text a reader sees, without the elements its markup hides,
- * whose text is reported as hidden; its tables are counted as a Word document's are. A page has
- * no geometry to measure columns by.
- */
+/** A resume saved as a web page: visible text, hidden elements reported as hidden, tables counted. */
 function readHtmlResume(html: string): AtsExtraction {
   const { text, hidden, tables } = readHtml(html, "document");
   return {
     text,
-    // The hidden elements are left out of the text, so none of their text is read.
+    // Hidden elements are left out of the text, so none of it is read.
     layout: {
       columnRatio: null,
       tableCount: tables,
@@ -278,8 +250,7 @@ export async function extractResume(
           : format === "text"
             ? { text: decodeText(data) }
             : null;
-  // A format from outside the type — over the child process's IPC, say — is refused, not read
-  // as text.
+  // A format from outside the type (over IPC, say) is refused, not read as text.
   if (!raw) throw new Error(`Unsupported resume format "${String(format)}".`);
   return { ...raw, text: normalizeExtractedText(raw.text) };
 }

@@ -44,12 +44,8 @@ describe("jobHtmlToText", () => {
     expect(jobHtmlToText(`<p>${"word ".repeat(10_000)}</p>`)).toHaveLength(MAX_JOB_TEXT_CHARS);
   });
 
-  /**
-   * The server fetches attacker-chosen pages of up to 2 MB. The regex this replaced took 660 ms
-   * on 40 KB of `<` and grows quadratically; every input here is the full 2 MB, on which that
-   * would take the better part of an hour. The budget is loose on purpose: a linear pass takes
-   * well under a second, and a tight one only measures how busy the CI runner is.
-   */
+  // Hostile pages of the full 2 MB. The budget is loose on purpose: a linear pass takes well under
+  // a second, and a tight one only measures how busy the runner is.
   it.each([
     ["unclosed angle brackets", "<".repeat(2_000_000)],
     ["unclosed script tags", "<script>".repeat(250_000)],

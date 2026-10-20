@@ -1,24 +1,19 @@
 /**
- * Text a reader cannot see but an ATS reads: the PDF tricks behind "white fonting".
+ * Text a reader cannot see but an ATS reads: the PDF tricks behind "white fonting". This replays
+ * pdf.js's operator list, keeping the graphics state a renderer keeps, and calls a run hidden when
+ * a person looking at the page would not see it:
  *
- * Text extraction sees every glyph a PDF draws and nothing about how it looks, so a keyword list
- * in the page's own colour reads to an ATS exactly like a real skills section. This replays the
- * page's drawing operations — pdf.js's operator list — keeping the graphics state a renderer
- * keeps, and calls a run of text hidden when a person looking at the page would not see it:
- *
- * - invisible render mode (`3 Tr`), unless it lies over an image: that is the OCR text layer of
- *   a scan, the one legitimate use, and it is what makes a scan readable at all;
- * - fully transparent (`ca 0`), unless the same text is drawn visibly in the same place — the
- *   selectable copy Chrome lays over text with a shadow, an outline or a gradient fill;
+ * - invisible render mode (`3 Tr`), unless over an image (the OCR layer of a scan);
+ * - fully transparent (`ca 0`), unless the same text is drawn visibly in the same place (the
+ *   selectable copy Chrome lays over text with a shadow, outline or gradient fill);
  * - smaller than 2pt;
  * - off the page;
- * - in a colour within 1.25:1 contrast of what lies beneath it — the topmost shape filled
- *   before it there, else the white page (an image, a gradient or a pattern beneath leaves the
- *   background unknown, and the run is given the benefit of the doubt);
+ * - within 1.25:1 contrast of what lies beneath: the topmost shape filled before it, else the
+ *   white page (an image, gradient or pattern leaves the background unknown: benefit of the doubt);
  * - covered by an image or an opaque shape drawn after it.
  *
- * Measured, not certain: a font whose glyphs are drawn as paths, a clip region or a blend mode
- * can still hide text this does not see. It errs on the side of not accusing anyone.
+ * Measured, not certain: path-drawn glyphs, clip regions and blend modes can still hide text this
+ * does not see. It errs on the side of not accusing anyone.
  */
 
 import { indexDrawn, type Box, type Drawn } from "./surroundings.js";
@@ -70,14 +65,10 @@ function contrast(a: string, b: string) {
 }
 
 /**
- * `fill` and `stroke` are "#rrggbb", or "" when the colour is not a flat one: a pattern, a
- * gradient. `alpha` and `strokeAlpha` are `ca` and `CA`. `softMask`: a soft mask is in force, so
- * what is painted may show through anywhere, or nowhere. `lineWidth` is the pen (`w`), in user
- * space.
- *
- * The text state — font size (`Tf`), horizontal scaling (`Tz`, as a factor), leading (`TL`) and
- * render mode (`Tr`) — is part of the graphics state, so `q`/`Q` save and restore it: an
- * invisible or 1pt line inside `q … Q` must not make every line after it hidden too.
+ * `fill` and `stroke` are "#rrggbb", or "" when not flat (a pattern, a gradient). `alpha` and
+ * `strokeAlpha` are `ca` and `CA`. `softMask`: a soft mask is in force, so what is painted may show
+ * through anywhere or nowhere. `lineWidth` is the pen (`w`) in user space. The text state
+ * (`Tf`, `Tz` as a factor, `TL`, `Tr`) is saved and restored by `q`/`Q` too.
  */
 type GraphicsState = {
   ctm: Matrix;
@@ -103,10 +94,9 @@ type Run = {
 } & GraphicsState;
 
 /**
- * `images`: where each image was drawn, in page points. `marks`: small filled shapes — list
- * markers Chrome draws as paths rather than glyphs — in page points too. `tables`: ruled tables
- * drawn on the page (`countRuledTables`). `invisibleChars`: of `textChars`, those drawn in an
- * invisible render mode, as a scan's OCR layer is.
+ * `images`: where each image was drawn, in page points. `marks`: small filled shapes (list markers
+ * Chrome draws as paths) in page points. `tables`: ruled tables (`countRuledTables`).
+ * `invisibleChars`: of `textChars`, those in an invisible render mode, as a scan's OCR layer.
  */
 export type PageVisibility = {
   textChars: number;
@@ -117,14 +107,13 @@ export type PageVisibility = {
   tables: number;
 };
 
-/** Shapes no wider or taller than this, in points, may be list markers; this many are kept. */
+/** Shapes no larger than this many points may be list markers; at most `MAX_MARKS` are kept. */
 const MARK_SIZE = 12;
 const MAX_MARKS = 2_000;
 
-/** Glyphs a soft mask is built from that are matched against what is painted through it; past
- * this many pairs, the rest are taken as painted visibly. */
+/** Soft-mask glyph/paint pairs matched; past this the rest are taken as painted visibly. */
 const MAX_MASK_PAIRS = 100_000;
-/** Visible glyphs a transparent run is compared with, across a page, before the rest are not. */
+/** Visible glyphs transparent runs are compared with, across a page; past this the rest are not. */
 const MAX_PIECE_CHECKS = 2_000_000;
 
 /** A run's text and where it is, to a 2pt cell `dx`, `dy` cells away. */
@@ -140,9 +129,9 @@ type Ops = Record<string, number>;
 type OperatorList = { fnArray: number[]; argsArray: unknown[][] };
 
 /**
- * pdf.js paints an image that carries its own mask — a soft mask (`/SMask`) or a colour-key or
- * stencil `/Mask` alike — as `save`, `setGState [["SMask", false]]`, the image, `restore`: the
- * only trace of the mask it lists, and the same for a mask that hides nothing.
+ * pdf.js paints an image with its own mask (`/SMask`, colour-key or stencil `/Mask`) as `save`,
+ * `setGState [["SMask", false]]`, the image, `restore`: the only trace of the mask, the same for a
+ * mask that hides nothing.
  */
 function ownMask(ops: Ops, list: OperatorList, order: number) {
   let before = order - 1;
@@ -164,20 +153,16 @@ type ObjectStore = { get(objId: string, callback: (data: unknown) => void): unkn
 export type PageObjects = { objs: ObjectStore; commonObjs: ObjectStore };
 
 /**
- * Which of a page's masked images can actually be seen through: those whose decoded pixels
- * hold an alpha below 255. A colour key that matches no pixel, or a soft mask opaque throughout,
- * leaves the image as solid as one with no mask at all.
+ * Which of a page's masked images can be seen through: those whose decoded pixels hold an alpha
+ * below 255. Pass the result to `measureVisibility`.
  *
- * pdf.js sends an image's pixels apart from the operator list, possibly after it, so this
- * waits for each (`waitMs` at most). An image whose pixels do not arrive, or arrive in a form
- * this cannot read (a bitmap), is taken as see-through: the benefit of the doubt, as before.
- * Pass the result to `measureVisibility`.
+ * pdf.js sends an image's pixels apart from the operator list, possibly after it, so this waits for
+ * each (`waitMs` at most). Pixels that do not arrive, or arrive unreadable (a bitmap), are taken
+ * as see-through: the benefit of the doubt.
  *
- * It waits for the page's other images too. pdf.js decodes every image whether or not anyone
- * asks, and a page closed before its images are decoded leaves them decoding behind it: six
- * pages with a 48 MP photo each held 1.4 GB after the document had been read, one page's worth
- * at a time once each page waits for its own. Not every image: one in a tiling pattern or a
- * Type3 glyph, a soft mask, and one that takes over `waitMs` still decode after the page.
+ * It waits for the page's other images too: a page closed before its images decode leaves them
+ * decoding behind it (six 48 MP pages held 1.4 GB). Images in a pattern, a Type3 glyph or a soft
+ * mask, or slower than `waitMs`, still decode after the page.
  */
 export async function seeThroughImages(
   ops: Ops,
@@ -214,10 +199,7 @@ export async function seeThroughImages(
   return seeThrough;
 }
 
-/**
- * `seeThrough`: the masked images (`seeThroughImages`) whose pixels let what is under them
- * show. Without it, every image with a mask of its own is taken as see-through.
- */
+/** `seeThrough`: the masked images (`seeThroughImages`) whose pixels let what is under them show; without it every masked image does. */
 export function measureVisibility(
   ops: Ops,
   list: OperatorList,
@@ -241,21 +223,19 @@ export function measureVisibility(
   };
   let textMatrix: Matrix = IDENTITY;
   let lineMatrix: Matrix = IDENTITY;
-  // The last path built, in page space: what a shading (`sh`) fills is the clip it sets.
+  // The last path built, in page space: a shading (`sh`) fills the clip it sets.
   let lastPath: Box | null = null;
-  // Inside a soft mask's own content: pdf.js lists what the mask is made of among the page's
-  // operators, but none of it is painted.
+  // Inside a soft mask's own content: listed among the page's operators, but not painted.
   let maskDepth = 0;
 
   const drawn: Drawn[] = [];
   const runs: Run[] = [];
   const marks: Box[] = [];
-  // Where glyphs were drawn as a soft mask — text painted with a gradient — and where visible
-  // text was drawn: a transparent copy of either is the selectable layer of a text effect.
+  // Where glyphs were drawn as a soft mask (gradient text) or visibly: a transparent copy of
+  // either is the selectable layer of a text effect.
   const drawnGlyphs = new Set<string>();
-  // The glyphs the soft mask being built or in force is made of. They show only where what is
-  // painted through the mask stands out from what lies under it: a white rectangle painted
-  // through a mask of the text on a white page shows nothing, and is no visible copy of it.
+  // The glyphs of the soft mask being built or in force. They show only where what is painted
+  // through the mask stands out from what lies under it.
   let maskGlyphs: Array<{ text: string; center: [number, number] }> = [];
   const throughMask: Array<{
     text: string;
@@ -278,8 +258,8 @@ export function measureVisibility(
             order: item.order,
           });
       }
-    // Through a mask it may show anywhere or nowhere: it covers nothing for certain, and what
-    // lies on it has no known background.
+    // Through a mask it may show anywhere or nowhere: it covers nothing for certain, and text on
+    // it has no known background.
     drawn.push(masked ? { ...item, fill: "", alpha: 0 } : { ...item, alpha: state.alpha });
   };
   /** An image's own mask lets what is under it show — unless its pixels say it hides nothing. */
@@ -332,8 +312,7 @@ export function measureVisibility(
     }
     advance *= hScale;
     const device = multiply(state.ctm, textMatrix);
-    // A glyph prints as small as its narrower side: `1 Tz`, or a matrix that squashes the text
-    // sideways, leaves 10pt text a hairline wide, as unreadable as 0.1pt text.
+    // A glyph prints as small as its narrower side (`1 Tz` leaves 10pt text a hairline wide).
     const scale = Math.min(
       Math.hypot(device[0], device[1]) * Math.abs(hScale),
       Math.hypot(device[2], device[3]),
@@ -347,8 +326,7 @@ export function measureVisibility(
       ...state,
       text,
       origin: apply(device, 0, 0),
-      // No font size set is no size known (NaN, never tiny); a mirrored font is its own size, and
-      // a zero scale — `0 Tz` — leaves no size at all.
+      // No font size set is no size known (NaN, never tiny); a zero scale (`0 Tz`) leaves no size.
       size: fontSize ? Math.abs(fontSize) * scale : Number.NaN,
       box,
       center,
@@ -365,8 +343,7 @@ export function measureVisibility(
         ...state,
         ctm: multiply(state.ctm, Array.from(args as ArrayLike<number>) as Matrix),
       };
-    // A form XObject is drawn inside its own `q … Q`, through its own matrix: a colour it sets
-    // must not leak into the page's text after it, and its content is placed where it prints.
+    // A form XObject is drawn inside its own `q … Q`, through its own matrix.
     else if (fn === ops.paintFormXObjectBegin) {
       stack.push({ ...state });
       const matrix = args[0];
@@ -412,8 +389,7 @@ export function measureVisibility(
       state = { ...state, leading: -Number(args[1]) };
       moveText(Number(args[0]), Number(args[1]));
     } else if (fn === ops.setTextMatrix) {
-      // pdf.js passes the matrix as a typed array, wrapped or not depending on the version; a
-      // plain-array check read it as NaN and silently hid nothing.
+      // pdf.js passes the matrix as a typed array, wrapped or not by version.
       const inner = args[0];
       const matrix = Array.isArray(inner) || ArrayBuffer.isView(inner) ? inner : args;
       textMatrix = lineMatrix = Array.from(matrix as ArrayLike<number>).map(Number) as Matrix;
@@ -459,8 +435,7 @@ export function measureVisibility(
     } else if (fn === ops.shadingFill)
       // A gradient banner: its colour varies, so text on it is not judged by contrast.
       paint({ box: lastPath ?? pageBox, order, kind: "shading", fill: "" });
-    // A one-pixel stencil mask (`BI /IM true`) paints its unit square in the fill colour: a
-    // rectangle like any other, under text or over it.
+    // A one-pixel stencil mask (`BI /IM true`) paints its unit square in the fill colour.
     else if (fn === ops.paintSolidColorImageMask)
       paint({ box: boxThrough(state.ctm, [0, 0, 1, 1]), order, kind: "shape", fill: state.fill });
     else if (isImage.has(fn))
@@ -481,9 +456,8 @@ export function measureVisibility(
     if (fill === "" || background === "" || contrast(fill, background) >= MIN_CONTRAST)
       drawnGlyphs.add(cell(text, center));
   }
-  // What the render mode paints the glyphs with: their outline in modes 1 and 5, outline and
-  // fill in 2 and 6 (seen if either is), else their fill. Outlined text is judged by its stroke:
-  // a white-filled heading outlined in black is plainly visible.
+  // What the render mode paints glyphs with: outline in modes 1 and 5, outline and fill in 2 and 6
+  // (seen if either is), else fill.
   const paintsOf = (run: Run) => [
     ...(run.mode % 4 === 1 ? [] : [{ colour: run.fill, alpha: run.alpha }]),
     ...(run.mode % 4 === 1 || run.mode % 4 === 2
@@ -491,9 +465,9 @@ export function measureVisibility(
       : []),
   ];
   const transparentRun = (run: Run) => paintsOf(run).every(({ alpha }) => alpha === 0);
-  // Visible runs by the point their baseline is on, in order along it: Chrome draws an outline
-  // a glyph at a time and its transparent copy in pieces ("PRIY", "A", " NAIR"), in fonts whose
-  // widths differ, so a piece is matched by the glyphs that start within it.
+  // Visible runs by baseline, in order along it: Chrome draws an outline a glyph at a time and its
+  // transparent copy in pieces, in fonts of differing widths, so a piece is matched by the glyphs
+  // that start within it.
   const lines = new Map<number, Run[]>();
   for (const run of runs)
     if (run.mode % 4 !== 3 && !transparentRun(run)) {
@@ -506,8 +480,7 @@ export function measureVisibility(
   let checks = 0;
   const copied = (run: Run) => {
     const [x, y] = run.origin;
-    // Widths differ a little between the two fonts: the glyphs are taken in order from where
-    // the piece starts until they spell as many characters as it has.
+    // Glyphs are taken in order from where the piece starts until they spell as many characters.
     const end = run.box[2] + run.size;
     const bare = (text: string) => text.replace(/\s/g, "");
     const target = bare(run.text);
@@ -548,9 +521,8 @@ export function measureVisibility(
     if (unseen) invisibleChars += chars;
     const invisible = unseen && !overImage;
     const paints = paintsOf(run);
-    // Fully transparent, unless the same text is drawn where it lies — as glyphs, or as the mask
-    // a gradient is painted through: Chrome lays such a copy over text with a shadow, an outline
-    // or `background-clip: text`, for selection. It hides nothing.
+    // Fully transparent, unless the same text is drawn where it lies (as glyphs or a gradient's
+    // mask): Chrome's selectable copy hides nothing.
     const transparent =
       transparentRun(run) &&
       ![-1, 0, 1].some((dx) =>
@@ -563,16 +535,15 @@ export function measureVisibility(
       run.box[0] > pageBox[2] ||
       run.box[3] < pageBox[1] ||
       run.box[1] > pageBox[3];
-    // An image, a gradient or a pattern beneath leaves the background unknown, and text in a
-    // pattern has no one colour: either way the run is given the benefit of the doubt.
+    // An unknown background, or text in a pattern, gets the benefit of the doubt.
     const background = top ? top.fill : "#ffffff";
     const blended =
       background !== "" &&
       paints.every(({ colour }) => colour !== "" && contrast(colour, background) < MIN_CONTRAST);
 
     if (!(invisible || transparent || tiny || offPage || blended || covered)) continue;
-    // Runs one after another on a line are one piece of text: Chrome draws a glyph at a time, and
-    // its hidden text read back "K u b e r n e t e s". A gap of a space's width is a space.
+    // Runs one after another on a line are one text (Chrome draws a glyph at a time); a gap of a
+    // space's width is a space.
     const gap = previous ? run.box[0] - previous.box[2] : NaN;
     if (
       previous &&

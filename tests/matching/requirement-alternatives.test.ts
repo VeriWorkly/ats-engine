@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsRequirement } from "../../src/index.js";
+import { DEFAULT_POLICY, type AtsRequirement, check } from "../../src/index.js";
 import { main } from "../../src/cli/main.js";
 import { BUILT_IN_LOCALES, localizePolicy, withLocales } from "../../src/locales/index.js";
 import { degreeLevel } from "../../src/parser/education.js";
@@ -37,7 +37,7 @@ const FOUR_YEARS = "Engineer, Acme Corp Jan 2022 - Present\n- Built payment serv
 const BACHELOR = "B.S. Computer Science, State University 2015";
 
 const one = (line: string, text: string, policy = DEFAULT_POLICY) =>
-  AtsScoringService.check(text, policy, { jobDescription: `Requirements\n- ${line}`, now: NOW })
+  check(text, policy, { jobDescription: `Requirements\n- ${line}`, now: NOW })
     .requirements[0] as AtsRequirement;
 
 /** Time one pattern on hostile inputs: long runs of spaces, digits, letters and separators. */
@@ -151,7 +151,7 @@ describe("a bare two-letter degree is told from a state code by what follows it"
     ["Harvard, MA (Economics), 2015", 7],
     ["B.S. Computer Science, Boston University, Boston MA, 2015", 6],
     ["BS Biology, Tufts University, Medford MA 2016", 6],
-    // No state is "BS" or "BA", so those read as degrees wherever they stand, as they always did.
+    // No state is "BS" or "BA": those read as degrees wherever they stand.
     ["Northeastern University, BS, Computer Science", 6],
     ["Oberlin College, BA, 2014", 6],
     ["BA 2016", 6],
@@ -209,9 +209,9 @@ describe("an unknown region is an error, not silently ignored", () => {
       }
     })();
     for (const id of ["ES", "DE", "FR", "GB", "IN", "US"]) expect(message).toContain(id);
-    expect(() =>
-      AtsScoringService.check(resume({ roles: TEN_YEARS }), P, { region: "ES", now: NOW }),
-    ).toThrow(AtsPolicyError);
+    expect(() => check(resume({ roles: TEN_YEARS }), P, { region: "ES", now: NOW })).toThrow(
+      AtsPolicyError,
+    );
   });
 
   it("still accepts an attached region in any case", () => {
@@ -231,13 +231,12 @@ describe("an unknown region is an error, not silently ignored", () => {
   });
 });
 
-/** Found by the final review. */
+/** Follow-up defects. */
 describe("degree requirements beside fields and places", () => {
   it("keeps an alternative inside the field of study out of the degree-or-years choice", () => {
     const line =
       "Bachelor's degree in Computer Science, Engineering or a related field, and 3+ years of experience";
-    // Not met: 1 year of 3. (Missing, not partial, since the field words belong to the degree
-    // and no longer stand in for the years.)
+    // Not met: 1 year of 3 (the field words belong to the degree, not the years).
     expect(one(line, resume({ roles: ONE_YEAR, education: BACHELOR })).status).not.toBe("met");
     const de = localizePolicy(P, "", { languages: ["de"] }).policy;
     expect(

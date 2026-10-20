@@ -1,14 +1,12 @@
 /**
  * Seeded synthetic resumes for `npm run bench`, labelled from the inputs they are written from,
- * never from what the engine reads. People, employers and schools are invented, drawn from small
- * hand-written lists. Layout varies the way real resumes do: how a job's title, employer and dates
- * are joined, where the date and the city go, how dates are written, which heading synonym and
- * section order, which bullet. The same resume is rendered as text, as a one-column PDF with
- * flush-right dates (over several pages when it is long), as a two-column PDF with a sidebar, and
- * as a DOCX, so reading order, columns and page breaks are measured too.
+ * never from what the engine reads. People, employers and schools are invented. Layout varies as
+ * real resumes do (header joins, date and city placement, date format, heading synonyms, section
+ * order, bullet). Each is rendered as text, a one-column PDF with flush-right dates, a two-column
+ * PDF with a sidebar, and a DOCX.
  *
- * Deterministic: a seed gives the same corpus on every machine. Change a list or the order the
- * generator draws in and every resume changes, so the baseline in bench/baseline.json is redone.
+ * Deterministic per seed. Changing a list or the draw order changes every resume, so redo
+ * bench/baseline.json.
  */
 import { extractResume } from "../../src/node/extract.js";
 import { buildDocx } from "./buildDocx.js";
@@ -288,7 +286,6 @@ export function generateResumes(count: number, seed = 20261001): GeneratedResume
           : pick(DEGREES.filter((d) => d.isced === 7));
       return { school, ...degree, year: oldest - 1 - (degreeCount === 2 ? 2 - i * 2 : 0) };
     });
-    // Newest first.
     degrees.sort((a, b) => b.year - a.year);
 
     const skills = some(SKILLS, 5 + int(3));
@@ -308,7 +305,6 @@ export function generateResumes(count: number, seed = 20261001): GeneratedResume
     const dateRange = (r: (typeof roles)[number]) =>
       `${fmt(r.start)}${rangeWord}${r.current ? currentWord : fmt(r.end)}`;
 
-    // Experience.
     const experience: Line[] = [];
     for (const role of roles) {
       const dates = dateRange(role);
@@ -319,7 +315,6 @@ export function generateResumes(count: number, seed = 20261001): GeneratedResume
       for (const bullet of role.bullets) experience.push({ left: `${bulletMark} ${bullet}` });
     }
 
-    // Education.
     const eduStyle = int(3);
     const education: Line[] = [];
     const stacked: Line[] = [];
@@ -334,7 +329,6 @@ export function generateResumes(count: number, seed = 20261001): GeneratedResume
       stacked.push({ left: d.school }, { left: `${study}, ${d.year}` });
     }
 
-    // Skills.
     const skillStyle = int(3);
     const skillLines: Line[] =
       skillStyle === 0
@@ -343,7 +337,6 @@ export function generateResumes(count: number, seed = 20261001): GeneratedResume
           ? [{ left: skills.join(" | ") }]
           : skills.map((s) => ({ left: `${bulletMark} ${s}` }));
 
-    // Certifications.
     const certLines: Line[] = [];
     const certExpected: NonNullable<LocaleFixture["certifications"]> = [];
     for (const cert of certs) {
@@ -375,7 +368,6 @@ export function generateResumes(count: number, seed = 20261001): GeneratedResume
       }
     }
 
-    // Header lines.
     const contact = [email, phone, ...(chance(0.5) ? [city] : [])];
     const headerStyle = int(3);
     const header: Line[] = [{ left: name }];

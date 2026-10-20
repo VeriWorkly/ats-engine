@@ -1,6 +1,5 @@
-// The built MCP server, spawned over stdio and driven with the SDK's own client: every tool's
-// structured answer is the engine's `check` on the same input, and every mistake in a call is a
-// tool error the assistant can read, not a crash.
+// The built MCP server over stdio, driven with the SDK's client: each tool's structured answer is
+// the engine's `check` on the same input, and a mistake in a call is a tool error, not a crash.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -331,9 +330,7 @@ describe("registry metadata", () => {
     const pkg = JSON.parse(readFileSync(PACKAGE, "utf8"));
     const server = JSON.parse(readFileSync(SERVER_JSON, "utf8"));
     expect(server.name).toBe(pkg.mcpName);
-    // The registry grants `io.github.<owner>/*` in the owner's exact casing and compares
-    // names case-sensitively (modelcontextprotocol/registry#689), so a lowercase
-    // namespace is refused for the VeriWorkly organisation.
+    // The registry compares `io.github.<owner>/*` case-sensitively (registry#689).
     expect(server.name).toBe("io.github.VeriWorkly/ats-engine");
     expect(server.version).toBe(pkg.version);
     expect(server.packages).toEqual([

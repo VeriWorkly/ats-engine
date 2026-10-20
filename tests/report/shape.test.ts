@@ -46,8 +46,10 @@ function report(overrides: Partial<AtsReport> = {}): AtsReport {
       ],
       education: [],
       skills: ["react"],
+      certifications: [],
+      spokenLanguages: [],
       monthsOfExperience: 24,
-      highestDegree: "bachelor",
+      highestIsced: null,
       provenance: {
         name: "parser",
         email: "parser",
@@ -55,8 +57,13 @@ function report(overrides: Partial<AtsReport> = {}): AtsReport {
         roles: "parser",
         education: "none",
         skills: "parser",
+        certifications: "none",
+        spokenLanguages: "none",
       },
     },
+    locale: { languages: ["en"], region: null },
+    engine: { version: "0.0.0", policy: "test" },
+    requirements: [],
     advice: [],
     ...overrides,
   };
@@ -97,8 +104,7 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
       advice: [],
     });
 
-    // Nothing that would let a visitor reconstruct the report. `categories` is on this list
-    // deliberately: the rollup says which areas lost points, which is most of the diagnostic.
+    // Nothing that would let a visitor reconstruct the report; `categories` is deliberately included.
     for (const withheld of [
       "rules",
       "categories",
@@ -136,8 +142,7 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
       "restricted",
     );
     if (!shaped.restricted) throw new Error("expected a restricted report");
-    // Advice never moves the score and is no part of the rubric's answer key; what it quotes —
-    // the file name, a year, the candidate's name in the suggestion — stays with the full report.
+    // Advice is no part of the rubric's answer key; what it quotes stays with the full report.
     expect(shaped.advice).toEqual([
       {
         id: "file.name",
@@ -192,8 +197,7 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
     );
 
     if (shaped.restricted !== true) throw new Error("expected a restricted report");
-    // Chosen over the heavier content failure: you can read a job posting and spot a missing
-    // keyword yourself; you cannot see that your columns scramble on extraction.
+    // Chosen over a heavier content failure: a missing keyword is visible to the reader, scrambled columns are not.
     expect(shaped.primaryWarning).toContain("gutter");
   });
 

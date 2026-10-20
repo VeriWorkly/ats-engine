@@ -1,17 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, parseResume, check } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { applyVocabulary } from "../../src/locales/languages.js";
 import { cefrLevel } from "../../src/parser/languages.js";
 import { segmentResume } from "../../src/parser/sections.js";
 import { expectFast } from "../fixtures/timing.js";
 
-/**
- * Spoken languages read as rows — the language, the level as written, and that level on the
- * CEFR scale — from a Languages section or a "Languages:" line among the skills. Invented
- * people only.
- */
+// Spoken languages as rows (language, level as written, CEFR) from a Languages section or line.
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const LOCALES = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -169,8 +165,7 @@ describe("a languages line becomes rows", () => {
 
 describe("spoken languages in German and Hindi", () => {
   const read = (text: string, language: string) =>
-    AtsScoringService.check(`${HEAD}\n${text}`, LOCALES, { languages: [language], now: NOW }).parsed
-      .spokenLanguages;
+    check(`${HEAD}\n${text}`, LOCALES, { languages: [language], now: NOW }).parsed.spokenLanguages;
 
   it("reads German level words and an explicit CEFR level", () => {
     expect(

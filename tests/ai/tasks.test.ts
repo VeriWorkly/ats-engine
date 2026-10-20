@@ -4,7 +4,7 @@ import { createAtsAi } from "../../src/ai/index.js";
 import { createRedaction } from "../../src/ai/redact.js";
 import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
-import { AtsScoringService } from "../../src/scoring/engine.js";
+import { check } from "../../src/scoring/engine.js";
 import type { AtsReport } from "../../src/types.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -23,7 +23,7 @@ const RESUME = [
 const JOB = "We need TypeScript, Kubernetes and payments experience.";
 
 function report(): AtsReport {
-  return AtsScoringService.check(RESUME, DEFAULT_POLICY, { jobDescription: JOB });
+  return check(RESUME, DEFAULT_POLICY, { jobDescription: JOB });
 }
 
 const insights = (overrides: Record<string, unknown> = {}) =>
@@ -66,7 +66,7 @@ describe("analyze", () => {
   });
 
   it("leaves the advice out, so the file name does not carry the name", async () => {
-    const withFile = AtsScoringService.check(RESUME, DEFAULT_POLICY, {
+    const withFile = check(RESUME, DEFAULT_POLICY, {
       file: { name: "Jane_Doe_Resume_final_v3 (2).pdf", format: "pdf", bytes: 1_000 },
     });
     expect(JSON.stringify(withFile.advice)).toMatch(/Jane.Doe/); // the advice quotes it
@@ -107,8 +107,7 @@ describe("analyze", () => {
   });
 
   it("drops every keyword suggestion when there is no posting for one to point at", async () => {
-    // A suggestion without a posting is the model's own idea of what the role needs: the advice
-    // that sends a candidate to pad a resume with irrelevant words.
+    // Without a posting a suggestion is the model's own idea of the role.
     const provider = scriptedProvider(insights({ keywordOpportunities: ["Blockchain"] }));
     const ai = createAtsAi({ provider, routes });
     const outcome = await ai.analyze({ resumeText: RESUME, report: report() });
@@ -148,8 +147,7 @@ describe("analyze", () => {
   });
 
   it("sends nothing from past the cut that redaction pulled in", async () => {
-    // Redaction shrinks every long email to "[EMAIL_n]", over a thousand characters in all, so
-    // the 50,000 characters sent reached past the 51,000th of the resume, where the phone starts.
+    // Redaction shrinks long emails, so the characters sent must not reach past the cut.
     const email = "jane.doe.portfolio.contact@janedoe-consulting.example.com";
     const head = `${RESUME}\n${`Reach me at ${email}\n`.repeat(25)}`;
     const text = `${head}${"x".repeat(51_000 - head.length - 7)} (415) 555-0199 and more`;
@@ -205,8 +203,7 @@ describe("redaction", () => {
     expect(redaction.restore(redaction.apply(value))).toEqual(value);
   });
 
-  // A pattern for each distinct address ran the text once per address: 50,000 characters of them
-  // took 3.3 seconds. One pass now, and each still restores to itself.
+  // One pass over the text, not one per distinct address; each still restores to itself.
   it("redacts thousands of distinct email addresses in one pass", () => {
     const hostile = Array.from({ length: 8_000 }, (_, i) => `u${i}@b.co`).join(" ");
     const redaction = createRedaction(parsed, hostile);
@@ -258,7 +255,7 @@ describe("redaction", () => {
 
 describe("repairParse", () => {
   const SOURCE = "Jane Doe\nSenior Engineer, Acme Corporation\nJan 2020 - Present\n";
-  const empty = AtsScoringService.check("x", DEFAULT_POLICY).parsed;
+  const empty = check("x", DEFAULT_POLICY).parsed;
 
   it("fills empty fields with grounded values and reports the ungrounded ones", async () => {
     const provider = scriptedProvider(

@@ -1,9 +1,7 @@
 /**
- * `--ai`: a model's plain-language reading of the report, from a provider the user picks.
- *
- * The API key comes from the environment only, never from a flag, which would leave it in shell
- * history and in the process list. Named providers are presets over the two adapters; anything
- * else that serves Chat Completions is `openai-compatible` with a `--base-url`.
+ * `--ai`: a model's reading of the report. The API key comes from the environment only (a flag
+ * would leak into shell history and the process list). Named providers are presets over the two
+ * adapters; anything else is `openai-compatible` with a `--base-url`.
  */
 
 import { anthropic } from "../ai/anthropic.js";
@@ -56,11 +54,10 @@ export const PROVIDERS: Readonly<Record<string, Preset>> = {
 
 const PROVIDER_NAMES = Object.keys(PROVIDERS);
 
-/** Output budget when none is given. Thinking models spend part of it before they answer. */
+/** Output budget when none is given; thinking is included. */
 export const DEFAULT_MAX_TOKENS = 8_000;
 
-/** The longest the CLI waits for an analysis, retries included, when none is given. A thinking
- * model spending its whole default budget answers well within it. */
+/** The longest the CLI waits for an analysis, retries included, when none is given. */
 export const DEFAULT_TIMEOUT_SECONDS = 120;
 const MAX_TIMEOUT_SECONDS = 3_600;
 
@@ -92,11 +89,9 @@ function isLocal(url: string): boolean {
 }
 
 /**
- * Flags win over `ATS_AI_*` variables. Throws a `UsageError` naming what is missing.
- *
- * A provider named by flag ignores `ATS_AI_BASE_URL`: an endpoint left in the environment for
- * another provider would otherwise receive this provider's key. For the same reason the provider's
- * own key variable is read before the shared `ATS_AI_API_KEY`.
+ * Flags win over `ATS_AI_*` variables. Throws a `UsageError` naming what is missing. A provider
+ * named by flag ignores `ATS_AI_BASE_URL`, and the provider's own key variable is read before
+ * `ATS_AI_API_KEY`: an endpoint left in the environment for another provider must not get this key.
  */
 export function resolveAiConfig(flags: AiFlags, env: Env): AiConfig {
   const baseUrlOverride =
@@ -196,8 +191,7 @@ export async function analyzeReport(
     provider: createProvider(config, fetch),
     routes: { analyze: { model: config.model, maxTokens: config.maxTokens, retries: 1 } },
   });
-  // One deadline for the whole call: each attempt may use all of it, and a retry only what is
-  // left, so a provider that never answers costs `timeoutMs`, not that once per attempt.
+  // One deadline for the whole call, retries included.
   return ai.analyze(input, { signal: AbortSignal.timeout(config.timeoutMs) });
 }
 

@@ -4,18 +4,11 @@ import type { AtsParsedCertification } from "../types.js";
 import { memo } from "../util/memo.js";
 import { findDates } from "./dates.js";
 
-/**
- * Certifications and licences as rows: "AWS Certified Solutions Architect – Associate, Amazon
- * Web Services, 2023" is a name, an issuer and the year it was earned; "PMP (PMI), expires 2027"
- * a name, an issuer in brackets and an expiry.
- *
- * A line is cut into parts at its separators — commas, bars, dots, an em dash, a column gap —
- * outside brackets. Spaced en dashes and hyphens cut only when nothing else does and there are
- * two of them ("ITIL 4 Foundation – AXELOS – 2020"): one is as often inside the name ("AWS
- * Certified Developer – Associate"). Dates come out of each part with the word before them
- * (`credentialWords`), which says whether a date is the expiry; what is left is the name, then the
- * issuer.
- */
+// Certifications as rows (name, issuer, earned, expiry): "AWS Certified Solutions Architect –
+// Associate, Amazon Web Services, 2023". A line is cut at its separators outside brackets; spaced
+// en dashes and hyphens cut only when nothing else does and there are two (one is as often inside
+// the name). Dates come out of each part with the word before them (`credentialWords`), which says
+// whether a date is the expiry; what is left is the name, then the issuer.
 
 /** A line longer than this is a sentence about a certification, not one. */
 const MAX_LINE = 200;
@@ -50,7 +43,7 @@ const wordsOf = memo((rp: AtsEnginePolicy["resumeParse"]): Words => {
   };
 });
 
-/** Spaced en dashes and hyphens: separators only when a line holds two and nothing else. */
+/** Spaced en dashes and hyphens: separators only when a line holds two and no other separator. */
 const SPACED_DASH = /\s[–-]\s/gu;
 const PRIMARY = new Set([",", ";", "|", "·", "•", "—", "\t"]);
 
@@ -131,8 +124,7 @@ function takeDates(
     const expiry = words.expires.exec(before);
     const issued = expiry ? null : words.issued.exec(before);
     const label = expiry ?? issued;
-    // An unlabelled year with a word straight after it is part of the name: "Windows Server
-    // 2019 Administrator".
+    // An unlabelled year with a word straight after it is part of the name ("Windows Server 2019 Administrator").
     const after = part.slice(found.end, found.end + LABEL_REACH);
     if (!label && WORD_AFTER.test(after) && !words.opening.test(after)) continue;
     rest += part.slice(from, label ? start + label.index : found.index);
@@ -200,10 +192,16 @@ function readCertification(
   return { row: { name, issuer: issuer.slice(0, MAX_FIELD), ...dated }, dated };
 }
 
+/** Each certification once in a list, by name, in the order first read. */
+export function addCertifications(into: AtsParsedCertification[], rows: AtsParsedCertification[]) {
+  for (const row of rows)
+    if (!into.some((kept) => kept.name.toLowerCase() === row.name.toLowerCase())) into.push(row);
+}
+
 /**
  * The rows of a certifications section. Where the section mixes plain lines and bullets, the
- * bullets describe the line above them and are skipped; a list written all in bullets is the
- * list. A line of dates alone joins the row above it. Each certification once, by name.
+ * bullets describe the line above and are skipped; a list all in bullets is the list. A line of
+ * dates alone joins the row above it. Each certification once, by name.
  */
 export function parseCertifications(
   lines: readonly string[],

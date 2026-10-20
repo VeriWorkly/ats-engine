@@ -9,22 +9,17 @@ import {
 import { expectFastAsync } from "../fixtures/timing.js";
 
 /**
- * Calibration suite: exercises the engine against the *real* shipped policy rather than a
- * miniature fixture, because the failures these cover were failures of the policy and the
- * algorithm together. A strong candidate scoring 30 against a posting they matched completely
- * was not visible in any unit test written against a five-rule fixture.
- *
- * The policy is private and gitignored, so the suite skips itself when it is not present rather
- * than failing a checkout that legitimately does not have it. See `./livePolicy.ts` for how it
- * is resolved — the path moved when this file did.
+ * Calibration suite: the engine against the real shipped policy, not a fixture, since these
+ * failures were of the policy and the algorithm together. The policy is private and gitignored,
+ * so the suite skips itself when absent (see `./livePolicy.ts`).
  */
 const check = async (
   resume: AtsResumeInput,
   jobDescription?: string,
   layout?: AtsLayoutSignals,
 ) => {
-  const { AtsScoringService } = await import("../../src/index.js");
-  return AtsScoringService.check(resume, policy!, { jobDescription, layout });
+  const { check: score } = await import("../../src/index.js");
+  return score(resume, policy!, { jobDescription, layout });
 };
 
 const STRONG_RESUME = [
@@ -94,13 +89,8 @@ const POSTING = [
 ].join("\n");
 
 /**
- * Proof that the suite below is actually running.
- *
- * Everything here is gated on the private policy being present, and a `skipIf` that silently
- * stops matching is indistinguishable from a passing run. That is not hypothetical: this file
- * moved, and the relative path to `.private/` moved with it. This test does not skip, so a
- * broken path fails loudly and names the location it tried, instead of quietly reporting green
- * on nothing at all.
+ * Proof that the suite below is running: it is gated on the private policy, and a silent `skipIf`
+ * looks like a pass. This test does not skip, so a broken path fails loudly.
  */
 it("resolves the private policy, or explains why the calibration suite is skipped", () => {
   if (policy) {
@@ -117,8 +107,7 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
   it("scores a candidate who meets every stated requirement as a strong match", async () => {
     const report = await check(STRONG_RESUME, POSTING);
 
-    // Before section scoping and specificity weighting this pair scored 30 and was labelled
-    // "weak" — the posting's benefits copy and company name outvoted the skills it asked for.
+    // Benefits copy and the company name must not outvote the skills asked for.
     expect(report.jobMatchScore).toBeGreaterThanOrEqual(70);
     expect(computeVerdict(report)).toBe("strong");
     expect(report.readinessScore).toBeGreaterThanOrEqual(85);
@@ -172,8 +161,7 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
     const withRequired = await check(`${base}Deployed Kubernetes clusters`, posting);
     const withPreferred = await check(`${base}Wrote Terraform modules`, posting);
 
-    // The old fixed 600-character window ran past "Requirements" into the nice-to-haves, so
-    // both terms carried the required weight and these two scored identically.
+    // The required section ends at the next heading, so nice-to-haves keep the preferred weight.
     expect(withRequired.jobMatchScore).toBeGreaterThan(withPreferred.jobMatchScore ?? 0);
   });
 
@@ -183,8 +171,7 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
       "Requirements\nStrong machine learning ability and model deployment.",
     );
 
-    // Consuming phrase components document-wide used to strike "machine" and "learning" from
-    // the resume entirely, scoring this pair at 0.
+    // Phrase components are consumed by span, not document-wide.
     expect(report.jobMatchScore).toBeGreaterThan(0);
     expect(report.matchedKeywords).toContain("machine learning");
   });
@@ -298,11 +285,8 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
     expect(none.missingKeywords.join(" ")).toMatch(/react or vue or angular/);
   });
 
-  /**
-   * A word appearing beside two different "or"s must not weld their requirements together.
-   * Chaining through the union-find let "Java or equivalent" and "Python or equivalent" become
-   * one group, so a Java-only resume scored 100 and Python vanished from the missing list.
-   */
+  // A word beside two different "or"s must not weld their requirements together ("Java or
+  // equivalent", "Python or equivalent").
   it("never lets a filler word merge two separate requirements", async () => {
     const base = "jane@example.com\nExperience\nEducation\nSkills\n";
     const report = await check(
@@ -321,16 +305,11 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
       "Requirements\n- Java or Kotlin\n- Kotlin or Swift",
     );
 
-    // Kotlin satisfies the first choice. The second is a separate requirement that happens to
-    // share a member, not an extension of the first.
+    // Kotlin satisfies the first choice; the second is a separate requirement sharing a member.
     expect(report.jobMatchScore).toBeLessThan(100);
   });
 
-  /**
-   * The obvious regex for alternation nests a quantifier inside a repetition, which backtracks
-   * catastrophically on a long comma list containing no "or" — 546 ms against 10 ms for a normal
-   * posting, on the free unauthenticated endpoint. This pins the linear replacement.
-   */
+  // A long comma list containing no "or" must stay linear.
   it("stays fast on a comma list built to make a backtracking scanner suffer", async () => {
     const bomb = Array.from({ length: 4000 }, (_, index) => `term${index}`).join(", ");
 
@@ -340,12 +319,8 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
     );
   });
 
-  /**
-   * A Studio resume arrives as a JSON document, not text. Heading-scoped structure rules made
-   * that path a real regression risk — there are no headings in an object — so `flatten` emits
-   * each key on its own line. The collapsed text is byte-identical either way; only `lines`
-   * changes, which is exactly what the rules read.
-   */
+  // A structured resume has no headings, so `flatten` emits each key on its own line: the
+  // collapsed text is byte-identical, only `lines` changes.
   it("maps sections from a Studio resume document, not just from text", async () => {
     const document = {
       basics: { fullName: "Jane Doe", email: "jane@example.com" },
@@ -363,10 +338,9 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
   });
 
   it("survives every degenerate input without throwing", async () => {
-    // Resolved first, then asserted synchronously: `check` is async here only because it imports
-    // the engine, and a rejected promise would sail straight past `.not.toThrow()`.
+    // Resolved first, then asserted synchronously: a rejected promise would pass `.not.toThrow()`.
     for (const resume of [null, undefined, 42, "", "   \n\n  ", {}, [], { a: { b: [] } }]) {
-      const report = await check(resume).then(
+      const report = await check(resume as AtsResumeInput).then(
         (value) => () => value,
         (error: unknown) => () => {
           throw error;
@@ -375,8 +349,7 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
       expect(report).not.toThrow();
     }
 
-    // A posting made entirely of about-us and benefits copy yields no scoreable term. Reporting
-    // no score is right; inventing one from boilerplate is what the rewrite exists to prevent.
+    // A posting of only about-us and benefits copy yields no score.
     const boilerplate = await check(
       "jane@example.com\nSkills\nGo",
       "About us\nWe are great.\n\nBenefits\nDental and vision coverage.",
@@ -410,8 +383,7 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
         .reduce((sum, entry) => sum + entry.lost, 0);
       const lost = ordinary.reduce((sum, entry) => sum + entry.lost, 0);
       const possible = ordinary.reduce((sum, entry) => sum + entry.possible, 0);
-      // The old score was `100 - lost`, which floored the worst possible resume at 11 and
-      // shifted meaning as soon as the applicable rule set changed.
+      // Normalised against what the applicable rules could take away, so the worst resume scores 0.
       expect(report.readinessScore).toBe(
         Math.max(0, Math.round((1 - lost / possible) * 100) - penalty),
       );

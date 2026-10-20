@@ -1,10 +1,8 @@
 /**
  * @veriworkly/ats-engine/ai/testing — test doubles and an eval harness for the AI tasks.
  *
- * `scriptedProvider` replays canned replies, for unit tests and for checking prompt overrides
- * without a network. `runAiEval` measures what matters about a provider + prompt combination:
- * does the output parse, does it stay grounded, does it invent numbers, is it stable, and does
- * a resume that tries to give the model instructions get its way.
+ * `scriptedProvider` replays canned replies without a network. `runAiEval` measures a provider
+ * and prompt: schema validity, grounding, invented numbers, stability and injection leaks.
  */
 
 import type { AtsAi } from "../index.js";
@@ -12,10 +10,7 @@ import type { LlmProvider, LlmRequest, LlmResponse } from "../provider.js";
 import type { AtsAiResult } from "../run.js";
 import { AtsAiError } from "../run.js";
 
-/**
- * One scripted answer: the response text, a partial response, an error to throw, or a function
- * of the request.
- */
+/** One scripted answer: the response text, a partial response, an error to throw, or a function of the request. */
 export type ScriptedReply =
   string | Partial<LlmResponse> | Error | ((request: LlmRequest) => string | Partial<LlmResponse>);
 
@@ -25,11 +20,7 @@ export type ScriptedProvider = LlmProvider & {
   readonly calls: LlmRequest[];
 };
 
-/**
- * A provider that answers from a script, one reply per call; the last reply repeats once the
- * script runs out. A string is the response text, an `Error` is thrown, a function is called
- * with the request.
- */
+/** A provider that answers from a script, one reply per call; the last reply repeats once the script runs out. */
 export function scriptedProvider(...replies: ScriptedReply[]): ScriptedProvider {
   if (!replies.length) throw new Error("scriptedProvider needs at least one reply.");
   const calls: LlmRequest[] = [];
@@ -51,10 +42,7 @@ export type AiEvalCase = {
   id: string;
   /** Runs the task under test. `ai` is the instance passed to `runAiEval`. */
   run(ai: AtsAi): Promise<AtsAiResult<unknown>>;
-  /**
-   * Text the output may legitimately draw numbers from: everything the task is given — the
-   * resume, the posting, and for `analyze` the report (`JSON.stringify(report)` will do).
-   */
+  /** Text the output may draw numbers from: the resume, the posting, and for `analyze` the report. */
   source: string;
   /** Values that must never appear in the output, e.g. an employer a resume tries to inject. */
   forbidden?: string[] | undefined;
@@ -93,10 +81,7 @@ const ISO_MONTH = /(?<!\d)(\d{4})-(0[1-9]|1[0-2])(?!\d)/g;
 /** A month and year in numbers, either way round: "2019-03", "2019/3", "03/2019", "3.2019". */
 const NUMERIC_MONTH = /(?<!\d)(?:(\d{4})[-/.](\d{1,2})|(\d{1,2})[-/.](\d{4}))(?!\d)/g;
 
-/**
- * The first three letters of each month's English name, from the platform (`Intl`): the
- * language the eval's cases are written in. Read once, when first needed.
- */
+/** The first three letters of each month's English name, read once from `Intl`. */
 let monthNames: string[] | undefined;
 const namesOfMonths = () =>
   (monthNames ??= Array.from({ length: 12 }, (_, month) =>
@@ -113,7 +98,7 @@ function statedMonths(source: string): Set<string> {
     stated.add(`${year ?? yearAfter}-${Number(month ?? monthFirst)}`);
   const names = namesOfMonths();
   const named = new RegExp(
-    // `\s*(?:,\s*)?`, not `\s*,?\s*`: two adjacent `\s*` split a run of spaces every way.
+    // Not `\s*,?\s*`: adjacent `\s*` backtrack quadratically.
     String.raw`(?<!\p{L})(${names.join("|")})\p{L}*\.?\s*(?:,\s*)?(\d{4})(?!\d)`,
     "giu",
   );
@@ -122,11 +107,7 @@ function statedMonths(source: string): Set<string> {
   return stated;
 }
 
-/**
- * Numbers in the output that the source never states. An ISO date's year and month are not when
- * the source states that month of that year: conversion writes "Mar 2019" as "2019-03". A day
- * after them still counts.
- */
+/** Numbers in the output that the source never states; an ISO year-month counts as stated when the source states that month. */
 export function fabricatedNumbers(output: unknown, source: string): string[] {
   const known = new Set(source.match(NUMBER) ?? []);
   const months = statedMonths(source);
@@ -141,10 +122,7 @@ export function fabricatedNumbers(output: unknown, source: string): string[] {
 
 const rate = (count: number, total: number) => (total ? count / total : 0);
 
-/**
- * Runs every case `runs` times (default 1) and measures schema-valid output, grounding, numbers
- * not in the source, consistency between runs, and leaks of forbidden values.
- */
+/** Runs every case `runs` times (default 1) and measures the `AiEvalReport` rates. */
 export async function runAiEval(
   ai: AtsAi,
   cases: AiEvalCase[],

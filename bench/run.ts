@@ -1,19 +1,13 @@
-// Parsing benchmark: field accuracy over two labelled corpora of invented resumes, and time per
-// resume. `npm run bench`.
-//
-// - "hand-written": the resumes in tests/fixtures, read as text. A regression check: the engine
-//   was built against them.
-// - "generated": a seeded corpus (tests/fixtures/generatedResumes.ts) rendered as text, a PDF, a
-//   two-column PDF and a DOCX, labelled from its inputs. Not tuned to the engine.
-//
-// bench/baseline.json lists every field each corpus misses today. The run fails on a miss that is
-// not in it, so one field read better cannot hide another read worse; `npm run bench -- --update`
-// rewrites it, in the change that earns the difference.
+// Parsing benchmark: field accuracy and time per resume. `npm run bench`.
+// - "hand-written": the resumes in tests/fixtures, read as text (a regression check).
+// - "generated": a seeded corpus rendered as text, a PDF, a two-column PDF and a DOCX.
+// bench/baseline.json lists every field each corpus misses. The run fails on a miss not in it;
+// `npm run bench -- --update` rewrites it, in the change that earns the difference.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { format, resolveConfig } from "prettier";
 
-import { AtsScoringService, DEFAULT_POLICY, type AtsLayoutSignals } from "../src/index.js";
+import { check, DEFAULT_POLICY, type AtsLayoutSignals } from "../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../src/locales/index.js";
 import { fieldChecks, type FieldCheck } from "../tests/fixtures/accuracy.js";
 import { RENDERINGS, generateResumes, renderResume } from "../tests/fixtures/generatedResumes.js";
@@ -52,13 +46,13 @@ function record(set: string, corpus: string, id: string, checks: FieldCheck[]) {
 
 function checkTimed(text: string, layout?: AtsLayoutSignals) {
   const started = performance.now();
-  const report = AtsScoringService.check(text, policy, { now, layout });
+  const report = check(text, policy, { now, layout });
   timings.push(performance.now() - started);
   return report;
 }
 
-// The first call pays for compiling the policy's patterns; it is not what a server pays per resume.
-AtsScoringService.check("Jane Doe\nExperience\nEngineer, Acme 2020 - 2022", policy, { now });
+// Warm-up: the first call compiles the policy's patterns.
+check("Jane Doe\nExperience\nEngineer, Acme 2020 - 2022", policy, { now });
 
 for (const [locale, fixtures] of Object.entries(LOCALE_FIXTURES))
   for (const fixture of fixtures)
@@ -104,7 +98,7 @@ else console.log(`\n${misses.get("generated")?.size ?? 0} generated misses (--ve
 
 const current = Object.fromEntries([...misses].map(([corpus, keys]) => [corpus, [...keys.keys()]]));
 if (update) {
-  // Written as `npm run lint` checks it, so an update never fails the formatting check.
+  // Formatted as the lint check expects.
   const file = fileURLToPath(BASELINE);
   const options = { ...(await resolveConfig(file)), filepath: file };
   writeFileSync(file, await format(JSON.stringify(current), options));
@@ -115,7 +109,6 @@ if (update) {
   const missed = new Set(Object.values(current).flat());
   const added = [...missed].filter((key) => !known.has(key));
   const fixed = [...known].filter((key) => !missed.has(key));
-  // Above the baseline: worth recording, so the gate holds the gain from now on.
   if (fixed.length)
     console.log(
       `\n${fixed.length} misses in bench/baseline.json are now read right; ` +

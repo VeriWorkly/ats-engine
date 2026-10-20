@@ -17,11 +17,7 @@ const NOW = new Date("2026-09-30T00:00:00Z");
 const merge = (deterministic: AtsParsedResume, candidate: AtsRepairCandidate, source: string) =>
   mergeGrounded(deterministic, candidate, source, { policy: DEFAULT_POLICY, now: NOW });
 
-/**
- * The grounding check is the whole reason an LLM is allowed near the parse. If it can be talked
- * past, the feature puts fabricated employers on people's resumes, so these tests are written
- * adversarially: each one is a way a model could return something it did not read.
- */
+// Adversarial: each test is a way a model could return something it did not read.
 
 const SOURCE = `
 Jane Q. Doe
@@ -45,7 +41,7 @@ describe("grounding: values must occur in the source", () => {
   });
 
   it("rejects a plausible employer that is not in the document", () => {
-    // The failure this feature exists to prevent: a real-sounding company nobody wrote down.
+    // A real-sounding company nobody wrote down.
     expect(isGrounded("Initech", normalizeForGrounding(SOURCE))).toBe(false);
   });
 
@@ -100,7 +96,7 @@ describe("grounding: walking a returned object", () => {
   });
 
   it("covers fields added later without being listed here", () => {
-    // A hand-listed field set leaves the newest field unchecked. This walks generically.
+    // The walk is generic, so a new field is checked too.
     const violations = findGroundingViolations({ somethingAddedLater: "Initech" }, SOURCE);
     expect(violations).toEqual([{ path: "somethingAddedLater", value: "Initech" }]);
   });
@@ -118,7 +114,6 @@ const emptyParsed: AtsParsedResume = {
   spokenLanguages: [],
   monthsOfExperience: null,
   highestIsced: null,
-  highestDegree: null,
   provenance: {
     name: "none",
     email: "none",
@@ -240,8 +235,7 @@ describe("trigger: repair runs only where the parse visibly failed", () => {
     );
   });
 
-  // The merge never edits a row the parser found, so offering a paid repair for incomplete rows
-  // would sell a pass that comes back unchanged.
+  // The merge never edits a row the parser found, so incomplete rows are not repairable.
   it("is not offered when roles were found but are incomplete", () => {
     const report = reportWith({
       name: "Jane",
@@ -290,11 +284,8 @@ describe("trigger: repair runs only where the parse visibly failed", () => {
 });
 
 describe("grounding: the whitespace-insensitive pass does not open a hole", () => {
-  /**
-   * `isGrounded` falls back to comparing with whitespace stripped, so a word broken across a
-   * column boundary still matches. That is a real loosening, and these fix how far it goes: it
-   * may join characters that are adjacent in the document, and nothing more.
-   */
+  // `isGrounded` compares with whitespace stripped so a word broken across a column still matches;
+  // it may join adjacent characters in the document, nothing more.
   it("still rejects a fabricated name after whitespace is stripped", () => {
     expect(isGrounded("Initech", normalizeForGrounding(SOURCE))).toBe(false);
   });
@@ -334,11 +325,10 @@ describe("merge: derived fields and provenance follow the merged values", () => 
       SOURCE,
     );
 
-    // Before the merge moved into the package these stayed at the deterministic values, so a
-    // repaired resume showed its jobs beside "no experience" and no degree.
+    // Derived fields follow the merged values.
     expect(merged.monthsOfExperience).toBe(12);
-    expect(merged.highestDegree).toBe("bachelor");
-    expect(merged.education[0]!.level).toBe("bachelor");
+    expect(merged.highestIsced).toBe(6);
+    expect(merged.education[0]!.isced).toBe(6);
   });
 
   it("stamps filled fields as ai and leaves the rest as they were", () => {

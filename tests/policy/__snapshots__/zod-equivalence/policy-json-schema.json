@@ -213,14 +213,6 @@
                   "type": "string",
                   "const": "position"
                 },
-                "emailPattern": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "phonePattern": {
-                  "type": "string",
-                  "minLength": 1
-                },
                 "windowFraction": {
                   "type": "number",
                   "minimum": 0,
@@ -2531,73 +2523,37 @@
             }
           },
           "degrees": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "diploma": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "associate": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "bachelor": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "master": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "doctorate": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": [
-                  "diploma",
-                  "associate",
-                  "bachelor",
-                  "master",
-                  "doctorate"
-                ]
+            "type": "object",
+            "properties": {
+              "2": {
+                "type": "string",
+                "minLength": 1
               },
-              {
-                "type": "object",
-                "properties": {
-                  "2": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "3": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "4": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "5": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "6": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "7": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "8": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                }
+              "3": {
+                "type": "string",
+                "minLength": 1
+              },
+              "4": {
+                "type": "string",
+                "minLength": 1
+              },
+              "5": {
+                "type": "string",
+                "minLength": 1
+              },
+              "6": {
+                "type": "string",
+                "minLength": 1
+              },
+              "7": {
+                "type": "string",
+                "minLength": 1
+              },
+              "8": {
+                "type": "string",
+                "minLength": 1
               }
-            ]
+            }
           }
         },
         "required": [
@@ -5243,14 +5199,6 @@
                   "type": "string",
                   "const": "position"
                 },
-                "emailPattern": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "phonePattern": {
-                  "type": "string",
-                  "minLength": 1
-                },
                 "windowFraction": {
                   "type": "number",
                   "minimum": 0,
@@ -7823,43 +7771,38 @@
             }
           },
           "degrees": {
-            "anyOf": [
-              {},
-              {
-                "type": "object",
-                "properties": {
-                  "2": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "3": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "4": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "5": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "6": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "7": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "8": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "additionalProperties": false
+            "type": "object",
+            "properties": {
+              "2": {
+                "type": "string",
+                "minLength": 1
+              },
+              "3": {
+                "type": "string",
+                "minLength": 1
+              },
+              "4": {
+                "type": "string",
+                "minLength": 1
+              },
+              "5": {
+                "type": "string",
+                "minLength": 1
+              },
+              "6": {
+                "type": "string",
+                "minLength": 1
+              },
+              "7": {
+                "type": "string",
+                "minLength": 1
+              },
+              "8": {
+                "type": "string",
+                "minLength": 1
               }
-            ]
+            },
+            "additionalProperties": false
           }
         },
         "required": [

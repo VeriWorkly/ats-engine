@@ -29,8 +29,7 @@ export function rollUpCategories(
     ...entry,
     lost: Math.round(entry.lost),
     possible: Math.round(entry.possible),
-    // A category whose rules carry no weight at all is informational, not failed — report it
-    // as complete rather than dividing by zero.
+    // A category with no weight is informational: complete, not a division by zero.
     score:
       entry.possible > 0
         ? Math.max(0, Math.round((1 - entry.lost / entry.possible) * 100))

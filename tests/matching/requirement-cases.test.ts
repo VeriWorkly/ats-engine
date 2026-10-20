@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const BASE = "Jane Doe\njane@example.com";
 const requirement = (resume: string, line: string) =>
-  AtsScoringService.check(resume, DEFAULT_POLICY, {
+  check(resume, DEFAULT_POLICY, {
     jobDescription: `Requirements\n- ${line}`,
     now: NOW,
   }).requirements;

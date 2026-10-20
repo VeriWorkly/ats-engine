@@ -1,12 +1,6 @@
 import * as z from "zod/mini";
 
-/**
- * Lenient field parsers for model output.
- *
- * Every field is nullable and optional and defaults to an empty value, so a model that leaves a
- * field out or answers `null` produces a sparse result rather than a failed request. Lengths and
- * counts stay bounded: an oversized reply is malformed, and failing it earns a retry.
- */
+/** Lenient field parsers: nullable, optional, defaulting to empty; lengths stay bounded so an oversized reply fails and retries. */
 
 export const text = (maxLength: number) =>
   z.pipe(

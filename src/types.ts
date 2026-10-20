@@ -1,7 +1,3 @@
-/**
- * The public report types. The parsed record and the layout signals have files of their own
- * under `./types/`, re-exported here so every import of `types.js` keeps working.
- */
 import type { AtsParsedResume } from "./types/parsed.js";
 
 export type * from "./types/layout.js";
@@ -29,11 +25,9 @@ export type AtsRuleResult = {
 };
 
 /**
- * Per-category rollup of the deterministic rules. `lost` is the sum of the score impacts the
- * category actually cost, `possible` the worst case it could have cost, so `score` is the
- * percentage of that category the resume kept. Exposing the rollup is deliberately safe: it is
- * an aggregate of numbers the full report already returns per rule, and it tells an anonymous
- * caller *where* the problem is without handing over the rule-by-rule answer key.
+ * Per-category rollup of the rules. `lost` is the score impact the category cost, `possible` the
+ * worst case, so `score` is the percentage the resume kept. Safe to expose: it says where the
+ * problem is without the rule-by-rule answer key.
  */
 export type AtsCategoryScore = {
   category: string;
@@ -45,10 +39,9 @@ export type AtsCategoryScore = {
 };
 
 /**
- * One requirement of the posting, judged against the resume, the way a per-qualification
- * screener grades it (Workday HiredScore, Ashby): met or not, with the resume's own words as
- * evidence. `unverifiable`: not something a resume settles — the right to work, a clearance —
- * unless it says so; such a question is asked in the application, and often filters there.
+ * One requirement of the posting, judged against the resume: met or not, with the resume's own
+ * words as evidence. `unverifiable`: not settled by a resume unless it says so (right to work,
+ * a clearance); the application asks it.
  */
 export type AtsRequirement = {
   /** The requirement as the posting wrote it. */
@@ -60,24 +53,17 @@ export type AtsRequirement = {
   terms: Array<{ term: string; found: boolean }>;
   /** Resume lines that show it, quoted. Work history first; a skills list last. */
   evidence: string[];
-  /**
-   * For years, degrees, language levels and clearance levels: what was compared, "6 years in the
-   * work history, 5 asked", "Secret read, Top Secret asked".
-   */
+  /** For years, degrees, language levels and clearances, what was compared: "6 years, 5 asked". */
   detail?: string;
 };
 
-/**
- * Posting terms by kind: `hard` holds named skills and every other word, `soft` the policy's soft
- * skills (`keywordMatch.softSkills`).
- */
+/** Posting terms by kind: `soft` holds the policy's `keywordMatch.softSkills`, `hard` the rest. */
 export type AtsKeywordGroups = { hard: string[]; soft: string[] };
 
 /**
- * Something worth knowing that is not scored: about the file (its name, size, a password, tracked
- * changes or comments left in), about details that can invite age bias where the region pack
- * says so, and about a target ATS the caller named. Never part of the readiness score, the
- * categories, the failed checks or the fixes. The text comes from the policy (`advice`).
+ * Something worth knowing that is not scored: the file (name, size, password, tracked changes),
+ * details that can invite age bias where the region pack says so, and a named target ATS. Never
+ * part of the score, categories, failed checks or fixes. The text comes from the policy (`advice`).
  */
 export type AtsAdvice = {
   /** "file.name", "age.graduationYear", "ats.greenhouse.parseSize", … */
@@ -93,7 +79,7 @@ export type AtsAdvice = {
 
 /**
  * What the caller knows about the uploaded file, for the file advice. Every field is optional;
- * advice needing one that is absent is not given. Pasted text has no file: pass nothing.
+ * advice needing an absent one is skipped. Pasted text has no file: pass nothing.
  */
 export type AtsFileInfo = {
   /** The file's name as uploaded, with its extension: "Resume_final_v3 (2).pdf". */
@@ -108,32 +94,25 @@ export type AtsFileInfo = {
 };
 
 /**
- * What `check` returns: the readiness score and the rules behind it, the fields an ATS would store,
- * the job match when a posting was given, and advice that is never scored. A pure function of the
- * resume, the policy and the options (`now` included); `engine` names what produced it.
+ * What `check` returns: the readiness score and its rules, the fields an ATS would store, the job
+ * match when a posting was given, and unscored advice. A pure function of the resume, the policy
+ * and the options (`now` included).
  */
 export type AtsReport = {
   /** The scoring policy's declared `version` ("ats-v2" for the community policy). */
   version: string;
   readinessScore: number;
   jobMatchScore: number | null;
-  /**
-   * Posting terms the resume has and lacks, hard skills (and every other word) first, then soft
-   * skills; at most 12. The two groups joined, cut to 12.
-   */
+  /** Posting terms the resume has and lacks: hard skills first, then soft; at most 12. */
   matchedKeywords: string[];
   missingKeywords: string[];
   /**
-   * The same terms by kind, each group at most 12. `soft` holds the policy's soft skills
-   * (`keywordMatch.softSkills`: "communication", "teamwork"), which weigh less in
-   * `jobMatchScore` (`keywordMatch.softSkillWeight`); `hard` holds everything else.
+   * The same terms by kind, each group at most 12. `soft` skills weigh less in `jobMatchScore`
+   * (`keywordMatch.softSkillWeight`).
    */
   matchedKeywordGroups: AtsKeywordGroups;
   missingKeywordGroups: AtsKeywordGroups;
-  /**
-   * Evidence of every failed check that stops an ATS reading the document: the parse checks, and
-   * the format checks on how the text extracts (columns, tables, letter spacing).
-   */
+  /** Evidence of every failed check that stops an ATS reading the document (parse and extraction). */
   parsingWarnings: string[];
   strengths: string[];
   failedChecks: AtsRuleResult[];
@@ -145,28 +124,14 @@ export type AtsReport = {
   wordCount: number;
   /** The fields an ATS would recover from this document. See AtsParsedResume. */
   parsed: AtsParsedResume;
-  /**
-   * The locale packs the resume was read with: languages detected (or asked for) beyond the
-   * policy's base vocabulary, and the region applied. Empty and null without packs attached.
-   */
+  /** The locale packs the resume was read with: extra languages and the region; empty without packs. */
   locale: { languages: string[]; region: string | null };
-  /**
-   * What produced this report: the engine's version and a fingerprint of the policy as applied.
-   * The same input, reference date (`now`), engine and policy fingerprint always give the same
-   * report; a score that moved with neither changed was not this engine's doing.
-   */
+  /** What produced this report: the engine version and a fingerprint of the policy as applied. */
   engine: { version: string; policy: string };
   /** The posting's requirements, each judged; empty without a job description. At most 25. */
   requirements: AtsRequirement[];
-  /**
-   * Advice that is not scored: file hygiene when the caller described the file, age signals where
-   * the region pack asks for them, a named target ATS's documented notes. Always present; empty
-   * when there is nothing to say. Changes no score.
-   */
+  /** Unscored advice: file hygiene, age signals where the region pack asks, target ATS notes. */
   advice: AtsAdvice[];
-  /**
-   * The text in the order the engine read it — after wrapped lines were rejoined and spaced
-   * letters read back — when `includeLines` was asked for. At most 500 lines.
-   */
+  /** The text in the order the engine read it, when `includeLines` was asked for. At most 500 lines. */
   lines?: string[];
 };

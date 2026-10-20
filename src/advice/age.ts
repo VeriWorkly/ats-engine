@@ -4,12 +4,6 @@ import type { AtsAdvice, AtsParsedResume } from "../types.js";
 import { memo } from "../util/memo.js";
 import { adviceItem } from "./file.js";
 
-/**
- * Age signals: a graduation year and a count of years that let a reader work out a candidate's
- * age. Given only where the policy as localised sets the thresholds — a region pack's
- * `ageAdvice` — and never scored.
- */
-
 const phrasePatterns = memo((age: AtsEnginePolicy["advice"]["age"]) =>
   age.experiencePatterns.map((pattern) => policyRegex(pattern, "gi")),
 );
@@ -27,6 +21,10 @@ function statedTotal(
   return null;
 }
 
+/**
+ * Age signals (a graduation year, a count of years) that let a reader work out a candidate's
+ * age. Only where the localised policy sets thresholds (a region pack's `ageAdvice`).
+ */
 export function ageAdvice(
   policy: AtsEnginePolicy,
   parsed: AtsParsedResume,

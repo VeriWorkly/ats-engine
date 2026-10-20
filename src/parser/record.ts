@@ -1,11 +1,11 @@
 import type { AtsParsedField, AtsParsedResume, AtsProvenance } from "../types.js";
-import { degreeLabel, highestIsced } from "./education.js";
+import { highestIsced } from "./education.js";
 import { monthsOfExperience } from "./tenure.js";
 
 /** The recovered values themselves; everything else in `AtsParsedResume` is derived from them. */
 export type ParsedCore = Omit<
   AtsParsedResume,
-  "monthsOfExperience" | "highestIsced" | "highestDegree" | "provenance"
+  "monthsOfExperience" | "highestIsced" | "provenance"
 >;
 
 const PARSED_FIELDS: readonly AtsParsedField[] = [
@@ -29,15 +29,9 @@ const MAX_REPORTED = {
 };
 
 /**
- * Caps the lists, derives tenure and highest degree, and stamps provenance.
- *
- * Every producer of a parsed record goes through here — the text parser, the structured
- * document reader, and the AI repair merge — so the derived fields can never disagree with the
- * values they are derived from. The repair merge used to replace the roles and keep the old
- * `monthsOfExperience`, so a repaired resume showed its jobs beside "no experience".
- *
- * A field that holds nothing is `none` whatever `sourceOf` says: provenance describes a value,
- * and an empty field has no value to describe.
+ * Caps the lists, derives tenure and highest degree, and stamps provenance. Every producer of a
+ * parsed record (text parser, document reader, repair merge) goes through here, so derived fields
+ * cannot disagree with their values. An empty field is `none` whatever `sourceOf` says.
  */
 export function finalizeParsed(
   core: ParsedCore,
@@ -52,7 +46,7 @@ export function finalizeParsed(
     roles: core.roles.slice(0, MAX_REPORTED.roles),
     education: core.education.slice(0, MAX_REPORTED.education),
     skills: [...new Set(core.skills)].slice(0, MAX_REPORTED.skills),
-    // A record stored before these were read (and handed back to the repair merge) has neither.
+    // A record handed back by a caller may lack these.
     certifications: (core.certifications ?? []).slice(0, MAX_REPORTED.certifications),
     spokenLanguages: (core.spokenLanguages ?? []).slice(0, MAX_REPORTED.spokenLanguages),
   };
@@ -60,15 +54,12 @@ export function finalizeParsed(
   const provenance = {} as Record<AtsParsedField, AtsProvenance>;
   for (const field of PARSED_FIELDS)
     provenance[field] = capped[field].length > 0 ? sourceOf(field) : "none";
-  const highest = highestIsced(core.education);
 
   return {
     ...capped,
-    // Tenure counts every recovered role, not only the reported ones: capping the table at 20
-    // rows is a display decision and must not shorten someone's career.
+    // Tenure counts every recovered role, not only the capped ones.
     monthsOfExperience: monthsOfExperience(core.roles, now),
-    highestIsced: highest,
-    highestDegree: highest === null ? null : degreeLabel(highest),
+    highestIsced: highestIsced(core.education),
     provenance,
   };
 }

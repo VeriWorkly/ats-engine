@@ -1,10 +1,7 @@
 /**
  * @veriworkly/ats-engine/ai/openai-compatible — any Chat Completions endpoint, over `fetch`.
  *
- * OpenAI, OpenRouter, Groq, Together, vLLM, Ollama and anything else that serves
- * `POST {baseUrl}/chat/completions`. No SDK: the adapter makes exactly one HTTP call per
- * `complete()` and never retries on its own — retrying is the task's decision, and a transport
- * that retried underneath it would multiply every attempt into several billed calls.
+ * One HTTP call per `complete()`; never retried here, the task owns retries.
  */
 
 import { own } from "../util/own.js";
@@ -22,15 +19,13 @@ export type OpenAiCompatibleOptions = HttpOptions & {
   /** Defaults to `https://api.openai.com/v1`. */
   baseUrl?: string | undefined;
   /**
-   * OpenRouter only: with a `json_schema` request, also send `provider.require_parameters`, so
-   * the gateway routes only to upstreams that honour the schema instead of one that ignores it
-   * and returns prose. Other endpoints reject the unknown `provider` field, so it is opt-in.
+   * OpenRouter only: with a `json_schema` request, also send `provider.require_parameters` so
+   * the gateway routes only to upstreams that honour the schema. Other endpoints reject the field.
    */
   requireParameters?: boolean | undefined;
   /**
-   * The name the output budget is sent under. OpenAI's current models take only
-   * `max_completion_tokens` and reject `max_tokens`; most compatible servers (Ollama, vLLM, Groq,
-   * OpenRouter) still read `max_tokens`. Defaults to the first for api.openai.com, else the second.
+   * The name the output budget is sent under. Defaults to `max_completion_tokens` for
+   * api.openai.com (which rejects `max_tokens`), else `max_tokens`.
    */
   maxTokensParameter?: "max_tokens" | "max_completion_tokens" | undefined;
 };
@@ -51,10 +46,7 @@ type ChatCompletion = {
   };
 };
 
-/**
- * Message content as text: a string, or the text parts of a content array some servers send. A
- * part with another type ("reasoning", "thinking") is the model's working, not its answer.
- */
+/** Message content as text: a string, or the text parts of an array; reasoning parts are skipped. */
 const contentText = (content: unknown) =>
   typeof content === "string"
     ? content
@@ -115,9 +107,8 @@ export function chatCompletionBody(
 }
 
 /**
- * A provider for any service that serves `POST {baseUrl}/chat/completions`: OpenAI by default,
- * or OpenRouter, Gemini, Groq, Together, Ollama, vLLM and others by `baseUrl`. One HTTP call per
- * `complete()`, never retried here. Throws `LlmProviderError` without an API key.
+ * A provider for any `POST {baseUrl}/chat/completions` service: OpenAI by default, others by
+ * `baseUrl`. One HTTP call per `complete()`. Throws `LlmProviderError` without an API key.
  */
 export function openAiCompatible(options: OpenAiCompatibleOptions): LlmProvider {
   if (!options.apiKey) throw new LlmProviderError("An API key is required.", { retryable: false });

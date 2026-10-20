@@ -27,7 +27,7 @@ export type JobMatch = {
 /** At most this many terms in each list the report shows. */
 const LISTED = 12;
 
-// A function, not a constant: the report hands these arrays to the caller, who may change them.
+// A function: the report hands these arrays to the caller, who may mutate them.
 const noMatch = (): JobMatch => ({
   score: null,
   matched: [],
@@ -38,11 +38,7 @@ const noMatch = (): JobMatch => ({
 
 type Listed = { label: string; weight: number; skill: boolean; soft: boolean };
 
-/**
- * Hard terms lead, then soft skills; within each, recognised skills lead regardless of section
- * weight: a missing skill is always more actionable advice than a missing ordinary word, and
- * these lists are what the user is shown and what the AI layer is handed as evidence.
- */
+/** Hard terms lead, then soft skills; within each, recognised skills lead, then by weight. */
 function listed(terms: Listed[]) {
   terms.sort(
     (a, b) =>
@@ -57,9 +53,8 @@ function listed(terms: Listed[]) {
 }
 
 /**
- * A posting line as the keyword match reads it: without the text that is never a keyword (a
- * "City, ST" location) and without its degree, which is matched by level rather than by word
- * (`highestIsced`), so a B.Tech meets "Bachelor's degree" as the requirements judge says it does.
+ * A posting line as the keyword match reads it: without text that is never a keyword (a
+ * "City, ST" location) and without its degree, which is matched by level (`highestIsced`).
  */
 function readPostingLine(line: string, policy: AtsEnginePolicy) {
   let text = withoutIgnored(line, policy);
@@ -74,17 +69,11 @@ function readPostingLine(line: string, policy: AtsEnginePolicy) {
 }
 
 /**
- * Scores the resume against the posting.
- *
- * Two independent defences keep boilerplate out of the score, because either one alone is
- * defeatable. Section scoping drops "About us", benefits, and EEO copy entirely — but only
- * works on a posting that has headings. Specificity weighting discounts ordinary English
- * against recognised skills and proper nouns — and works on any posting, headings or not.
- * Without both, a strong candidate scored around 30 against a posting they matched completely,
- * because "dental", "stipend" and the employer's own name counted the same as "Kubernetes".
- *
- * Names are left out altogether: every word of `company`, the employer as the host knows it,
- * and the words the posting writes only as names in its prose (`proseNames`).
+ * Scores the resume against the posting. Two defences keep boilerplate out of the score: section
+ * scoping drops "About us", benefits and EEO copy (needs headings), and specificity weighting
+ * discounts ordinary English against recognised skills and proper nouns (works on any posting).
+ * Names are left out altogether: every word of `company` and the words the posting writes only
+ * as names in its prose (`proseNames`).
  */
 export function computeJobMatch(
   resumeText: string,
@@ -118,10 +107,9 @@ export function computeJobMatch(
     excluded: 0,
   };
 
-  // The employer's name, from the heading of its own section ("About Acme Robotics"): it recurs
-  // through the posting and is never something a candidate is missing — unless a requirement
-  // names the word itself: "About GitLab" over "Experience with GitLab CI", "About Cloud Data
-  // Systems" over "cloud data pipelines".
+  // The employer's name, from the heading of its own section ("About Acme Robotics"), is never
+  // something a candidate is missing, unless a requirement names the word itself ("About GitLab"
+  // over "Experience with GitLab CI").
   const headings = sections.filter((section) => section.kind === "excluded" && section.heading);
   const asked = headings.length
     ? extractVocabulary(
@@ -138,24 +126,21 @@ export function computeJobMatch(
       .filter((token) => !asked.has(token)),
   );
 
-  // A term can appear in more than one block. Keep the strongest claim: a skill listed under
-  // Requirements is required even if it is mentioned again in the responsibilities prose.
+  // A term in more than one block keeps its strongest claim.
   const terms = new Map<string, Listed>();
   const scoredLines: string[] = [];
-  /** The degree levels the posting asks for: the label it used and the strongest weight. */
+  // Degree levels the posting asks for: the label it used and the strongest weight.
   const degrees = new Map<number, { label: string; weight: number }>();
 
   for (const section of sections) {
     const weight = sectionWeight[section.kind];
     if (weight <= 0) continue;
-    // What the posting offers ("Salary range $175,000", "Benefits: dental") is not asked of the
-    // candidate, as the requirements judge reads it.
+    // What the posting offers ("Salary range $175,000") is not asked of the candidate.
     const read = section.text
       .split("\n")
       .filter((line) => !isOfferLine(line, policy))
       .map((line) => readPostingLine(line, policy));
-    // Appended rather than spread: a posting is capped at 20k characters, which is more than
-    // enough newlines to push a spread past the engine's argument-count limit.
+    // Appended, not spread: enough newlines would exceed the argument-count limit.
     for (const line of read) scoredLines.push(line.text);
     for (const { degree } of read) {
       if (!degree) continue;
@@ -167,13 +152,11 @@ export function computeJobMatch(
     const text = read.map((line) => line.text).join("\n");
     for (const [token, term] of extractVocabulary(text, km, vocab)) {
       if (employer.has(token) || names.has(token)) continue;
-      // A soft skill is an ordinary word discounted further, whatever its capitals: "Strong
-      // Communication skills" asks for no product called Communication.
+      // A soft skill is an ordinary word discounted further, whatever its capitals.
       const soft = vocab.softTokens.has(token);
       const skill = !soft && (term.skill || proper.has(term.label) || proper.has(token));
-      // One- and two-letter words carry meaning only as a named skill or acronym ("Go", "AI",
-      // "JS"). Otherwise they are function words — "in", "to", "or", "a" — and scoring them told
-      // candidates to add "or" to their resume, and credited them for having written "a".
+      // One- and two-letter words mean something only as a named skill or acronym ("Go", "AI");
+      // otherwise they are function words ("or", "a").
       if (!skill && term.label.length <= 2) continue;
       const specificity = skill
         ? 1
@@ -192,8 +175,8 @@ export function computeJobMatch(
   const held = resumeCapabilities(extractVocabulary(resumeText, km, vocab), vocab);
   const { find, separatorOf } = alternationGroups(scoredLines, km, vocab);
 
-  // Alternatives collapse into one requirement worth one member's weight, satisfied by any of
-  // them. "Go or Java" is a single ask, not two.
+  // Alternatives collapse into one requirement ("Go or Java"), worth one member's weight and
+  // satisfied by any of them.
   type Group = {
     members: Array<{ label: string; skill: boolean; soft: boolean }>;
     weight: number;
@@ -234,14 +217,13 @@ export function computeJobMatch(
   for (const group of groups.values()) {
     totalWeight += group.weight;
     const skill = group.members.some((member) => member.skill);
-    // A choice is soft only when every alternative is: "Python or teamwork" asks for Python.
+    // Soft only when every alternative is: "Python or teamwork" asks for Python.
     const soft = group.members.every((member) => member.soft);
     if (group.matched !== null) {
       matchedWeight += group.weight;
       matched.push({ label: group.matched, weight: group.weight, skill, soft });
     } else {
-      // Named as the choice the posting actually offered, so the advice reads "Go or Java"
-      // rather than listing each alternative as a separate gap.
+      // Named as the choice offered ("Go or Java"), not as separate gaps.
       missing.push({
         label: group.members.map((member) => member.label).join(` ${group.separator} `),
         weight: group.weight,

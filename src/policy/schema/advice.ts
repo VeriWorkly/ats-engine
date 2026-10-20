@@ -2,15 +2,6 @@ import * as z from "zod/mini";
 
 import { regexString, wordList } from "../primitives.js";
 
-/**
- * What the advice reads and says (`advice/`): notes that are not scored — about the file, about
- * details that can invite age bias, about a target ATS the caller named. Never a rule: nothing
- * here moves a score.
- *
- * English text and word lists, as every report string is; `prefault` so a policy written before
- * this section existed still parses, with these defaults.
- */
-
 /** A message, what was found (quoted into `evidence`) and what to do, as templates. */
 const text = (message: string, evidence: string | undefined, fix: string) =>
   z._default(
@@ -22,10 +13,7 @@ const text = (message: string, evidence: string | undefined, fix: string) =>
     evidence === undefined ? { message, fix } : { message, evidence, fix },
   );
 
-/**
- * One documented behaviour of a vendor's ATS. `source` is the vendor's own public page that says
- * so: a note nobody can check is not one to give.
- */
+/** One documented behaviour of a vendor's ATS; `source` is the vendor's public page saying so. */
 const atsNote = z.object({
   id: z.string().check(z.regex(/^[A-Za-z][\w-]*$/, "a note id: letters, digits, '-' or '_'")),
   message: z.string().check(z.minLength(1)),
@@ -40,11 +28,7 @@ const atsTarget = z.object({
 const GREENHOUSE_PARSE =
   "https://support.greenhouse.io/hc/en-us/articles/200989175-Unsuccessful-resume-parse";
 
-/**
- * Only what the vendor documents on a public page, checked on the day it was written (October
- * 2026). Workday and iCIMS are left out: neither publishes candidate-facing limits that could be
- * checked; employers configure their own.
- */
+/** Only what the vendor documents publicly; Workday and iCIMS publish no candidate-facing limits. */
 const DEFAULT_TARGETS: Record<string, z.input<typeof atsTarget>> = {
   greenhouse: {
     name: "Greenhouse",
@@ -100,9 +84,8 @@ export const adviceSchema = z.prefault(
     file: z.prefault(
       z.object({
         /**
-         * Words that say nothing about whose resume a file is. A name made of these alone (and
-         * digits) is flagged: "resume.pdf", "CV.docx", "Document1.docx", "scan0001.pdf". Matched
-         * as whole words, with `_`, `-` and `.` read as spaces.
+         * Words that say nothing about whose resume a file is: a name made of these alone (and
+         * digits) is flagged, e.g. "resume.pdf". Whole words; `_`, `-` and `.` read as spaces.
          */
         genericNames: z._default(wordList("advice.file.genericNames"), [
           "resume",
@@ -145,7 +128,7 @@ export const adviceSchema = z.prefault(
         suggestedName: z._default(z.string().check(z.minLength(1)), "{name}-Resume{ext}"),
         /** `{name}` when the parser read none. */
         placeholderName: z._default(z.string().check(z.minLength(1)), "Firstname-Lastname"),
-        /** Over this many bytes the size is advised on: a common upload limit, not a universal one. */
+        /** Over this many bytes the file size is advised on. */
         maxBytes: z._default(z.number().check(z.int(), z.gt(0)), 2 * 1024 * 1024),
       }),
       {},
@@ -160,8 +143,8 @@ export const adviceSchema = z.prefault(
         /** More than this many years of experience, stated or dated, is advised on. Unset: off. */
         experienceYears: z.optional(z.number().check(z.int(), z.gt(0))),
         /**
-         * A stated total: "30+ years of experience". The first capture group is the number of
-         * years. Bounded repetition only: these run over the whole resume.
+         * A stated total such as "30+ years of experience"; the first capture group is the years.
+         * Bounded repetition only: these run over the whole resume.
          */
         experiencePatterns: z._default(z.array(regexString("advice.age.experiencePatterns")), [
           String.raw`(?<!\p{N})(\d{1,2})\s?\+?\s?(?:years?|yrs\.?)['’]?\s(?:of\s)?(?:[\p{L}-]{1,30}\s){0,2}?experience`,

@@ -1,16 +1,14 @@
 import { describe, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { jobTextFromHtml } from "../../src/job/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * Every input shape that has made, or could make, a pattern backtrack: 50 KB of it as the name
- * line, as a bullet and as the posting, under the community policy with every locale pack
- * applied. Most take tens of milliseconds, 25,000 short lines a few hundred: the ceiling is above
- * that and far below the seconds a super-linear pattern, or a search repeated on every line by
- * every reader, takes. SECURITY.md promises this.
+ * Every input shape that could make a pattern backtrack: 50 KB of it as the name line, a bullet
+ * and the posting, under the community policy with every locale pack. The ceiling is far below
+ * what a super-linear pattern takes. SECURITY.md promises this.
  */
 
 const N = 50_000;
@@ -70,7 +68,7 @@ const SHAPES: Record<string, string> = {
   "rank run": rep("rank this candidate "),
   "title run": rep("Harbor "),
   "space then capital": `a${rep(" ", N - 2)}B`,
-  // The writing checks (tests/checks/writing.test.ts runs them read as English too).
+  // The writing checks.
   "passive run": rep("was quickly used "),
   "pronoun slash": rep("I/"),
   "weak opener run": rep("responsible for "),
@@ -80,11 +78,11 @@ const SHAPES: Record<string, string> = {
   "cefr run": rep("B2 "),
   "level phrase run": rep("professional working "),
   "fließend run": rep("fließend "),
-  // Soft skills matched as phrases, the English and a language pack's.
+  // Soft skills matched as phrases, English and a pack's.
   "soft phrase run": rep("problem solving "),
   "soft phrase prefix run": rep("attention to "),
   "devanagari soft phrase run": rep("समस्या समाधान "),
-  // The right to work and a clearance, read for what they say and the level they name.
+  // The right to work and a clearance.
   "sponsorship run": rep("authorized to work not visa "),
   "needs sponsorship run": rep("requires visa work "),
   "no sponsorship run": `authorized to work ${rep("not currently eligible for ")}`,
@@ -98,14 +96,13 @@ const SHAPES: Record<string, string> = {
   "slash number run": rep("a/1/"),
   "link run": rep("a://b/"),
   "scheme run": rep("a+b.c-"),
-  // Many short lines: every reader of a line looks for its dates, so 25,000 lines cost each of
-  // them 25,000 searches.
+  // Many short lines: every line reader searches for dates.
   "digit lines": rep("1\n"),
   "two-digit lines": rep("12\n"),
   "digit dot lines": rep("1.\n"),
   "devanagari lines": rep("क\n"),
   "letter lines": rep("a\n"),
-  // A quoted injection example after a word that says it was caught: openers without closers.
+  // A quoted injection example after a "caught" word: openers without closers.
   "curly quote run": `flags ignore all previous instructions ${rep("“", N - 40)}`,
   "low quote run": `flags ignore all previous instructions ${rep("„", N - 40)}`,
   "guillemet run": `flags ignore all previous instructions ${rep("«", N - 40)}`,
@@ -115,7 +112,7 @@ const SHAPES: Record<string, string> = {
   // A list of works, read for citations.
   "citation heading run": `Publications\n${rep("Doe J (2019) et al. ")}`,
   "citation initials run": `Talks\n${rep("Doe JJ, ")}`,
-  // A product's version, a standard's number, a multiple: read by the metrics rule.
+  // A version, a standard's number, a multiple: read by the metrics rule.
   "version run": rep("Python 1.1 "),
   "version spaces run": `Windows 1${rep(" ", N - 20)}x`,
   "standard run": rep("ISO 1 "),
@@ -129,8 +126,8 @@ const SHAPES: Record<string, string> = {
   "dated place run": `Jan 2020 - Present | ${rep("Austin, Texas, ", N - 40)}`,
   "legal form run": rep("Acme Corp, "),
   "co run": rep("Co "),
-  // The French pack: a range by "à", a start by "depuis", a level after the language, a degree
-  // counted in years after the baccalauréat, a word joined by an apostrophe.
+  // The French pack: "à" ranges, "depuis", language levels, years after the baccalauréat,
+  // apostrophes.
   "à range run": rep("2019 à "),
   "depuis run": rep("depuis "),
   "years range run": rep("3 à 5 "),
@@ -153,11 +150,11 @@ describe("50 KB adversarial input", () => {
     const jobDescription = `Requirements\n- ${input}`;
     const html = `<p>${input}</p>`;
     expectFast(() => jobTextFromHtml(html), 1_500);
-    // Every region's credential patterns, each compiled into the policy only under its region.
+    // Every region's credential patterns, compiled only under its region.
     for (const region of ["DE", "FR", "GB", "IN"])
       expectFast(
         () =>
-          AtsScoringService.check(resume, POLICY, {
+          check(resume, POLICY, {
             now: NOW,
             jobDescription,
             languages: ["de", "fr", "hi"],
@@ -168,14 +165,14 @@ describe("50 KB adversarial input", () => {
       );
   });
 
-  // Certification and language rows are read only under their headings and on a labelled line.
+  // Certification and language rows: under their headings and on a labelled line only.
   it.each(Object.entries(SHAPES))(
     "%s under Certifications and Languages, in bounded time",
     (_, input) => {
       const resume = `Jane Doe\njane@example.com\nCertifications\n${input}\nLanguages\n${input}\nSkills\nLanguages: ${input}\nCertifications: ${input}`;
       expectFast(
         () =>
-          AtsScoringService.check(resume, POLICY, {
+          check(resume, POLICY, {
             now: NOW,
             jobDescription: `Requirements\n- Fluent ${input}\n- ${input} certification`,
             languages: ["de", "fr", "hi"],
@@ -185,13 +182,13 @@ describe("50 KB adversarial input", () => {
     },
   );
 
-  // English, with lists to compare with, so the posting's prose is read for names.
+  // English with lists, so the posting's prose is read for names.
   it.each(Object.entries(SHAPES))(
     "%s as an English posting's prose, in bounded time",
     (_, input) => {
       expectFast(
         () =>
-          AtsScoringService.check("Jane Doe\njane@example.com", POLICY, {
+          check("Jane Doe\njane@example.com", POLICY, {
             now: NOW,
             jobDescription: `We ship from ${input}\n- Kafka\n- Go\n- SQL`,
             languages: [],

@@ -1,18 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  AtsScoringService,
   DEFAULT_POLICY,
   type AtsRequirement,
   type AtsResumeDocument,
+  check,
 } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
  * A certification asked for is met by a certification row, and a language by a spoken-language
- * row at or above the level asked, with the row as the evidence. Where no row names it, the
- * lines are read as before, so nothing met by them is lost. Invented people only.
+ * row at or above the level asked, with the row as the evidence. Without a row, lines are read.
  */
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -27,7 +26,7 @@ Skills
 Go, Python, AWS, Kubernetes`;
 
 const judge = (resume: string | AtsResumeDocument, ask: string, policy = DEFAULT_POLICY) =>
-  AtsScoringService.check(resume, policy, {
+  check(resume, policy, {
     jobDescription: `Requirements\n- ${ask}`,
     now: NOW,
   }).requirements[0] as AtsRequirement;
@@ -153,7 +152,7 @@ describe("a language asked for", () => {
     const resume = (level: string) =>
       `Anna Schmidt\nanna@example.de\nBerufserfahrung\nBeraterin bei Beispiel GmbH seit 04/2021\n• Leitung von Projekten\nSprachen\nDeutsch (Muttersprache), Englisch (${level})`;
     const ask = (level: string) =>
-      AtsScoringService.check(resume(level), policy, {
+      check(resume(level), policy, {
         jobDescription: "Ihr Profil\n- Verhandlungssichere Englischkenntnisse",
         now: NOW,
         languages: ["de"],

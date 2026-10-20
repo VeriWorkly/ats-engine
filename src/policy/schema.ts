@@ -9,18 +9,9 @@ import { engineTextSchema } from "./schema/text.js";
 import { writingSchema } from "./schema/writing.js";
 
 /**
- * The scoring policy schema.
- *
- * The policy is data, not code: rules, weights, thresholds, and every language-bound
- * vocabulary the engine reads live here rather than in source, so a new job-title word or a
- * second locale is a data change rather than a release. The host supplies it; this module only
- * says what a valid one looks like. Each area has its own file under `./schema/`.
- */
-
-/**
- * Locale packs attached to the policy (see `withLocales`). The policy's vocabulary is the base,
- * in effect for every resume; a language pack's vocabulary joins it only for resumes and postings
- * detected as written in that language, and one region pack applies per resume.
+ * Locale packs attached to the policy (see `withLocales`). The policy's vocabulary is the base;
+ * a language pack joins it only for text detected in that language, and one region pack applies
+ * per resume.
  */
 const localesSchema = z.prefault(
   z.object({

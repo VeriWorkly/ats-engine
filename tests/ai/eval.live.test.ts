@@ -11,25 +11,21 @@ import { evalCases } from "../fixtures/ai-eval-cases.js";
 
 /**
  * The eval against a real model. It costs money (15 small calls at the default 3 runs), so it
- * runs only when asked:
+ * runs only when asked. Variables:
  *
  *   ATS_EVAL_PROVIDER    anthropic | openai-compatible (default)
  *   ATS_EVAL_API_KEY     the provider key
  *   ATS_EVAL_MODEL       model id
  *   ATS_EVAL_BASE_URL    optional, e.g. a gateway's /api/v1
- *   ATS_EVAL_AI_POLICY   optional path to the private ATS AI policy JSON; its prompts replace the
- *                        package defaults, so the eval measures what production actually sends
+ *   ATS_EVAL_AI_POLICY   optional path to an AI policy JSON whose prompts replace the defaults
  *   ATS_EVAL_RUNS        optional, default 3
  *   ATS_EVAL_STRUCTURED  optional, `false` to ask for plain JSON instead of JSON Schema output
  *
  *   npm run eval:live
  *
- * The variables can live in a `.env` file at the repository root (gitignored), which is read
- * when present; variables already set in the shell win.
- *
- * Prints the report — including every value grounding dropped, which is how to tell a caught
- * fabrication from a suggestion the keyword filter should have kept — and fails on the floors:
- * schema-valid output nearly always, and no injected value ever leaking into a result.
+ * They can live in a gitignored `.env` at the repository root; the shell's win. Prints the
+ * report, dropped values included, and fails on the floors: schema-valid output nearly always,
+ * and no injected value ever leaking into a result.
  */
 const dotenv = fileURLToPath(new URL("../../.env", import.meta.url));
 if (existsSync(dotenv)) process.loadEnvFile(dotenv);

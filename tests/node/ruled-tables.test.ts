@@ -1,7 +1,7 @@
 import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it } from "vitest";
 
-import { AtsScoringService, DEFAULT_POLICY } from "../../src/index.js";
+import { DEFAULT_POLICY, check } from "../../src/index.js";
 import { extractResume } from "../../src/node/extract.js";
 import { measureVisibility } from "../../src/node/hidden.js";
 import { countRuledTables, type Box } from "../../src/node/tables.js";
@@ -18,12 +18,9 @@ import {
 import { expectFast } from "../fixtures/timing.js";
 
 /**
- * Ruled tables read from the page's own drawing, as well as pdf-parse's: a browser prints a CSS
- * border as a thin filled rectangle (`re f`), not a stroked line, and pdf-parse's `getTable`
- * looks for stroked rules only, so a resume laid out in a bordered HTML table reported "No ruled
- * tables were found". A table here is horizontal and vertical rules — stroked lines, or filled
- * rectangles at most 1.5pt thick — closing at least a 2×2 grid of cells with text in them.
- * Every resume here is an invented person.
+ * Ruled tables read from the page's own drawing, as well as pdf-parse's (stroked rules only): a
+ * browser prints a CSS border as a thin filled rectangle (`re f`). A table is rules (stroked, or
+ * filled and at most 1.5pt thick) closing at least a 2×2 grid of cells with text.
  */
 
 const tables = async (pdf: Buffer) => (await extractResume(pdf, "pdf")).layout?.tableCount;
@@ -219,7 +216,7 @@ describe("a resume laid out in a bordered table", () => {
     const { text: extracted, layout } = await extractResume(buildPdf(page), "pdf");
     expect(layout?.tableCount).toBe(1);
 
-    const report = AtsScoringService.check(extracted, DEFAULT_POLICY, {
+    const report = check(extracted, DEFAULT_POLICY, {
       layout,
       now: new Date("2026-10-01T00:00:00Z"),
     });
@@ -287,15 +284,13 @@ describe("cost on a crowded page", () => {
 
   it("replays 20,000 shapes, half of them a table, and finds the table", () => {
     const page = crowdedTablePage();
-    // The replay alone takes ~0.5s on a desktop and ~3s on a GitHub runner (see the crowded-page
-    // test in audit-2026-10); finding the table adds a few milliseconds.
+    // The replay alone takes ~0.5s on a desktop and ~3s on a GitHub runner.
     const seen = expectFast(() => measureVisibility(ops, page, PAGE), 8_000);
     expect(seen.tables).toBeGreaterThanOrEqual(1);
   }, 30_000);
 
   it("stays linear when every rule crosses every point", () => {
-    // 20,000 rules all through the same spot and 20,000 words on it: without the rule and check
-    // budgets, 400 million comparisons.
+    // 20,000 rules through one spot and 20,000 words on it: 400 million comparisons without the budgets.
     const rules: Box[] = Array.from({ length: 20_000 }, (_, i) =>
       i % 2
         ? [0, 300 + (i % 400) / 100, 600, 300.5 + (i % 400) / 100]
@@ -306,8 +301,7 @@ describe("cost on a crowded page", () => {
   });
 
   it("finds a table drawn after thousands of thin decorative shapes", async () => {
-    // 5,000 short hairlines (a dotted background, an underline per word) before the table: kept
-    // to the first 2,000 rules, the table's own borders were never looked at.
+    // 5,000 short hairlines (a dotted background, an underline per word) before the table.
     const noise = Array.from({ length: 5_000 }, (_, i) =>
       chromeRect(40 + (i % 100) * 7, 40 + Math.floor(i / 100) * 4, 5, 0.5),
     );
