@@ -414,6 +414,9 @@ export function createServer(): McpServer {
     (args) =>
       answer(async () => {
         const { report, layout } = await score(args, true);
+        // The hidden text the lines hold repeats `hiddenText` on a PDF: up to 5,000 characters the
+        // model would read twice and has no use for.
+        const { hiddenTextRead: _read, ...measured } = layout ?? {};
         const lines = report.lines ?? [];
         const warnings = report.parsingWarnings.map((warning) => `- ${warning}`);
         return {
@@ -427,7 +430,7 @@ export function createServer(): McpServer {
             lines,
             wordCount: report.wordCount,
             parsingWarnings: report.parsingWarnings,
-            layout: layout ?? null,
+            layout: layout ? measured : null,
           },
         };
       }),

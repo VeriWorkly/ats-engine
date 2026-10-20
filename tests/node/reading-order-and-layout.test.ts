@@ -830,6 +830,67 @@ describe("hiddenText carries all of the hidden text", () => {
     const fromDocx = (await extractResume(docx, "docx")).layout;
     expect(fromDocx?.hiddenText).toBe(words);
   });
+
+  // A white run drawn twice in place is read once into the text but listed twice as hidden: the
+  // second copy is that line again, not hidden text inside the visible bullet that repeats it.
+  it("keeps a visible bullet that repeats a white line drawn twice", async () => {
+    const visible = [
+      "Jane Doe",
+      "jane@example.com",
+      "Experience",
+      "Senior Engineer, Acme Corp, Jan 2018 - Present",
+      "Ran Python Kubernetes Kafka pipelines for 40 teams",
+      "Skills",
+      "Docker, Terraform",
+    ];
+    const ops = `${visible.map((text, i) => at(50, 750 - 20 * i, text)).join("\n")}\n1 1 1 rg ${at(50, 400, "Python Kubernetes Kafka")}\n${at(50.5, 400, "Python Kubernetes Kafka")}`;
+    const { text, layout } = await pdf(ops);
+    expect(layout?.hiddenTextRead).toBe("Python Kubernetes Kafka Python Kubernetes Kafka");
+    const report = check(text, DEFAULT_POLICY, {
+      jobDescription: "Requirements\n- Python\n- Kubernetes\n- Kafka\n- Docker",
+      now: new Date("2024-06-01"),
+      layout,
+    });
+    expect(report.matchedKeywords).toEqual(
+      expect.arrayContaining(["python", "kubernetes", "kafka", "docker"]),
+    );
+  });
+
+  // `hiddenTextRead` is what the text holds of the hidden text, the only part the job match sets
+  // aside: hidden text left out of the text costs no visible line that repeats it.
+  it("says which of the hidden text the text holds, for a PDF, a Word file and a web page", async () => {
+    const fromPdf = (
+      await pdf(`${at(50, 700, "Jane Doe")}\n1 1 1 rg ${at(20, 600, "Kafka Spark", 8)}`)
+    ).layout;
+    expect(fromPdf?.hiddenTextRead).toBe("Kafka Spark");
+
+    // The body's hidden runs are read, Word-hidden ones too; a header's Word-hidden run is left
+    // out of the header's text, its white one is not.
+    const docx = buildDocxBody(p("Jane Doe") + p("Kafka", "<w:vanish/>") + p("Experience"), false, [
+      [
+        "word/header1.xml",
+        marginXml(
+          "hdr",
+          p("Jane Doe") + p("Snowflake", "<w:vanish/>") + p("Airflow", '<w:color w:val="FFFFFF"/>'),
+        ),
+      ],
+    ]);
+    const fromDocx = await extractResume(docx, "docx");
+    expect(fromDocx.text).toContain("Kafka");
+    expect(fromDocx.text).not.toContain("Snowflake");
+    expect(fromDocx.layout?.hiddenText).toBe("Kafka Snowflake Airflow");
+    expect(fromDocx.layout?.hiddenTextRead).toBe("Kafka Airflow");
+
+    // A web page's hidden elements are left out of its text.
+    const fromHtml = (
+      await extractResume(
+        new TextEncoder().encode('<h1>Jane Doe</h1><div style="display:none">Kafka Spark</div>'),
+        "html",
+      )
+    ).layout;
+    expect(fromHtml?.hiddenText).toBe("Kafka Spark");
+    expect(fromHtml?.hiddenTextRead).toBe("");
+  });
 });
 
 describe("the new scans stay linear on hostile input", () => {

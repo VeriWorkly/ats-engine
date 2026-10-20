@@ -223,13 +223,16 @@ describe("ats-engine-mcp over stdio", () => {
     const result = await call("extract_text", { path: pdfPath });
     expect(result.isError).toBeFalsy();
     const { report, layout } = await pdfReport({ includeLines: true });
+    // All of the layout but `hiddenTextRead`, which on a PDF repeats `hiddenText` for the model.
+    const { hiddenTextRead, ...measured } = layout!;
+    expect(hiddenTextRead).toBe(layout!.hiddenText);
     expect(result.structuredContent).toEqual(
       JSON.parse(
         JSON.stringify({
           lines: report.lines,
           wordCount: report.wordCount,
           parsingWarnings: report.parsingWarnings,
-          layout,
+          layout: measured,
         }),
       ),
     );

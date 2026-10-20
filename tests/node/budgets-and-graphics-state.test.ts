@@ -11,6 +11,7 @@ import { main } from "../../src/cli/main.js";
 import { htmlText } from "../../src/job/html.js";
 import {
   measureDocx,
+  readableArchive,
   readZipEntry,
   withinExpansionLimit,
   zipEntries,
@@ -1232,6 +1233,20 @@ describe("the parts measured are the parts mammoth reads", () => {
       expect(measureDocx(data)?.hiddenChars).toBe(KEYWORD_CHARS);
       const { layout } = await extractResume(data, "docx");
       expect(layout?.hiddenTextChars).toBe(KEYWORD_CHARS);
+    });
+
+    // Each level copies the prefixes in scope: 10,000 levels each declaring one took 8 seconds of a
+    // 26 KB file, and 20,000 the whole heap. Nested past what any writer writes, it is refused.
+    it("refuses a relationships file nested thousands of levels deep, in bounded time", () => {
+      let open = "";
+      let close = "";
+      for (let i = 0; i < 10_000; i++) {
+        open += `<x xmlns:p${i}="u">`;
+        close = `</x>${close}`;
+      }
+      const deep = `<Relationships xmlns="${PACKAGE}"><Relationship Id="a" Type="${TYPES}officeDocument" Target="word/document.xml"/>${open}${close}</Relationships>`;
+      const data = buildDocxBody(BODY, true, [["_rels/.rels", deep]]);
+      expectFast(() => readableArchive(data), 500);
     });
 
     it("falls back to word/document.xml when the target is missing", () => {

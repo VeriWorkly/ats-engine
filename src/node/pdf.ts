@@ -201,6 +201,9 @@ async function readPdf(
           hiddenTextChars: hiddenText.replace(/\s/g, "").length,
           hiddenTextSample: hiddenText.slice(0, 80),
           hiddenText: hiddenText.slice(0, MAX_HIDDEN_TEXT),
+          // A hidden run is a text item like any other, and every text item is read into a line
+          // (a copy drawn over itself once, `pageText`): the text holds all of the hidden text.
+          hiddenTextRead: hiddenText.slice(0, MAX_HIDDEN_TEXT),
           imageOnlyPages,
           imageCount,
         }),

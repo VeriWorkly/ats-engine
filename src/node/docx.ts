@@ -337,6 +337,8 @@ const MARKUP_COMPATIBILITY = "http://schemas.openxmlformats.org/markup-compatibi
 const RELATIONSHIP_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
 /** A relationships file is a few kilobytes; one past this is not followed. */
 const MAX_RELS_BYTES = 1024 * 1024;
+/** A relationships file nests two levels, its root and its entries; one past this is refused. */
+const MAX_RELS_DEPTH = 8;
 
 const XML_ENTITIES = new Map([
   ["amp", "&"],
@@ -375,8 +377,10 @@ const RELS_ATTR = /\s+([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
  * A relationships part as `mammoth` reads it: the targets of each type, in order, of the
  * `Relationship` elements in the package namespace directly under the root. Null for anything
  * this cannot read as `mammoth`'s parser does — a DTD, an unknown entity or prefix, unbalanced or
- * malformed tags, markup-compatibility content — which no writer puts in such a file. Linear:
- * each tag pattern stops at the next `<`.
+ * malformed tags, markup-compatibility content, or elements nested past `MAX_RELS_DEPTH` — which
+ * no writer puts in such a file. Linear: each tag pattern stops at the next `<`, and each element
+ * copies the prefixes in scope, so the depth is bounded too (thousands of levels each declaring a
+ * prefix took seconds, then the whole heap).
  */
 function relationshipTargets(bytes: Buffer): Map<string, string[]> | null {
   // The decoder drops one byte-order mark and `mammoth` another.
@@ -400,6 +404,7 @@ function relationshipTargets(bytes: Buffer): Map<string, string[]> | null {
       continue;
     }
     if (scopes.length === 1 && roots++) return null;
+    if (scopes.length > MAX_RELS_DEPTH) return null;
     // The prefixes in scope, and under "\0" the element's name, which its end tag must repeat.
     const scope = new Map(scopes[scopes.length - 1]);
     scope.set("\0", name!);
@@ -701,6 +706,12 @@ export type DocxMeasure = {
   hiddenSample: string;
   /** All of the hidden text, in document order, to `MAX_HIDDEN_TEXT` characters. */
   hiddenText: string;
+  /**
+   * Of it, what the text holds too, to `MAX_HIDDEN_TEXT` characters: every hidden run of the body,
+   * which `mammoth` reads whatever its formatting, and a header's or footer's but those marked
+   * hidden, which `docxMargins` leaves out.
+   */
+  hiddenTextRead: string;
   /** Tables in the body, nested ones included: Word layouts built from tables extract out of order. */
   tableCount: number;
   /** Pictures printed at least 50pt a side — a photo, as for a PDF. */
@@ -836,9 +847,10 @@ function inflatePart(entry: ZipEntry): Buffer | null {
   return null;
 }
 
-/** What a part's runs say: the text of its hidden ones, and its paragraphs' text without the
- * runs marked hidden (`w:vanish`), a tab, break or carriage return each as a tab or line break. */
-type PartRuns = { hidden: string[]; lines: string[] };
+/** What a part's runs say: the text of its hidden ones, of those not marked hidden (`w:vanish`),
+ * and its paragraphs' text without the runs marked hidden, a tab, break or carriage return each
+ * as a tab or line break. */
+type PartRuns = { hidden: string[]; shownHidden: string[]; lines: string[] };
 
 /**
  * Reads the runs of one part — the main document, a header, a footer — for those a reader of
@@ -879,6 +891,7 @@ function scanRuns(
   let runText = "";
   let line = "";
   const hidden: string[] = [];
+  const shownHidden: string[] = [];
   const lines: string[] = [];
 
   for (const match of xml.matchAll(TAG)) {
@@ -951,7 +964,10 @@ function scanRuns(
         isHex(background) &&
         nearWhite(background);
       const tiny = run.size !== null && run.size < 4;
-      if (runText.trim() && (run.vanish || tiny || whiteOnWhite)) hidden.push(runText);
+      if (runText.trim() && (run.vanish || tiny || whiteOnWhite)) {
+        hidden.push(runText);
+        if (!run.vanish) shownHidden.push(runText);
+      }
       if (!run.vanish) line += runText;
       run = null;
     } else if (run && where === "run") {
@@ -964,7 +980,7 @@ function scanRuns(
     } else if (run && open && (tag === "w:tab" || tag === "w:br" || tag === "w:cr"))
       runText += tag === "w:tab" ? "\t" : "\n";
   }
-  return { hidden, lines };
+  return { hidden, shownHidden, lines };
 }
 
 /**
@@ -1033,6 +1049,8 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
   const behindText = /<wp:anchor\b[^<>]*\bbehindDoc=["'](?:1|true|on)["']/.test(xml);
 
   const hidden = scanRuns(xml, paragraphStyle, page, behindText).hidden;
+  // The hidden text the text holds: all of the body's, as `mammoth` reads every run.
+  const read = [...hidden];
   let trackedChanges = count(xml, REVISION);
   // A header's banner — a shape or picture behind its text, as Word's templates draw them — is
   // a background this cannot read: white text on the bare page of a part that draws one is not
@@ -1041,7 +1059,9 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
     const content = withoutMarkup(part.toString("utf8"));
     trackedChanges += count(content, REVISION);
     const drawn = behindText || /<w:(?:drawing|pict)\b/.test(content);
-    for (const run of scanRuns(content, paragraphStyle, page, drawn).hidden) hidden.push(run);
+    const runs = scanRuns(content, paragraphStyle, page, drawn);
+    for (const run of runs.hidden) hidden.push(run);
+    for (const run of runs.shownHidden) read.push(run);
   }
 
   // The comments themselves, from their own part when it is there to read.
@@ -1055,6 +1075,7 @@ export function measureDocx(data: Uint8Array): DocxMeasure | null {
   const decoded = xmlText(hidden.join(" ").replace(/\s+/g, " ").trim());
   return {
     hiddenText: decoded.slice(0, MAX_HIDDEN_TEXT),
+    hiddenTextRead: xmlText(read.join(" ").replace(/\s+/g, " ").trim()).slice(0, MAX_HIDDEN_TEXT),
     hiddenChars: decoded.replace(/\s/g, "").length,
     hiddenSample: decoded.slice(0, 80),
     tableCount,
