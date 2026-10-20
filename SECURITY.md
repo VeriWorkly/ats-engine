@@ -63,8 +63,10 @@ than 1 000 of them, a document type declaration, a `<` that starts no well-forme
 bound to a second namespace, or more than 1 000 distinct elements (a name in a namespace) and style,
 break, symbol or content-type tags: on those its XML parser (`@xmldom/xmldom` 0.8) or its list of
 warnings takes seconds to minutes, and a file of 1.4 KB held it for two minutes. A style map the
-file carries is not applied. What passes still costs `mammoth` up to about a second a megabyte of
-XML. PDF parsing (pdf.js) and DOCX parsing (`mammoth`) are CPU-bound: run `/node` extraction in the
+file carries is not applied. A relationships part (the `.rels` files that name the document and its
+parts) nested past eight levels is refused as unreadable: read with every namespace prefix above
+each level, 10,000 levels of a 26 KB file took 8 seconds and 20,000 the whole heap. What passes
+still costs `mammoth` up to about a second a megabyte of XML. PDF parsing (pdf.js) and DOCX parsing (`mammoth`) are CPU-bound: run `/node` extraction in the
 forkable `/node/child` process with a timeout and a memory limit, so a pathological file costs a
 killed process, not a worker. Cap the child's memory in the operating system (a cgroup,
 `ulimit -v`, a Windows Job object): decoded images live outside the V8 heap, so

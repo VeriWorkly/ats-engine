@@ -29,6 +29,8 @@ jobs:
           scope: "@veriworkly"
       - run: npm ci
       - run: npm run build
+      # Writes dist/sizes.json, which the package exports as `./sizes.json`; `build` cleans dist.
+      - run: npm run size
       # Provenance attestations are an npmjs.com feature; GitHub's registry refuses them.
       - run: npm pkg delete publishConfig.provenance
       - run: npm publish --registry https://npm.pkg.github.com

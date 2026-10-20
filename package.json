@@ -102,6 +102,7 @@
       "default": "./dist/node/child.js"
     },
     "./policy.schema.json": "./dist/policy.schema.json",
+    "./sizes.json": "./dist/sizes.json",
     "./package.json": "./package.json"
   },
   "files": [

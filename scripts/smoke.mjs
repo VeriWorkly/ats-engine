@@ -81,6 +81,18 @@ if (!policySchema.$id.includes(`@${version}/`) || undescribed.length > 0)
   );
 console.log(`schema   policy.schema.json covers ${Object.keys(DEFAULT_POLICY).length} sections`);
 
+// Sizes: `npm run size` wrote them for this version, for every subpath a bundler imports, so the
+// docs that read their size tables from `./sizes.json` describe this build.
+const sizes = JSON.parse(readFileSync(exports["./sizes.json"], "utf8"));
+const unsized = Object.keys(exports).filter(
+  (subpath) => exports[subpath].import && !(subpath in sizes.subpaths),
+);
+if (sizes.version !== version || unsized.length > 0)
+  throw new Error(
+    `sizes: sizes.json is stale (version ${sizes.version} for ${version}; missing: ${unsized.join(", ") || "none"}); run npm run size`,
+  );
+console.log(`sizes    sizes.json covers ${Object.keys(sizes.subpaths).length} subpaths`);
+
 // Each sample is its own module beside package.json, so `@veriworkly/ats-engine` resolves to this
 // package's exports. The names a sample uses without defining are declared for it.
 const DECLARED = ["resume", "resumeText", "postingHtml", "jobDescription"]
