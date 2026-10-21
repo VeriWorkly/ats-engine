@@ -65,7 +65,10 @@ export const resumeParseSchema = z.object({
     intermediate: "B1",
     [String.raw`elementary(?:\s+proficiency)?`]: "A2",
     basic: "A2",
+    [String.raw`school[\s-]level`]: "A2",
     beginner: "A1",
+    // Not "learning" alone: "machine learning".
+    [String.raw`(?:currently|still)\s+learning`]: "A1",
   }),
   /**
    * The words around a certification's dates and issuer ("Issued Mar 2022", "expires 2027",

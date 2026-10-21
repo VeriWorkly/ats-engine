@@ -1965,7 +1965,9 @@
       "intermediate": "B1",
       "elementary(?:\\s+proficiency)?": "A2",
       "basic": "A2",
-      "beginner": "A1"
+      "school[\\s-]level": "A2",
+      "beginner": "A1",
+      "(?:currently|still)\\s+learning": "A1"
     },
     "credentialWords": {
       "issued": [
@@ -3611,6 +3613,7 @@
           "sehr\\s+gute?[mnrs]?(?:\\s+kenntnisse)?": "B2",
           "gute?[mnrs]?\\s+kenntnisse": "B1",
           "grundkenntnisse": "A2",
+          "schulkenntnisse": "A2",
           "anfänger(?:in|kenntnisse)?": "A1"
         },
         "credentialWords": {

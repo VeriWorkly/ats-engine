@@ -68,6 +68,7 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     [String.raw`sehr\s+gute?[mnrs]?(?:\s+kenntnisse)?`]: "B2",
     [String.raw`gute?[mnrs]?\s+kenntnisse`]: "B1",
     grundkenntnisse: "A2",
+    schulkenntnisse: "A2",
     [String.raw`anfänger(?:in|kenntnisse)?`]: "A1",
   },
   credentialWords: {

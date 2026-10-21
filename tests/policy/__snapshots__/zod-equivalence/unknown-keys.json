@@ -933,7 +933,9 @@
       "intermediate": "B1",
       "elementary(?:\\s+proficiency)?": "A2",
       "basic": "A2",
-      "beginner": "A1"
+      "school[\\s-]level": "A2",
+      "beginner": "A1",
+      "(?:currently|still)\\s+learning": "A1"
     },
     "credentialWords": {
       "issued": [

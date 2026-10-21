@@ -131,6 +131,27 @@ describe("a language asked for", () => {
     expect(judge(speaks("English, German"), "Fluent German").status).toBe("met");
   });
 
+  // A level the engine could not read met any level asked.
+  it("is partial by a row whose level it cannot read, when a level is asked", () => {
+    const found = judge(speaks("English (native), Spanish (some exposure)"), "Fluent Spanish");
+    expect(found.status).toBe("partial");
+    expect(found.detail).toBe("Spanish: level not read, C1 asked");
+    expect(judge(speaks("Spanish (some exposure)"), "Must speak Spanish").status).toBe("met");
+  });
+
+  it.each([
+    ["Spanish (currently learning)", "Fluent Spanish", "en"],
+    ["Spanish (school level)", "Fluent Spanish", "en"],
+    ["Französisch (Schulkenntnisse)", "Verhandlungssicheres Französisch", "de"],
+  ])("reads a learner's level: %s", (row, ask, language) => {
+    const found = check(speaks(row), withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
+      jobDescription: `Requirements\n- ${ask}`,
+      languages: [language],
+      now: NOW,
+    }).requirements[0] as AtsRequirement;
+    expect(found).toMatchObject({ kind: "language", status: "missing" });
+  });
+
   it("is missing when the rows leave it off", () => {
     const found = judge(speaks("English (native), German (C1)"), "Fluent French");
     expect(found.status).toBe("missing");

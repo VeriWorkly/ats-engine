@@ -893,10 +893,14 @@ export function judgeRequirements(
           (spoken) => canonicalLanguage(spoken.language, policy) === english,
         );
         const level = asked.get(name) ?? null;
+        // A level written that no word reads ("some exposure") meets no level asked for certain.
+        const unread = Boolean(level && row && !row.cefr && row.level.trim());
         const status: Status | null = row
-          ? !level || !row.cefr || compareCefr(row.cefr, level) >= 0
-            ? "met"
-            : belowLevel(row.cefr, level)
+          ? unread
+            ? "partial"
+            : !level || !row.cefr || compareCefr(row.cefr, level) >= 0
+              ? "met"
+              : belowLevel(row.cefr, level)
           : resumeLines.some(shows)
             ? "met"
             : null;
@@ -906,7 +910,11 @@ export function judgeRequirements(
           shows,
           row,
           status,
-          detail: short ? `${row.language}: ${row.cefr} read, ${level} asked` : null,
+          detail: short
+            ? `${row.language}: ${row.cefr} read, ${level} asked`
+            : unread
+              ? `${row!.language}: level not read, ${level} asked`
+              : null,
         };
       });
       const met = states.filter((state) => state.status === "met").length;
