@@ -185,6 +185,25 @@ B.S. Statistics, City College, 2019`;
     });
   });
 
+  it("does not flag a bullet copied word for word under three roles", () => {
+    const bullet = "- Mentored three junior colleagues into their first promotion";
+    const roles = ["Engineer at Acme", "Analyst at Globex", "Engineer at Initech"]
+      .map((role, i) => {
+        const own = Array.from(
+          { length: 3 },
+          (_, j) => `- Built report ${i}${j} for ${j + 2} teams`,
+        );
+        own.splice(i, 0, bullet);
+        return `${role}, ${2014 + i * 3} - ${2016 + i * 3}\nAustin, TX\n${own.join("\n")}`;
+      })
+      .join("\n");
+    const resume = `Jane Doe\njane@example.com\nExperience\n${roles}\nEducation\nBSc Economics, 2013`;
+    expect(stuffing(resume)).toMatchObject({ passed: true });
+    // Pasted three times under one role, it is still a line repeated far beyond need.
+    const pasted = `${SALES}\n${bullet}\n${bullet}\n${bullet}`;
+    expect(stuffing(pasted)).toMatchObject({ passed: false });
+  });
+
   it("does not flag a short data engineer's resume for saying data", () => {
     const resume = `Sam Okafor
 sam.okafor@example.com | +1 646 555 0123
