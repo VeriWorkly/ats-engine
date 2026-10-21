@@ -172,7 +172,8 @@ function listItems(line: string): string[] | null {
  *   that names other things more: a data engineer says "data" in most bullets. A bare run of
  *   terms is no sentence. Nor on citations (`cited`), nor for a word of the candidate's `name`;
  *   the checks below still read both.
- * - A non-list line repeating one term five times or more, as 30% of its words.
+ * - A non-list line repeating one term five times or more, as 30% of its words; or terms named
+ *   three times or more each, together ten words or more and half the line.
  * - A list item named three times or more within one line, or across the undated, unlabelled
  *   lists of a skills section. A role naming its own stack is not, nor three certifications
  *   from one issuer.
@@ -220,6 +221,10 @@ export function stuffedTerms(
         add(spread, word, paragraph ? count : 1);
       if (!list && count >= 5 && count >= words.length * 0.3) stuffed.set(word, 0);
     }
+    // A few terms taking turns stay under the bar one by one, so they are counted together.
+    const again = list ? [] : [...here].filter(([, count]) => count >= 3);
+    const share = again.reduce((sum, [, count]) => sum + count, 0);
+    if (share >= 10 && share >= words.length / 2) for (const [word] of again) stuffed.set(word, 0);
   }
   // The share is of the words besides the repeated ones, or pasted terms raise their own bar.
   const repeated = [...spread].filter(([, count]) => count >= 15);

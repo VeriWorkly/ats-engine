@@ -301,6 +301,14 @@ ${Array.from(
     expect(stuffing(`${SALES}\n${run.join("\n")}`)).toMatchObject({ passed: false });
   });
 
+  it("flags a line naming the same few skills again and again, each under five times", () => {
+    const skills = "Python Kubernetes AWS Docker Go Kafka";
+    const found = stuffing(`${SALES}\nKeywords: ${Array(4).fill(skills).join(" ")}`);
+    expect(found).toMatchObject({ passed: false });
+    expect(found?.evidence).toContain("×4");
+    expect(stuffing(`${SALES}\nKeywords: ${skills}`)).toMatchObject({ passed: true });
+  });
+
   it("still flags a line repeating a term under a publications heading", () => {
     expect(stuffing(`${ACADEMIC}\n- ${"Kubernetes ".repeat(30)}`)).toMatchObject({
       passed: false,
