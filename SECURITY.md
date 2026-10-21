@@ -92,8 +92,8 @@ What does not depend on the model:
   skills) must occur in the source text, and is dropped and reported in `rejected` if it does not.
   An email address or URL must occur whole, not as words spread over the text. Dates in parse
   repair must name a year the text contains, and a contact field it fills must hold that kind of
-  value (an email address; a phone number's characters and 7 to 15 digits, not a date range; a
-  name without digits or "@").
+  value (an email address; a phone number's characters and 7 to 15 digits; a name of up to eight
+  words without digits or "@").
 - Free text a model writes (an explanation, a recommendation) is advice and is not grounded:
   show it as the model's words, not as facts about the candidate.
 - A provider's error is quoted in the error message only in its own short words (a JSON body's

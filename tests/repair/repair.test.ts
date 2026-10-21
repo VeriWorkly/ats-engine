@@ -213,6 +213,19 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     expect(merged[field]).toBe("");
   });
 
+  // The first shape checks dropped honest values the parser had missed.
+  it.each([
+    ["phone", "(+44) 7700 900123"],
+    ["phone", "+1 415–555–0134"],
+    ["phone", "+1 (415) 555-0134 ext. 12"],
+    ["phone", "+1 415 555 0134 x12"],
+    ["phone", "+55 11 2019-2020"],
+    ["name", "María José de la Cruz Fernández García"],
+  ] as const)("fills %s with %j", (field, value) => {
+    const { merged } = merge(emptyParsed, candidate({ [field]: value }), `${SOURCE}\n${value}`);
+    expect(merged[field]).toBe(value);
+  });
+
   it("fills an email and a phone written as such", () => {
     const { merged } = merge(
       emptyParsed,

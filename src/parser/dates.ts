@@ -20,8 +20,8 @@ type DateMatchers = {
   named: RegExp;
   season: RegExp;
   openEnded: RegExp;
-  /** An open end anywhere, as a word: "Current role". */
-  openEndedWord: RegExp;
+  /** A field opening with an open end: "Current role", not "Not current". */
+  openEndedStart: RegExp;
 };
 
 /** A two-digit year after an apostrophe: "Jan '20". */
@@ -92,16 +92,17 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
     ),
     season: new RegExp(String.raw`^(${seasonNames})[\s-]+(\d{4})$`, "u"),
     openEnded: new RegExp(`^${openEnded}$`, "iu"),
-    openEndedWord: new RegExp(`(?<!${LETTER})${openEnded}`, "iu"),
+    openEndedStart: new RegExp(`^\\s*${openEnded}`, "iu"),
   };
 });
 
 /**
  * Whether a structured document's end field, holding no date, says the role or study is still
- * going on, in the words the policy and its packs read: "heute", "Current role", "Till now".
+ * going on, opening with words the policy and its packs read: "heute", "Current role", "Till
+ * now"; not "Not current".
  */
 export function saysOngoing(end: string | undefined, rp: AtsEnginePolicy["resumeParse"]) {
-  return Boolean(end?.trim()) && buildMatchers(rp).openEndedWord.test(normalizeText(end!));
+  return Boolean(end?.trim()) && buildMatchers(rp).openEndedStart.test(normalizeText(end!));
 }
 
 /**

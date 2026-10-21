@@ -346,13 +346,16 @@ describe("JSON Resume through the engine's front door", () => {
     expect(report.parsed.monthsOfExperience).toBeGreaterThanOrEqual(92);
   });
 
-  it("still reads an end it cannot read as no end, not as current", () => {
-    const resume = {
-      basics: { name: "Jane Doe" },
-      work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate: "soon" }],
-    };
-    expect(check(resume).parsed.roles[0]).toMatchObject({ current: false, end: null });
-  });
+  it.each(["soon", "Not current", "No longer current"])(
+    "still reads an end of %j as no end, not as current",
+    (endDate) => {
+      const resume = {
+        basics: { name: "Jane Doe" },
+        work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate }],
+      };
+      expect(check(resume).parsed.roles[0]).toMatchObject({ current: false, end: null });
+    },
+  );
 
   it("reads only a bounded slice of a huge array", () => {
     const huge = {

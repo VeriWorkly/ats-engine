@@ -133,8 +133,11 @@ export function ongoingIn(source: string, policy: AtsEnginePolicy) {
 
 /** An email address and nothing else, as the parser reads one. */
 const WHOLE_EMAIL = new RegExp(`^(?:${EMAIL.source})$`, EMAIL.flags);
-/** Only what a phone number is written with: digits, "+", spaces, brackets, dots, dashes, slashes. */
-const PHONE_SHAPE = /^\+?[\d\s().\-/]+$/;
+/**
+ * Only what a phone number is written with: digits, "+", spaces, brackets ("(+44)"), dots,
+ * dashes of any width, slashes; then an extension ("ext. 12", "x12") apart.
+ */
+const PHONE_SHAPE = /^([+\d\s().\-/–—]+?)(?:\s*(?:ext\.?|x)\s*\d{1,6})?$/i;
 
 /**
  * Fills gaps in the deterministic parse with grounded AI values. A value the parser found is
@@ -169,14 +172,19 @@ export function mergeGrounded(
 
   // Grounded words are not enough: each contact field must also be the kind of value it holds.
   const shaped = {
-    name: (value: string) => !/[\d@/]/.test(value) && value.trim().split(/\s+/).length <= 6,
+    name: (value: string) => !/[\d@/]/.test(value) && value.trim().split(/\s+/).length <= 8,
     email: (value: string) => WHOLE_EMAIL.test(value.trim()),
-    // A phone's characters and 7 to 15 digits (E.164), not a date range; libphonenumber's check
-    // would put its metadata in the `/ai` bundle.
-    phone: (value: string) =>
-      PHONE_SHAPE.test(value.trim()) &&
-      /^(?:\D*\d){7,15}\D*$/.test(value) &&
-      !findDateRange(value, policy.resumeParse, now),
+    // A phone's characters and 7 to 15 digits (E.164) besides an extension; without a country
+    // code, not a date range ("2017 - 2019"). libphonenumber's check would put its metadata in the
+    // `/ai` bundle.
+    phone: (value: string) => {
+      const number = PHONE_SHAPE.exec(value.trim())?.[1];
+      return (
+        number !== undefined &&
+        /^(?:\D*\d){7,15}\D*$/.test(number) &&
+        (number.includes("+") || !findDateRange(number, policy.resumeParse, now))
+      );
+    },
   };
   for (const field of ["name", "email", "phone"] as const)
     if (!core[field] && ok(field, candidate[field]) && shaped[field](candidate[field])) {
