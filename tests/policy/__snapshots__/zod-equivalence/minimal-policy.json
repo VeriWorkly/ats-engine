@@ -530,7 +530,10 @@
         {
           "name": "US",
           "patterns": [
-            "u\\.?s\\.?(?:a\\.?)?",
+            "u\\.s\\.(?:a\\.)?",
+            "usa",
+            "(?<=(?:the|in)\\s)us",
+            "us(?=\\s+citizen)",
             "(?:the\\s+)?united\\s+states(?:\\s+of\\s+america)?",
             "american(?=\\s+citizen)",
             "green\\s+card"
@@ -568,13 +571,6 @@
           "patterns": [
             "australia",
             "australian"
-          ]
-        },
-        {
-          "name": "Ireland",
-          "patterns": [
-            "ireland",
-            "irish"
           ]
         },
         {
@@ -621,9 +617,14 @@
         "lapsed",
         "able\\s+to\\s+obtain",
         "former(?:ly)?",
-        "not\\s+(?:currently\\s+)?(?:active|current|valid|held)",
-        "no\\s+longer",
-        "in\\s+progress"
+        "not\\s+(?:currently\\s+)?(?:active|current|valid|held|obtained|renewed|cleared)",
+        "no\\s+longer"
+      ],
+      "inProgress": [
+        "in\\s+progress",
+        "pursuing",
+        "studying\\s+for",
+        "working\\s+towards?"
       ],
       "citizenship": [
         "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",

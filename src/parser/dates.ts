@@ -68,8 +68,12 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
 
   // A range's end may be a year's last two digits ("2019–21"); `findDateRange` places them.
   const shortEnd = String.raw`\d{2}(?![\d./-])`;
-  // A month and two-digit year ("06/21"), read only as a range's ends: alone, "10/10" is a rating.
-  const monthYear = String.raw`(?<![\d./-])(?:0?[1-9]|1[0-2])\s*\/\s*\d{2}(?![\d./])`;
+  // A month, with its zero, and a two-digit year ("06/21"), read only as a range's ends: alone,
+  // "10/10" is a rating, and "7/10 - 9/10" a score.
+  const monthYear = String.raw`(?<![\d./-])(?:0[1-9]|1[0-2])\s*\/\s*\d{2}(?![\d./])`;
+  // An open end written straight after a date, with no dash, ends the clause ("Jan 2020 to
+  // date", "Jun 2021 onwards"): "Jan 2017 continuing support" is a sentence.
+  const clauseEnd = String.raw`(?=\s*(?:$|[,;|)\]·•–—-]))`;
 
   return {
     months,
@@ -78,7 +82,7 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
     // "Jan 2020 to date" (the "to" belongs to the open-ended phrase); then a season alone; the
     // last a range of months and two-digit years ("06/21 - Present").
     range: new RegExp(
-      String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})|(${monthYear})${separator}(${monthYear}|${openEnded})`,
+      String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded})${clauseEnd})|${since}\s+(${date})|(${seasonDate})|(${monthYear})${separator}(${monthYear}|${openEnded})`,
       "giu",
     ),
     single: new RegExp(date, "giu"),

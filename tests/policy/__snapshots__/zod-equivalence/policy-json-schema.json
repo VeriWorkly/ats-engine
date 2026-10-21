@@ -1124,7 +1124,10 @@
                   {
                     "name": "US",
                     "patterns": [
-                      "u\\.?s\\.?(?:a\\.?)?",
+                      "u\\.s\\.(?:a\\.)?",
+                      "usa",
+                      "(?<=(?:the|in)\\s)us",
+                      "us(?=\\s+citizen)",
                       "(?:the\\s+)?united\\s+states(?:\\s+of\\s+america)?",
                       "american(?=\\s+citizen)",
                       "green\\s+card"
@@ -1162,13 +1165,6 @@
                     "patterns": [
                       "australia",
                       "australian"
-                    ]
-                  },
-                  {
-                    "name": "Ireland",
-                    "patterns": [
-                      "ireland",
-                      "irish"
                     ]
                   },
                   {
@@ -1271,9 +1267,22 @@
                   "lapsed",
                   "able\\s+to\\s+obtain",
                   "former(?:ly)?",
-                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held)",
-                  "no\\s+longer",
-                  "in\\s+progress"
+                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held|obtained|renewed|cleared)",
+                  "no\\s+longer"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "inProgress": {
+                "default": [
+                  "in\\s+progress",
+                  "pursuing",
+                  "studying\\s+for",
+                  "working\\s+towards?"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -6484,7 +6493,10 @@
                   {
                     "name": "US",
                     "patterns": [
-                      "u\\.?s\\.?(?:a\\.?)?",
+                      "u\\.s\\.(?:a\\.)?",
+                      "usa",
+                      "(?<=(?:the|in)\\s)us",
+                      "us(?=\\s+citizen)",
                       "(?:the\\s+)?united\\s+states(?:\\s+of\\s+america)?",
                       "american(?=\\s+citizen)",
                       "green\\s+card"
@@ -6522,13 +6534,6 @@
                     "patterns": [
                       "australia",
                       "australian"
-                    ]
-                  },
-                  {
-                    "name": "Ireland",
-                    "patterns": [
-                      "ireland",
-                      "irish"
                     ]
                   },
                   {
@@ -6632,9 +6637,22 @@
                   "lapsed",
                   "able\\s+to\\s+obtain",
                   "former(?:ly)?",
-                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held)",
-                  "no\\s+longer",
-                  "in\\s+progress"
+                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held|obtained|renewed|cleared)",
+                  "no\\s+longer"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "inProgress": {
+                "default": [
+                  "in\\s+progress",
+                  "pursuing",
+                  "studying\\s+for",
+                  "working\\s+towards?"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -6919,6 +6937,7 @@
               "sponsorshipOffered",
               "negation",
               "notHeld",
+              "inProgress",
               "citizenship",
               "residence",
               "clearance",

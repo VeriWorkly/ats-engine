@@ -138,6 +138,12 @@ describe("a certification not held", () => {
   it("is met by a row with no expiry", () => {
     expect(judge(listing("CISSP, ISC2, 2019"), "Active CISSP certification").status).toBe("met");
   });
+
+  it("is met by a row whose words say no more than that it needs no renewal", () => {
+    expect(
+      judge(listing("CISSP, ISC2 (no longer required to renew)"), "CISSP certification").status,
+    ).toBe("met");
+  });
 });
 
 describe("a language asked for", () => {
@@ -171,12 +177,10 @@ describe("a language asked for", () => {
     expect(judge(speaks("English, German"), "Fluent German").status).toBe("met");
   });
 
-  // A level the engine could not read met any level asked.
-  it("is partial by a row whose level it cannot read, when a level is asked", () => {
-    const found = judge(speaks("English (native), Spanish (some exposure)"), "Fluent Spanish");
-    expect(found.status).toBe("partial");
-    expect(found.detail).toBe("Spanish: level not read, C1 asked");
-    expect(judge(speaks("Spanish (some exposure)"), "Must speak Spanish").status).toBe("met");
+  // A level it cannot read is no worse than no level: "excellent" or "heritage speaker" is honest.
+  it("is met by a row whose level it cannot read, as by a row with none", () => {
+    for (const row of ["Spanish (excellent)", "Spanish (heritage speaker)", "Spanish (5/5)"])
+      expect(judge(speaks(row), "Fluent Spanish").status, row).toBe("met");
   });
 
   it.each([

@@ -394,12 +394,20 @@ function judgeAuthorization(
   const countriesIn = (text: string) =>
     matchers.countries.filter(({ pattern }) => pattern.test(text)).map(({ name }) => name);
   const asked = countriesIn(ask);
+  const phrases = new RegExp(matchers.authorization.source, "giu");
   const stated = lines.flatMap((entry) => {
     const { line } = entry;
     if (
       !matchers.authorization.test(line) &&
       !matchers.citizenship.test(line) &&
       !matchers.residence.test(line)
+    )
+      return [];
+    // A heading or label alone ("Work Authorization") states nothing; "U.S. citizen" does.
+    if (
+      !matchers.citizenship.test(line) &&
+      !matchers.residence.test(line) &&
+      !/[\p{L}\p{N}]/u.test(line.replace(phrases, ""))
     )
       return [];
     const named = countriesIn(line);
@@ -746,7 +754,9 @@ export function judgeRequirements(
         listsLanguages(entry.line, matchers, km.requirements.languageNames),
       ));
   // The certification rows, each with what it names: a credential asked for is met by one held.
-  // Expired, dated after today or in progress, a row is not held, and says why.
+  // Expired, dated after today or in progress (`inProgress`), a row is not held, and says why.
+  // Schema-defaulted; a hand-built policy may lack it.
+  const inProgress = wordListRegex(km.requirements.inProgress ?? ["(?!)"]);
   const today = now.getUTCFullYear() * 12 + now.getUTCMonth() + 1;
   const monthOf = (date: { year: number; month: number | null }, edge: "start" | "end") =>
     date.year * 12 + (date.month ?? (edge === "start" ? 1 : 12));
@@ -757,7 +767,7 @@ export function judgeRequirements(
       row.expires && monthOf(row.expires, "end") < today
         ? `${row.name}: expired ${row.expires.year}`
         : (row.date && monthOf(row.date, "start") > today) ||
-            matchers.notHeld.test(`${row.name} ${row.issuer}`)
+            inProgress.test(`${row.name} ${row.issuer}`)
           ? `${row.name}: not yet held`
           : null,
   }));
@@ -908,14 +918,10 @@ export function judgeRequirements(
           (spoken) => canonicalLanguage(spoken.language, policy) === english,
         );
         const level = asked.get(name) ?? null;
-        // A level written that no word reads ("some exposure") meets no level asked for certain.
-        const unread = Boolean(level && row && !row.cefr && row.level.trim());
         const status: Status | null = row
-          ? unread
-            ? "partial"
-            : !level || !row.cefr || compareCefr(row.cefr, level) >= 0
-              ? "met"
-              : belowLevel(row.cefr, level)
+          ? !level || !row.cefr || compareCefr(row.cefr, level) >= 0
+            ? "met"
+            : belowLevel(row.cefr, level)
           : resumeLines.some(shows)
             ? "met"
             : null;
@@ -925,11 +931,7 @@ export function judgeRequirements(
           shows,
           row,
           status,
-          detail: short
-            ? `${row.language}: ${row.cefr} read, ${level} asked`
-            : unread
-              ? `${row!.language}: level not read, ${level} asked`
-              : null,
+          detail: short ? `${row.language}: ${row.cefr} read, ${level} asked` : null,
         };
       });
       const met = states.filter((state) => state.status === "met").length;

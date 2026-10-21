@@ -399,6 +399,13 @@ describe("the right to work, read for what the statement says", () => {
     ["Green card holder", "Must have the right to work in the UK"],
     ["EU citizen", "Must be authorized to work in the United States"],
     ["U.S. citizen", "Must be a British citizen"],
+    // "us" the pronoun is no country.
+    [
+      "Authorized to work in the US",
+      "Must have the right to work in the UK. Tell us if you need sponsorship.",
+    ],
+    // A heading naming the subject is no statement of it.
+    ["Work Authorization\nAuthorized to work in the US", "Must have the right to work in the UK"],
   ])("does not take a statement about another country as evidence: %s", (statement, ask) => {
     expect(authorized(statement, ask)).toMatchObject({
       kind: "authorization",
@@ -413,6 +420,9 @@ describe("the right to work, read for what the statement says", () => {
     ["EU citizen; right to work in the European Union", "Must be authorized to work in the EU"],
     // A statement naming no country is read as before.
     ["Full right to work, no sponsorship needed", "Must have the right to work in the UK"],
+    // An Irish citizen may work in the EU and the UK.
+    ["Work authorization: Irish citizen", "Must have the right to work in the EU"],
+    ["US citizen", "Must be authorized to work in the United States"],
   ])("meets an ask about the country the statement names: %s", (statement, ask) => {
     expect(authorized(statement, ask)).toMatchObject({ kind: "authorization", status: "met" });
   });
@@ -558,6 +568,10 @@ describe("a clearance, compared by its level", () => {
     ["TS/SCI clearance not active", "TS/SCI clearance required"],
     ["Secret clearance (not active)", "Secret clearance required"],
     ["Secret clearance, no longer held", "Secret clearance required"],
+    // A clause of its own that says so, in any order.
+    ["TS/SCI clearance (not obtained)", "TS/SCI clearance required"],
+    ["Not currently cleared, TS/SCI previously", "TS/SCI clearance required"],
+    ["Held TS/SCI clearance, not renewed", "TS/SCI clearance required"],
   ])("takes no clearance from one not held: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("unverifiable");
   });
@@ -567,6 +581,8 @@ describe("a clearance, compared by its level", () => {
     ["Active TS/SCI clearance, no lapses since 2015", "TS/SCI clearance required"],
     ["Active Secret clearance (no incidents)", "Secret clearance required"],
     ["Secret clearance, held without interruption since 2018", "Secret clearance required"],
+    ["Active TS/SCI clearance; promotion to lead in progress", "TS/SCI clearance required"],
+    ["TS/SCI clearance (active), polygraph in progress", "TS/SCI clearance required"],
   ])("keeps a clearance beside a negation about something else: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("met");
   });

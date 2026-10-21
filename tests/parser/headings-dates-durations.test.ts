@@ -424,6 +424,22 @@ describe("date spellings that dropped the role", () => {
   it("reads a month and two-digit year only as a range's end", () => {
     expect(rows("Jane Doe\nExperience\nRated 10/10 by the review board")).toEqual([]);
     expect(rows("Jane Doe\nExperience\nShipped 3/12 features")).toEqual([]);
+    // A score or a sprint: a month written without its zero is no MM/YY date.
+    expect(rows("Jane Doe\nExperience\nPushed NPS from 7/10 - 9/10")).toEqual([]);
+    expect(rows("Jane Doe\nExperience\nShipped 3/12 - 5/12 sprint goals")).toEqual([]);
+  });
+
+  // An open end written straight after a date ends its clause: in a sentence it is a word.
+  it.each([
+    ["Jan 2017 continuing support for 3 legacy apps", "en"],
+    ["Mar 2019 Continuing professional development: AWS course", "en"],
+    ["2017 से टीम का नेतृत्व किया", "hi"],
+  ])("does not read %j in a role's bullets as a role", (bullet, language) => {
+    const { roles } = check(
+      `Jane Doe\nExperience\nEngineer, Hooli\nJan 2016 - Dec 2018\nBuilt Java services used by 40 teams\n${bullet}`,
+      { languages: [language] },
+    );
+    expect(roles).toHaveLength(1);
   });
 });
 

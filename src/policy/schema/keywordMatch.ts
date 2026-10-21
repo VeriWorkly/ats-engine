@@ -243,7 +243,11 @@ export const keywordMatchSchema = z
             {
               name: "US",
               patterns: [
-                String.raw`u\.?s\.?(?:a\.?)?`,
+                // Not "us" the pronoun ("Tell us"): dotted, "USA", after "the"/"in", or before "citizen".
+                String.raw`u\.s\.(?:a\.)?`,
+                "usa",
+                String.raw`(?<=(?:the|in)\s)us`,
+                String.raw`us(?=\s+citizen)`,
                 String.raw`(?:the\s+)?united\s+states(?:\s+of\s+america)?`,
                 // Not "Latin American": only a citizen.
                 String.raw`american(?=\s+citizen)`,
@@ -269,7 +273,7 @@ export const keywordMatchSchema = z
             },
             { name: "Canada", patterns: ["canada", "canadian"] },
             { name: "Australia", patterns: ["australia", "australian"] },
-            { name: "Ireland", patterns: ["ireland", "irish"] },
+            // Not Ireland: an Irish citizen may work in the EU and the UK as well.
             { name: "India", patterns: ["india", "indian"] },
           ],
         ),
@@ -329,11 +333,19 @@ export const keywordMatchSchema = z
           "lapsed",
           String.raw`able\s+to\s+obtain`,
           String.raw`former(?:ly)?`,
-          // In a clause of its own: "Secret clearance (not active)".
-          String.raw`not\s+(?:currently\s+)?(?:active|current|valid|held)`,
+          // In a clause of its own: "Secret clearance (not active)", "TS/SCI (not obtained)".
+          String.raw`not\s+(?:currently\s+)?(?:active|current|valid|held|obtained|renewed|cleared)`,
           String.raw`no\s+longer`,
-          // A certification being studied for: "AWS Solutions Architect (in progress)".
+        ]),
+        /**
+         * Words that say a certification is being studied for, not held: "AWS Solutions Architect
+         * (in progress)". A row naming one is partial for a certification asked for.
+         */
+        inProgress: z._default(wordList("requirements.inProgress"), [
           String.raw`in\s+progress`,
+          "pursuing",
+          String.raw`studying\s+for`,
+          String.raw`working\s+towards?`,
         ]),
         /**
          * Citizenship, and the permanent residence that is not it: an ask for `citizenship` that
