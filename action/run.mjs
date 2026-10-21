@@ -92,7 +92,8 @@ const failed = (report.failedChecks ?? []).map(({ id, severity, evidence, fix })
 
 function output(name, value) {
   if (!env.GITHUB_OUTPUT) return;
-  const delimiter = `ATS_${Math.random().toString(36).slice(2)}`;
+  // Unguessable: a failed check quotes the resume, which must not be able to close the value.
+  const delimiter = `ATS_${randomBytes(16).toString("hex")}`;
   appendFileSync(env.GITHUB_OUTPUT, `${name}<<${delimiter}\n${value}\n${delimiter}\n`);
 }
 output("score", String(report.readinessScore));
