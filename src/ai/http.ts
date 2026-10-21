@@ -154,6 +154,28 @@ function withoutSecrets(text: string, headers: Record<string, string>): string {
     .replace(SECRET, (match) => (/^Bearer/i.test(match) ? "Bearer [redacted]" : "[redacted]"));
 }
 
+/** The most of a provider's own error text an error message quotes. */
+const MAX_PROVIDER_TEXT = 200;
+
+/**
+ * What an error body says in the provider's own words: a JSON body's `error.message` (or a
+ * `message` or `error` string), else a short one-line text body ("Bad Gateway"); "" otherwise. A
+ * gateway may echo the request, the resume with it, around that text: the rest is never quoted.
+ */
+function providerSays(raw: string): string {
+  let said: unknown = raw.trim();
+  try {
+    const json = JSON.parse(raw) as Record<string, unknown> | null;
+    const error = json?.error as Record<string, unknown> | string | undefined;
+    said = typeof error === "string" ? error : (error?.message ?? json?.message);
+  } catch {
+    // Not JSON: plain text, quoted only when it is a short line.
+  }
+  return typeof said === "string" && said.length <= MAX_PROVIDER_TEXT && !said.includes("\n")
+    ? said.trim()
+    : "";
+}
+
 /**
  * POSTs `body` as JSON and returns the parsed JSON response. Every failure is an
  * `LlmProviderError` with the shared retry rule, except the caller's own abort (`AbortedError`).
@@ -199,11 +221,15 @@ export async function postJson(
   }
 
   if (!response.ok) {
-    const excerpt = withoutSecrets(raw.slice(0, 1_000), headers).slice(0, 500);
-    throw new LlmProviderError(`Provider returned HTTP ${response.status}: ${excerpt}`, {
-      status: response.status,
-      retryable: isRetryableStatus(response.status),
-    });
+    const said = providerSays(raw);
+    const excerpt = said && withoutSecrets(said, headers);
+    throw new LlmProviderError(
+      `Provider returned HTTP ${response.status}${excerpt ? `: ${excerpt}` : "."}`,
+      {
+        status: response.status,
+        retryable: isRetryableStatus(response.status),
+      },
+    );
   }
 
   let json: unknown;

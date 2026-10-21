@@ -95,6 +95,9 @@ What does not depend on the model:
   value (an email address, a phone number the parser would read, a name without digits or "@").
 - Free text a model writes (an explanation, a recommendation) is advice and is not grounded:
   show it as the model's words, not as facts about the candidate.
+- A provider's error is quoted in the error message only in its own short words (a JSON body's
+  `error.message`, or a one-line text body, up to 200 characters, keys redacted). The rest of the
+  body, where a gateway may echo the request and the resume in it, is never quoted.
 - `analyze` redacts contact details before the request leaves, best effort and only these
   forms. The name as the parser read it, in any case or letter spacing, also as "Doe, Jane", with
   or without a middle initial, and inside a web address built from it (`janedoe.dev`); not
