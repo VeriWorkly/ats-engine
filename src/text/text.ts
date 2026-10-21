@@ -46,11 +46,17 @@ function asciiDigit(digit: string) {
 
 /**
  * Text in the form every pattern is written against: NFKC (ligatures, fullwidth letters,
- * no-break spaces, composed accents), decimal digits of every script as ASCII, and invisible
+ * no-break spaces, composed accents), decimal digits of every script as ASCII, every line break
+ * as "\n" (a lone CR, a vertical tab, a form feed, NEL, U+2028 and U+2029 too), and invisible
  * characters removed (`prepareResume` counts them first).
  */
 export function normalizeText(text: string) {
-  return stripHiddenCharacters(text.normalize("NFKC").replace(/\p{Nd}/gu, asciiDigit));
+  return stripHiddenCharacters(
+    text
+      .replace(/\r\n?|[\v\f\u0085\p{Zl}\p{Zp}]/gu, "\n")
+      .normalize("NFKC")
+      .replace(/\p{Nd}/gu, asciiDigit),
+  );
 }
 
 /** The words a length check counts, lower-cased: every run starting with a letter or digit. */

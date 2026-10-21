@@ -14,3 +14,4 @@ Fixes from an audit of the engine.
   - A month and two-digit year, between two such dates or before an open end: "06/21 - Present", "01/15 - 05/21". Alone, "10/10" is still no date.
   - German: "– bis heute", "bis jetzt", "bis dato", and "ab 03/2020". Hindi: "अभी तक", and "मार्च 2020 से" with nothing after "से". French: "hiver" as a season (January to March).
   - **Breaking:** the default policy's `resumeParse.openEnded` gains "till now", "continuing", "onwards" and "onward", and `resumeParse.rangeWords` gains "thru". The default policy's fingerprint changes.
+- **Breaking:** every kind of line break starts a new line: a lone carriage return (old Mac files, some Word exports), a vertical tab, a form feed, NEL, and the Unicode line and paragraph separators. Before, such a resume read as one line: an invented one scored 85 instead of 91, with its name and one of its two roles lost.
