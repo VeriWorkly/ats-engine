@@ -12,7 +12,7 @@ Fixes from an audit of the engine.
 - **Breaking:** more ways of writing a current role's dates are read, so the role is no longer dropped, and the experience and seniority read from it no longer halve. A role dated "Jun 2021 - Till now" was missing from the work history, with no warning.
   - English: "Till now", "Continuing", "Jun 2021 onwards" (and "onward"), and "thru" between two dates.
   - A month with its zero and a two-digit year, between two such dates or before an open end: "06/21 - Present", "01/15 - 05/21". Alone, "10/10" is still no date, and "7/10 - 9/10" is a score.
-  - An open end written straight after a date with no dash ("Jun 2021 onwards", "Jan 2020 to date") must end its clause: "Jan 2017 continuing support for 3 apps" in a bullet is no role.
+  - An open end written straight after a date with no dash, then a lowercase or uncased word, is a sentence: "Jan 2017 continuing support for 3 apps" in a bullet is no role. A place after it is not: "Jun 2021 Present San Francisco, CA" is still a current role.
   - German: "– bis heute", "bis jetzt", "bis dato", and "ab 03/2020". Hindi: "अभी तक", and "मार्च 2020 से" with nothing after "से". French: "hiver" as a season (January to March).
   - **Breaking:** the default policy's `resumeParse.openEnded` gains "till now", "continuing", "onwards" and "onward", and `resumeParse.rangeWords` gains "thru". The default policy's fingerprint changes.
 - **Breaking:** every kind of line break starts a new line: a lone carriage return (old Mac files, some Word exports), a vertical tab, a form feed, NEL, and the Unicode line and paragraph separators. Before, such a resume read as one line: an invented one scored 85 instead of 91, with its name and one of its two roles lost.

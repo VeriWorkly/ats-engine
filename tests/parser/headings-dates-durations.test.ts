@@ -441,6 +441,18 @@ describe("date spellings that dropped the role", () => {
     );
     expect(roles).toHaveLength(1);
   });
+
+  // A PDF often loses the dash: a place after the open end is no sentence.
+  it.each([
+    ["Engineer, Hooli\nJun 2021 Present San Francisco, CA", "en"],
+    ["Engineer, Hooli\nJun 2021 Present\tRemote", "en"],
+    ["Engineer, Hooli\nJun 2021 Current Remote", "en"],
+    ["Senior Engineer Jun 2021 Present Austin, TX", "en"],
+    ["Ingenieur, Hooli\n03/2020 heute Berlin", "de"],
+  ])("still reads %j as a current role", (lines, language) => {
+    const { roles } = check(`Jane Doe\nExperience\n${lines}`, { languages: [language] });
+    expect(roles).toMatchObject([{ current: true }]);
+  });
 });
 
 describe("the education fallback", () => {
