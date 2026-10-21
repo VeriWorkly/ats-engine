@@ -1402,7 +1402,7 @@
           "name": "senior",
           "years": 5,
           "patterns": [
-            "senior",
+            "senior(?![\\s-]+living)",
             "sr"
           ]
         },
@@ -1410,8 +1410,8 @@
           "name": "lead",
           "years": 8,
           "patterns": [
-            "lead(?![\\s-]+gen\\p{L}*)",
-            "staff",
+            "lead(?![\\s-]+(?:gen\\p{L}*|paint))",
+            "staff(?=\\s+(?:(?:software|data|machine\\s+learning|ml|research|security|site\\s+reliability|platform|backend|frontend|full[\\s-]?stack|product|ux)\\s+)?(?:engineer|scientist|developer|architect|designer|researcher)s?(?![\\p{L}]))",
             "principal"
           ]
         }

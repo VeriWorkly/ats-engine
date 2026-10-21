@@ -212,11 +212,14 @@ function seniorityOf(title: string, matchers: Matchers) {
 const TITLE_WORDS = 8;
 const TITLE_CHARS = 120;
 
+const titleWordIn = memo((rp: AtsEnginePolicy["resumeParse"]) => wordListRegex(rp.titleWords));
+
 /**
  * The level a posting's title asks for ("Senior Backend Engineer"), judged by the resume's latest
- * title and its years: met by a title at or above it, or by the years when the title names no
- * level; partial with a lower title and the years. Null when the posting's first line is no
- * title, or names no level. A requirement line naming a level ("senior stakeholders") is not read.
+ * title and its years: met by a title at or above it with half the years the level takes or more,
+ * or by the years alone when the title names no level; partial with the title or the years
+ * alone. Null when the posting's first line is no title (a sentence, or no title word: an
+ * employer's name), or names no level. A requirement line ("senior stakeholders") is not read.
  */
 function seniorityRequirement(
   jobText: string,
@@ -232,31 +235,48 @@ function seniorityRequirement(
     readsAsSentence(title) &&
     (title.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).some((w) => w.length > 1 && stop.has(w));
   if (title.split(/\s+/).length > TITLE_WORDS || sentence) return null;
+  if (!titleWordIn(policy.resumeParse).test(title)) return null;
   const asked = seniorityOf(title, matchers);
   if (!asked) return null;
 
-  // The current role, else the one that ended last; the first listed on a tie.
+  // The current role, else the one that ended last; of several, the highest level, then the
+  // first listed.
   const when = (role: AtsParsedResume["roles"][number]) => {
     const date = role.end ?? role.start;
     return role.current ? Infinity : date ? date.year * 12 + (date.month ?? 12) : -Infinity;
   };
+  const rank = (role: AtsParsedResume["roles"][number]) =>
+    seniorityOf(role.title, matchers)?.rank ?? -1;
   const latest = parsed.roles.reduce<AtsParsedResume["roles"][number] | null>(
-    (best, role) => (!best || when(role) > when(best) ? role : best),
+    (best, role) =>
+      !best || when(role) > when(best) || (when(role) === when(best) && rank(role) > rank(best))
+        ? role
+        : best,
     null,
   );
   const held = latest?.title ? seniorityOf(latest.title, matchers) : null;
   const years = parsed.monthsOfExperience === null ? null : parsed.monthsOfExperience / 12;
-  const enough = years !== null && years >= asked.years;
-  const status = held
-    ? held.rank >= asked.rank
+  // An entry level takes no years, so a resume without dated roles meets it.
+  const enough = asked.years === 0 || (years !== null && years >= asked.years);
+  // A title alone, without half the years, may be a word misread or a title inflated.
+  const titled = held !== null && held.rank >= asked.rank;
+  const status = titled
+    ? years === null || years >= asked.years / 2
       ? "met"
-      : enough
-        ? "partial"
-        : "missing"
+      : "partial"
     : enough
-      ? "met"
+      ? held
+        ? "partial"
+        : "met"
       : "missing";
-  const line = latest?.title ? lines.find((candidate) => candidate.includes(latest.title)) : null;
+  // The role's own line: one naming its employer too, else its dated line, else the title alone.
+  const line = latest?.title
+    ? (lines.find(
+        (l) => l.includes(latest.title) && latest.employer && l.includes(latest.employer),
+      ) ??
+      lines.find((l) => l.includes(latest.title) && isDatedLine(l, policy)) ??
+      lines.find((l) => l.replace(BULLET_PREFIX, "").trim() === latest.title))
+    : null;
   return {
     text: title,
     importance: "required",
@@ -266,7 +286,9 @@ function seniorityRequirement(
     evidence: line ? [line] : [],
     detail: [
       held ? `Latest title ${held.word}` : "No level in the latest title",
-      years === null ? "no dated roles" : `${Math.floor(years)} years in the work history`,
+      years === null
+        ? "no dated roles"
+        : `${Math.floor(years)} year${Math.floor(years) === 1 ? "" : "s"} in the work history`,
     ]
       .join(", ")
       .concat(`; ${asked.word} asked${asked.years ? ` (${asked.years}+ years)` : ""}`),

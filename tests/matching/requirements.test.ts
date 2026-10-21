@@ -597,8 +597,59 @@ describe("seniority, from the posting's title", () => {
       "Senior Engineer to build payments with our platform team in Berlin and Lisbon",
     ],
     ["a sales title", "Lead Generation Specialist"],
+    // A JSON-LD posting without a title starts with its employer.
+    ["a company's name", "Principal Health Partners"],
+    ["a staff title outside engineering", "Staff Accountant"],
+    ["a title naming no job", "Staff Nurse"],
+    ["a care home's title", "Senior Living Community Coordinator"],
+    ["an inspector's title", "Lead Paint Inspector"],
   ])("is not judged from %s", (_, job) => {
     expect(level(job)).toBeUndefined();
+  });
+
+  it("reads staff as a level only in engineering and science titles", () => {
+    const accountant = career("Staff Accountant, Acme Jan 2024 - Present");
+    expect(level("Senior Accountant", accountant)).toMatchObject({
+      status: "missing",
+      detail: "No level in the latest title, 2 years in the work history; senior asked (5+ years)",
+    });
+    expect(level("Staff Data Scientist")?.detail).toMatch(/staff asked \(8\+ years\)$/);
+  });
+
+  it("is partial for a title at the level with under half its years", () => {
+    expect(
+      level("Senior Engineer", career("Senior Engineer, Acme Jan 2025 - Present")),
+    ).toMatchObject({ status: "partial", detail: expect.stringContaining(", 1 year in the work") });
+  });
+
+  it("is met at an entry level without dated roles", () => {
+    const graduate =
+      "Jane Doe\njane@example.com\nEducation\nB.S. Computer Science, State University 2026\nSkills\nGo";
+    expect(level("Junior Developer", graduate)).toMatchObject({
+      status: "met",
+      detail: "No level in the latest title, no dated roles; junior asked",
+    });
+  });
+
+  it("quotes the role's line, not a summary naming the title", () => {
+    const resume = career("Analyst, Globex Jan 2016 - Present").replace(
+      "Experience\n",
+      "Summary\nAnalyst with a decade in retail.\nExperience\n",
+    );
+    expect(level("Senior Analyst", resume)?.evidence).toEqual([
+      "Analyst, Globex Jan 2016 - Present",
+    ]);
+  });
+
+  it("judges the highest of several current roles", () => {
+    const both = career(
+      "Junior Web Developer, Self Jan 2024 - Present",
+      "Senior Analyst, Acme Jan 2015 - Present",
+    );
+    expect(level("Senior Analyst", both)).toMatchObject({
+      status: "met",
+      evidence: ["Senior Analyst, Acme Jan 2015 - Present"],
+    });
   });
 
   it("is not judged from a requirement naming a level", () => {

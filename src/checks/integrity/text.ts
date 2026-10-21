@@ -288,6 +288,7 @@ export function stuffedTerms(
   const eachInARole = (at: number[]) =>
     at.every((index) => Number.isFinite(roleOf(index))) &&
     new Set(at.map(roleOf)).size === at.length &&
+    listItems(lines[at[0]]) === null &&
     readsAsSentence(lines[at[0]]) &&
     wordsOf(lines[at[0]]).some((word) => stopwords.has(word));
   const repeatedLines = [...lineAt].filter(

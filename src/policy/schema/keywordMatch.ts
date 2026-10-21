@@ -388,12 +388,18 @@ export const keywordMatchSchema = z
               ],
             },
             { name: "mid", years: 2, patterns: [String.raw`mid[\s-]+level`, "intermediate"] },
-            { name: "senior", years: 5, patterns: ["senior", "sr"] },
-            // Not "Lead Generation Specialist", a sales role.
+            // Not "Senior Living Coordinator", a care home's.
+            { name: "senior", years: 5, patterns: [String.raw`senior(?![\s-]+living)`, "sr"] },
+            // Not "Lead Generation Specialist" (sales) or "Lead Paint Inspector". "Staff" is a level only before an
+            // engineering or science noun: a Staff Accountant or Staff Nurse is a regular post.
             {
               name: "lead",
               years: 8,
-              patterns: [String.raw`lead(?![\s-]+gen\p{L}*)`, "staff", "principal"],
+              patterns: [
+                String.raw`lead(?![\s-]+(?:gen\p{L}*|paint))`,
+                String.raw`staff(?=\s+(?:(?:software|data|machine\s+learning|ml|research|security|site\s+reliability|platform|backend|frontend|full[\s-]?stack|product|ux)\s+)?(?:engineer|scientist|developer|architect|designer|researcher)s?(?![\p{L}]))`,
+                "principal",
+              ],
             },
           ],
         ),

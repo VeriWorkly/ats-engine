@@ -199,6 +199,9 @@ B.S. Statistics, City College, 2019`;
       .join("\n");
     const resume = `Jane Doe\njane@example.com\nExperience\n${roles}\nEducation\nBSc Economics, 2013`;
     expect(stuffing(resume)).toMatchObject({ passed: true });
+    // A list of terms is no sentence, in lower case and with an "and" too.
+    const list = "- python, kubernetes, docker, aws, terraform and kafka";
+    expect(stuffing(resume.split(bullet).join(list))).toMatchObject({ passed: false });
     // Pasted three times under one role, it is still a line repeated far beyond need.
     const pasted = `${SALES}\n${bullet}\n${bullet}\n${bullet}`;
     expect(stuffing(pasted)).toMatchObject({ passed: false });
