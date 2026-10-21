@@ -54,10 +54,14 @@ const [command, prefix] = local
     ? [process.execPath, [join(dirname(process.execPath), "node_modules/npm/bin/npx-cli.js")]]
     : ["npx", []];
 // Outside the repository, or npx would run a local copy of the engine instead of the pinned one.
+// Ten minutes covers npx's download and any resume; a file that freezes the reader would
+// otherwise hold the runner until the job's limit.
 const run = spawnSync(command, [...prefix, ...(local ? cliArgs : args)], {
   cwd: env.RUNNER_TEMP || tmpdir(),
   encoding: "utf8",
   maxBuffer: 64 * 1024 * 1024,
+  timeout: 10 * 60 * 1000,
+  killSignal: "SIGKILL",
 });
 // The CLI's warnings can quote the resume, and the runner reads a "::" line as a workflow
 // command: they are passed on with commands stopped, under a token no resume can guess.
@@ -67,6 +71,7 @@ if (run.stderr) {
     `::stop-commands::${token}\n${run.stderr}${run.stderr.endsWith("\n") ? "" : "\n"}::${token}::\n`,
   );
 }
+if (run.error?.code === "ETIMEDOUT") fail("ats-engine did not finish within 10 minutes.");
 if (run.error) fail(`Could not run ats-engine: ${run.error.message}`);
 if (run.status !== 0) fail(`ats-engine exited with code ${run.status}.`);
 

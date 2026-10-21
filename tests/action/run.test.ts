@@ -249,15 +249,18 @@ describe("the Action's npx run", () => {
     `import cp from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
 import { writeFileSync } from "node:fs";
-cp.spawnSync = (command, args) => {
-  writeFileSync(${JSON.stringify(record)}, JSON.stringify(args));
+cp.spawnSync = (command, args, options) => {
+  writeFileSync(${JSON.stringify(record)}, JSON.stringify({ args, timeout: options?.timeout }));
+  if (process.env.STUB_TIMED_OUT)
+    return { status: null, signal: "SIGKILL", stdout: "", stderr: "",
+      error: Object.assign(new Error("spawnSync npx ETIMEDOUT"), { code: "ETIMEDOUT" }) };
   return { status: 0, stdout: JSON.stringify({ readinessScore: 90, failedChecks: [] }), stderr: "" };
 };
 syncBuiltinESMExports();
 `,
   );
-  const spawned = (env: Record<string, string>) => {
-    const run = spawnSync(
+  const stubbed = (env: Record<string, string>) =>
+    spawnSync(
       process.execPath,
       ["--import", pathToFileURL(preload).href, join(root, "action/run.mjs")],
       {
@@ -265,8 +268,11 @@ syncBuiltinESMExports();
         env: { ...process.env, ATS_RESUME: "resume.pdf", RUNNER_TEMP: dir, ...env },
       },
     );
-    expect(run.status).toBe(0);
-    return JSON.parse(readFileSync(record, "utf8")) as string[];
+  const recorded = () =>
+    JSON.parse(readFileSync(record, "utf8")) as { args: string[]; timeout?: number };
+  const spawned = (env: Record<string, string>) => {
+    expect(stubbed(env).status).toBe(0);
+    return recorded().args;
   };
   const { peerDependencies } = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
     peerDependencies: Record<string, string>;
@@ -287,6 +293,15 @@ syncBuiltinESMExports();
       "ats-engine",
       "check",
     ]);
+  });
+
+  // A file that freezes the reader held the runner until the job's own limit, 6 hours.
+  it("stops the engine after 10 minutes and says so", () => {
+    expect(stubbed({ ATS_ENGINE_CLI: "" }).status).toBe(0);
+    expect(recorded().timeout).toBe(10 * 60 * 1000);
+    const run = stubbed({ ATS_ENGINE_CLI: "", STUB_TIMED_OUT: "1" });
+    expect(run.status).toBe(1);
+    expect(run.stdout).toContain("::error::ats-engine did not finish within 10 minutes.");
   });
 
   it("passes a local build only the CLI's own arguments", () => {

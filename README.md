@@ -173,7 +173,7 @@ Keep your resume in a repository and check it on every push. The step fails when
 | `ats`       | Add the documented notes for the ATS you apply through (`greenhouse`, `lever`, `taleo`) to the advice; needs `version` 0.3.0 or later |
 | `summary`   | `false` to leave the job summary out                                                                                                  |
 
-Outputs: `score`, `job-match`, `failed-checks` (JSON) and `report` (the path of the full JSON report). Pin `@main` to a commit SHA if you want the action itself fixed too.
+Outputs: `score`, `job-match`, `failed-checks` (JSON) and `report` (the path of the full JSON report). The step fails if the engine has not finished within 10 minutes. Pin `@main` to a commit SHA if you want the action itself fixed too.
 
 ## Use it in your app
 
