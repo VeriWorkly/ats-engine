@@ -358,8 +358,9 @@ function askedClearanceRanks(text: string, matchers: Matchers) {
 /**
  * The clearances a resume line says are held, each as the text about it: from the clearance
  * named before it to the one named after. A not-held word anywhere in that text ("pending",
- * "expired"), or a negation short of a semicolon, says it is not held: "Top Secret clearance
- * (TS/SCI eligible)" holds Top Secret, "Active Secret clearance; no incidents" holds Secret.
+ * "expired", "not active"), or a negation in the clearance's own clause (cut at a semicolon,
+ * comma or bracket), says it is not held: "Top Secret clearance (TS/SCI eligible)" holds Top
+ * Secret, "Active TS/SCI clearance, no lapses since 2015" holds TS/SCI.
  */
 function heldClearances(line: string, matchers: Matchers) {
   const named = [...line.matchAll(matchers.clearanceAll)];
@@ -367,7 +368,10 @@ function heldClearances(line: string, matchers: Matchers) {
     const before = named[at - 1];
     const from = before ? before.index + before[0].length : 0;
     const about = line.slice(from, named[at + 1]?.index ?? line.length);
-    const clause = about.slice(about.lastIndexOf(";", match.index - from) + 1).split(";", 1)[0]!;
+    const where = match.index - from;
+    const start = Math.max(...[";", ",", "(", ")"].map((mark) => about.lastIndexOf(mark, where)));
+    const end = about.slice(where).search(/[;,()]/u);
+    const clause = about.slice(start + 1, end < 0 ? about.length : where + end);
     return matchers.notHeld.test(about) || matchers.negation.test(clause) ? [] : [about];
   });
 }

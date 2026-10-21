@@ -1270,7 +1270,9 @@
                   "expired",
                   "lapsed",
                   "able\\s+to\\s+obtain",
-                  "former(?:ly)?"
+                  "former(?:ly)?",
+                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held)",
+                  "no\\s+longer"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -6628,7 +6630,9 @@
                   "expired",
                   "lapsed",
                   "able\\s+to\\s+obtain",
-                  "former(?:ly)?"
+                  "former(?:ly)?",
+                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held)",
+                  "no\\s+longer"
                 ],
                 "minItems": 1,
                 "type": "array",

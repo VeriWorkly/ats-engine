@@ -329,6 +329,9 @@ export const keywordMatchSchema = z
           "lapsed",
           String.raw`able\s+to\s+obtain`,
           String.raw`former(?:ly)?`,
+          // In a clause of its own: "Secret clearance (not active)".
+          String.raw`not\s+(?:currently\s+)?(?:active|current|valid|held)`,
+          String.raw`no\s+longer`,
         ]),
         /**
          * Citizenship, and the permanent residence that is not it: an ask for `citizenship` that

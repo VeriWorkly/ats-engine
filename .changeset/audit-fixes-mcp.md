@@ -9,4 +9,5 @@
 - **Breaking:** `check_resume` reads a resume whose lines end in a lone carriage return, a vertical tab or a Unicode line separator line by line, which it read as one line, and returns a different score.
 - **Breaking:** `check_resume` and `match_job` no longer meet a right-to-work requirement with a statement about another country ("Authorized to work in the US" for a UK role), and read "Must be a British citizen" as a citizenship requirement.
 - **Breaking:** a language requirement with a level is partial, not met, by a spoken language whose level the engine cannot read, and missing by "currently learning" or "Schulkenntnisse".
+- **Breaking:** a clearance stated beside a negation about something else ("Active TS/SCI clearance, no lapses since 2015") meets a clearance requirement, which it did not.
 - **Breaking:** `check_resume` reads the text of a Chinese, Japanese or Korean PDF whose font uses a standard CJK character map, which came out empty.

@@ -553,8 +553,22 @@ describe("a clearance, compared by its level", () => {
     ["Secret clearance; inactive since 2020", "Active Secret clearance required"],
     ["Secret clearance; currently inactive", "Active Secret clearance required"],
     ["Secret clearance; eligible for reinstatement", "Active Secret clearance required"],
+    // A negation in the clearance's own clause, or a bracket saying it is not held.
+    ["No active Secret clearance", "Secret clearance required"],
+    ["TS/SCI clearance not active", "TS/SCI clearance required"],
+    ["Secret clearance (not active)", "Secret clearance required"],
+    ["Secret clearance, no longer held", "Secret clearance required"],
   ])("takes no clearance from one not held: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("unverifiable");
+  });
+
+  // Any "no" near the clearance cancelled it.
+  it.each([
+    ["Active TS/SCI clearance, no lapses since 2015", "TS/SCI clearance required"],
+    ["Active Secret clearance (no incidents)", "Secret clearance required"],
+    ["Secret clearance, held without interruption since 2018", "Secret clearance required"],
+  ])("keeps a clearance beside a negation about something else: %s", (statement, ask) => {
+    expect(cleared(statement, ask).status).toBe("met");
   });
 });
 
