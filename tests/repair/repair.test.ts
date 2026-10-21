@@ -213,14 +213,13 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     expect(merged[field]).toBe("");
   });
 
-  it("fills an email and a phone written as such, the phone one the parser would read", () => {
-    const source = SOURCE.replace("(555) 010-2020", "+1 415 555 0134");
+  it("fills an email and a phone written as such", () => {
     const { merged } = merge(
       emptyParsed,
-      candidate({ email: "jane.doe@example.com", phone: "+1 415 555 0134" }),
-      source,
+      candidate({ email: "jane.doe@example.com", phone: "(555) 010-2020" }),
+      SOURCE,
     );
-    expect(merged).toMatchObject({ email: "jane.doe@example.com", phone: "+1 415 555 0134" });
+    expect(merged).toMatchObject({ email: "jane.doe@example.com", phone: "(555) 010-2020" });
   });
 
   it("keeps dates, which the schema bounds rather than the substring check", () => {
