@@ -1,4 +1,4 @@
-import { isDatedLine, readsAsSentence } from "../checks/bullets.js";
+import { isDatedLine } from "../checks/bullets.js";
 import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../format/index.js";
 import { degreeLevels } from "../parser/education.js";
 import { namesPlace } from "../parser/experience.js";
@@ -199,11 +199,11 @@ function patternLanguages(text: string, matchers: Matchers) {
 
 /** The highest seniority level a title names, and the word naming it; null when it names none. */
 function seniorityOf(title: string, matchers: Matchers) {
-  let found: { rank: number; years: number; word: string } | null = null;
+  let found: { rank: number; years: number; word: string; index: number } | null = null;
   for (const { rank, years, pattern } of matchers.seniorityLevels) {
     const match = pattern.exec(title);
     if (match && (!found || rank > found.rank))
-      found = { rank, years, word: match[0].toLowerCase() };
+      found = { rank, years, word: match[0].toLowerCase(), index: match.index };
   }
   return found;
 }
@@ -212,14 +212,18 @@ function seniorityOf(title: string, matchers: Matchers) {
 const TITLE_WORDS = 8;
 const TITLE_CHARS = 120;
 
-const titleWordIn = memo((rp: AtsEnginePolicy["resumeParse"]) => wordListRegex(rp.titleWords));
+const titleWordsIn = memo((rp: AtsEnginePolicy["resumeParse"]) =>
+  wordListRegex(rp.titleWords, "gi"),
+);
 
 /**
  * The level a posting's title asks for ("Senior Backend Engineer"), judged by the resume's latest
  * title and its years: met by a title at or above it with half the years the level takes or more,
  * or by the years alone when the title names no level; partial with the title or the years
- * alone. Null when the posting's first line is no title (a sentence, or no title word: an
- * employer's name), or names no level. A requirement line ("senior stakeholders") is not read.
+ * alone. Null when the posting's first line is no title, or names no level. A title names a job:
+ * a title word besides its level word ("Lead Engineer", not the employer "Lead Bank"), unless the
+ * level ends it ("Team Lead") or is an entry level, whose words are jobs ("Data Science Intern").
+ * A line ending as a sentence ends, or a requirement ("senior stakeholders"), is not read.
  */
 function seniorityRequirement(
   jobText: string,
@@ -229,15 +233,20 @@ function seniorityRequirement(
   matchers: Matchers,
 ): AtsRequirement | null {
   const title = jobText.split("\n", 1)[0]!.trim();
-  if (title.length > TITLE_CHARS) return null;
-  const stop = new Set(policy.keywordMatch.stopwords);
-  const sentence =
-    readsAsSentence(title) &&
-    (title.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).some((w) => w.length > 1 && stop.has(w));
-  if (title.split(/\s+/).length > TITLE_WORDS || sentence) return null;
-  if (!titleWordIn(policy.resumeParse).test(title)) return null;
+  if (title.length > TITLE_CHARS || title.split(/\s+/).length > TITLE_WORDS) return null;
+  if (/[.!?]$/u.test(title)) return null;
   const asked = seniorityOf(title, matchers);
   if (!asked) return null;
+  // The title before a place, a note or a department: "Team Lead, Customer Support".
+  const head = title
+    .split(/\s[-–—|]\s|[,(]/u)[0]!
+    .trim()
+    .toLowerCase();
+  const titleWords = [...title.matchAll(titleWordsIn(policy.resumeParse))];
+  const namesJob =
+    titleWords.some(({ index }) => index !== asked.index) ||
+    (titleWords.length > 0 && (asked.rank === 0 || head.endsWith(asked.word)));
+  if (!namesJob) return null;
 
   // The current role, else the one that ended last; of several, the highest level, then the
   // first listed.
