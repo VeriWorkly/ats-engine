@@ -82,6 +82,11 @@ Releases go out from `main` through changesets and `.github/workflows/release.ym
    `io.github.VeriWorkly/ats-engine` (the registry compares the casing). Nothing publishes
    without that pull request.
 
+The two steps are two jobs. `version` (step 2) may write to the repository and open pull
+requests, and cannot publish. `publish` (step 3) runs only when no changeset is pending; it alone
+gets the OIDC token, and it installs with `npm ci --ignore-scripts`, so no dependency's install
+script runs where a package can be published.
+
 If the organisation does not let GitHub Actions create pull requests, the workflow fails at
 step 2. Open the pull request by hand instead: on a branch from `main`, run
 `npm run version-packages` with npm 11 (`npm install -g npm@11` first if `npm --version` says
