@@ -178,7 +178,8 @@ function listItems(line: string): string[] | null {
  *   lists of a skills section. A role naming its own stack is not, nor three certifications
  *   from one issuer.
  * - A line appearing three times or more, unless every copy sits at the same place in its role
- *   block (the employer above each title): that is layout.
+ *   block (the employer above each title): that is layout. Nor a sentence copied into the
+ *   bullets of several roles, once each.
  *
  * Stopwords and words under three letters are never terms; a two-letter skill ("Go") counts as
  * a list item. `now` bounds the plausible years.
@@ -282,12 +283,21 @@ export function stuffedTerms(
   // Every copy at one distance from its role's dates is the layout of a role block.
   const sameOffset = (at: number[], offset: number[]) =>
     at.every((index) => offset[index] <= 4 && offset[index] === offset[at[0]]);
+  // A sentence copied into the bullets of several roles, one copy each, is a habit, not stuffing.
+  const roleOf = (at: number) => at - above[at];
+  const eachInARole = (at: number[]) =>
+    at.every((index) => Number.isFinite(roleOf(index))) &&
+    new Set(at.map(roleOf)).size === at.length &&
+    listItems(lines[at[0]]) === null &&
+    readsAsSentence(lines[at[0]]) &&
+    wordsOf(lines[at[0]]).some((word) => stopwords.has(word));
   const repeatedLines = [...lineAt].filter(
     ([, at]) =>
       at.length >= 3 &&
       !sameOffset(at, above) &&
       !sameOffset(at, below) &&
-      !at.some((i) => above[i] <= 1 || below[i] <= 1),
+      !at.some((i) => above[i] <= 1 || below[i] <= 1) &&
+      !eachInARole(at),
   );
 
   const value = terms.length + repeatedLines.length;

@@ -252,6 +252,18 @@ describe("ats-engine-mcp over stdio", () => {
     expect(textOf(result)).toContain(`Fix: ${entry.fix}`);
   });
 
+  it("explain_rule weighs a rule as the region asked for does", async () => {
+    const id = "ats-v2.format.photo";
+    const us = await call("explain_rule", { rule_id: id, region: "us" });
+    expect(us.isError).toBeFalsy();
+    expect(us.structuredContent).toMatchObject({ id, points: 6, severity: "warning" });
+    const de = await call("explain_rule", { rule_id: id, region: "DE" });
+    expect(de.isError).toBe(true);
+    expect(textOf(de)).toMatch(/not scored in DE/);
+    const unknown = await call("explain_rule", { rule_id: id, region: "XX" });
+    expect(textOf(unknown)).toMatch(/Unknown region "XX"/);
+  });
+
   it("publishes the rubric as rubric://default", async () => {
     const { resources } = await client.listResources();
     expect(resources.map((resource) => resource.uri)).toEqual(["rubric://default"]);

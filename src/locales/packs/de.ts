@@ -234,6 +234,15 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
       arabisch: "arabic",
       portugiesisch: "portuguese",
     },
+    // "Senior" and "Junior" are written in English. Not "Leiter", a manager's title.
+    seniorityLevels: {
+      entry: [
+        String.raw`praktikant(?:in)?`,
+        String.raw`werkstudent(?:in)?`,
+        String.raw`auszubildende[rn]?`,
+        String.raw`berufseinsteiger(?:in)?`,
+      ],
+    },
   },
   // How a German posting asks for a degree: "abgeschlossenes Studium der Informatik".
   degrees: {

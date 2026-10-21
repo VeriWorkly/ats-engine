@@ -367,6 +367,46 @@
           ]
         }
       ],
+      "seniorityLevels": [
+        {
+          "name": "entry",
+          "years": 0,
+          "patterns": [
+            "intern(?:ship)?",
+            "trainee",
+            "apprentice",
+            "graduate",
+            "junior",
+            "jr",
+            "entry[\\s-]+level"
+          ]
+        },
+        {
+          "name": "mid",
+          "years": 2,
+          "patterns": [
+            "mid[\\s-]+level",
+            "intermediate"
+          ]
+        },
+        {
+          "name": "senior",
+          "years": 5,
+          "patterns": [
+            "senior(?![\\s-]+living)",
+            "sr"
+          ]
+        },
+        {
+          "name": "lead",
+          "years": 8,
+          "patterns": [
+            "lead(?![\\s-]+(?:gen\\p{L}*|paint))",
+            "staff(?=\\s+(?:(?:software|data|machine\\s+learning|ml|research|security|site\\s+reliability|platform|backend|frontend|full[\\s-]?stack|product|ux)\\s+)?(?:engineer|scientist|developer|architect|designer|researcher)s?(?![\\p{L}]))",
+            "principal"
+          ]
+        }
+      ],
       "languagePatterns": [
         "(?:fluent|fluency|proficien(?:t|cy)|native|business[\\s-]level|working\\s+proficiency|professional\\s+proficiency)\\s+(?:in\\s+|with\\s+)?(\\p{L}+)"
       ],

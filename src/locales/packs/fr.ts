@@ -290,6 +290,10 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
       polonais: "polish",
       turc: "turkish",
     },
+    seniorityLevels: {
+      entry: ["stagiaire", String.raw`alternant(?:e)?`, String.raw`d${e}butant(?:e)?`],
+      senior: [String.raw`confirm${e}(?:e)?`, String.raw`exp${e}riment${e}(?:e)?`],
+    },
   },
   // "Bac+N" is the `FR` region's too, and here for a French posting read under another region.
   // A baccalauréat named for its field is Québec's bachelor's; France names it for a stream.

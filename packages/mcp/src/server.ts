@@ -17,6 +17,7 @@ import {
   type AtsReport,
 } from "@veriworkly/ats-engine";
 import { printable } from "@veriworkly/ats-engine/format";
+import { localizePolicy } from "@veriworkly/ats-engine/locales";
 import { z } from "zod";
 
 import {
@@ -378,14 +379,29 @@ export function createServer(): McpServer {
       description:
         "Explains one rule of the published rubric by its id (as in a failed check's id): its " +
         "category, severity, what it checks, how many points it is worth, and how to fix it. " +
-        "The full rubric is the resource rubric://default.",
-      inputSchema: { rule_id: z.string().min(1).describe("A rule id, e.g. from failedChecks.") },
+        "With a region, as that country weighs it. The full rubric is the resource rubric://default.",
+      inputSchema: {
+        rule_id: z.string().min(1).describe("A rule id, e.g. from failedChecks."),
+        region: z
+          .string()
+          .optional()
+          .describe(
+            `The country the resume was scored as (${REGIONS.join(", ")}), as in a report's locale. Default: none, the published weights.`,
+          ),
+      },
       outputSchema: rubricEntry,
       annotations: { title: "Explain a rubric rule", ...READ_ONLY },
     },
-    ({ rule_id }) =>
+    ({ rule_id, region }) =>
       answer(async () => {
-        const entry = rubric.find((rule) => rule.id === rule_id);
+        checkRegion(region);
+        // A region reweighs some rules (a photo in the US) and turns others off (in Germany).
+        const rules = region ? policyRubric(localizePolicy(POLICY, "", { region }).policy) : rubric;
+        const entry = rules.find((rule) => rule.id === rule_id);
+        if (!entry && rubric.some((rule) => rule.id === rule_id))
+          throw new ToolInputError(
+            `Rule "${rule_id}" is not scored in ${region!.toUpperCase()}: the region turns it off.`,
+          );
         if (!entry)
           throw new ToolInputError(
             `Unknown rule id "${rule_id}". Valid ids: ${rubric.map((rule) => rule.id).join(", ")}.`,

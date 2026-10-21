@@ -47,7 +47,15 @@ export type AtsRequirement = {
   /** The requirement as the posting wrote it. */
   text: string;
   importance: "required" | "preferred";
-  kind: "skills" | "experience" | "education" | "authorization" | "clearance" | "language";
+  /** `seniority`: the level the posting's title names ("Senior …"), first when there is one. */
+  kind:
+    | "skills"
+    | "experience"
+    | "education"
+    | "authorization"
+    | "clearance"
+    | "language"
+    | "seniority";
   status: "met" | "partial" | "missing" | "unverifiable";
   /** What the requirement names, and whether the resume has each. Skills and languages. */
   terms: Array<{ term: string; found: boolean }>;

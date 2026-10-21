@@ -148,18 +148,18 @@ function readableText(text: string, format: string): string {
 export type AtsJobFile = { text: string; company?: string };
 
 /**
- * A job posting file's text, normalised as a fetched posting is: `.html` read for its posting, PDF
+ * A job posting file's text, normalised as a fetched posting is: `.html` and `.xhtml` read for its posting, PDF
  * and Word as a resume is, `.txt` and `.md` as text. A saved page's JSON-LD names the employer.
  */
 export async function readJobFile(path: string, options?: AtsReadFileOptions): Promise<AtsJobFile> {
   // A posting's words come back as missing keywords, so other files (a key) would be echoed.
-  if (!/\.(txt|md|html?|pdf|docx)$/i.test(path))
+  if (!/\.(txt|md|x?html?|pdf|docx)$/i.test(path))
     throw new AtsFileError(
       `Unsupported job posting file type "${extname(path) || path}". Use .txt, .md, .html, .pdf or .docx.`,
     );
   const data = await readFileBytes(path, options);
   let job: AtsJobFile;
-  if (/\.html?$/i.test(path)) {
+  if (/\.x?html?$/i.test(path)) {
     const html = decodeText(data);
     const company = extractJobPosting(html)?.company;
     job = company ? { text: jobTextFromHtml(html), company } : { text: jobTextFromHtml(html) };

@@ -58,9 +58,11 @@ function action(inputs: Record<string, string>) {
     },
   });
   const outputs: Record<string, string> = {};
-  for (const match of readFileSync(output, "utf8").matchAll(/^(\S+)<<(\S+)\n([\s\S]*?)\n\2$/gm))
+  const written = readFileSync(output, "utf8");
+  for (const match of written.matchAll(/^(\S+)<<(\S+)\n([\s\S]*?)\n\2$/gm))
     outputs[match[1]!] = match[3]!;
-  return { code: run.status, stdout: run.stdout, outputs, summary: readFileSync(summary, "utf8") };
+  const { status: code, stdout } = run;
+  return { code, stdout, outputs, output: written, summary: readFileSync(summary, "utf8") };
 }
 
 describe("the GitHub Action", () => {
@@ -85,6 +87,15 @@ describe("the GitHub Action", () => {
     expect(summary).toContain("## ATS resume check");
     expect(summary).toContain("### Job requirements");
     expect(summary).toContain("No AI model is involved in the score.");
+  });
+
+  // A failed check quotes the resume, so a guessable delimiter would let it write other outputs.
+  it("ends each output with a delimiter of 128 random bits", () => {
+    const { output } = action({ ATS_RESUME: resume });
+    const delimiters = [...output.matchAll(/^\S+<<(\S+)$/gm)].map((match) => match[1]);
+    expect(delimiters).toHaveLength(4);
+    for (const delimiter of delimiters) expect(delimiter).toMatch(/^ATS_[0-9a-f]{32}$/);
+    expect(new Set(delimiters).size).toBe(4);
   });
 
   it("fails the step with exit code 2 below min-score", () => {

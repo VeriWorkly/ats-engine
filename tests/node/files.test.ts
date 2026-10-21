@@ -195,6 +195,14 @@ describe("readResumeFile and readJobFile", () => {
       expect((await readJobFile(file(name, "Platform Engineer, Go required"))).text).toContain(
         "Go required",
       );
+    // A page saved as XHTML, read as a resume is: as HTML, not as text with its tags.
+    const xhtml = file(
+      "job.xhtml",
+      "<html><body><p>Platform Engineer</p><p>Go required</p></body></html>",
+    );
+    const read = (await readJobFile(xhtml)).text;
+    expect(read).toContain("Go required");
+    expect(read).not.toContain("<p>");
   });
 
   it("never quote a file's content in a JSON error", async () => {

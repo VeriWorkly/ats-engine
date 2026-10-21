@@ -172,6 +172,10 @@ what a right-to-work or clearance statement says (`requirements.needsSponsorship
 `numberWords`, `qualifiers`, `offerWords`, the `writing` and `advice` sections, and the rules
 and their weights, which only a region pack's `rules` and `ageAdvice` adjust.
 
+`requirements.seniorityLevels` maps a seniority level's name to title words added to it:
+`{ "entry": ["praktikant(?:in)?"] }`. The levels themselves (`entry`, `mid`, `senior`, `lead`),
+their order and the years each takes stay the policy's.
+
 Things to know:
 
 - **Patterns compile in Unicode mode** (`u` flag). `\p{L}` works. An escape that needs no escaping
