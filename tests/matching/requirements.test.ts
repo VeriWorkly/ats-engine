@@ -591,7 +591,9 @@ describe("seniority, from the posting's title", () => {
 
   it.each([
     ["a title without a level", "Backend Engineer"],
-    ["a sentence", "We are hiring a senior engineer"],
+    ["a sentence", "We are hiring a senior engineer."],
+    // "Lead" is a title word too, but here names neither the job nor a level of it.
+    ["an employer named for a level", "Lead Bank"],
     [
       "a long line",
       "Senior Engineer to build payments with our platform team in Berlin and Lisbon",
@@ -605,6 +607,29 @@ describe("seniority, from the posting's title", () => {
     ["an inspector's title", "Lead Paint Inspector"],
   ])("is not judged from %s", (_, job) => {
     expect(level(job)).toBeUndefined();
+  });
+
+  it.each([
+    ["We are hiring a senior engineer", "senior"],
+    ["Team Lead, Customer Support", "lead"],
+    ["Tech Lead", "lead"],
+    ["Data Science Intern", "intern"],
+  ])("reads the level in %s", (job, word) => {
+    expect(level(job)?.detail).toMatch(new RegExp(`; ${word} asked`));
+  });
+
+  it("reads a French title, its level after the noun", () => {
+    const localized = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
+    const read = (job: string) =>
+      check(RESUME, localized, {
+        jobDescription: `${job}\nExigences\n- Go`,
+        now: NOW,
+        languages: ["fr"],
+      }).requirements.find((r) => r.kind === "seniority");
+    expect(read("Chargé de clientèle junior")?.detail).toMatch(/; junior asked$/);
+    expect(read("Ingénieur logiciel expérimenté en CDI")?.detail).toMatch(
+      /; expérimenté asked \(5\+ years\)$/,
+    );
   });
 
   it("reads staff as a level only in engineering and science titles", () => {

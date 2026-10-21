@@ -4155,6 +4155,7 @@
           "d[eéèê]veloppeu(?:r|se)",
           "programmeu(?:r|se)",
           "chef(?:fe)?\\s+de\\s+(?:projet|produit|[eéèê]quipe|service|rayon)",
+          "charg[eéèê]e?\\s+(?:de|d['’])\\s*(?:client[eéèê]le|mission|affaires|recrutement|communication|projet)",
           "responsable",
           "directeur",
           "directrice",

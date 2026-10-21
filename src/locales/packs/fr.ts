@@ -140,6 +140,7 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     String.raw`d${e}veloppeu(?:r|se)`,
     "programmeu(?:r|se)",
     String.raw`chef(?:fe)?\s+de\s+(?:projet|produit|${e}quipe|service|rayon)`,
+    String.raw`charg${e}e?\s+(?:de|d['’])\s*(?:client${e}le|mission|affaires|recrutement|communication|projet)`,
     "responsable",
     "directeur",
     "directrice",

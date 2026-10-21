@@ -199,6 +199,34 @@ B.S. Statistics, City College, 2019`;
       .join("\n");
     const resume = `Jane Doe\njane@example.com\nExperience\n${roles}\nEducation\nBSc Economics, 2013`;
     expect(stuffing(resume)).toMatchObject({ passed: true });
+    // Copied into five roles and more, it is repeated beyond what a habit explains.
+    const five = [
+      "Engineer at Acme",
+      "Analyst at Globex",
+      "Engineer at Initech",
+      "Lead at Umbrella",
+      "Analyst at Hooli",
+    ]
+      .map((role, i) => {
+        // Each role's own bullets in words of their own, so only the copied one repeats.
+        const verbs = ["Built", "Cut", "Ran", "Led", "Wrote", "Shipped", "Moved"];
+        const nouns = ["report", "dashboard", "pipeline"];
+        const own = nouns.map((noun, j) => `- ${verbs[(i + j) % 7]} the ${noun} ${i}${j}`);
+        own.splice(i % 3, 0, bullet);
+        return `${role}, ${2008 + i * 3} - ${2010 + i * 3}\nAustin, TX\n${own.join("\n")}`;
+      })
+      .join("\n");
+    const career = `Jane Doe\njane@example.com\nExperience\n${five}\nEducation\nBSc Economics, 2007`;
+    expect(stuffing(career)).toMatchObject({ passed: false });
+    // In four, it is still a habit.
+    const four = career.split(/\nLead at Umbrella[\s\S]*?(?=\nAnalyst at Hooli)/).join("");
+    expect(stuffing(four)).toMatchObject({ passed: true });
+    // A terse bullet with no stopword is a sentence too, opening with its verb.
+    const terse = "- Mentored junior engineers through weekly pairing sessions";
+    expect(stuffing(resume.split(bullet).join(terse))).toMatchObject({ passed: true });
+    // A run of terms is not, in lower case too.
+    const run = "- python kubernetes docker aws terraform kafka";
+    expect(stuffing(resume.split(bullet).join(run))).toMatchObject({ passed: false });
     // A list of terms is no sentence, in lower case and with an "and" too.
     const list = "- python, kubernetes, docker, aws, terraform and kafka";
     expect(stuffing(resume.split(bullet).join(list))).toMatchObject({ passed: false });

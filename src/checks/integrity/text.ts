@@ -143,6 +143,10 @@ export function copiedPosting(resume: string, posting: string | undefined): Find
  */
 const LINE_WORDS = 40;
 
+const actionVerbAtStart = memo(
+  (text: AtsEnginePolicy["text"]) => new RegExp(`^\\s*${wordListPattern(text.actionVerbs)}`, "iu"),
+);
+
 /** A line with a label before a colon: "kafka-tools: Kafka, Go", "Cloud: AWS, GCP". */
 const LABELLED = /^[^:]{1,40}:/u;
 /** A year in a line: an entry ("Mentor, Code for America, 2019"), not a list of skills. */
@@ -179,7 +183,7 @@ function listItems(line: string): string[] | null {
  *   from one issuer.
  * - A line appearing three times or more, unless every copy sits at the same place in its role
  *   block (the employer above each title): that is layout. Nor a sentence copied into the
- *   bullets of several roles, once each.
+ *   bullets of up to four roles, once each.
  *
  * Stopwords and words under three letters are never terms; a two-letter skill ("Go") counts as
  * a list item. `now` bounds the plausible years.
@@ -283,14 +287,20 @@ export function stuffedTerms(
   // Every copy at one distance from its role's dates is the layout of a role block.
   const sameOffset = (at: number[], offset: number[]) =>
     at.every((index) => offset[index] <= 4 && offset[index] === offset[at[0]]);
-  // A sentence copied into the bullets of several roles, one copy each, is a habit, not stuffing.
+  // A sentence copied into the bullets of a few roles, one copy each, is a habit, not stuffing;
+  // in five or more it is repeated beyond what a habit explains.
+  // A sentence has a stopword or opens with an action verb ("Mentored junior engineers through
+  // pairing"); a run of terms has neither.
   const roleOf = (at: number) => at - above[at];
+  const opensWithVerb = actionVerbAtStart(policy.text);
   const eachInARole = (at: number[]) =>
+    at.length <= 4 &&
     at.every((index) => Number.isFinite(roleOf(index))) &&
     new Set(at.map(roleOf)).size === at.length &&
     listItems(lines[at[0]]) === null &&
     readsAsSentence(lines[at[0]]) &&
-    wordsOf(lines[at[0]]).some((word) => stopwords.has(word));
+    (wordsOf(lines[at[0]]).some((word) => stopwords.has(word)) ||
+      opensWithVerb.test(lines[at[0]].replace(BULLET_PREFIX, "")));
   const repeatedLines = [...lineAt].filter(
     ([, at]) =>
       at.length >= 3 &&
