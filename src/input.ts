@@ -147,7 +147,9 @@ export function prepareResume(input: unknown): PreparedResume {
     text = flatten(input);
   }
 
-  const canonical = cut(normalizeText(text).trim(), MAX_TEXT_CHARS);
+  // Cut before it is read through, with room for what normalising removes (invisible
+  // characters, CR LF), then to the limit.
+  const canonical = cut(normalizeText(cut(text, MAX_TEXT_CHARS * 2)).trim(), MAX_TEXT_CHARS);
 
   return Object.freeze({
     text: canonical,

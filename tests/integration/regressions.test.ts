@@ -477,6 +477,16 @@ describe("a LinkedIn profile export", () => {
   });
 });
 
+describe("a huge paste", () => {
+  // The whole paste was normalised and only then cut: 40 MB with numbers took one to two seconds.
+  it("is cut before it is read through", () => {
+    const huge = `Jane Doe\n${"Cut costs by 40% in 2019 and २०२१. ".repeat(1_150_000)}`;
+    const { text } = expectFast(() => prepareResume(huge), 300);
+    expect(text.length).toBeLessThanOrEqual(50_000);
+    expect(text.startsWith("Jane Doe\nCut costs by 40% in 2019 and 2021.")).toBe(true);
+  });
+});
+
 describe("line breaks of every kind", () => {
   // A lone carriage return (old Mac files, some Word exports) was no break: the resume read as
   // one line, the name and a role lost.
