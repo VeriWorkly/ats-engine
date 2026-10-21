@@ -448,22 +448,30 @@ export function joinPages(pages: readonly PageLines[]): string {
 
 /** At most this many link targets are added to a document's text. */
 const MAX_LINKS = 50;
+/** Distinct link targets looked for in the text; the rest are not added. */
+const MAX_LINKS_CHECKED = 1_000;
+/** Text searched for a link: what extraction keeps (`MAX_EXTRACTED_CHARS`). */
+const SHOWN_CHARS = 50_000;
 
 /**
  * `text` with the web and email targets of its links that it does not already show, one per line
  * at the end: a link reading "LinkedIn" carries its URL only in the target.
  */
 export function withLinks(text: string, targets: readonly string[]): string {
-  const shown = text.toLowerCase();
+  const shown = text.slice(0, SHOWN_CHARS).toLowerCase();
   const missing = new Map<string, string>();
+  const checked = new Set<string>();
   for (const target of targets) {
-    if (missing.size >= MAX_LINKS || target.length > 500) continue;
+    if (missing.size >= MAX_LINKS || checked.size >= MAX_LINKS_CHECKED) break;
+    if (target.length > 500) continue;
     const bare = target.trim().replace(/^mailto:([^?]*).*$/i, "$1");
     if (!/^(?:https?:\/\/\S+|[^\s@/:]+@[^\s@/]+)$/i.test(bare)) continue;
     // Scheme, "www." and trailing slashes aside, a target already shown or added is skipped.
     let core = bare.replace(/^https?:\/\/(?:www\.)?/i, "").toLowerCase();
     while (/[/?#]$/.test(core)) core = core.slice(0, -1);
-    if (!shown.includes(core) && !missing.has(core)) missing.set(core, bare);
+    if (checked.has(core)) continue;
+    checked.add(core);
+    if (!shown.includes(core)) missing.set(core, bare);
   }
   return missing.size ? `${text}\n${[...missing.values()].join("\n")}` : text;
 }
