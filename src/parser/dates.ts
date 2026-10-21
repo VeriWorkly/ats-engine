@@ -66,14 +66,17 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
 
   // A range's end may be a year's last two digits ("2019–21"); `findDateRange` places them.
   const shortEnd = String.raw`\d{2}(?![\d./-])`;
+  // A month and two-digit year ("06/21"), read only as a range's ends: alone, "10/10" is a rating.
+  const monthYear = String.raw`(?<![\d./-])(?:0?[1-9]|1[0-2])\s*\/\s*\d{2}(?![\d./])`;
 
   return {
     months,
     seasons,
     // Global so `findDateRange` can try the next candidate on a line. The second branch reads
-    // "Jan 2020 to date" (the "to" belongs to the open-ended phrase); the last a season alone.
+    // "Jan 2020 to date" (the "to" belongs to the open-ended phrase); then a season alone; the
+    // last a range of months and two-digit years ("06/21 - Present").
     range: new RegExp(
-      String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})`,
+      String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})|(${monthYear})${separator}(${monthYear}|${openEnded})`,
       "giu",
     ),
     single: new RegExp(date, "giu"),
@@ -122,6 +125,11 @@ function parseDate(
     return m ? { year: third, month: m } : null;
   }
 
+  // "06/21": the year's two digits, for `findDateRange` to place.
+  const monthYear = value.match(/^(\d{1,2})\s*\/\s*(\d{2})$/);
+  if (monthYear && month(Number(monthYear[1])))
+    return { year: Number(monthYear[2]), month: Number(monthYear[1]) };
+
   const numeric = value.match(/^(\d{1,2})\s*[./-]\s*(\d{4})$/);
   if (numeric && month(Number(numeric[1])))
     return { year: Number(numeric[2]), month: Number(numeric[1]) };
@@ -167,8 +175,8 @@ export function parseDocumentDate(
   return isPlausibleDate(date, now) ? date : null;
 }
 
-/** A date written with a two-digit year: "21", "Jan '20". "0000" is a four-digit one. */
-const TWO_DIGIT_YEAR = /(?:^|['’‘])\d{2}$/u;
+/** A date written with a two-digit year: "21", "Jan '20", "06/21". "0000" is a four-digit one. */
+const TWO_DIGIT_YEAR = /(?:^|['’‘/])\d{2}$/u;
 
 /** A two-digit year in the latest century that keeps it at or before `latest`. */
 function withCentury(date: AtsParsedDate | null, latest: number): AtsParsedDate | null {
@@ -279,9 +287,10 @@ function searchDateRange(
       term = { range: { start, end, current: false }, matched: match[0] };
       continue;
     }
-    const endText = match[2] ?? match[3];
+    // Groups 6 and 7: a range of months and two-digit years.
+    const endText = match[2] ?? match[3] ?? match[7];
     const current = match[4] !== undefined || matchers.openEnded.test(endText.trim());
-    const startText = match[1] ?? match[4];
+    const startText = match[1] ?? match[4] ?? match[6];
     const start = placedStart(startText, rp, now);
     const shortEnd = !current && /^\d{2}$/.test(endText.trim());
     if (shortEnd) {

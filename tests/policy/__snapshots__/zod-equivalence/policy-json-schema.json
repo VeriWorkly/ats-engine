@@ -1892,7 +1892,11 @@
               "ongoing",
               "to date",
               "till date",
-              "today"
+              "till now",
+              "today",
+              "continuing",
+              "onwards",
+              "onward"
             ],
             "minItems": 1,
             "type": "array",
@@ -1935,7 +1939,8 @@
             "default": [
               "to",
               "until",
-              "through"
+              "through",
+              "thru"
             ],
             "minItems": 1,
             "type": "array",
@@ -7242,7 +7247,11 @@
               "ongoing",
               "to date",
               "till date",
-              "today"
+              "till now",
+              "today",
+              "continuing",
+              "onwards",
+              "onward"
             ],
             "minItems": 1,
             "type": "array",
@@ -7285,7 +7294,8 @@
             "default": [
               "to",
               "until",
-              "through"
+              "through",
+              "thru"
             ],
             "minItems": 1,
             "type": "array",

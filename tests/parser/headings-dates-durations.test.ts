@@ -385,6 +385,46 @@ describe("date spellings that dropped the role", () => {
     expect(rows("Jane Doe\nExperience\nReleased 2021-03")).toEqual([]);
     expect(rows("Jane Doe\norcid.org/0000-0002-1825-0097")).toEqual([]);
   });
+
+  // The current role was dropped, and with it half the experience, without a word.
+  it.each([
+    ["Engineer, Hooli Jun 2021 - Till now", "en"],
+    ["Engineer, Hooli Jun 2021 onwards", "en"],
+    ["Engineer, Hooli Jun 2021 - Continuing", "en"],
+    ["Engineer, Hooli Jun 2021 thru Present", "en"],
+    ["Engineer, Hooli 06/21 - Present", "en"],
+    ["Ingenieur, Hooli 06/2021 – bis heute", "de"],
+    ["Ingenieur, Hooli ab 06/2021", "de"],
+    ["इंजीनियर, Hooli जून 2021 से", "hi"],
+    ["इंजीनियर, Hooli जून 2021 - अभी तक", "hi"],
+  ])("reads %j as current", (line, language) => {
+    const { roles } = check(`Jane Doe\nExperience\n${line}`, { languages: [language] });
+    expect(roles).toMatchObject([{ start: { year: 2021, month: 6 }, current: true }]);
+  });
+
+  it.each([
+    ["Analyst, Initech 01/15 - 05/21", "en", { year: 2015, month: 1 }, { year: 2021, month: 5 }],
+    [
+      "Analyst, Initech Jan 2015 thru May 2021",
+      "en",
+      { year: 2015, month: 1 },
+      { year: 2021, month: 5 },
+    ],
+    [
+      "Analyste, Initech hiver 2015 - automne 2020",
+      "fr",
+      { year: 2015, month: 1 },
+      { year: 2020, month: 11 },
+    ],
+  ])("reads %j", (line, language, start, end) => {
+    const { roles } = check(`Jane Doe\nExperience\n${line}`, { languages: [language] });
+    expect(roles).toMatchObject([{ start, end, current: false }]);
+  });
+
+  it("reads a month and two-digit year only as a range's end", () => {
+    expect(rows("Jane Doe\nExperience\nRated 10/10 by the review board")).toEqual([]);
+    expect(rows("Jane Doe\nExperience\nShipped 3/12 features")).toEqual([]);
+  });
 });
 
 describe("the education fallback", () => {

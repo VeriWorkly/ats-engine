@@ -130,7 +130,7 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   // "Mars 2019 à juin 2021", "du 03/2019 au 06/2021", "jusqu'à 2021".
   rangeWords: ["à", "au", String.raw`jusqu['’]\s?(?:à|au|en)`],
   sinceWords: ["depuis"],
-  seasons: { printemps: [3, 5], été: [6, 8], automne: [9, 11] },
+  seasons: { printemps: [3, 5], été: [6, 8], automne: [9, 11], hiver: [1, 3] },
   durationUnits: ["an", "ans", "année", "années", "mois"],
   nameLabels: ["nom", String.raw`nom\s+et\s+pr${e}nom`, String.raw`pr${e}nom\s+et\s+nom`],
   employerWords: ["chez"],

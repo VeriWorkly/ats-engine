@@ -1991,7 +1991,11 @@
       "ongoing",
       "to date",
       "till date",
-      "today"
+      "till now",
+      "today",
+      "continuing",
+      "onwards",
+      "onward"
     ],
     "durationUnits": [
       "yr",
@@ -2010,7 +2014,8 @@
     "rangeWords": [
       "to",
       "until",
-      "through"
+      "through",
+      "thru"
     ],
     "sinceWords": [
       "since"
