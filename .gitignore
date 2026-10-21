@@ -18,3 +18,4 @@ mcp-publisher.exe
 mcp-publisher*.tar.gz
 .mcpregistry_*
 .private/
+graphify-out/
