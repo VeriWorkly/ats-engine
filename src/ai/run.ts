@@ -105,6 +105,11 @@ export type TaskSpec<Raw, Result> = {
   task: AtsAiTask;
   outputName: string;
   schema: z.ZodMiniType<Raw>;
+  /**
+   * Whether a reply that fits `schema` says anything. Every field is lenient, so a reply in
+   * another shape (`{"analysis": {…}}`) fits as an empty one; without this it is a success.
+   */
+  usable?: (raw: Raw) => boolean;
   /** `schema` as the strict JSON Schema sent to the model. */
   jsonSchema: Record<string, unknown>;
   defaultPrompt: string;
@@ -126,15 +131,6 @@ function resolveRoute(context: RunContext, task: AtsAiTask, options: AtsAiCallOp
     throw new AtsAiError("config", `"${task}" retries must be an integer from 0 to 5.`);
   return { ...route, retries } as TaskRoute & { retries: number };
 }
-
-const parses = (text: string) => {
-  try {
-    JSON.parse(text);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /** The object or array opening at `start`, to its matching close, skipping strings; or null. */
 function balancedFrom(text: string, start: number): string | null {
@@ -163,12 +159,25 @@ const MAX_CANDIDATES = 20;
 /**
  * The JSON in a reply that may wrap it in a fence, in prose, or after `<think>…</think>`
  * reasoning (whose opening tag a chat template may supply). The answer whole if it parses, else
- * the first fenced block or balanced JSON object that does; else the reply as it is.
+ * the first fenced block or balanced JSON object that parses and `fits`: a reply may show an
+ * example before its answer. Failing that, the first that parses, else the reply as it is.
  */
-function unfence(text: string): string {
+function unfence(text: string, fits: (value: unknown) => boolean): string {
   const close = text.toLowerCase().lastIndexOf("</think>");
   const answer = (close === -1 ? text : text.slice(close + "</think>".length)).trim();
-  if (parses(answer)) return answer;
+  let first: string | undefined;
+  const found = (candidate: string) => {
+    let value: unknown;
+    try {
+      value = JSON.parse(candidate);
+    } catch {
+      return false;
+    }
+    first ??= candidate;
+    return fits(value);
+  };
+  // JSON whole is the answer, fitting or not: an object inside it is a part of it.
+  if (found(answer) || first) return answer;
   // `indexOf`, not a lazy pattern: unclosed fences made that quadratic.
   for (
     let open = answer.indexOf("```"), fences = 0;
@@ -179,7 +188,7 @@ function unfence(text: string): string {
     const close = answer.indexOf("```", start);
     if (close === -1) break;
     const block = answer.slice(start, close).trim();
-    if (/^[[{]/.test(block) && /[\]}]$/.test(block) && parses(block)) return block;
+    if (/^[[{]/.test(block) && /[\]}]$/.test(block) && found(block)) return block;
   }
   let tried = 0;
   for (
@@ -188,13 +197,17 @@ function unfence(text: string): string {
     at = answer.indexOf("{", at + 1), tried += 1
   ) {
     const candidate = balancedFrom(answer, at);
-    if (candidate && parses(candidate)) return candidate;
+    if (candidate && found(candidate)) return candidate;
   }
-  return answer;
+  return first ?? answer;
 }
 
 /** Parses one response. Throws an `AtsAiError` whose code says whether a retry can help. */
-function readReply<Raw>(response: LlmResponse, schema: z.ZodMiniType<Raw>): Raw {
+function readReply<Raw>(
+  response: LlmResponse,
+  schema: z.ZodMiniType<Raw>,
+  usable: (raw: Raw) => boolean = () => true,
+): Raw {
   if (response.finish === "refusal") throw new AtsAiError("refused", "The model declined.");
   const truncated = response.finish === "length";
   if (!response.text.trim())
@@ -204,7 +217,12 @@ function readReply<Raw>(response: LlmResponse, schema: z.ZodMiniType<Raw>): Raw 
 
   let json: unknown;
   try {
-    json = JSON.parse(unfence(response.text));
+    json = JSON.parse(
+      unfence(response.text, (value) => {
+        const fitted = schema.safeParse(value);
+        return fitted.success && usable(fitted.data);
+      }),
+    );
   } catch (error) {
     throw truncated
       ? new AtsAiError("truncated", "Response was cut off at maxTokens.", { cause: error })
@@ -221,6 +239,8 @@ function readReply<Raw>(response: LlmResponse, schema: z.ZodMiniType<Raw>): Raw 
       cause: parsed.error,
     });
   }
+  if (!usable(parsed.data))
+    throw new AtsAiError("invalid_output", "Response held none of the fields asked for.");
   return parsed.data;
 }
 
@@ -297,7 +317,7 @@ export async function runTask<Raw, Result>(
         for (const key of Object.keys(response.usage) as Array<keyof LlmUsage>)
           total[key] = (total[key] ?? 0) + (response.usage[key] ?? 0);
       }
-      raw = readReply(response, spec.schema);
+      raw = readReply(response, spec.schema, spec.usable);
     } catch (thrown) {
       const { error, retryable } = classify(thrown, options.signal);
       if (retryable && attempt <= route.retries) {

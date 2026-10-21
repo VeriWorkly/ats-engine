@@ -151,8 +151,25 @@ describe("reasoning-model replies", () => {
     ],
     ["a fenced block after prose", `Here it is:\n\`\`\`json\n${INSIGHTS}\n\`\`\`\nDone.`],
     ["a fence on one line", `\`\`\`json${INSIGHTS}\`\`\``],
+    // The first object that parsed was taken, though it was not the answer.
+    [
+      "a JSON example before the answer",
+      `The shape is {"note": "an example"}. Answer: ${INSIGHTS}`,
+    ],
+    [
+      "a fenced example before the answer",
+      `\`\`\`json\n{"keys": ["explanation"]}\n\`\`\`\n\`\`\`json\n${INSIGHTS}\n\`\`\``,
+    ],
   ])("reads %s", async (_label, text) => {
     expect(await read(text)).toBe("Fine.");
+  });
+
+  // A reply in another shape parsed as an empty analysis: a paid call, nothing back, no error.
+  it.each([
+    ["wrapped in another key", JSON.stringify({ analysis: { explanation: "Fine." } })],
+    ["with nothing in it", JSON.stringify({ explanation: " ", priorityOrder: [] })],
+  ])("refuses a reply %s", async (_label, text) => {
+    await expect(read(text)).rejects.toMatchObject({ code: "invalid_output" });
   });
 
   // Unclosed fences must not make the scan quadratic; a reply may run to 4 MB.

@@ -130,6 +130,10 @@ export function analyzeSpec(
     task: "analyze",
     outputName: "ats_insights",
     schema: insightsSchema,
+    // A sparse analysis is one; an empty one is a reply in another shape.
+    usable: (insights) =>
+      insights.explanation.trim() !== "" ||
+      Object.values(insights).some((value) => Array.isArray(value) && value.length > 0),
     jsonSchema,
     defaultPrompt: DEFAULT_ANALYZE_PROMPT,
     user: JSON.stringify({
