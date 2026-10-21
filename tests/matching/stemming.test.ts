@@ -177,6 +177,42 @@ Jan 2020 - Present
   });
 });
 
+// "Reacted" met React and "R&D" met R: cutting a verb's ending made it a named skill.
+describe("a verb is not the named skill its stem spells", () => {
+  const judged = (bullets: string[], asks: string[]) =>
+    check(
+      `Kai Moreno\nkai@example.com\nExperience\nSupport Engineer, Bluebird\nJan 2020 - Present\n${bullets.map((b) => `- ${b}`).join("\n")}`,
+      DEFAULT_POLICY,
+      {
+        now: new Date("2026-10-01T00:00:00Z"),
+        jobDescription: `Requirements\n${asks.map((a) => `- ${a}`).join("\n")}`,
+      },
+    ).requirements.map((r) => r.status);
+
+  it("does not meet React, Spark, Rust or R with Reacted, Sparked, rusted or R&D", () => {
+    expect(
+      judged(
+        [
+          "Reacted to 40 outages a month",
+          "Sparked a redesign of the on-call rota",
+          "Replaced rusted runbooks",
+          "Led R&D for 3 product lines",
+        ],
+        ["React", "Spark", "Rust", "R"],
+      ),
+    ).toEqual(["missing", "missing", "missing", "missing"]);
+  });
+
+  it("still meets a skill by its plural, and a plain word by its other forms", () => {
+    expect(
+      judged(
+        ["Built REST APIs in React and Spark", "Tested 3 services in R"],
+        ["API design", "React", "Spark", "Testing", "R"],
+      ),
+    ).toEqual(["met", "met", "met", "met", "met"]);
+  });
+});
+
 describe("words the rules keep apart", () => {
   it.each([
     ["account", "accounting"],

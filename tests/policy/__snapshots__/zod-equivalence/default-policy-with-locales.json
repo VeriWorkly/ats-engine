@@ -1920,7 +1920,9 @@
       "business development",
       "documentation",
       "containers",
-      "sql"
+      "sql",
+      "spark",
+      "rust"
     ],
     "buzzwords": [
       "team player",

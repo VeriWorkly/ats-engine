@@ -11,4 +11,5 @@
 - **Breaking:** a language requirement with a level is partial, not met, by a spoken language whose level the engine cannot read, and missing by "currently learning" or "Schulkenntnisse".
 - **Breaking:** a clearance stated beside a negation about something else ("Active TS/SCI clearance, no lapses since 2015") meets a clearance requirement, which it did not.
 - **Breaking:** an expired, future-dated or in-progress certification is partial, not met, for a certification requirement, and says why.
+- **Breaking:** "Reacted", "Sparked", "rusted" and "R&D" no longer meet React, Spark, Rust and R, in the requirements and the job match score.
 - **Breaking:** `check_resume` reads the text of a Chinese, Japanese or Korean PDF whose font uses a standard CJK character map, which came out empty.

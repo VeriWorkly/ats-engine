@@ -18,7 +18,22 @@ export type Vocabulary = {
   implies: Map<string, string[]>;
   /** The terms the policy writes with a slash ("ci/cd", "tcp/ip"): never split. */
   slashTerms: Set<string>;
+  /** Skills the policy spells as their own stem ("react", "spark"): no verb folds onto one. */
+  namedSkills: Set<string>;
 };
+
+/**
+ * A word's token: its stem, unless a verb's ending folded it onto a named skill ("reacted" onto
+ * "react", "sparked" onto "spark"), where the word stays itself. A plural still folds ("apis").
+ */
+function fold(word: string, km: AtsEnginePolicy["keywordMatch"], vocab: Vocabulary) {
+  const token = stem(word, km.stemming);
+  return token !== word &&
+    vocab.namedSkills.has(token) &&
+    !km.pluralSuffixes.some((suffix) => word === token + suffix)
+    ? word
+    : token;
+}
 
 /** A "." or "/" a word picked up from the sentence around it: "JavaScript.", "and/". */
 const TRAILING = /(?<![./])[./]+$/;
@@ -69,7 +84,7 @@ export function canonicalize(raw: string, km: AtsEnginePolicy["keywordMatch"], v
   if (!word || vocab.stopwords.has(word) || vocab.stopwords.has(stem(word, km.stemming)))
     return null;
   const mapped = own(km.synonyms, word) ?? word;
-  return mapped.includes(" ") ? mapped : stem(mapped, km.stemming);
+  return mapped.includes(" ") ? mapped : fold(mapped, km, vocab);
 }
 
 /** The policy's term maps, folded once per policy. */
@@ -89,6 +104,7 @@ export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocab
     softTokens,
     softPhrases: [],
     implies: new Map(),
+    namedSkills: new Set(),
     slashTerms: new Set(
       [...km.phrases, ...Object.keys(km.synonyms), ...Object.values(km.synonyms)].filter((term) =>
         term.includes("/"),
@@ -117,6 +133,13 @@ export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocab
     skillTokens.add(stem(abbreviation, km.stemming));
     skillTokens.add(token);
   }
+  for (const spelling of [
+    ...km.phrases,
+    ...Object.keys(km.synonyms),
+    ...Object.values(km.synonyms),
+  ])
+    if (skillTokens.has(spelling) && stem(spelling, km.stemming) === spelling)
+      vocabulary.namedSkills.add(spelling);
 
   // Both sides of the implication map are canonicalised like the term maps.
   for (const [skill, capabilities] of Object.entries(km.implies)) {
@@ -209,6 +232,8 @@ export function extractVocabulary(
       const written = text.slice(index, index + raw.length);
       if (written === raw) return;
       if (raw.length === 1 && word.endsWith(".")) return;
+      // "R&D", "Q&A": a letter glued to another by "&" is part of a word, not the skill R.
+      if (text[index - 1] === "&" || text[index + raw.length] === "&") return;
       shortSkill = true;
     }
 
@@ -218,7 +243,7 @@ export function extractVocabulary(
         map.set(mapped, { token: mapped, label: mapped, skill: !vocab.softTokens.has(mapped) });
       return;
     }
-    const token = stem(mapped, km.stemming);
+    const token = fold(mapped, km, vocab);
     if (!map.has(token))
       map.set(token, { token, label: raw, skill: shortSkill || vocab.skillTokens.has(token) });
   }
