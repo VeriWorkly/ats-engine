@@ -20,8 +20,8 @@ const IMAGE = (x: number, y: number, w: number, h: number) =>
 
 /** A 1pt border around 40,690 to 440,720: two rectangles filled even-odd. */
 const BORDER = "40 690 400 30 re 41 691 398 28 re f*";
-/** `GS1` paints nothing, `GS2` paints at 8% opacity. */
-const GSTATES = "/ExtGState<</GS1<</ca 0>>/GS2<</ca 0.08>>>>";
+/** `GS1` paints nothing, `GS2` paints at 8% opacity, `GS3` at 99%. */
+const GSTATES = "/ExtGState<</GS1<</ca 0>>/GS2<</ca 0.08>>/GS3<</ca 0.99>>>>";
 
 async function hidden(content: string, resources = "") {
   const { layout } = await extractResume(buildPdf(`${visible}\n${content}`, resources), "pdf");
@@ -46,6 +46,23 @@ describe("hidden text", () => {
     ["placed by a text matrix", `1 1 1 rg BT /F1 10 Tf 1 0 0 1 50 700 Tm (${KEYWORDS}) Tj ET`],
     ["white inside a box's border", `0 g ${BORDER} 1 1 1 rg ${line(700)}`],
     ["white on a faint tint", `q /GS2 gs 0 g 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`],
+    // A path too intricate to split, or layers too deep, is read as solid, never as unknown.
+    [
+      "white on a white box with junk moves in its path",
+      `1 1 1 rg 40 690 400 30 re ${Array.from({ length: 9 }, (_, i) => `${i} ${i} m`).join(" ")} f ${line(700)}`,
+    ],
+    [
+      "white on two white triangles",
+      `1 1 1 rg 40 690 m 440 690 l 440 720 l h 40 690 m 440 720 l 40 720 l h f* ${line(700)}`,
+    ],
+    [
+      "white on five stacked near-opaque white boxes",
+      `q /GS3 gs 1 1 1 rg ${"40 690 400 30 re f ".repeat(5)}Q 1 1 1 rg ${line(700)}`,
+    ],
+    [
+      "white on a white path of 150,000 points",
+      `1 1 1 rg 40 690 m ${"440 690 l ".repeat(150_000)}440 720 l 40 720 l h f ${line(700)}`,
+    ],
   ])("finds text %s", async (_, content) => {
     const layout = await hidden(content, GSTATES);
     expect(layout.hiddenTextChars).toBe(KEYWORDS.replace(/\s/g, "").length);

@@ -78,14 +78,37 @@ function mix(over: string, under: string, alpha: number) {
     .join("")}`;
 }
 
-/** A filled path's subpaths split into boxes; past this many, what it fills is not worked out. */
+/** A filled path's rectangles split into boxes; past this many, it is read as its bounding box. */
 const MAX_SUBPATHS = 8;
 
+/** The corners of an upright rectangle, or null: 4 points (5 when the first is repeated), each side level or plumb. */
+function rectangle(points: ReadonlyArray<[number, number]>): { box: Box; turn: number } | null {
+  const corners =
+    points.length === 5 && points[4]![0] === points[0]![0] && points[4]![1] === points[0]![1]
+      ? points.slice(0, 4)
+      : points;
+  if (corners.length !== 4) return null;
+  let area = 0;
+  for (let index = 0; index < 4; index += 1) {
+    const [x0, y0] = corners[index]!;
+    const [x1, y1] = corners[(index + 1) % 4]!;
+    if (Math.abs(x1 - x0) > 1e-6 && Math.abs(y1 - y0) > 1e-6) return null;
+    // Twice the signed area: its sign is the rectangle's winding.
+    area += x0 * y1 - x1 * y0;
+  }
+  const [[ax, ay], [bx, by]] = [corners[0]!, corners[2]!];
+  return {
+    box: [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)],
+    turn: area < 0 ? -1 : 1,
+  };
+}
+
 /**
- * What a filled path covers, as boxes in page space, each subpath taken as its bounding box and
- * its winding: a ring (`re re f*`, a bordered box) is its four sides, not the box around it.
- * `undefined` when it has too many subpaths to work out, or `budget` (grid cells, shared across a
- * page) runs out.
+ * What a filled path of upright rectangles covers, as boxes in page space, by each rectangle's
+ * winding: a frame (`re re f*`, a bordered box) is its four sides, not the box around it.
+ * `undefined` for any other path (a curve, a slanted side, more than `MAX_SUBPATHS` rectangles),
+ * or when `budget` (grid cells, shared across a page) runs out: the caller reads it as its
+ * bounding box in its fill, as a solid shape.
  */
 function filledBoxes(
   data: ArrayLike<number>,
@@ -96,38 +119,27 @@ function filledBoxes(
   const subpaths: Array<{ box: Box; turn: number }> = [];
   let points: Array<[number, number]> = [];
   const close = () => {
-    if (!points.length) return;
-    const xs = points.map((p) => p[0]);
-    const ys = points.map((p) => p[1]);
-    // Twice the signed area: its sign is the subpath's winding.
-    let area = 0;
-    points.forEach(([x0, y0], index) => {
-      const [x1, y1] = points[(index + 1) % points.length]!;
-      area += x0 * y1 - x1 * y0;
-    });
-    const box: Box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
-    subpaths.push({ box, turn: area < 0 ? -1 : 1 });
+    if (!points.length) return true;
+    const found = rectangle(points);
     points = [];
+    return found ? subpaths.push(found) <= MAX_SUBPATHS : false;
   };
   const point = (at: number) => toPage(Number(data[at]), Number(data[at + 1]));
-  for (let at = 0; at < data.length && subpaths.length <= MAX_SUBPATHS;) {
+  for (let at = 0; at < data.length;) {
     const code = data[at];
     if (code === 0) {
-      close();
+      if (!close()) return undefined;
       points.push(point(at + 1));
       at += 3;
     } else if (code === 1) {
-      points.push(point(at + 1));
+      // A rectangle has five points at most: past that, no need to keep reading.
+      if (points.push(point(at + 1)) > 5) return undefined;
       at += 3;
-    } else if (code === 2) {
-      points.push(point(at + 1), point(at + 3), point(at + 5));
-      at += 7;
     } else if (code === 3) at += 1;
-    else break;
+    else return undefined;
   }
-  close();
-  if (subpaths.length <= 1) return subpaths.map((subpath) => subpath.box);
-  if (subpaths.length > MAX_SUBPATHS) return undefined;
+  if (!close()) return undefined;
+  if (subpaths.length <= 1) return subpaths.length ? [subpaths[0]!.box] : undefined;
 
   const edges = (low: 0 | 1, high: 2 | 3) =>
     [...new Set(subpaths.flatMap(({ box }) => [box[low], box[high]]))].sort((a, b) => a - b);
@@ -206,7 +218,7 @@ const MAX_MASK_PAIRS = 100_000;
 const MAX_PIECE_CHECKS = 2_000_000;
 /** Grid cells spent splitting filled paths into boxes, across a page. */
 const MAX_FILL_CELLS = 1_000_000;
-/** Translucent fills looked through, one over another, before what lies beneath is unknown. */
+/** Translucent fills looked through, one over another; the last is read as opaque. */
 const MAX_LAYERS = 4;
 
 /** A run's text and where it is, to a 2pt cell `dx`, `dy` cells away. */
@@ -524,10 +536,10 @@ export function measureVisibility(
                   fillCells,
                 )
               : [lastPath];
-          // Too intricate to work out: it covers nothing for certain, and text on it has no
-          // known background.
-          if (!boxes) paint({ box: lastPath, order, kind: "shape", fill: "" }, true);
-          else for (const box of boxes) paint({ box, order, kind: "shape", fill: state.fill });
+          // Any other path is read as its bounding box, solid: a curve or a cheap pile of moves
+          // must not leave white text on it unjudged.
+          for (const box of boxes ?? [lastPath])
+            paint({ box, order, kind: "shape", fill: state.fill });
           const [mx0, my0, mx1, my1] = lastPath;
           if (
             !maskDepth &&
@@ -558,10 +570,12 @@ export function measureVisibility(
   );
   // The colour seen at a point under `top`, the last fill there: blended by its opacity with what
   // lies beneath it, else the white page; "" when unknown.
+  // Past `MAX_LAYERS` the fill counts as opaque: layers stacked to that depth must not leave the
+  // background unknown.
   const shown = (point: [number, number], top: Drawn | undefined, depth = 0): string => {
     if (!top) return "#ffffff";
-    if (top.fill === "" || !(top.alpha < 1)) return top.fill;
-    const under = depth < MAX_LAYERS ? shown(point, around(point, top.order).top, depth + 1) : "";
+    if (top.fill === "" || !(top.alpha < 1) || depth >= MAX_LAYERS) return top.fill;
+    const under = shown(point, around(point, top.order).top, depth + 1);
     return under && mix(top.fill, under, top.alpha);
   };
   for (const { text, center, fill, order } of throughMask) {
