@@ -11,6 +11,7 @@ import {
   type AtsResumeDocument,
   check as score,
 } from "../../src/index.js";
+import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 const NOW = new Date("2026-09-30T00:00:00Z");
@@ -324,6 +325,33 @@ describe("JSON Resume through the engine's front door", () => {
     });
     const role = doc.sections[0]?.kind === "experience" ? doc.sections[0].items[0] : undefined;
     expect(role).toMatchObject({ start: "2020-01", end: undefined, current: true });
+  });
+
+  // Only English "Present" and its kin made a role current; "heute" gave a one-month role.
+  it.each([
+    ["Current role", []],
+    ["Till now", []],
+    ["heute", ["de"]],
+    ["aujourd'hui", ["fr"]],
+  ])("treats an end of %j as a current role", (endDate, languages) => {
+    const resume = {
+      basics: { name: "Jane Doe", email: "jane@example.com" },
+      work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate }],
+    };
+    const report = score(resume, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
+      now: NOW,
+      languages: languages as string[],
+    });
+    expect(report.parsed.roles[0]).toMatchObject({ current: true, end: null });
+    expect(report.parsed.monthsOfExperience).toBeGreaterThanOrEqual(92);
+  });
+
+  it("still reads an end it cannot read as no end, not as current", () => {
+    const resume = {
+      basics: { name: "Jane Doe" },
+      work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate: "soon" }],
+    };
+    expect(check(resume).parsed.roles[0]).toMatchObject({ current: false, end: null });
   });
 
   it("reads only a bounded slice of a huge array", () => {

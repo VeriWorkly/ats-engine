@@ -13,4 +13,5 @@
 - **Breaking:** an expired, future-dated or in-progress certification is partial, not met, for a certification requirement, and says why.
 - **Breaking:** "Reacted", "Sparked", "rusted" and "R&D" no longer meet React, Spark, Rust and R, in the requirements and the job match score.
 - **Breaking:** a right-to-left Word resume no longer fails the invisible-characters check for the direction embeddings Word writes, and scores 10 points higher.
+- **Breaking:** a JSON Resume whose current role ends in "heute", "Current role" or another open end the engine reads is current, with its full experience, not one month.
 - **Breaking:** `check_resume` reads the text of a Chinese, Japanese or Korean PDF whose font uses a standard CJK character map, which came out empty.
