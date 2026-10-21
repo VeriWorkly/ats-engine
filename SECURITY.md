@@ -32,8 +32,9 @@ adversarial suite against a private policy when one is present.
 bounded in depth, array length and node count before it is validated, a policy or a locale pack
 nested deeper than 5 000 levels (or one that contains itself) is refused as invalid with
 `AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
-64 MB and hold at most 2 MB of the XML `mammoth` parses and 2 MB of page headers and footers (a
-part past that is neither read nor measured), and PDF text reading stops at the cap or
+64 MB and hold at most 2 MB of the XML `mammoth` parses, 2 MB of page headers and footers and
+8 MB of embedded HTML pages (`w:altChunk`, each read once however often it is named; a part past
+these is neither read nor measured), and PDF text reading stops at the cap or
 after the first 100 pages, whichever comes first (the page count still counts every page). PDF
 images have no size cap: pdf.js decodes every image in full, about 12 bytes a pixel, whatever
 its size, and a 420 KB file with one 144 MP image held 1.8 GB. The table pass decodes no image,
