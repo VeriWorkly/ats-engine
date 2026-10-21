@@ -36,6 +36,27 @@ describe("AI layer regressions", () => {
     expect(rejected.map((violation) => violation.path)).toEqual(["links[2].url"]);
   });
 
+  // With its scheme taken off, a made-up address was two words of the document ("Fabrikam Ltd").
+  it("rejects a link made of the document's words but not written in it", async () => {
+    const source = "Jane Doe\nEngineer, Fabrikam Ltd\nProject: Ledger Tool";
+    const provider = scriptedProvider(
+      JSON.stringify({
+        basics: { fullName: "Jane Doe" },
+        links: [{ label: "Site", url: "https://fabrikam.ltd" }],
+        projects: [{ name: "Ledger Tool", link: "https://ledger.tool" }],
+      }),
+    );
+    const ai = createAtsAi({ provider, routes: { convertResume: route } });
+    const { result, rejected } = await ai.convertResume({ resumeText: source });
+
+    expect(result.links[0]!.url).toBe("");
+    expect(result.projects[0]!.link).toBe("");
+    expect(rejected.map((violation) => violation.path)).toEqual([
+      "links[0].url",
+      "projects[0].link",
+    ]);
+  });
+
   it("does not sell a repair that the merge cannot apply", () => {
     // The merge never edits rows the parser found, so a repair here would change nothing.
     const parsed = check(

@@ -1,5 +1,7 @@
 import { escapeRegex, normalizeText, wordListRegex } from "../text/text.js";
+import { EMAIL } from "../parser/contact.js";
 import { educationLevel } from "../parser/education.js";
+import { findPhone } from "../parser/phone.js";
 import { isPlausibleDate } from "../parser/dates.js";
 import { parseQuality } from "../parser/index.js";
 import { finalizeParsed, type ParsedCore } from "../parser/record.js";
@@ -130,6 +132,9 @@ export function ongoingIn(source: string, policy: AtsEnginePolicy) {
   };
 }
 
+/** An email address and nothing else, as the parser reads one. */
+const WHOLE_EMAIL = new RegExp(`^(?:${EMAIL.source})$`, EMAIL.flags);
+
 /**
  * Fills gaps in the deterministic parse with grounded AI values. A value the parser found is
  * never overwritten; a string that does not occur in the source is dropped; a role or school
@@ -161,8 +166,14 @@ export function mergeGrounded(
   const core: ParsedCore = { ...deterministic };
   const filled = new Set<AtsParsedField>();
 
+  // Grounded words are not enough: each contact field must also be the kind of value it holds.
+  const shaped = {
+    name: (value: string) => !/[\d@/]/.test(value) && value.trim().split(/\s+/).length <= 6,
+    email: (value: string) => WHOLE_EMAIL.test(value.trim()),
+    phone: (value: string) => findPhone(value, policy, now) === value.trim(),
+  };
   for (const field of ["name", "email", "phone"] as const)
-    if (!core[field] && ok(field, candidate[field])) {
+    if (!core[field] && ok(field, candidate[field]) && shaped[field](candidate[field])) {
       core[field] = candidate[field];
       filled.add(field);
     }

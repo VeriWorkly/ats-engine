@@ -90,7 +90,9 @@ What does not depend on the model:
 
 - Every identity value a task returns (names, employers, titles, schools, email addresses, URLs,
   skills) must occur in the source text, and is dropped and reported in `rejected` if it does not.
-  Dates in parse repair must name a year the text contains.
+  An email address or URL must occur whole, not as words spread over the text. Dates in parse
+  repair must name a year the text contains, and a contact field it fills must hold that kind of
+  value (an email address, a phone number the parser would read, a name without digits or "@").
 - Free text a model writes (an explanation, a recommendation) is advice and is not grounded:
   show it as the model's words, not as facts about the candidate.
 - `analyze` redacts contact details before the request leaves, best effort and only these

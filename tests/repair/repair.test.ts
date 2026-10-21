@@ -200,6 +200,29 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     expect(merged.roles).toEqual([]);
   });
 
+  // Any words of the resume grounded, so text planted in it could fill a contact field with junk.
+  it.each([
+    ["email", "Acme Corporation"],
+    ["email", "jane.doe"],
+    ["phone", "Senior Engineer"],
+    ["phone", "2017 - 2019"],
+    ["name", "jane.doe@example.com"],
+    ["name", "(555) 010-2020"],
+  ] as const)("does not put a value that is not one in %s: %j", (field, value) => {
+    const { merged } = merge(emptyParsed, candidate({ [field]: value }), SOURCE);
+    expect(merged[field]).toBe("");
+  });
+
+  it("fills an email and a phone written as such, the phone one the parser would read", () => {
+    const source = SOURCE.replace("(555) 010-2020", "+1 415 555 0134");
+    const { merged } = merge(
+      emptyParsed,
+      candidate({ email: "jane.doe@example.com", phone: "+1 415 555 0134" }),
+      source,
+    );
+    expect(merged).toMatchObject({ email: "jane.doe@example.com", phone: "+1 415 555 0134" });
+  });
+
   it("keeps dates, which the schema bounds rather than the substring check", () => {
     const { merged } = merge(
       emptyParsed,
