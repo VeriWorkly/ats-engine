@@ -24,11 +24,21 @@ const PHOTO_MIN = 50;
 const ENCRYPTED = "The PDF is password-protected; remove the password and upload it again.";
 const DAMAGED = "The file could not be read as a PDF; it may be damaged.";
 
-/** Where pdf.js finds the standard fonts: a file-system path (not a `file:` URL) with the trailing "/" pdf.js insists on. */
-function standardFontsDirectory() {
+/**
+ * Where pdf.js finds the standard fonts and the CMaps CJK fonts are decoded through: a
+ * file-system path (not a `file:` URL) with the trailing "/" pdf.js insists on.
+ */
+function pdfjsDirectory(name: "standard_fonts" | "cmaps") {
   const packageJson = createRequire(import.meta.url).resolve("pdfjs-dist/package.json");
-  return `${join(dirname(packageJson), "standard_fonts")}/`;
+  return `${join(dirname(packageJson), name)}/`;
 }
+
+/** What both pdf.js passes are given to find their files. */
+const pdfjsFiles = () => ({
+  standardFontDataUrl: pdfjsDirectory("standard_fonts"),
+  cMapUrl: pdfjsDirectory("cmaps"),
+  cMapPacked: true,
+});
 
 type PdfGeometry = Omit<AtsLayoutSignals, "tableCount">;
 
@@ -48,7 +58,7 @@ async function readPdf(
     .getDocument({
       data,
       isEvalSupported: false,
-      standardFontDataUrl: standardFontsDirectory(),
+      ...pdfjsFiles(),
       verbosity: 0,
     })
     .promise.catch((cause: unknown) => {
@@ -195,7 +205,13 @@ export async function extractPdf(
   // Ruled tables are counted twice, the larger kept: from the stroked or filled rules the page
   // draws (a CSS border prints as a thin filled rectangle), and by pdf-parse (stroked only).
   // `maxImageSize: 0`: tables are rules, and images would be decoded in full.
-  const parser = new PDFParse({ data: new Uint8Array(data), maxImageSize: 0, verbosity: 0 });
+  const parser = new PDFParse({
+    data: new Uint8Array(data),
+    maxImageSize: 0,
+    isEvalSupported: false,
+    ...pdfjsFiles(),
+    verbosity: 0,
+  });
 
   try {
     let tableCount = drawn;
