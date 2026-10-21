@@ -1,5 +1,16 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.9.0
+
+### Minor Changes
+
+- b20dd84: - **Breaking:** `check_resume` fails the keyword-stuffing check, and returns a lower score, for a resume with a line that names a few skills again and again, each under five times ("Python Kubernetes AWS Docker Go Kafka" written four times).
+
+### Patch Changes
+
+- Updated dependencies [b20dd84]
+  - @veriworkly/ats-engine@0.15.0
+
 ## 0.8.0
 
 ### Minor Changes
