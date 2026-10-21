@@ -1,5 +1,21 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.10.0
+
+### Minor Changes
+
+- d939b84: `explain_rule` takes an optional `region` and explains a rule as that country weighs it, as `check_resume` scores it. Without one it gave the published weights only: a photo showed 2 points where a US resume is scored on 6. A rule a region turns off (a photo in Germany) answers that it is not scored there. Without `region`, the answer is unchanged.
+- d88dc12: - **Breaking:** `match_job` and `check_resume` with a posting list a new first requirement, `kind: "seniority"`, when the posting's title names a level ("Senior Backend Engineer"), judged by the resume's latest title and years.
+- 85765ab: - **Breaking:** `check_resume` no longer fails the keyword-stuffing check, and returns a higher score, for a resume that copies one bullet into three or four roles, once each. In five or more, it is still stuffing.
+
+### Patch Changes
+
+- Updated dependencies [d88dc12]
+- Updated dependencies [9cff50a]
+- Updated dependencies [85765ab]
+- Updated dependencies [d939b84]
+  - @veriworkly/ats-engine@0.16.0
+
 ## 0.9.0
 
 ### Minor Changes
