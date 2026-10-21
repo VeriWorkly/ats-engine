@@ -172,9 +172,11 @@ reads at most 20 MB. `npm run smoke` fails if the core, `/document`, `/format`, 
 and calls no model. It reads the files a tool call names, with the rights of the user running it,
 and nothing else; folders, pipes, devices, network paths and files over 20 MB are refused, and so
 is a `job_path` that is not a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file. It reads a PDF or
-DOCX in its own `/node/child` process, one per file, stopped after 60 seconds, so a file that
-exhausts memory, crashes the parser or never ends takes down that process and not the server;
-memory still needs an OS limit to stop it early (see **Size**). Its stdout carries only the protocol. Its answers include text from the resume, which the assistant
+DOCX in its own `/node/child` process, one per file, stopped after 60 seconds or when the call is
+cancelled, so a file that exhausts memory, crashes the parser or never ends takes down that
+process and not the server. It reads as many files at once as the machine has CPU cores; further
+calls wait their turn, so many calls at once cannot start a process each. Memory still needs an
+OS limit to stop a process early (see **Size**). Its stdout carries only the protocol. Its answers include text from the resume, which the assistant
 sends to its own model provider.
 
 **The GitHub Action.** Its inputs reach `run.mjs` as environment variables, never pasted into a

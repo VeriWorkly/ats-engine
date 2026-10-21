@@ -378,3 +378,42 @@ describe("certifications and spoken languages", () => {
     expect(parsed.spokenLanguages).toHaveLength(2);
   });
 });
+
+// 150 calls at once started 150 children (7.3 GB), and a cancelled call left its child running.
+describe("file reading is bounded", () => {
+  it("reads at most MAX_READS files at once; the rest wait their turn", async () => {
+    const { inTurn, MAX_READS } = await import("../src/inputs.js");
+    let running = 0;
+    let most = 0;
+    const read = async () => {
+      most = Math.max(most, (running += 1));
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      running -= 1;
+    };
+    await Promise.all(Array.from({ length: MAX_READS * 3 + 1 }, () => inTurn(read)));
+    expect(most).toBe(MAX_READS);
+  });
+
+  it("never starts a read whose call was cancelled while it waited", async () => {
+    const { inTurn, MAX_READS } = await import("../src/inputs.js");
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const busy = Array.from({ length: MAX_READS }, () => inTurn(() => held));
+    const controller = new AbortController();
+    let started = false;
+    const waiting = inTurn(async () => void (started = true), controller.signal);
+    controller.abort();
+    await expect(waiting).rejects.toThrow("The call was cancelled.");
+    release();
+    await Promise.all(busy);
+    expect(started).toBe(false);
+  });
+
+  it("stops the child reading a file when the call is cancelled", async () => {
+    const { extractInChild } = await import("../src/inputs.js");
+    const controller = new AbortController();
+    const reading = extractInChild(new Uint8Array(pdf), "pdf", controller.signal);
+    setTimeout(() => controller.abort(), 20);
+    await expect(reading).rejects.toThrow("The call was cancelled.");
+  });
+});
