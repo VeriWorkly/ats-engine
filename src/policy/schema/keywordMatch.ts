@@ -222,9 +222,57 @@ export const keywordMatchSchema = z
           String.raw`(?:requires?|requiring|needs?|needing)\s+sponsorship`,
           String.raw`work\s+permit`,
           String.raw`(?:us|u\.s\.)\s+citizen(?:ship)?`,
+          String.raw`(?:british|uk|u\.k\.|eu|e\.u\.|american|canadian|australian|irish|indian)\s+citizen(?:ship)?`,
           String.raw`green\s+card`,
           String.raw`permanent\s+resident`,
         ]),
+        /**
+         * The countries a right to work or a citizenship is stated for, each a name and the ways
+         * of writing it. A statement naming only other countries than the posting asks about is
+         * no evidence ("Authorized to work in the US" for a UK role); one naming none is read as
+         * it stands.
+         */
+        countries: z._default(
+          z.array(
+            z.object({
+              name: z.string().check(z.minLength(1)),
+              patterns: wordList("requirements.countries"),
+            }),
+          ),
+          [
+            {
+              name: "US",
+              patterns: [
+                String.raw`u\.?s\.?(?:a\.?)?`,
+                String.raw`(?:the\s+)?united\s+states(?:\s+of\s+america)?`,
+                // Not "Latin American": only a citizen.
+                String.raw`american(?=\s+citizen)`,
+                String.raw`green\s+card`,
+              ],
+            },
+            {
+              name: "UK",
+              patterns: [
+                String.raw`u\.?k\.?`,
+                String.raw`(?:the\s+)?united\s+kingdom`,
+                String.raw`(?:great\s+)?britain`,
+                "british",
+                "england",
+                "scotland",
+                // Not New South Wales.
+                String.raw`(?<!south\s)wales`,
+              ],
+            },
+            {
+              name: "EU",
+              patterns: [String.raw`e\.?u\.?`, String.raw`european\s+union`, "eea"],
+            },
+            { name: "Canada", patterns: ["canada", "canadian"] },
+            { name: "Australia", patterns: ["australia", "australian"] },
+            { name: "Ireland", patterns: ["ireland", "irish"] },
+            { name: "India", patterns: ["india", "indian"] },
+          ],
+        ),
         /**
          * What a statement about the right to work says. A line matching `noSponsorship` is read
          * without those words first, so their "no" and "not" are not its negation. `needsSponsorship`
@@ -284,11 +332,14 @@ export const keywordMatchSchema = z
         ]),
         /**
          * Citizenship, and the permanent residence that is not it: an ask for `citizenship` that
-         * does not also accept `residence` is not met by a green card. U.S. citizenship by default.
+         * does not also accept `residence` is not met by a green card. Whose citizenship is told
+         * by `countries`.
          */
         citizenship: z._default(wordList("requirements.citizenship"), [
           String.raw`(?:us|u\.s\.|united\s+states)\s+citizen(?:ship)?`,
           String.raw`citizen\s+of\s+the\s+(?:us|u\.s\.|united\s+states)`,
+          String.raw`(?:british|uk|u\.k\.|eu|e\.u\.|american|canadian|australian|irish|indian)\s+citizen(?:ship)?`,
+          String.raw`citizen\s+of\s+(?:the\s+)?(?:uk|u\.k\.|united\s+kingdom|eu|european\s+union|canada|australia|ireland|india)`,
         ]),
         residence: z._default(wordList("requirements.residence"), [
           String.raw`green\s+card`,

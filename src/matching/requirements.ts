@@ -121,6 +121,8 @@ type Matchers = {
   notHeld: RegExp;
   citizenship: RegExp;
   residence: RegExp;
+  /** The countries a right to work is stated for, each by name. */
+  countries: Array<{ name: string; pattern: RegExp }>;
   clearance: RegExp;
   /** The same, global: where in a line each clearance is named. */
   clearanceAll: RegExp;
@@ -164,6 +166,11 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     notHeld: wordListRegex(r.notHeld),
     citizenship: wordListRegex(r.citizenship),
     residence: wordListRegex(r.residence),
+    // Schema-defaulted; a hand-built policy may lack it.
+    countries: (r.countries ?? []).map(({ name, patterns }) => ({
+      name,
+      pattern: wordListRegex(patterns),
+    })),
     clearance: wordListRegex(r.clearance),
     clearanceAll: wordListRegex(r.clearance, "gi"),
     clearanceLevels: r.clearanceLevels
@@ -371,7 +378,8 @@ function heldClearances(line: string, matchers: Matchers) {
  * that needs sponsorship is no evidence, and evidence against where the posting rules sponsorship
  * out; what is left negated ("Cannot work in the US") is no evidence. An ask for citizenship
  * alone is met only by citizenship held; a line naming permanent residence instead says it is
- * not held. Otherwise the question is the application's.
+ * not held. A line naming only other countries than the posting asks about says nothing of it.
+ * Otherwise the question is the application's.
  */
 function judgeAuthorization(
   ask: string,
@@ -379,6 +387,9 @@ function judgeAuthorization(
   matchers: Matchers,
   policy: AtsEnginePolicy,
 ): { status: Status | "unverifiable"; lines: Array<{ line: string }> } {
+  const countriesIn = (text: string) =>
+    matchers.countries.filter(({ pattern }) => pattern.test(text)).map(({ name }) => name);
+  const asked = countriesIn(ask);
   const stated = lines.flatMap((entry) => {
     const { line } = entry;
     if (
@@ -386,6 +397,9 @@ function judgeAuthorization(
       !matchers.citizenship.test(line) &&
       !matchers.residence.test(line)
     )
+      return [];
+    const named = countriesIn(line);
+    if (asked.length && named.length && !named.some((country) => asked.includes(country)))
       return [];
     const rest = line.replace(matchers.noSponsorshipAll, " ");
     if (matchers.needsSponsorship.test(rest)) return [{ entry, says: line, needs: true }];

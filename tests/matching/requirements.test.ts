@@ -392,6 +392,31 @@ describe("the right to work, read for what the statement says", () => {
       expect(authorized(statement, CITIZEN).status, statement).not.toBe("met");
   });
 
+  // US authorisation met a UK ask, and "British citizen" was read as a skill.
+  it.each([
+    ["Authorized to work in the US", "Must have the right to work in the UK"],
+    ["Authorized to work in the United Kingdom", "Must be authorized to work in the US"],
+    ["Green card holder", "Must have the right to work in the UK"],
+    ["EU citizen", "Must be authorized to work in the United States"],
+    ["U.S. citizen", "Must be a British citizen"],
+  ])("does not take a statement about another country as evidence: %s", (statement, ask) => {
+    expect(authorized(statement, ask)).toMatchObject({
+      kind: "authorization",
+      status: "unverifiable",
+    });
+  });
+
+  it.each([
+    ["Right to work in the UK", "Must have the right to work in the United Kingdom"],
+    ["British citizen", "Must be a British citizen"],
+    ["Authorized to work in the U.S.A.", "Must be authorized to work in the US"],
+    ["EU citizen; right to work in the European Union", "Must be authorized to work in the EU"],
+    // A statement naming no country is read as before.
+    ["Full right to work, no sponsorship needed", "Must have the right to work in the UK"],
+  ])("meets an ask about the country the statement names: %s", (statement, ask) => {
+    expect(authorized(statement, ask)).toMatchObject({ kind: "authorization", status: "met" });
+  });
+
   it("meets a citizenship-or-residence ask with either", () => {
     expect(
       authorized("Green card holder", "Must be a U.S. citizen or green card holder").status,
