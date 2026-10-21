@@ -1,4 +1,4 @@
-import { isDatedLine } from "../checks/bullets.js";
+import { isDatedLine, readsAsSentence } from "../checks/bullets.js";
 import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../format/index.js";
 import { degreeLevels } from "../parser/education.js";
 import { namesPlace } from "../parser/experience.js";
@@ -126,6 +126,8 @@ type Matchers = {
   clearanceAll: RegExp;
   /** Clearance levels, highest first, each with its rank (0 the lowest) and a global pattern. */
   clearanceLevels: Array<{ name: string; rank: number; pattern: RegExp }>;
+  /** Seniority levels, lowest first, each with the years it takes. */
+  seniorityLevels: Array<{ rank: number; years: number; pattern: RegExp }>;
   /** `qualifiers`, each folded to the tokens a line is read as. */
   qualifiers: Array<{ tokens: Set<string>; sameLine: boolean }>;
 };
@@ -167,6 +169,12 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     clearanceLevels: r.clearanceLevels
       .map(({ name, patterns }, rank) => ({ name, rank, pattern: wordListRegex(patterns, "gi") }))
       .reverse(),
+    // Schema-defaulted; a hand-built policy may lack it.
+    seniorityLevels: (r.seniorityLevels ?? []).map(({ years, patterns }, rank) => ({
+      rank,
+      years,
+      pattern: wordListRegex(patterns),
+    })),
     qualifiers: km.qualifiers.map(({ words, sameLine }) => ({
       tokens: new Set(
         words
@@ -187,6 +195,82 @@ function patternLanguages(text: string, matchers: Matchers) {
       (captured): captured is string =>
         captured !== undefined && matchers.languageNames.has(captured),
     );
+}
+
+/** The highest seniority level a title names, and the word naming it; null when it names none. */
+function seniorityOf(title: string, matchers: Matchers) {
+  let found: { rank: number; years: number; word: string } | null = null;
+  for (const { rank, years, pattern } of matchers.seniorityLevels) {
+    const match = pattern.exec(title);
+    if (match && (!found || rank > found.rank))
+      found = { rank, years, word: match[0].toLowerCase() };
+  }
+  return found;
+}
+
+/** Words, and characters, past which a posting's first line is prose, not its title. */
+const TITLE_WORDS = 8;
+const TITLE_CHARS = 120;
+
+/**
+ * The level a posting's title asks for ("Senior Backend Engineer"), judged by the resume's latest
+ * title and its years: met by a title at or above it, or by the years when the title names no
+ * level; partial with a lower title and the years. Null when the posting's first line is no
+ * title, or names no level. A requirement line naming a level ("senior stakeholders") is not read.
+ */
+function seniorityRequirement(
+  jobText: string,
+  lines: readonly string[],
+  parsed: AtsParsedResume,
+  policy: AtsEnginePolicy,
+  matchers: Matchers,
+): AtsRequirement | null {
+  const title = jobText.split("\n", 1)[0]!.trim();
+  if (title.length > TITLE_CHARS) return null;
+  const stop = new Set(policy.keywordMatch.stopwords);
+  const sentence =
+    readsAsSentence(title) &&
+    (title.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).some((w) => w.length > 1 && stop.has(w));
+  if (title.split(/\s+/).length > TITLE_WORDS || sentence) return null;
+  const asked = seniorityOf(title, matchers);
+  if (!asked) return null;
+
+  // The current role, else the one that ended last; the first listed on a tie.
+  const when = (role: AtsParsedResume["roles"][number]) => {
+    const date = role.end ?? role.start;
+    return role.current ? Infinity : date ? date.year * 12 + (date.month ?? 12) : -Infinity;
+  };
+  const latest = parsed.roles.reduce<AtsParsedResume["roles"][number] | null>(
+    (best, role) => (!best || when(role) > when(best) ? role : best),
+    null,
+  );
+  const held = latest?.title ? seniorityOf(latest.title, matchers) : null;
+  const years = parsed.monthsOfExperience === null ? null : parsed.monthsOfExperience / 12;
+  const enough = years !== null && years >= asked.years;
+  const status = held
+    ? held.rank >= asked.rank
+      ? "met"
+      : enough
+        ? "partial"
+        : "missing"
+    : enough
+      ? "met"
+      : "missing";
+  const line = latest?.title ? lines.find((candidate) => candidate.includes(latest.title)) : null;
+  return {
+    text: title,
+    importance: "required",
+    kind: "seniority",
+    status,
+    terms: [],
+    evidence: line ? [line] : [],
+    detail: [
+      held ? `Latest title ${held.word}` : "No level in the latest title",
+      years === null ? "no dated roles" : `${Math.floor(years)} years in the work history`,
+    ]
+      .join(", ")
+      .concat(`; ${asked.word} asked${asked.years ? ` (${asked.years}+ years)` : ""}`),
+  };
 }
 
 /**
@@ -698,7 +782,7 @@ export function judgeRequirements(
     return heldOn.get(entry)!;
   };
 
-  return lines.map(({ text, importance: heading }) => {
+  const judged = lines.map(({ text, importance: heading }) => {
     const { asked: ask, optional } = withoutOptional(text, matchers);
     const importance = optional ? ("preferred" as const) : heading;
     const base = { text, importance };
@@ -1066,4 +1150,7 @@ export function judgeRequirements(
       evidence: termEvidence,
     } satisfies AtsRequirement;
   });
+  const allLines = sections.flatMap((section) => section.lines);
+  const seniority = seniorityRequirement(jobText, allLines, parsed, policy, matchers);
+  return seniority ? [seniority, ...judged] : judged;
 }

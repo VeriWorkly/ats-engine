@@ -94,6 +94,10 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
         clearance: union(km.requirements.clearance, v.requirements?.clearance),
         languagePatterns: union(km.requirements.languagePatterns, v.requirements?.languagePatterns),
         languageNames: { ...km.requirements.languageNames, ...v.requirements?.languageNames },
+        seniorityLevels: km.requirements.seniorityLevels.map((level) => ({
+          ...level,
+          patterns: union(level.patterns, v.requirements?.seniorityLevels?.[level.name]),
+        })),
       },
     },
   };

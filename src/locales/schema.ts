@@ -88,6 +88,11 @@ const vocabularyShape = {
         clearance: wordList("requirements.clearance"),
         languagePatterns: z.array(regexString("requirements.languagePatterns")),
         languageNames: z.record(z.string().check(z.minLength(1)), z.string().check(z.minLength(1))),
+        /** Patterns added to the seniority level of that name ("entry": "werkstudent(?:in)?"). */
+        seniorityLevels: z.record(
+          z.string().check(z.minLength(1)),
+          wordList("requirements.seniorityLevels"),
+        ),
       }),
     ),
   ),

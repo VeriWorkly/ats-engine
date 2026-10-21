@@ -359,6 +359,44 @@ export const keywordMatchSchema = z
             },
           ],
         ),
+        /**
+         * Seniority levels, lowest first, each with the years of work it usually takes. A
+         * posting's title names the level asked ("Senior Backend Engineer"); the resume's latest
+         * title and its years show the level held. The highest level a title names is its level.
+         * Manager and director titles are a ladder of their own and name none.
+         */
+        seniorityLevels: z._default(
+          z.array(
+            z.object({
+              name: z.string().check(z.minLength(1)),
+              years: z.number().check(z.int(), z.gte(0)),
+              patterns: wordList("requirements.seniorityLevels"),
+            }),
+          ),
+          [
+            {
+              name: "entry",
+              years: 0,
+              patterns: [
+                String.raw`intern(?:ship)?`,
+                "trainee",
+                "apprentice",
+                "graduate",
+                "junior",
+                "jr",
+                String.raw`entry[\s-]+level`,
+              ],
+            },
+            { name: "mid", years: 2, patterns: [String.raw`mid[\s-]+level`, "intermediate"] },
+            { name: "senior", years: 5, patterns: ["senior", "sr"] },
+            // Not "Lead Generation Specialist", a sales role.
+            {
+              name: "lead",
+              years: 8,
+              patterns: [String.raw`lead(?![\s-]+gen\p{L}*)`, "staff", "principal"],
+            },
+          ],
+        ),
         languagePatterns: z._default(z.array(regexString("requirements.languagePatterns")), [
           String.raw`(?:fluent|fluency|proficien(?:t|cy)|native|business[\s-]level|working\s+proficiency|professional\s+proficiency)\s+(?:in\s+|with\s+)?(\p{L}+)`,
         ]),

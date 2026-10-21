@@ -31,6 +31,8 @@ describe("requirements", () => {
       "Senior Engineer\nRequirements\n- Go\n- Kubernetes\nNice to have\n- Terraform",
     );
     expect(found.map((r) => [r.text, r.importance])).toEqual([
+      // The level its title names comes first.
+      ["Senior Engineer", "required"],
       ["Go", "required"],
       ["Kubernetes", "required"],
       ["Terraform", "preferred"],
@@ -528,6 +530,100 @@ describe("a clearance, compared by its level", () => {
     ["Secret clearance; eligible for reinstatement", "Active Secret clearance required"],
   ])("takes no clearance from one not held: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("unverifiable");
+  });
+});
+
+describe("seniority, from the posting's title", () => {
+  const level = (job: string, resume?: string, policy?: typeof DEFAULT_POLICY) =>
+    judge(`${job}\nRequirements\n- Go`, resume, policy).find((r) => r.kind === "seniority");
+  const career = (...roles: string[]) =>
+    `Jane Doe\njane@example.com\nExperience\n${roles.join("\n- Built services in Go\n")}\n- Built services in Go\nEducation\nB.S. Computer Science, State University 2010`;
+
+  it("is met by a latest title at the level asked", () => {
+    expect(level("Senior Backend Engineer")).toEqual({
+      text: "Senior Backend Engineer",
+      importance: "required",
+      kind: "seniority",
+      status: "met",
+      terms: [],
+      evidence: ["Senior Engineer, Acme Corp Jan 2019 - Present"],
+      detail: "Latest title senior, 10 years in the work history; senior asked (5+ years)",
+    });
+  });
+
+  it("is partial with a lower title and the years the level takes", () => {
+    expect(level("Staff Software Engineer")).toMatchObject({
+      status: "partial",
+      detail: "Latest title senior, 10 years in the work history; staff asked (8+ years)",
+    });
+  });
+
+  it("reads the years when the latest title names no level", () => {
+    const three = career("Engineer, Acme Jan 2023 - Present");
+    expect(level("Senior Engineer", three)).toMatchObject({
+      status: "missing",
+      detail: "No level in the latest title, 3 years in the work history; senior asked (5+ years)",
+    });
+    const seven = career("Engineer, Acme Jan 2019 - Present");
+    expect(level("Senior Engineer", seven)?.status).toBe("met");
+  });
+
+  it("judges the latest role, not the highest one", () => {
+    const stepped = career(
+      "Junior Developer, Globex Jan 2024 - Present",
+      "Senior Engineer, Acme Jan 2012 - Dec 2023",
+    );
+    expect(level("Senior Engineer", stepped)).toMatchObject({
+      status: "partial",
+      evidence: ["Junior Developer, Globex Jan 2024 - Present"],
+    });
+    expect(
+      level("Senior Engineer", career("Junior Developer, Globex Jan 2025 - Present")),
+    ).toMatchObject({ status: "missing" });
+  });
+
+  it("is met at or above an entry level", () => {
+    expect(level("Junior Developer")).toMatchObject({
+      status: "met",
+      detail: expect.stringMatching(/junior asked$/),
+    });
+  });
+
+  it.each([
+    ["a title without a level", "Backend Engineer"],
+    ["a sentence", "We are hiring a senior engineer"],
+    [
+      "a long line",
+      "Senior Engineer to build payments with our platform team in Berlin and Lisbon",
+    ],
+    ["a sales title", "Lead Generation Specialist"],
+  ])("is not judged from %s", (_, job) => {
+    expect(level(job)).toBeUndefined();
+  });
+
+  it("is not judged from a requirement naming a level", () => {
+    const found = judge("Requirements\n- Work with senior stakeholders\n- Go");
+    expect(found.some((r) => r.kind === "seniority")).toBe(false);
+  });
+
+  it("reads the words a language pack adds", () => {
+    const localized = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
+    const read = (job: string, languages: string[]) =>
+      check(RESUME, localized, {
+        jobDescription: `${job}\nRequirements\n- Go`,
+        now: NOW,
+        languages,
+      }).requirements.find((r) => r.kind === "seniority");
+    expect(read("Werkstudent Softwareentwicklung (m/w/d)", ["de"])).toMatchObject({
+      status: "met",
+      detail: expect.stringMatching(/werkstudent asked$/),
+    });
+    expect(read("Développeur confirmé", ["fr"])).toMatchObject({
+      status: "met",
+      detail: expect.stringMatching(/confirmé asked \(5\+ years\)$/),
+    });
+    // Without the pack, its words name no level.
+    expect(level("Werkstudent Softwareentwicklung (m/w/d)")).toBeUndefined();
   });
 });
 

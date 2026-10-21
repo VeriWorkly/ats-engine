@@ -1315,6 +1315,76 @@
                   ]
                 }
               },
+              "seniorityLevels": {
+                "default": [
+                  {
+                    "name": "entry",
+                    "years": 0,
+                    "patterns": [
+                      "intern(?:ship)?",
+                      "trainee",
+                      "apprentice",
+                      "graduate",
+                      "junior",
+                      "jr",
+                      "entry[\\s-]+level"
+                    ]
+                  },
+                  {
+                    "name": "mid",
+                    "years": 2,
+                    "patterns": [
+                      "mid[\\s-]+level",
+                      "intermediate"
+                    ]
+                  },
+                  {
+                    "name": "senior",
+                    "years": 5,
+                    "patterns": [
+                      "senior",
+                      "sr"
+                    ]
+                  },
+                  {
+                    "name": "lead",
+                    "years": 8,
+                    "patterns": [
+                      "lead(?![\\s-]+gen\\p{L}*)",
+                      "staff",
+                      "principal"
+                    ]
+                  }
+                ],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "years": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "patterns": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "years",
+                    "patterns"
+                  ]
+                }
+              },
               "languagePatterns": {
                 "default": [
                   "(?:fluent|fluency|proficien(?:t|cy)|native|business[\\s-]level|working\\s+proficiency|professional\\s+proficiency)\\s+(?:in\\s+|with\\s+)?(\\p{L}+)"
@@ -4327,6 +4397,21 @@
                         "type": "string",
                         "minLength": 1
                       }
+                    },
+                    "seniorityLevels": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "additionalProperties": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
                     }
                   }
                 },
@@ -4816,6 +4901,21 @@
                       "additionalProperties": {
                         "type": "string",
                         "minLength": 1
+                      }
+                    },
+                    "seniorityLevels": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "additionalProperties": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       }
                     }
                   }
@@ -6480,6 +6580,77 @@
                   "additionalProperties": false
                 }
               },
+              "seniorityLevels": {
+                "default": [
+                  {
+                    "name": "entry",
+                    "years": 0,
+                    "patterns": [
+                      "intern(?:ship)?",
+                      "trainee",
+                      "apprentice",
+                      "graduate",
+                      "junior",
+                      "jr",
+                      "entry[\\s-]+level"
+                    ]
+                  },
+                  {
+                    "name": "mid",
+                    "years": 2,
+                    "patterns": [
+                      "mid[\\s-]+level",
+                      "intermediate"
+                    ]
+                  },
+                  {
+                    "name": "senior",
+                    "years": 5,
+                    "patterns": [
+                      "senior",
+                      "sr"
+                    ]
+                  },
+                  {
+                    "name": "lead",
+                    "years": 8,
+                    "patterns": [
+                      "lead(?![\\s-]+gen\\p{L}*)",
+                      "staff",
+                      "principal"
+                    ]
+                  }
+                ],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "years": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "patterns": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "years",
+                    "patterns"
+                  ],
+                  "additionalProperties": false
+                }
+              },
               "languagePatterns": {
                 "default": [
                   "(?:fluent|fluency|proficien(?:t|cy)|native|business[\\s-]level|working\\s+proficiency|professional\\s+proficiency)\\s+(?:in\\s+|with\\s+)?(\\p{L}+)"
@@ -6565,6 +6736,7 @@
               "residence",
               "clearance",
               "clearanceLevels",
+              "seniorityLevels",
               "languagePatterns",
               "languageNames"
             ],
@@ -9670,6 +9842,21 @@
                         "type": "string",
                         "minLength": 1
                       }
+                    },
+                    "seniorityLevels": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "additionalProperties": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
                     }
                   },
                   "additionalProperties": false
@@ -10159,6 +10346,21 @@
                       "additionalProperties": {
                         "type": "string",
                         "minLength": 1
+                      }
+                    },
+                    "seniorityLevels": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "additionalProperties": {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       }
                     }
                   },
