@@ -3,6 +3,31 @@
 Release notes are generated from `.changeset/` by `changeset version`. See
 [.changeset/README.md](.changeset/README.md) for what counts as breaking.
 
+## 0.16.0
+
+### Minor Changes
+
+- d88dc12: The requirements table judges the seniority a posting's title asks for.
+
+  - **Breaking:** a posting whose first line is a title naming a level ("Senior Backend Engineer", "Staff Software Engineer", "Junior Developer") gets a new first row with `kind: "seniority"`. The resume's latest title and its years judge it:
+    - **met** by a latest title at or above the level with at least half the years the level takes, or by those years alone when the title names no level;
+    - **partial** with the title alone (under half the years), or with a lower title and the years;
+    - **missing** otherwise.
+    - `detail` says what was compared: "Latest title senior, 10 years in the work history; staff asked (8+ years)". Of several current roles, the highest level counts. An entry level takes no years, so a resume without dated roles meets it.
+  - A posting gets no row, and its table is unchanged, when its first line names no level, ends as a sentence ends (".", "!", "?"), is longer than eight words, or names no job besides its level word: an employer's name such as "Principal Health Partners" or "Lead Bank". A level that ends the title ("Team Lead, Customer Support") or an entry level ("Data Science Intern") is a job itself. A French level after its noun is read ("Chargé de clientèle junior", "Ingénieur logiciel expérimenté"). A level named in a requirement ("work with senior stakeholders") is not read. No score changes: the job match does not read the table.
+  - **Breaking:** the policy has a new `keywordMatch.requirements.seniorityLevels`, lowest first, each a `name`, the `years` it takes and title `patterns`. The default ladder: entry (intern, trainee, apprentice, graduate, junior; 0 years), mid (mid-level, intermediate; 2), senior (senior, sr; 5), lead (lead, principal, and staff before an engineering or science noun; 8). "Staff Accountant", "Staff Nurse", "Senior Living" and "Lead Generation" name no level, and manager and director titles are a ladder of their own. The default policy's fingerprint changes.
+  - A language pack adds title words to a level by name (`requirements.seniorityLevels`): German adds Praktikant, Werkstudent, Auszubildende and Berufseinsteiger (entry); French adds stagiaire, alternant and débutant (entry), and confirmé and expérimenté (senior). The French pack also reads "chargé(e) de clientèle, de mission, d'affaires…" as a job title, in postings and on resumes.
+
+- 85765ab: A bullet copied word for word into a few roles is no longer read as keyword stuffing.
+
+  - **Breaking:** the readiness score rises by the keyword-stuffing deduction (10 points with the default policy) for a resume whose one sentence, such as "Mentored three junior colleagues into their first promotion", appears once under each of three or four roles. The check read it as a line pasted again and again. A sentence is one with a stopword or that opens with an action verb, so a terse bullet ("Mentored junior engineers through weekly pairing sessions") counts too. Of 3,000 generated resumes, 46 (1.5%) carried such a bullet and failed the check; they now pass, and no other result moves.
+    - Still stuffing: the same sentence in five roles or more; a sentence pasted three times under one role, or outside the roles; a run of terms ("python kubernetes docker aws") or a list ("python, kubernetes, docker and kafka") repeated anywhere, in lower case too.
+
+### Patch Changes
+
+- 9cff50a: `policy.schema.json` is strict: an editor now flags a misspelt key in a policy file, such as `rulez` at the top or `wieght` in a rule, which `parseAtsPolicy` drops without a word. Every object with a fixed set of keys allows no other key. Maps keep any key: `synonyms`, `implies`, `numberWords`, advice `targets`, month and season names, language levels and names, and a region's `rules`. `$schema` stays allowed at the top. `parseAtsPolicy` is unchanged: it still drops unknown keys.
+- d939b84: `readJobFile`, and so the CLI's `--job` and the MCP server's job path, reads a posting saved as `.xhtml` as a web page, as `readResumeFile` reads a resume. It was refused as an unsupported type.
+
 ## 0.15.0
 
 ### Minor Changes
