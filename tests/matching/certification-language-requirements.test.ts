@@ -86,7 +86,7 @@ describe("a certification asked for", () => {
               name: "Certified Kubernetes Administrator",
               issuer: "CNCF",
               date: "2021-11",
-              expires: "2024-11",
+              expires: "2027-11",
             },
           ],
         },
@@ -95,8 +95,48 @@ describe("a certification asked for", () => {
     const found = judge(doc, "Kubernetes certification");
     expect(found.status).toBe("met");
     expect(found.evidence[0]).toBe(
-      "Certified Kubernetes Administrator, CNCF, Nov 2021, expires Nov 2024",
+      "Certified Kubernetes Administrator, CNCF, Nov 2021, expires Nov 2027",
     );
+  });
+});
+
+// An expired or unfinished certification met the ask as a held one did.
+describe("a certification not held", () => {
+  const listing = (row: string) => `${BASE}\nCertifications\n${row}`;
+
+  it.each([
+    ["CISSP, ISC2, 2015, expired 2021", "Active CISSP certification", "CISSP: expired 2021"],
+    ["CISSP (expired 2021)", "CISSP certification required", "CISSP: expired 2021"],
+    [
+      "CISSP (in progress, expected Dec 2026)",
+      "CISSP certification required",
+      "CISSP: not yet held",
+    ],
+    ["CISSP, expected Dec 2026", "CISSP certification required", "CISSP: not yet held"],
+    [
+      "AWS Certified Solutions Architect (in progress)",
+      "AWS certification required",
+      "AWS Certified Solutions Architect: not yet held",
+    ],
+  ])("is partial, and says why: %s", (row, ask, detail) => {
+    const found = judge(listing(row), ask);
+    expect(found).toMatchObject({ status: "partial", detail });
+    expect(found.evidence[0]).toMatch(/^(?:CISSP|AWS Certified Solutions Architect)/);
+  });
+
+  it("is met by a held row beside a lapsed one", () => {
+    const found = judge(
+      listing(
+        "AWS Certified Developer, Amazon Web Services, 2015, expired 2018\nAWS Certified Solutions Architect, Amazon Web Services, 2023, expires 2029",
+      ),
+      "AWS certification required",
+    );
+    expect(found.status).toBe("met");
+    expect(found.detail).toBeUndefined();
+  });
+
+  it("is met by a row with no expiry", () => {
+    expect(judge(listing("CISSP, ISC2, 2019"), "Active CISSP certification").status).toBe("met");
   });
 });
 

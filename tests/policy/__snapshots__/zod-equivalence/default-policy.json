@@ -1364,7 +1364,8 @@
         "able\\s+to\\s+obtain",
         "former(?:ly)?",
         "not\\s+(?:currently\\s+)?(?:active|current|valid|held)",
-        "no\\s+longer"
+        "no\\s+longer",
+        "in\\s+progress"
       ],
       "citizenship": [
         "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",

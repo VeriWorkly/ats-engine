@@ -745,10 +745,21 @@ export function judgeRequirements(
       resumeLines.some((entry) =>
         listsLanguages(entry.line, matchers, km.requirements.languageNames),
       ));
-  // The certification rows, each with what it names: a credential asked for is met by one.
+  // The certification rows, each with what it names: a credential asked for is met by one held.
+  // Expired, dated after today or in progress, a row is not held, and says why.
+  const today = now.getUTCFullYear() * 12 + now.getUTCMonth() + 1;
+  const monthOf = (date: { year: number; month: number | null }, edge: "start" | "end") =>
+    date.year * 12 + (date.month ?? (edge === "start" ? 1 : 12));
   const certificationRows = parsed.certifications.map((row) => ({
     line: formatCertification(row),
     holds: resumeCapabilities(extractVocabulary(`${row.name} ${row.issuer}`, km, vocab), vocab),
+    lapsed:
+      row.expires && monthOf(row.expires, "end") < today
+        ? `${row.name}: expired ${row.expires.year}`
+        : (row.date && monthOf(row.date, "start") > today) ||
+            matchers.notHeld.test(`${row.name} ${row.issuer}`)
+          ? `${row.name}: not yet held`
+          : null,
   }));
 
   // What each dated role's lines hold. A role is anchored on its dated line and the header lines
@@ -1038,13 +1049,21 @@ export function judgeRequirements(
     // row if the ask names none; the row is the evidence.
     const rowShows = (row: (typeof certificationRows)[number]) =>
       !skills.length || picked.some(([token]) => row.holds.has(token));
-    const credentialRows = qualifiers.some((qualifier) => qualifier.sameLine)
+    const matchingRows = qualifiers.some((qualifier) => qualifier.sameLine)
       ? certificationRows.filter(rowShows)
       : [];
+    const credentialRows = matchingRows.filter((row) => !row.lapsed);
+    // Only lapsed rows: they show the credential was sought, not that it is held. The
+    // certifications section's lines, which repeat them, show nothing more.
+    const lapsedRows = credentialRows.length ? [] : matchingRows;
     const qualifiersShown = qualifiers.map(
       (qualifier) =>
         (qualifier.sameLine && credentialRows.length > 0) ||
-        resumeLines.some((entry) => showsQualifier(entry, qualifier)),
+        resumeLines.some(
+          (entry) =>
+            (!lapsedRows.length || entry.kind !== "certifications") &&
+            showsQualifier(entry, qualifier),
+        ),
     );
     const qualifiersMet = qualifiersShown.every(Boolean);
     const terms = [
@@ -1054,10 +1073,10 @@ export function judgeRequirements(
     // Beside a row, the certifications section's own lines would only repeat it.
     const termEvidence = [
       ...new Set([
-        ...credentialRows.map((row) => row.line),
+        ...[...credentialRows, ...lapsedRows].map((row) => row.line),
         ...evidenceFor(
           (entry) =>
-            (!credentialRows.length || entry.kind !== "certifications") &&
+            (!matchingRows.length || entry.kind !== "certifications") &&
             (picked.some(([token]) => entry.holds.has(token)) ||
               qualifiers.some((qualifier) => showsQualifier(entry, qualifier))),
         ),
@@ -1191,9 +1210,10 @@ export function judgeRequirements(
     const groupsStatus: Status = termsMet ? "met" : groupsMet > 0 ? "partial" : "missing";
     const qualifierStatus: Status = qualifiersMet
       ? "met"
-      : qualifiersShown.some(Boolean)
+      : qualifiersShown.some(Boolean) || lapsedRows.length
         ? "partial"
         : "missing";
+    const lapsed = qualifiersMet ? [] : lapsedRows.map((row) => row.lapsed);
     return {
       ...base,
       kind: "skills",
@@ -1205,6 +1225,7 @@ export function judgeRequirements(
           : qualified(groupsStatus),
       terms,
       evidence: termEvidence,
+      ...(lapsed.length ? { detail: lapsed.join("; ") } : {}),
     } satisfies AtsRequirement;
   });
   const allLines = sections.flatMap((section) => section.lines);

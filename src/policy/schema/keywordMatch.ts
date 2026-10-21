@@ -332,6 +332,8 @@ export const keywordMatchSchema = z
           // In a clause of its own: "Secret clearance (not active)".
           String.raw`not\s+(?:currently\s+)?(?:active|current|valid|held)`,
           String.raw`no\s+longer`,
+          // A certification being studied for: "AWS Solutions Architect (in progress)".
+          String.raw`in\s+progress`,
         ]),
         /**
          * Citizenship, and the permanent residence that is not it: an ask for `citizenship` that

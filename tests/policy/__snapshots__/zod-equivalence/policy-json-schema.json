@@ -1272,7 +1272,8 @@
                   "able\\s+to\\s+obtain",
                   "former(?:ly)?",
                   "not\\s+(?:currently\\s+)?(?:active|current|valid|held)",
-                  "no\\s+longer"
+                  "no\\s+longer",
+                  "in\\s+progress"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -6632,7 +6633,8 @@
                   "able\\s+to\\s+obtain",
                   "former(?:ly)?",
                   "not\\s+(?:currently\\s+)?(?:active|current|valid|held)",
-                  "no\\s+longer"
+                  "no\\s+longer",
+                  "in\\s+progress"
                 ],
                 "minItems": 1,
                 "type": "array",
