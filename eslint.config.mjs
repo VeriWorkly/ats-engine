@@ -11,6 +11,7 @@ export default tseslint.config(
       "packages/*/dist/**",
       ".claude/**",
       ".agents/**",
+      ".private/**",
     ],
   },
   js.configs.recommended,

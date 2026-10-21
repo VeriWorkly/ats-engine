@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { computeVerdict, type AtsLayoutSignals, type AtsResumeInput } from "../../src/index.js";
@@ -7,6 +11,9 @@ import {
   livePolicyPath,
 } from "../fixtures/livePolicy.js";
 import { expectFastAsync } from "../fixtures/timing.js";
+import { maxImpactOf } from "../../src/scoring/rules.js";
+
+const maxImpact = (id: string) => maxImpactOf(policy!.rules.find((rule) => rule.id === id)!);
 
 /**
  * Calibration suite: the engine against the real shipped policy, not a fixture, since these
@@ -376,13 +383,17 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
         pageCount: 2,
       }),
     ]) {
-      // Integrity rules are penalties: outside the share, their points come off the result.
-      const ordinary = report.categories.filter((entry) => entry.category !== "integrity");
-      const penalty = report.categories
-        .filter((entry) => entry.category === "integrity")
-        .reduce((sum, entry) => sum + entry.lost, 0);
-      const lost = ordinary.reduce((sum, entry) => sum + entry.lost, 0);
-      const possible = ordinary.reduce((sum, entry) => sum + entry.possible, 0);
+      // Penalty rules (integrity, and any the policy marks) sit outside the share: their points
+      // come off the result.
+      const penalties = new Set(
+        policy!.rules.filter((rule) => rule.penalty).map((rule) => rule.id),
+      );
+      const ordinary = report.rules.filter((rule) => !penalties.has(rule.id));
+      const penalty = report.rules
+        .filter((rule) => penalties.has(rule.id))
+        .reduce((sum, rule) => sum + rule.scoreImpact, 0);
+      const lost = ordinary.reduce((sum, rule) => sum + rule.scoreImpact, 0);
+      const possible = ordinary.reduce((sum, rule) => sum + maxImpact(rule.id), 0);
       // Normalised against what the applicable rules could take away, so the worst resume scores 0.
       expect(report.readinessScore).toBe(
         Math.max(0, Math.round((1 - lost / possible) * 100) - penalty),
@@ -391,4 +402,36 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
 
     expect((await check(bad)).readinessScore).toBeLessThan(25);
   });
+
+  // The graded resumes and their ranges live beside the policy (.private/source/resumes.mjs), so
+  // an engine change that moves a good resume down or a bad one up fails here, not in production.
+  const graded = join(dirname(livePolicyPath), "source", "resumes.mjs");
+  it.skipIf(!existsSync(graded))(
+    "scores each graded resume within its expected range",
+    async () => {
+      const resumes = await import(pathToFileURL(graded).href);
+      const {
+        check: score,
+        withLocales,
+        BUILT_IN_LOCALES,
+      } = await import("../../src/index.js").then(async (core) => ({
+        ...core,
+        ...(await import("../../src/locales/index.js")),
+      }));
+      const localized = withLocales(policy!, BUILT_IN_LOCALES);
+      const outside: string[] = [];
+      for (const [name, text, layout] of resumes.graded()) {
+        if (name in resumes.KNOWN_GAPS) continue;
+        const { readinessScore } = score(text, localized, {
+          now: resumes.NOW,
+          jobDescription: resumes.JOB,
+          ...(layout && { layout }),
+        });
+        const [low, high] = resumes.expectedRange(name);
+        if (readinessScore < low || readinessScore > high)
+          outside.push(`${name}: ${readinessScore}, want ${low}-${high}`);
+      }
+      expect(outside).toEqual([]);
+    },
+  );
 });

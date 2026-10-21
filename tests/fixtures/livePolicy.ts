@@ -8,10 +8,10 @@ import { parseAtsPolicy, type AtsEnginePolicy } from "../../src/index.js";
  * not the working directory. Suites using it skip when it is absent; `livePolicyLoadError` lets a
  * suite prove it is running rather than quietly skipping.
  */
-// `ATS_ENGINE_POLICY` points at it from anywhere; the default is the monorepo's .private folder.
+// `ATS_ENGINE_POLICY` points at it from anywhere; the default is this repo's .private folder.
 const policyPath =
   process.env.ATS_ENGINE_POLICY ??
-  fileURLToPath(new URL("../../../../.private/ats-engine-policy.dev.json", import.meta.url));
+  fileURLToPath(new URL("../../.private/ats-engine-policy.dev.json", import.meta.url));
 
 let policy: AtsEnginePolicy | null = null;
 let loadError: string | null = null;
