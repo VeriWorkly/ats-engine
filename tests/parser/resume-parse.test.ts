@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_POLICY, parseResume } from "../../src/index.js";
-import { livePolicy } from "../fixtures/livePolicy.js";
 
-// The live policy when present, the public default otherwise.
-const policy = livePolicy ?? DEFAULT_POLICY;
+// Always the public default, so these run the same here and in CI; the private policy has its
+// own calibration suite (tests/scoring/live-policy.test.ts).
+const policy = DEFAULT_POLICY;
 
 const NOW = new Date(Date.UTC(2026, 7, 31));
 
