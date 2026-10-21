@@ -73,7 +73,25 @@ if (!policySchema.$id.includes(`@${version}/`) || undescribed.length > 0)
   throw new Error(
     `schema: policy.schema.json is stale (version ${version}; undescribed: ${undescribed.join(", ") || "none"})`,
   );
-console.log(`schema   policy.schema.json covers ${Object.keys(DEFAULT_POLICY).length} sections`);
+// Strict: the shipped policies validate, and a misspelt key, at the top or inside a rule, does not.
+const { fromJSONSchema } = await import("zod");
+const { BUILT_IN_LOCALES, withLocales } = await import("../dist/locales/index.js");
+const validate = fromJSONSchema(policySchema);
+const plain = (policy) => JSON.parse(JSON.stringify(policy));
+const base = plain(DEFAULT_POLICY);
+const [first, ...rest] = base.rules;
+const verdicts = {
+  default: validate.safeParse(base).success,
+  "withLocales policy": validate.safeParse(plain(withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES)))
+    .success,
+  "top-level typo": !validate.safeParse({ ...base, rulez: [] }).success,
+  "rule typo": !validate.safeParse({ ...base, rules: [{ ...first, wieght: 2 }, ...rest] }).success,
+};
+const wrong = Object.keys(verdicts).filter((name) => !verdicts[name]);
+if (wrong.length) throw new Error(`schema: policy.schema.json is not strict (${wrong.join(", ")})`);
+console.log(
+  `schema   policy.schema.json covers ${Object.keys(DEFAULT_POLICY).length} sections, strictly`,
+);
 
 const sizes = JSON.parse(readFileSync(exports["./sizes.json"], "utf8"));
 const unsized = Object.keys(exports).filter(

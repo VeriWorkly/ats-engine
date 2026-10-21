@@ -9,6 +9,16 @@ import { atsEngineSchema } from "../dist/policy/schema.js";
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 const generated = z.toJSONSchema(atsEngineSchema, { io: "input", unrepresentable: "any" });
 
+// Strict, so an editor flags a misspelt key that `parseAtsPolicy` would drop without a word. Only
+// objects with a fixed set of keys: maps (synonyms, implies, advice targets) describe their values
+// under `additionalProperties` and stay open.
+(function strict(node) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) return node.forEach(strict);
+  if (node.properties && !("additionalProperties" in node)) node.additionalProperties = false;
+  Object.values(node).forEach(strict);
+})(generated);
+
 const schema = {
   $schema: generated.$schema,
   $id: `https://cdn.jsdelivr.net/npm/@veriworkly/ats-engine@${version}/dist/policy.schema.json`,

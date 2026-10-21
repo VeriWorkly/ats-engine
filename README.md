@@ -438,7 +438,7 @@ The full documentation is at **[docs.veriworkly.com/ats-engine](https://docs.ver
 - [CHANGELOG.md](./CHANGELOG.md): releases and breaking changes
 - [llms.txt](./llms.txt): a short summary of the package for AI tools, in the llmstxt.org format; also served from the npm package (`https://cdn.jsdelivr.net/npm/@veriworkly/ats-engine/llms.txt`)
 - [packages/mcp](https://github.com/VeriWorkly/ats-engine/tree/main/packages/mcp#readme): the MCP server, `@veriworkly/ats-engine-mcp`
-- `policy.schema.json`: the JSON Schema of a scoring policy, shipped in the package (`@veriworkly/ats-engine/policy.schema.json`) for a policy file's `$schema`. `parseAtsPolicy` stays the authority: it also compiles the patterns and checks that rule ids are unique.
+- `policy.schema.json`: the JSON Schema of a scoring policy, shipped in the package (`@veriworkly/ats-engine/policy.schema.json`) for a policy file's `$schema`. It is strict, so an editor flags a misspelt key, which `parseAtsPolicy` drops. `parseAtsPolicy` stays the authority: it also compiles the patterns and checks that rule ids are unique.
 - `sizes.json`: each subpath's size, minified and gzipped, as measured for this release (`@veriworkly/ats-engine/sizes.json`), for a page or a tool that quotes the bundle sizes.
 
 The package is still 0.x. Any change to the report's shape, the policy schema, or the score for the same input is treated as breaking and called out in the changelog.
