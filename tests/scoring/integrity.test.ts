@@ -191,10 +191,18 @@ describe("invisible characters", () => {
     expect(rule(check(`${RESUME}\nטלפון: ${phone}`), "invisibleCharacters")?.passed).toBe(true);
   });
 
-  it("still flags an embedding around words", () => {
-    expect(rule(check(`${RESUME}\n\u{202A}evil\u{202C}`), "invisibleCharacters")?.passed).toBe(
-      false,
-    );
+  // Word writes embeddings around the words of a right-to-left document: they set a run's
+  // direction and reverse no letters. They cost honest Hebrew and Arabic resumes 10 points.
+  it.each([
+    ["Latin words", "\u{202A}Senior Engineer\u{202C}"],
+    ["Hebrew words", "\u{202B}מהנדסת תוכנה בכירה\u{202C}"],
+  ])("leaves an embedding around %s alone", (_, line) => {
+    expect(rule(check(`${RESUME}\n${line}`), "invisibleCharacters")?.passed).toBe(true);
+  });
+
+  it("still flags an isolate or an override around words", () => {
+    for (const line of ["\u{2067}evil\u{2069}", "\u{202D}evil\u{202C}"])
+      expect(rule(check(`${RESUME}\n${line}`), "invisibleCharacters")?.passed, line).toBe(false);
   });
 });
 

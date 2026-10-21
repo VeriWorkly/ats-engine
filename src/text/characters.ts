@@ -5,11 +5,13 @@
  *   ("ASCII smuggling");
  * - bidirectional overrides and isolates reorder what is displayed against what is stored.
  *
- * Zero-width (non-)joiners are legitimate in Indic and Arabic script and emoji; they count only
- * between two Latin letters. A leading U+FEFF is a byte-order mark, neither counted nor stripped.
+ * Embeddings (U+202A to U+202C) are not counted: they set a run's direction and reverse no
+ * letters, and Word writes them around the words of a right-to-left document. Zero-width
+ * (non-)joiners are legitimate in Indic and Arabic script and emoji; they count only between two
+ * Latin letters. A leading U+FEFF is a byte-order mark, neither counted nor stripped.
  */
 const INVISIBLE =
-  /[\u{200B}\u{2060}-\u{2064}\u{202A}-\u{202E}\u{2066}-\u{2069}]|(?<!^)\u{FEFF}|(?<=\p{Script=Latin})[\u{200C}\u{200D}]+(?=\p{Script=Latin})|[\u{E0000}-\u{E007F}]/gu;
+  /[\u{200B}\u{2060}-\u{2064}\u{202D}\u{202E}\u{2066}-\u{2069}]|(?<!^)\u{FEFF}|(?<=\p{Script=Latin})[\u{200C}\u{200D}]+(?=\p{Script=Latin})|[\u{E0000}-\u{E007F}]/gu;
 
 /** An embedding or isolate around a number, as Word writes to keep a phone number left to right. */
 const WRAPPED_NUMBER =
