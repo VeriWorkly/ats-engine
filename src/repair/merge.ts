@@ -1,6 +1,7 @@
 import { escapeRegex, normalizeText, wordListRegex } from "../text/text.js";
+import { EMAIL } from "../parser/contact.js";
 import { educationLevel } from "../parser/education.js";
-import { isPlausibleDate } from "../parser/dates.js";
+import { findDateRange, isPlausibleDate } from "../parser/dates.js";
 import { parseQuality } from "../parser/index.js";
 import { finalizeParsed, type ParsedCore } from "../parser/record.js";
 import { inLanguagesOf } from "../locales/languages.js";
@@ -130,6 +131,14 @@ export function ongoingIn(source: string, policy: AtsEnginePolicy) {
   };
 }
 
+/** An email address and nothing else, as the parser reads one. */
+const WHOLE_EMAIL = new RegExp(`^(?:${EMAIL.source})$`, EMAIL.flags);
+/**
+ * Only what a phone number is written with: digits, "+", spaces, brackets ("(+44)"), dots,
+ * dashes of any width, slashes; then an extension ("ext. 12", "x12") apart.
+ */
+const PHONE_SHAPE = /^([+\d\s().\-/–—]+?)(?:\s*(?:ext\.?|x)\s*\d{1,6})?$/i;
+
 /**
  * Fills gaps in the deterministic parse with grounded AI values. A value the parser found is
  * never overwritten; a string that does not occur in the source is dropped; a role or school
@@ -161,8 +170,24 @@ export function mergeGrounded(
   const core: ParsedCore = { ...deterministic };
   const filled = new Set<AtsParsedField>();
 
+  // Grounded words are not enough: each contact field must also be the kind of value it holds.
+  const shaped = {
+    name: (value: string) => !/[\d@/]/.test(value) && value.trim().split(/\s+/).length <= 8,
+    email: (value: string) => WHOLE_EMAIL.test(value.trim()),
+    // A phone's characters and 7 to 15 digits (E.164) besides an extension; without a country
+    // code, not a date range ("2017 - 2019"). libphonenumber's check would put its metadata in the
+    // `/ai` bundle.
+    phone: (value: string) => {
+      const number = PHONE_SHAPE.exec(value.trim())?.[1];
+      return (
+        number !== undefined &&
+        /^(?:\D*\d){7,15}\D*$/.test(number) &&
+        (number.includes("+") || !findDateRange(number, policy.resumeParse, now))
+      );
+    },
+  };
   for (const field of ["name", "email", "phone"] as const)
-    if (!core[field] && ok(field, candidate[field])) {
+    if (!core[field] && ok(field, candidate[field]) && shaped[field](candidate[field])) {
       core[field] = candidate[field];
       filled.add(field);
     }

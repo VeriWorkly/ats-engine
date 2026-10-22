@@ -2,7 +2,7 @@ import { addCertifications, parseCertifications } from "../parser/certifications
 import { educationLevel } from "../parser/education.js";
 import { canonicalLanguage, cefrLevel, parseSpokenLanguages } from "../parser/languages.js";
 import { findPhone } from "../parser/phone.js";
-import { parseDocumentDate } from "../parser/dates.js";
+import { parseDocumentDate, saysOngoing } from "../parser/dates.js";
 import { finalizeParsed } from "../parser/record.js";
 import { sectionKind } from "../parser/sections.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
@@ -42,14 +42,12 @@ export function parseResumeDocument(
         const title = item.title.trim();
         const employer = item.employer.trim();
         if (!title && !employer) continue;
-        const current = Boolean(item.current);
-        roles.push({
-          title,
-          employer,
-          start: parseDocumentDate(item.start, rp, now),
-          end: current ? null : parseDocumentDate(item.end, rp, now),
-          current,
-        });
+        const start = parseDocumentDate(item.start, rp, now);
+        const end = parseDocumentDate(item.end, rp, now);
+        // An end that is no date but an open end in any language read ("heute", "Current role").
+        const current =
+          Boolean(item.current) || (start !== null && !end && saysOngoing(item.end, rp));
+        roles.push({ title, employer, start, end: current ? null : end, current });
       }
     } else if (section.kind === "education") {
       for (const item of section.items) {
@@ -62,7 +60,8 @@ export function parseResumeDocument(
           school,
           credential,
           ...educationLevel(credential, policy),
-          end: item.current ? null : parseDocumentDate(item.end, rp, now),
+          end:
+            item.current || saysOngoing(item.end, rp) ? null : parseDocumentDate(item.end, rp, now),
         });
       }
     } else if (section.kind === "skills") {

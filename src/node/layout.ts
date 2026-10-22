@@ -27,6 +27,8 @@ const MIN_ITEMS_FOR_COLUMN_SIGNAL = 12;
 const GUTTER_SEARCH_START = 0.3;
 const GUTTER_SEARCH_END = 0.7;
 const GUTTER_STEP = 4;
+/** The widest page a PDF allows, in points: a page the file says is wider is searched as this wide. */
+const MAX_PAGE_WIDTH = 14_400;
 /** Points from the page's right text edge within which a run is right-aligned to it. */
 const FLUSH = 3;
 /** Characters of right-hand text a tab stop holds at most: a date, a place, not a paragraph. */
@@ -81,7 +83,8 @@ function besideEachOther(rows: Iterable<PositionedRun[]>, split: number): boolea
  * Returns `null` when the page has too little text to say.
  */
 export function findGutter(runs: readonly PositionedRun[], pageWidth: number): Gutter | null {
-  if (runs.length < MIN_ITEMS_FOR_COLUMN_SIGNAL || pageWidth <= 0) return null;
+  if (runs.length < MIN_ITEMS_FOR_COLUMN_SIGNAL || !(pageWidth > 0)) return null;
+  const width = Math.min(pageWidth, MAX_PAGE_WIDTH);
 
   // A rule, a full-width heading, or a page border may legitimately cross a real gutter.
   const straddleAllowance = Math.max(1, Math.round(runs.length * 0.02));
@@ -97,8 +100,8 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
   const found: Array<Gutter & { straddling: number }> = [];
 
   for (
-    let split = pageWidth * GUTTER_SEARCH_START;
-    split <= pageWidth * GUTTER_SEARCH_END;
+    let split = width * GUTTER_SEARCH_START;
+    split <= width * GUTTER_SEARCH_END;
     split += GUTTER_STEP
   ) {
     let straddling = 0;

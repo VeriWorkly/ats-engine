@@ -117,7 +117,8 @@ adds the vendor's notes.
 
 The server runs on your computer, over stdio. It makes no network requests and calls no AI
 model. It reads only the files you name in a request, a PDF or DOCX in a separate process that
-is stopped after 60 seconds, and nothing leaves your machine except
+is stopped after 60 seconds or when the request is cancelled, as many at once as your computer
+has CPU cores, and nothing leaves your machine except
 what your assistant itself sends to its model provider: the tool results it reads, which include
 text from your resume.
 

@@ -11,15 +11,43 @@ on:
 
 concurrency: release
 
-permissions:
-  contents: write
-  pull-requests: write
-  id-token: write # npm trusted publishing and provenance, and the MCP Registry login
-  actions: write # starts the GitHub Packages workflow
+# Each job is given only what it needs. The right to publish (id-token) is the publish job's
+# alone: a dependency's code that runs while versioning cannot ask for it.
+permissions: {}
 
 jobs:
-  release:
+  # Opens or updates the "Version Packages" pull request while changesets are pending.
+  version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      # No changeset pending: the Version Packages pull request was merged (or there was none),
+      # and whatever is not yet on npm is published.
+      publish: ${{ steps.changesets.outputs.hasChangesets == 'false' }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      # `version-packages` rewrites the lockfile, which takes npm 11.
+      - run: npm install -g npm@11.20.0 && npm -v
+      - run: npm ci
+      - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2
+        id: changesets
+        with:
+          version-script: npm run version-packages
+
+  publish:
+    needs: version
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # release tags and GitHub releases
+      id-token: write # npm trusted publishing and provenance, and the MCP Registry login
+      actions: write # starts the GitHub Packages workflow
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -33,13 +61,14 @@ jobs:
       # Trusted publishing needs npm 11.5.1 or later and Node 22.14 or later (`22` is the latest
       # 22.x); Node 22 ships npm 10. Pinned exactly, at a version out for two weeks or more.
       - run: npm install -g npm@11.20.0 && npm -v
-      - run: npm ci
+      # No install script runs where the job can publish (esbuild's, the only one, is not needed:
+      # its binary comes as an optional package).
+      - run: npm ci --ignore-scripts
       # v2 reads the output of @changesets/cli v3; v1 published but could not see it, so it
-      # created no git tag and no GitHub release.
+      # created no git tag and no GitHub release. With no changeset pending, it only publishes.
       - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2
         id: changesets
         with:
-          version-script: npm run version-packages
           publish-script: npm run release
       # The same engine version on GitHub's registry, so it is listed under the repository's
       # Packages. With two packages in the workspace, changesets tags each release as

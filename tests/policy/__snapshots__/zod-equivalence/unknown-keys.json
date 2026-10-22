@@ -504,8 +504,64 @@
         "(?:requires?|requiring|needs?|needing)\\s+sponsorship",
         "work\\s+permit",
         "(?:us|u\\.s\\.)\\s+citizen(?:ship)?",
+        "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
         "green\\s+card",
         "permanent\\s+resident"
+      ],
+      "countries": [
+        {
+          "name": "US",
+          "patterns": [
+            "u\\.s\\.(?:a\\.)?",
+            "usa",
+            "(?<=(?:the|in)\\s)us",
+            "us(?=\\s+citizen)",
+            "(?:the\\s+)?united\\s+states(?:\\s+of\\s+america)?",
+            "american(?=\\s+citizen)",
+            "green\\s+card"
+          ]
+        },
+        {
+          "name": "UK",
+          "patterns": [
+            "u\\.?k\\.?",
+            "(?:the\\s+)?united\\s+kingdom",
+            "(?:great\\s+)?britain",
+            "british",
+            "england",
+            "scotland",
+            "(?<!south\\s)wales"
+          ]
+        },
+        {
+          "name": "EU",
+          "patterns": [
+            "e\\.?u\\.?",
+            "european\\s+union",
+            "eea"
+          ]
+        },
+        {
+          "name": "Canada",
+          "patterns": [
+            "canada",
+            "canadian"
+          ]
+        },
+        {
+          "name": "Australia",
+          "patterns": [
+            "australia",
+            "australian"
+          ]
+        },
+        {
+          "name": "India",
+          "patterns": [
+            "india",
+            "indian"
+          ]
+        }
       ],
       "needsSponsorship": [
         "(?:requires?|requiring|needs?|needing|will\\s+(?:require|need))\\s+(?:(?:an?|h-?1b|visa|work|employment|immigration|future)\\s+){0,3}sponsorship",
@@ -542,11 +598,21 @@
         "expired",
         "lapsed",
         "able\\s+to\\s+obtain",
-        "former(?:ly)?"
+        "former(?:ly)?",
+        "not\\s+(?:currently\\s+)?(?:active|current|valid|held|obtained|renewed|cleared)",
+        "no\\s+longer"
+      ],
+      "inProgress": [
+        "in\\s+progress",
+        "pursuing",
+        "studying\\s+for",
+        "working\\s+towards?"
       ],
       "citizenship": [
         "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",
-        "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)"
+        "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)",
+        "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
+        "citizen\\s+of\\s+(?:the\\s+)?(?:uk|u\\.k\\.|united\\s+kingdom|eu|european\\s+union|canada|australia|ireland|india)"
       ],
       "residence": [
         "green\\s+card",
@@ -871,7 +937,9 @@
       "intermediate": "B1",
       "elementary(?:\\s+proficiency)?": "A2",
       "basic": "A2",
-      "beginner": "A1"
+      "school[\\s-]level": "A2",
+      "beginner": "A1",
+      "(?:currently|still)\\s+learning": "A1"
     },
     "credentialWords": {
       "issued": [
@@ -959,7 +1027,11 @@
       "ongoing",
       "to date",
       "till date",
-      "today"
+      "till now",
+      "today",
+      "continuing",
+      "onwards",
+      "onward"
     ],
     "durationUnits": [
       "yr",
@@ -978,7 +1050,8 @@
     "rangeWords": [
       "to",
       "until",
-      "through"
+      "through",
+      "thru"
     ],
     "sinceWords": [
       "since"

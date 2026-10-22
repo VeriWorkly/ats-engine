@@ -1108,6 +1108,7 @@
                   "(?:requires?|requiring|needs?|needing)\\s+sponsorship",
                   "work\\s+permit",
                   "(?:us|u\\.s\\.)\\s+citizen(?:ship)?",
+                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
                   "green\\s+card",
                   "permanent\\s+resident"
                 ],
@@ -1116,6 +1117,85 @@
                 "items": {
                   "type": "string",
                   "minLength": 1
+                }
+              },
+              "countries": {
+                "default": [
+                  {
+                    "name": "US",
+                    "patterns": [
+                      "u\\.s\\.(?:a\\.)?",
+                      "usa",
+                      "(?<=(?:the|in)\\s)us",
+                      "us(?=\\s+citizen)",
+                      "(?:the\\s+)?united\\s+states(?:\\s+of\\s+america)?",
+                      "american(?=\\s+citizen)",
+                      "green\\s+card"
+                    ]
+                  },
+                  {
+                    "name": "UK",
+                    "patterns": [
+                      "u\\.?k\\.?",
+                      "(?:the\\s+)?united\\s+kingdom",
+                      "(?:great\\s+)?britain",
+                      "british",
+                      "england",
+                      "scotland",
+                      "(?<!south\\s)wales"
+                    ]
+                  },
+                  {
+                    "name": "EU",
+                    "patterns": [
+                      "e\\.?u\\.?",
+                      "european\\s+union",
+                      "eea"
+                    ]
+                  },
+                  {
+                    "name": "Canada",
+                    "patterns": [
+                      "canada",
+                      "canadian"
+                    ]
+                  },
+                  {
+                    "name": "Australia",
+                    "patterns": [
+                      "australia",
+                      "australian"
+                    ]
+                  },
+                  {
+                    "name": "India",
+                    "patterns": [
+                      "india",
+                      "indian"
+                    ]
+                  }
+                ],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "patterns": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "patterns"
+                  ]
                 }
               },
               "needsSponsorship": {
@@ -1186,7 +1266,23 @@
                   "expired",
                   "lapsed",
                   "able\\s+to\\s+obtain",
-                  "former(?:ly)?"
+                  "former(?:ly)?",
+                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held|obtained|renewed|cleared)",
+                  "no\\s+longer"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "inProgress": {
+                "default": [
+                  "in\\s+progress",
+                  "pursuing",
+                  "studying\\s+for",
+                  "working\\s+towards?"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -1198,7 +1294,9 @@
               "citizenship": {
                 "default": [
                   "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",
-                  "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)"
+                  "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)",
+                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
+                  "citizen\\s+of\\s+(?:the\\s+)?(?:uk|u\\.k\\.|united\\s+kingdom|eu|european\\s+union|canada|australia|ireland|india)"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -1714,7 +1812,9 @@
               "intermediate": "B1",
               "elementary(?:\\s+proficiency)?": "A2",
               "basic": "A2",
-              "beginner": "A1"
+              "school[\\s-]level": "A2",
+              "beginner": "A1",
+              "(?:currently|still)\\s+learning": "A1"
             },
             "type": "object",
             "propertyNames": {
@@ -1892,7 +1992,11 @@
               "ongoing",
               "to date",
               "till date",
-              "today"
+              "till now",
+              "today",
+              "continuing",
+              "onwards",
+              "onward"
             ],
             "minItems": 1,
             "type": "array",
@@ -1935,7 +2039,8 @@
             "default": [
               "to",
               "until",
-              "through"
+              "through",
+              "thru"
             ],
             "minItems": 1,
             "type": "array",
@@ -6372,6 +6477,7 @@
                   "(?:requires?|requiring|needs?|needing)\\s+sponsorship",
                   "work\\s+permit",
                   "(?:us|u\\.s\\.)\\s+citizen(?:ship)?",
+                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
                   "green\\s+card",
                   "permanent\\s+resident"
                 ],
@@ -6380,6 +6486,86 @@
                 "items": {
                   "type": "string",
                   "minLength": 1
+                }
+              },
+              "countries": {
+                "default": [
+                  {
+                    "name": "US",
+                    "patterns": [
+                      "u\\.s\\.(?:a\\.)?",
+                      "usa",
+                      "(?<=(?:the|in)\\s)us",
+                      "us(?=\\s+citizen)",
+                      "(?:the\\s+)?united\\s+states(?:\\s+of\\s+america)?",
+                      "american(?=\\s+citizen)",
+                      "green\\s+card"
+                    ]
+                  },
+                  {
+                    "name": "UK",
+                    "patterns": [
+                      "u\\.?k\\.?",
+                      "(?:the\\s+)?united\\s+kingdom",
+                      "(?:great\\s+)?britain",
+                      "british",
+                      "england",
+                      "scotland",
+                      "(?<!south\\s)wales"
+                    ]
+                  },
+                  {
+                    "name": "EU",
+                    "patterns": [
+                      "e\\.?u\\.?",
+                      "european\\s+union",
+                      "eea"
+                    ]
+                  },
+                  {
+                    "name": "Canada",
+                    "patterns": [
+                      "canada",
+                      "canadian"
+                    ]
+                  },
+                  {
+                    "name": "Australia",
+                    "patterns": [
+                      "australia",
+                      "australian"
+                    ]
+                  },
+                  {
+                    "name": "India",
+                    "patterns": [
+                      "india",
+                      "indian"
+                    ]
+                  }
+                ],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "patterns": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "patterns"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "needsSponsorship": {
@@ -6450,7 +6636,23 @@
                   "expired",
                   "lapsed",
                   "able\\s+to\\s+obtain",
-                  "former(?:ly)?"
+                  "former(?:ly)?",
+                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held|obtained|renewed|cleared)",
+                  "no\\s+longer"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "inProgress": {
+                "default": [
+                  "in\\s+progress",
+                  "pursuing",
+                  "studying\\s+for",
+                  "working\\s+towards?"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -6462,7 +6664,9 @@
               "citizenship": {
                 "default": [
                   "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",
-                  "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)"
+                  "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)",
+                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
+                  "citizen\\s+of\\s+(?:the\\s+)?(?:uk|u\\.k\\.|united\\s+kingdom|eu|european\\s+union|canada|australia|ireland|india)"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -6727,11 +6931,13 @@
               "yearsPatterns",
               "equivalence",
               "authorization",
+              "countries",
               "needsSponsorship",
               "noSponsorship",
               "sponsorshipOffered",
               "negation",
               "notHeld",
+              "inProgress",
               "citizenship",
               "residence",
               "clearance",
@@ -7058,7 +7264,9 @@
               "intermediate": "B1",
               "elementary(?:\\s+proficiency)?": "A2",
               "basic": "A2",
-              "beginner": "A1"
+              "school[\\s-]level": "A2",
+              "beginner": "A1",
+              "(?:currently|still)\\s+learning": "A1"
             },
             "type": "object",
             "propertyNames": {
@@ -7242,7 +7450,11 @@
               "ongoing",
               "to date",
               "till date",
-              "today"
+              "till now",
+              "today",
+              "continuing",
+              "onwards",
+              "onward"
             ],
             "minItems": 1,
             "type": "array",
@@ -7285,7 +7497,8 @@
             "default": [
               "to",
               "until",
-              "through"
+              "through",
+              "thru"
             ],
             "minItems": 1,
             "type": "array",

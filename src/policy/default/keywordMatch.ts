@@ -320,6 +320,9 @@ export const DEFAULT_KEYWORD_MATCH = {
     "documentation",
     "containers",
     "sql",
+    // Skills named as a verb is spelled: named, "Sparked" and "rusted" do not fold onto them.
+    "spark",
+    "rust",
   ],
   buzzwords: [
     "team player",

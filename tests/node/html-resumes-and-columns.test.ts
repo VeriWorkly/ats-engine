@@ -219,6 +219,39 @@ describe("hidden text in a DOCX's headers, footers and embedded pages is found",
     );
     expect(layout?.hiddenTextChars).toBe(55);
   });
+
+  const chunked = (pages: Array<[target: string, html: string]>, names = pages.length) =>
+    buildRichDocx(Array.from({ length: names }, (_, i) => `<w:altChunk r:id="c${i}"/>`).join(""), [
+      [
+        "word/_rels/document.xml.rels",
+        relationshipsXml(
+          Array.from({ length: names }, (_, i) => [
+            `c${i}`,
+            "aFChunk",
+            `/word/${pages[i % pages.length]![0]}`,
+          ]),
+        ),
+      ],
+      ...pages.map(([target, page]): [string, string] => [`word/${target}`, page]),
+    ]);
+
+  // Each name read the part again, up to 8 MB each: 30 names for one 2 MB page took 1.6 s.
+  it("reads a page the document names many times once", async () => {
+    const docx = chunked([["one.htm", "<html><body><p>Jane Roe</p></body></html>"]], 30);
+    expect((await extractResume(docx, "docx")).text.match(/Jane Roe/g)).toHaveLength(1);
+  });
+
+  it("reads embedded pages up to 8 MB between them", async () => {
+    const page = (name: string) =>
+      `<html><body><p>${name}</p><!--${"x".repeat(5_000_000)}--></body></html>`;
+    const docx = chunked([
+      ["first.htm", page("Jane Roe")],
+      ["second.htm", page("Kubernetes Terraform")],
+    ]);
+    const { text } = await extractResume(docx, "docx");
+    expect(text).toContain("Jane Roe");
+    expect(text).not.toContain("Kubernetes Terraform");
+  });
 });
 
 describe("a header's line breaks and tabs are kept", () => {
@@ -480,6 +513,19 @@ describe("a link added in two forms is added once", () => {
     expect(
       withLinks("Jane Doe", ["https://www.linkedin.com/in/jane/", "http://linkedin.com/in/jane"]),
     ).toBe("Jane Doe\nhttps://www.linkedin.com/in/jane/");
+  });
+
+  // Each link searched the whole text, the same link once per copy: a 13.7 KB Word file of
+  // repeated links took minutes.
+  it("searches the text once per link, in the time of a resume", () => {
+    const prose = "Built payment services in Go for a team of five engineers. ".repeat(35_000);
+    const shown = `${prose} https://example.com/a`;
+    expectFast(() => withLinks(shown, Array(2_000).fill("https://example.com/a")), 200);
+    const added = expectFast(
+      () => withLinks(prose, Array(2_000).fill("https://example.com/b")),
+      200,
+    );
+    expect(added.endsWith("\nhttps://example.com/b")).toBe(true);
   });
 });
 

@@ -388,7 +388,7 @@ describe("analyze: keyword suggestions and the request", () => {
       provider: {
         async complete(request) {
           sent = request.messages[0]!.content;
-          return { text: JSON.stringify({ explanation: "" }), finish: "stop" };
+          return { text: JSON.stringify({ explanation: "Fine." }), finish: "stop" };
         },
       },
       routes: route,

@@ -12,6 +12,7 @@ import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { extractResume } from "../../src/node/extract.js";
 import { readResume } from "../../src/scoring/context.js";
 import { buildPdf } from "../fixtures/buildPdf.js";
+import { EN_FIXTURES } from "../fixtures/en-resumes.js";
 import { livePolicy } from "../fixtures/livePolicy.js";
 import { expectFast } from "../fixtures/timing.js";
 
@@ -473,6 +474,36 @@ describe("a LinkedIn profile export", () => {
       "TypeScript",
       "PostgreSQL",
     ]);
+  });
+});
+
+describe("a huge paste", () => {
+  // The whole paste was normalised and only then cut: 40 MB with numbers took one to two seconds.
+  it("is cut before it is read through", () => {
+    const huge = `Jane Doe\n${"Cut costs by 40% in 2019 and २०२१. ".repeat(1_150_000)}`;
+    const { text } = expectFast(() => prepareResume(huge), 300);
+    expect(text.length).toBeLessThanOrEqual(50_000);
+    expect(text.startsWith("Jane Doe\nCut costs by 40% in 2019 and 2021.")).toBe(true);
+  });
+});
+
+describe("line breaks of every kind", () => {
+  // A lone carriage return (old Mac files, some Word exports) was no break: the resume read as
+  // one line, the name and a role lost.
+  const { text } = EN_FIXTURES[0]!;
+  const expected = check(text);
+  it.each([
+    ["CR LF", "\r\n"],
+    ["a lone CR", "\r"],
+    ["a vertical tab", "\v"],
+    ["a form feed", "\f"],
+    ["NEL", "\u0085"],
+    ["LINE SEPARATOR", "\u2028"],
+    ["PARAGRAPH SEPARATOR", "\u2029"],
+  ])("reads %s as a new line", (_, newline) => {
+    const report = check(text.replace(/\n/g, newline));
+    expect(report.parsed).toEqual(expected.parsed);
+    expect(report.readinessScore).toBe(expected.readinessScore);
   });
 });
 

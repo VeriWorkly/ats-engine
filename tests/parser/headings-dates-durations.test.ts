@@ -385,6 +385,74 @@ describe("date spellings that dropped the role", () => {
     expect(rows("Jane Doe\nExperience\nReleased 2021-03")).toEqual([]);
     expect(rows("Jane Doe\norcid.org/0000-0002-1825-0097")).toEqual([]);
   });
+
+  // The current role was dropped, and with it half the experience, without a word.
+  it.each([
+    ["Engineer, Hooli Jun 2021 - Till now", "en"],
+    ["Engineer, Hooli Jun 2021 onwards", "en"],
+    ["Engineer, Hooli Jun 2021 - Continuing", "en"],
+    ["Engineer, Hooli Jun 2021 thru Present", "en"],
+    ["Engineer, Hooli 06/21 - Present", "en"],
+    ["Ingenieur, Hooli 06/2021 – bis heute", "de"],
+    ["Ingenieur, Hooli ab 06/2021", "de"],
+    ["इंजीनियर, Hooli जून 2021 से", "hi"],
+    ["इंजीनियर, Hooli जून 2021 - अभी तक", "hi"],
+  ])("reads %j as current", (line, language) => {
+    const { roles } = check(`Jane Doe\nExperience\n${line}`, { languages: [language] });
+    expect(roles).toMatchObject([{ start: { year: 2021, month: 6 }, current: true }]);
+  });
+
+  it.each([
+    ["Analyst, Initech 01/15 - 05/21", "en", { year: 2015, month: 1 }, { year: 2021, month: 5 }],
+    [
+      "Analyst, Initech Jan 2015 thru May 2021",
+      "en",
+      { year: 2015, month: 1 },
+      { year: 2021, month: 5 },
+    ],
+    [
+      "Analyste, Initech hiver 2015 - automne 2020",
+      "fr",
+      { year: 2015, month: 1 },
+      { year: 2020, month: 11 },
+    ],
+  ])("reads %j", (line, language, start, end) => {
+    const { roles } = check(`Jane Doe\nExperience\n${line}`, { languages: [language] });
+    expect(roles).toMatchObject([{ start, end, current: false }]);
+  });
+
+  it("reads a month and two-digit year only as a range's end", () => {
+    expect(rows("Jane Doe\nExperience\nRated 10/10 by the review board")).toEqual([]);
+    expect(rows("Jane Doe\nExperience\nShipped 3/12 features")).toEqual([]);
+    // A score or a sprint: a month written without its zero is no MM/YY date.
+    expect(rows("Jane Doe\nExperience\nPushed NPS from 7/10 - 9/10")).toEqual([]);
+    expect(rows("Jane Doe\nExperience\nShipped 3/12 - 5/12 sprint goals")).toEqual([]);
+  });
+
+  // An open end written straight after a date ends its clause: in a sentence it is a word.
+  it.each([
+    ["Jan 2017 continuing support for 3 legacy apps", "en"],
+    ["Mar 2019 Continuing professional development: AWS course", "en"],
+    ["2017 से टीम का नेतृत्व किया", "hi"],
+  ])("does not read %j in a role's bullets as a role", (bullet, language) => {
+    const { roles } = check(
+      `Jane Doe\nExperience\nEngineer, Hooli\nJan 2016 - Dec 2018\nBuilt Java services used by 40 teams\n${bullet}`,
+      { languages: [language] },
+    );
+    expect(roles).toHaveLength(1);
+  });
+
+  // A PDF often loses the dash: a place after the open end is no sentence.
+  it.each([
+    ["Engineer, Hooli\nJun 2021 Present San Francisco, CA", "en"],
+    ["Engineer, Hooli\nJun 2021 Present\tRemote", "en"],
+    ["Engineer, Hooli\nJun 2021 Current Remote", "en"],
+    ["Senior Engineer Jun 2021 Present Austin, TX", "en"],
+    ["Ingenieur, Hooli\n03/2020 heute Berlin", "de"],
+  ])("still reads %j as a current role", (lines, language) => {
+    const { roles } = check(`Jane Doe\nExperience\n${lines}`, { languages: [language] });
+    expect(roles).toMatchObject([{ current: true }]);
+  });
 });
 
 describe("the education fallback", () => {

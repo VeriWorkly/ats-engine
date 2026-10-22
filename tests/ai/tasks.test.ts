@@ -28,7 +28,7 @@ function report(): AtsReport {
 
 const insights = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({
-    explanation: "",
+    explanation: "Your resume reads well.",
     missingEvidence: [],
     keywordOpportunities: [],
     recommendedImprovements: [],

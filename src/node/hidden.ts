@@ -8,8 +8,9 @@
  *   selectable copy Chrome lays over text with a shadow, outline or gradient fill);
  * - smaller than 2pt;
  * - off the page;
- * - within 1.25:1 contrast of what lies beneath: the topmost shape filled before it, else the
- *   white page (an image, gradient or pattern leaves the background unknown: benefit of the doubt);
+ * - within 1.25:1 contrast of what lies beneath: the topmost shape filled before it (blended by
+ *   its opacity with what lies under it; a border's inside is not its fill), else the white page
+ *   (an image, gradient or pattern leaves the background unknown: benefit of the doubt);
  * - covered by an image or an opaque shape drawn after it.
  *
  * Measured, not certain: path-drawn glyphs, clip regions and blend modes can still hide text this
@@ -64,6 +65,106 @@ function contrast(a: string, b: string) {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
+/** The "#rrggbb" seen where `over` is painted at opacity `alpha` on `under`. */
+function mix(over: string, under: string, alpha: number) {
+  const a = Math.min(1, Math.max(0, alpha));
+  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16);
+  return `#${[1, 3, 5]
+    .map((at) =>
+      Math.round(a * channel(over, at) + (1 - a) * channel(under, at))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+/** A filled path's rectangles split into boxes; past this many, it is read as its bounding box. */
+const MAX_SUBPATHS = 8;
+
+/** The corners of an upright rectangle, or null: 4 points (5 when the first is repeated), each side level or plumb. */
+function rectangle(points: ReadonlyArray<[number, number]>): { box: Box; turn: number } | null {
+  const corners =
+    points.length === 5 && points[4]![0] === points[0]![0] && points[4]![1] === points[0]![1]
+      ? points.slice(0, 4)
+      : points;
+  if (corners.length !== 4) return null;
+  let area = 0;
+  for (let index = 0; index < 4; index += 1) {
+    const [x0, y0] = corners[index]!;
+    const [x1, y1] = corners[(index + 1) % 4]!;
+    if (Math.abs(x1 - x0) > 1e-6 && Math.abs(y1 - y0) > 1e-6) return null;
+    // Twice the signed area: its sign is the rectangle's winding.
+    area += x0 * y1 - x1 * y0;
+  }
+  const [[ax, ay], [bx, by]] = [corners[0]!, corners[2]!];
+  return {
+    box: [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)],
+    turn: area < 0 ? -1 : 1,
+  };
+}
+
+/**
+ * What a filled path of upright rectangles covers, as boxes in page space, by each rectangle's
+ * winding: a frame (`re re f*`, a bordered box) is its four sides, not the box around it.
+ * `undefined` for any other path (a curve, a slanted side, more than `MAX_SUBPATHS` rectangles),
+ * or when `budget` (grid cells, shared across a page) runs out: the caller reads it as its
+ * bounding box in its fill, as a solid shape.
+ */
+function filledBoxes(
+  data: ArrayLike<number>,
+  toPage: (x: number, y: number) => [number, number],
+  evenOdd: boolean,
+  budget: { cells: number },
+): Box[] | undefined {
+  const subpaths: Array<{ box: Box; turn: number }> = [];
+  let points: Array<[number, number]> = [];
+  const close = () => {
+    if (!points.length) return true;
+    const found = rectangle(points);
+    points = [];
+    return found ? subpaths.push(found) <= MAX_SUBPATHS : false;
+  };
+  const point = (at: number) => toPage(Number(data[at]), Number(data[at + 1]));
+  for (let at = 0; at < data.length;) {
+    const code = data[at];
+    if (code === 0) {
+      if (!close()) return undefined;
+      points.push(point(at + 1));
+      at += 3;
+    } else if (code === 1) {
+      // A rectangle has five points at most: past that, no need to keep reading.
+      if (points.push(point(at + 1)) > 5) return undefined;
+      at += 3;
+    } else if (code === 3) at += 1;
+    else return undefined;
+  }
+  if (!close()) return undefined;
+  if (subpaths.length <= 1) return subpaths.length ? [subpaths[0]!.box] : undefined;
+
+  const edges = (low: 0 | 1, high: 2 | 3) =>
+    [...new Set(subpaths.flatMap(({ box }) => [box[low], box[high]]))].sort((a, b) => a - b);
+  const [xs, ys] = [edges(0, 2), edges(1, 3)];
+  if ((budget.cells -= xs.length * ys.length) < 0) return undefined;
+  const boxes: Box[] = [];
+  for (let row = 0; row + 1 < ys.length; row += 1) {
+    const y = (ys[row]! + ys[row + 1]!) / 2;
+    let from: number | undefined;
+    for (let column = 0; column + 1 < xs.length; column += 1) {
+      const x = (xs[column]! + xs[column + 1]!) / 2;
+      let winding = 0;
+      for (const { box, turn } of subpaths)
+        if (x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]) winding += turn;
+      const filled = evenOdd ? winding % 2 !== 0 : winding !== 0;
+      if (filled) from ??= xs[column]!;
+      if (from !== undefined && (!filled || column + 2 === xs.length)) {
+        boxes.push([from, ys[row]!, filled ? xs[column + 1]! : xs[column]!, ys[row + 1]!]);
+        from = undefined;
+      }
+    }
+  }
+  return boxes;
+}
+
 /**
  * `fill` and `stroke` are "#rrggbb", or "" when not flat (a pattern, a gradient). `alpha` and
  * `strokeAlpha` are `ca` and `CA`. `softMask`: a soft mask is in force, so what is painted may show
@@ -115,6 +216,10 @@ const MAX_MARKS = 2_000;
 const MAX_MASK_PAIRS = 100_000;
 /** Visible glyphs transparent runs are compared with, across a page; past this the rest are not. */
 const MAX_PIECE_CHECKS = 2_000_000;
+/** Grid cells spent splitting filled paths into boxes, across a page. */
+const MAX_FILL_CELLS = 1_000_000;
+/** Translucent fills looked through, one over another; the last is read as opaque. */
+const MAX_LAYERS = 4;
 
 /** A run's text and where it is, to a 2pt cell `dx`, `dy` cells away. */
 const cell = (text: string, [x, y]: [number, number], dx = 0, dy = 0) =>
@@ -281,6 +386,7 @@ export function measureVisibility(
   ]);
   // Thin lines and bars, in page space, for `countRuledTables`.
   const rules: Box[] = [];
+  const fillCells = { cells: MAX_FILL_CELLS };
   const isImage = new Set(
     [
       ops.paintImageXObject,
@@ -420,8 +526,20 @@ export function measureVisibility(
       if (Array.isArray(bounds) || ArrayBuffer.isView(bounds)) {
         const [x0, y0, x1, y1] = Array.from(bounds as ArrayLike<number>);
         lastPath = boxThrough(state.ctm, [x0, y0, x1, y1]);
-        if (isFill.has(args[0] as number)) {
-          paint({ box: lastPath, order, kind: "shape", fill: state.fill });
+        if (isFill.has(op)) {
+          const boxes =
+            ArrayBuffer.isView(data) || Array.isArray(data)
+              ? filledBoxes(
+                  data as ArrayLike<number>,
+                  (x, y) => apply(state.ctm, x, y),
+                  op === ops.eoFill || op === ops.eoFillStroke,
+                  fillCells,
+                )
+              : [lastPath];
+          // Any other path is read as its bounding box, solid: a curve or a cheap pile of moves
+          // must not leave white text on it unjudged.
+          for (const box of boxes ?? [lastPath])
+            paint({ box, order, kind: "shape", fill: state.fill });
           const [mx0, my0, mx1, my1] = lastPath;
           if (
             !maskDepth &&
@@ -450,9 +568,18 @@ export function measureVisibility(
     [...runs.map((run) => run.center), ...throughMask.map((glyph) => glyph.center)],
     pageBox,
   );
+  // The colour seen at a point under `top`, the last fill there: blended by its opacity with what
+  // lies beneath it, else the white page; "" when unknown.
+  // Past `MAX_LAYERS` the fill counts as opaque: layers stacked to that depth must not leave the
+  // background unknown.
+  const shown = (point: [number, number], top: Drawn | undefined, depth = 0): string => {
+    if (!top) return "#ffffff";
+    if (top.fill === "" || !(top.alpha < 1) || depth >= MAX_LAYERS) return top.fill;
+    const under = shown(point, around(point, top.order).top, depth + 1);
+    return under && mix(top.fill, under, top.alpha);
+  };
   for (const { text, center, fill, order } of throughMask) {
-    const top = around(center, order).top;
-    const background = top ? top.fill : "#ffffff";
+    const background = shown(center, around(center, order).top);
     if (fill === "" || background === "" || contrast(fill, background) >= MIN_CONTRAST)
       drawnGlyphs.add(cell(text, center));
   }
@@ -536,7 +663,7 @@ export function measureVisibility(
       run.box[3] < pageBox[1] ||
       run.box[1] > pageBox[3];
     // An unknown background, or text in a pattern, gets the benefit of the doubt.
-    const background = top ? top.fill : "#ffffff";
+    const background = shown(run.center, top);
     const blended =
       background !== "" &&
       paints.every(({ colour }) => colour !== "" && contrast(colour, background) < MIN_CONTRAST);

@@ -2,7 +2,7 @@
 
 import { fork } from "node:child_process";
 import { createRequire } from "node:module";
-import { homedir } from "node:os";
+import { availableParallelism, homedir } from "node:os";
 import { resolve } from "node:path";
 
 import {
@@ -38,16 +38,61 @@ const CHILD = createRequire(import.meta.url).resolve("@veriworkly/ats-engine/nod
 /** The longest one PDF or DOCX may take to read before its process is stopped. */
 const EXTRACT_TIMEOUT_MS = 60_000;
 
+const cancelled = () => new AtsFileError("The call was cancelled.");
+
+/**
+ * Files read at once, each with the file in memory and a child reading it; further calls wait
+ * their turn. 150 calls at once started 150 children (7.3 GB).
+ */
+export const MAX_READS = Math.max(1, availableParallelism());
+let reading = 0;
+const waiting: Array<() => void> = [];
+
+/** Runs `read` in its turn: a call cancelled while it waits never starts. */
+export async function inTurn<T>(read: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (signal?.aborted) throw cancelled();
+  if (reading < MAX_READS) reading += 1;
+  else
+    await new Promise<void>((start, fail) => {
+      const turn = () => {
+        signal?.removeEventListener("abort", leave);
+        start();
+      };
+      const leave = () => {
+        waiting.splice(waiting.indexOf(turn), 1);
+        fail(cancelled());
+      };
+      waiting.push(turn);
+      signal?.addEventListener("abort", leave, { once: true });
+    });
+  try {
+    return await read();
+  } finally {
+    // The turn passes straight to the next in line, so no new call takes it in between.
+    const next = waiting.shift();
+    if (next) next();
+    else reading -= 1;
+  }
+}
+
 /**
  * Reads a PDF or DOCX in its own `/node/child` process, so a file that exhausts memory, crashes
  * pdf.js or never ends takes down that process, not this server. Memory still needs an OS limit
- * (SECURITY.md).
+ * (SECURITY.md). Cancelling the call (`signal`) stops the process.
  */
-export function extractInChild(data: Uint8Array, format: AtsResumeFormat): Promise<AtsExtraction> {
+export function extractInChild(
+  data: Uint8Array,
+  format: AtsResumeFormat,
+  signal?: AbortSignal,
+): Promise<AtsExtraction> {
   return new Promise((done, fail) => {
+    if (signal?.aborted) return fail(cancelled());
     const child = fork(CHILD, [], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
+    const abort = () => stop(cancelled());
+    signal?.addEventListener("abort", abort, { once: true });
     const stop = (error?: Error, result?: AtsExtraction) => {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
       child.removeAllListeners();
       child.kill();
       if (error) fail(error);
@@ -96,13 +141,21 @@ function exactlyOne(
 export type ResumeArgs = { path?: string; text?: string };
 export type JobArgs = { job_path?: string; job_text?: string };
 
-/** The resume a call names, read from its file or taken from its text. */
+/** The resume a call names, read from its file (in its turn) or taken from its text. */
 export async function readResume(
   args: ResumeArgs,
+  signal?: AbortSignal,
 ): Promise<{ input: AtsResumeInput; layout?: AtsLayoutSignals; file?: AtsFileInfo }> {
   exactlyOne(args.path, args.text, "resume", ["path", "text"]);
-  if (args.path !== undefined)
-    return readResumeFile(absolute(args.path), { extract: extractInChild });
+  const path = args.path;
+  if (path !== undefined)
+    return inTurn(
+      () =>
+        readResumeFile(absolute(path), {
+          extract: (data, format) => extractInChild(data, format, signal),
+        }),
+      signal,
+    );
   if (args.text === undefined)
     throw new ToolInputError(
       "Give the resume: path (a file on this computer) or text (the resume itself).",
@@ -117,11 +170,19 @@ export async function readResume(
 /** The posting a call names, or undefined when it names none. */
 export async function readJob(
   args: JobArgs,
+  signal?: AbortSignal,
 ): Promise<{ text: string; company?: string } | undefined> {
   exactlyOne(args.job_path, args.job_text, "job posting", ["job_path", "job_text"]);
+  const path = args.job_path;
   const job =
-    args.job_path !== undefined
-      ? await readJobFile(absolute(args.job_path), { extract: extractInChild })
+    path !== undefined
+      ? await inTurn(
+          () =>
+            readJobFile(absolute(path), {
+              extract: (data, format) => extractInChild(data, format, signal),
+            }),
+          signal,
+        )
       : args.job_text !== undefined
         ? { text: normalizeJobText(args.job_text) }
         : undefined;

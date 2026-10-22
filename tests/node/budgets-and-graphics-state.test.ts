@@ -267,6 +267,16 @@ describe("PDF reading stops at a page cap", () => {
     expect(text).toContain("Jane Doe Senior Engineer");
     expect(layout?.pageCount).toBe(5_000);
   }, 60_000);
+
+  // The column search stepped across the page's width, which the file sets with no limit.
+  it("reads a page millions of points wide in the time of a resume", async () => {
+    const lines = Array.from({ length: 30 }, (_, i) =>
+      line(750 - i * 20, `Line ${i} of an ordinary resume body text`),
+    );
+    const pdf = buildPdf(lines.join("\n"), "", "", [], { page: "/MediaBox[0 0 50000000 792]" });
+    const { text } = await expectFastAsync(() => extractResume(pdf, "pdf"), 1_000);
+    expect(text).toContain("Line 29 of an ordinary resume body text");
+  }, 120_000);
 });
 
 describe("a page's images are decoded before the next page is read", () => {

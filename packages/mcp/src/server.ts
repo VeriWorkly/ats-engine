@@ -284,14 +284,16 @@ async function answer(run: () => Promise<Answer>): Promise<CallToolResult> {
   }
 }
 
+/** `signal`: the call's, so cancelling it stops the file reading it started. */
 async function score(
   args: ResumeArgs & JobArgs & { region?: string; target_ats?: string },
+  signal: AbortSignal,
   includeLines = false,
 ) {
   checkRegion(args.region);
   checkTarget(args.target_ats);
-  const { input, layout, file } = await readResume(args);
-  const job = await readJob(args);
+  const { input, layout, file } = await readResume(args, signal);
+  const job = await readJob(args, signal);
   const jobDescription = job?.text;
   const report = check(input, POLICY, {
     jobDescription,
@@ -333,9 +335,9 @@ export function createServer(): McpServer {
       outputSchema: checkOutput,
       annotations: { title: "Check my resume", ...READ_ONLY },
     },
-    (args) =>
+    (args, { signal }) =>
       answer(async () => {
-        const { report, withJob } = await score(args);
+        const { report, withJob } = await score(args, signal);
         const result = checkResult(report, withJob);
         return { text: renderCheck(report, result.verdict, withJob), data: result };
       }),
@@ -354,11 +356,11 @@ export function createServer(): McpServer {
       outputSchema: jobMatchOutput,
       annotations: { title: "Match my resume to a job", ...READ_ONLY },
     },
-    (args) =>
+    (args, { signal }) =>
       answer(async () => {
         if (args.job_path === undefined && args.job_text === undefined)
           throw new ToolInputError("Give the job posting: job_path or job_text.");
-        const { report } = await score(args);
+        const { report } = await score(args, signal);
         return {
           text: [provenance(report), "", ...renderJobMatch(report)].join("\n"),
           data: {
@@ -423,9 +425,9 @@ export function createServer(): McpServer {
       outputSchema: extractOutput,
       annotations: { title: "Show my resume as an ATS reads it", ...READ_ONLY },
     },
-    (args) =>
+    (args, { signal }) =>
       answer(async () => {
-        const { report, layout } = await score(args, true);
+        const { report, layout } = await score(args, signal, true);
         // Drops `hiddenTextRead`: up to 5,000 characters that repeat `hiddenText`.
         const { hiddenTextRead: _read, ...measured } = layout ?? {};
         const lines = report.lines ?? [];

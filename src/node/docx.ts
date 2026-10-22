@@ -465,8 +465,9 @@ function mammothParts(files: Map<string, ZipEntry>) {
     read(relationshipsOf(path));
     read(path);
   }
-  // HTML a web builder embeds whole (`w:altChunk`, usually MHT): `mammoth` skips it, this reads it.
-  const chunks = existing(related, "aFChunk", base!);
+  // HTML a web builder embeds whole (`w:altChunk`, usually MHT): `mammoth` skips it, this reads
+  // it, once however often it is named.
+  const chunks = [...new Set(existing(related, "aFChunk", base!))];
   for (const chunk of chunks) read(chunk, false);
   for (const key of files.keys()) if (HEADER_OR_FOOTER.test(key)) read(key, false);
   return {
@@ -1014,11 +1015,15 @@ export function docxMargins({ files }: DocxArchive): { header: string; footer: s
 /**
  * The HTML a DOCX embeds whole (`w:altChunk`), which `mammoth` reads as empty. An MHT chunk is
  * read from its `<html` to its `</html>`, quoted-printable decoded when it says so; RTF and other
- * chunks are left out.
+ * chunks are left out. The chunks share `MAX_XML_BYTES`: one past what is left is not read.
  */
 export function docxChunks({ files, parts }: DocxArchive): string[] {
+  let left = MAX_XML_BYTES;
   return parts.chunks.flatMap((chunk) => {
-    let content = inflate(files.get(chunk)!, MAX_XML_BYTES)?.toString("latin1") ?? "";
+    const inflated = inflate(files.get(chunk)!, left);
+    if (!inflated) return [];
+    left -= inflated.length;
+    let content = inflated.toString("latin1");
     if (/^MIME-Version:[^]*quoted-printable/i.test(content.slice(0, 2_000)))
       content = content
         .replace(/=\r?\n/g, "")

@@ -1,14 +1,12 @@
 {
   "outcomes": {
     "analyze": {
-      "result": {
-        "explanation": "",
-        "missingEvidence": [],
-        "keywordOpportunities": [],
-        "recommendedImprovements": [],
-        "priorityOrder": []
+      "error": {
+        "name": "AtsAiError",
+        "code": "invalid_output",
+        "message": "Response held none of the fields asked for."
       },
-      "rejected": []
+      "cause": "<undefined>"
     },
     "repairParse": {
       "result": {

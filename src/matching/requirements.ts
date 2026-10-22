@@ -121,6 +121,8 @@ type Matchers = {
   notHeld: RegExp;
   citizenship: RegExp;
   residence: RegExp;
+  /** The countries a right to work is stated for, each by name. */
+  countries: Array<{ name: string; pattern: RegExp }>;
   clearance: RegExp;
   /** The same, global: where in a line each clearance is named. */
   clearanceAll: RegExp;
@@ -164,6 +166,11 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     notHeld: wordListRegex(r.notHeld),
     citizenship: wordListRegex(r.citizenship),
     residence: wordListRegex(r.residence),
+    // Schema-defaulted; a hand-built policy may lack it.
+    countries: (r.countries ?? []).map(({ name, patterns }) => ({
+      name,
+      pattern: wordListRegex(patterns),
+    })),
     clearance: wordListRegex(r.clearance),
     clearanceAll: wordListRegex(r.clearance, "gi"),
     clearanceLevels: r.clearanceLevels
@@ -351,8 +358,9 @@ function askedClearanceRanks(text: string, matchers: Matchers) {
 /**
  * The clearances a resume line says are held, each as the text about it: from the clearance
  * named before it to the one named after. A not-held word anywhere in that text ("pending",
- * "expired"), or a negation short of a semicolon, says it is not held: "Top Secret clearance
- * (TS/SCI eligible)" holds Top Secret, "Active Secret clearance; no incidents" holds Secret.
+ * "expired", "not active"), or a negation in the clearance's own clause (cut at a semicolon,
+ * comma or bracket), says it is not held: "Top Secret clearance (TS/SCI eligible)" holds Top
+ * Secret, "Active TS/SCI clearance, no lapses since 2015" holds TS/SCI.
  */
 function heldClearances(line: string, matchers: Matchers) {
   const named = [...line.matchAll(matchers.clearanceAll)];
@@ -360,7 +368,10 @@ function heldClearances(line: string, matchers: Matchers) {
     const before = named[at - 1];
     const from = before ? before.index + before[0].length : 0;
     const about = line.slice(from, named[at + 1]?.index ?? line.length);
-    const clause = about.slice(about.lastIndexOf(";", match.index - from) + 1).split(";", 1)[0]!;
+    const where = match.index - from;
+    const start = Math.max(...[";", ",", "(", ")"].map((mark) => about.lastIndexOf(mark, where)));
+    const end = about.slice(where).search(/[;,()]/u);
+    const clause = about.slice(start + 1, end < 0 ? about.length : where + end);
     return matchers.notHeld.test(about) || matchers.negation.test(clause) ? [] : [about];
   });
 }
@@ -371,7 +382,8 @@ function heldClearances(line: string, matchers: Matchers) {
  * that needs sponsorship is no evidence, and evidence against where the posting rules sponsorship
  * out; what is left negated ("Cannot work in the US") is no evidence. An ask for citizenship
  * alone is met only by citizenship held; a line naming permanent residence instead says it is
- * not held. Otherwise the question is the application's.
+ * not held. A line naming only other countries than the posting asks about says nothing of it.
+ * Otherwise the question is the application's.
  */
 function judgeAuthorization(
   ask: string,
@@ -379,6 +391,10 @@ function judgeAuthorization(
   matchers: Matchers,
   policy: AtsEnginePolicy,
 ): { status: Status | "unverifiable"; lines: Array<{ line: string }> } {
+  const countriesIn = (text: string) =>
+    matchers.countries.filter(({ pattern }) => pattern.test(text)).map(({ name }) => name);
+  const asked = countriesIn(ask);
+  const phrases = new RegExp(matchers.authorization.source, "giu");
   const stated = lines.flatMap((entry) => {
     const { line } = entry;
     if (
@@ -386,6 +402,16 @@ function judgeAuthorization(
       !matchers.citizenship.test(line) &&
       !matchers.residence.test(line)
     )
+      return [];
+    // A heading or label alone ("Work Authorization") states nothing; "U.S. citizen" does.
+    if (
+      !matchers.citizenship.test(line) &&
+      !matchers.residence.test(line) &&
+      !/[\p{L}\p{N}]/u.test(line.replace(phrases, ""))
+    )
+      return [];
+    const named = countriesIn(line);
+    if (asked.length && named.length && !named.some((country) => asked.includes(country)))
       return [];
     const rest = line.replace(matchers.noSponsorshipAll, " ");
     if (matchers.needsSponsorship.test(rest)) return [{ entry, says: line, needs: true }];
@@ -727,10 +753,23 @@ export function judgeRequirements(
       resumeLines.some((entry) =>
         listsLanguages(entry.line, matchers, km.requirements.languageNames),
       ));
-  // The certification rows, each with what it names: a credential asked for is met by one.
+  // The certification rows, each with what it names: a credential asked for is met by one held.
+  // Expired, dated after today or in progress (`inProgress`), a row is not held, and says why.
+  // Schema-defaulted; a hand-built policy may lack it.
+  const inProgress = wordListRegex(km.requirements.inProgress ?? ["(?!)"]);
+  const today = now.getUTCFullYear() * 12 + now.getUTCMonth() + 1;
+  const monthOf = (date: { year: number; month: number | null }, edge: "start" | "end") =>
+    date.year * 12 + (date.month ?? (edge === "start" ? 1 : 12));
   const certificationRows = parsed.certifications.map((row) => ({
     line: formatCertification(row),
     holds: resumeCapabilities(extractVocabulary(`${row.name} ${row.issuer}`, km, vocab), vocab),
+    lapsed:
+      row.expires && monthOf(row.expires, "end") < today
+        ? `${row.name}: expired ${row.expires.year}`
+        : (row.date && monthOf(row.date, "start") > today) ||
+            inProgress.test(`${row.name} ${row.issuer}`)
+          ? `${row.name}: not yet held`
+          : null,
   }));
 
   // What each dated role's lines hold. A role is anchored on its dated line and the header lines
@@ -1012,13 +1051,21 @@ export function judgeRequirements(
     // row if the ask names none; the row is the evidence.
     const rowShows = (row: (typeof certificationRows)[number]) =>
       !skills.length || picked.some(([token]) => row.holds.has(token));
-    const credentialRows = qualifiers.some((qualifier) => qualifier.sameLine)
+    const matchingRows = qualifiers.some((qualifier) => qualifier.sameLine)
       ? certificationRows.filter(rowShows)
       : [];
+    const credentialRows = matchingRows.filter((row) => !row.lapsed);
+    // Only lapsed rows: they show the credential was sought, not that it is held. The
+    // certifications section's lines, which repeat them, show nothing more.
+    const lapsedRows = credentialRows.length ? [] : matchingRows;
     const qualifiersShown = qualifiers.map(
       (qualifier) =>
         (qualifier.sameLine && credentialRows.length > 0) ||
-        resumeLines.some((entry) => showsQualifier(entry, qualifier)),
+        resumeLines.some(
+          (entry) =>
+            (!lapsedRows.length || entry.kind !== "certifications") &&
+            showsQualifier(entry, qualifier),
+        ),
     );
     const qualifiersMet = qualifiersShown.every(Boolean);
     const terms = [
@@ -1028,10 +1075,10 @@ export function judgeRequirements(
     // Beside a row, the certifications section's own lines would only repeat it.
     const termEvidence = [
       ...new Set([
-        ...credentialRows.map((row) => row.line),
+        ...[...credentialRows, ...lapsedRows].map((row) => row.line),
         ...evidenceFor(
           (entry) =>
-            (!credentialRows.length || entry.kind !== "certifications") &&
+            (!matchingRows.length || entry.kind !== "certifications") &&
             (picked.some(([token]) => entry.holds.has(token)) ||
               qualifiers.some((qualifier) => showsQualifier(entry, qualifier))),
         ),
@@ -1165,9 +1212,10 @@ export function judgeRequirements(
     const groupsStatus: Status = termsMet ? "met" : groupsMet > 0 ? "partial" : "missing";
     const qualifierStatus: Status = qualifiersMet
       ? "met"
-      : qualifiersShown.some(Boolean)
+      : qualifiersShown.some(Boolean) || lapsedRows.length
         ? "partial"
         : "missing";
+    const lapsed = qualifiersMet ? [] : lapsedRows.map((row) => row.lapsed);
     return {
       ...base,
       kind: "skills",
@@ -1179,6 +1227,7 @@ export function judgeRequirements(
           : qualified(groupsStatus),
       terms,
       evidence: termEvidence,
+      ...(lapsed.length ? { detail: lapsed.join("; ") } : {}),
     } satisfies AtsRequirement;
   });
   const allLines = sections.flatMap((section) => section.lines);

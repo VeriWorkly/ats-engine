@@ -159,10 +159,44 @@ describe("openai-compatible transport", () => {
       fetch: fetchReturning(400, echo),
     });
     const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
-    expect(error.message).toContain("HTTP 400");
-    expect(error.message).toContain("authorization:");
+    expect(error.message).toBe("Provider returned HTTP 400.");
     for (const secret of ["0123456789", "9876543210", "AIzaInvented", "eyJhbGci"])
       expect(error.message).not.toContain(secret);
+  });
+
+  // A gateway that echoes the request put the resume, name, email and phone, in the message.
+  it("quotes only the provider's own error text, never an echoed request", async () => {
+    const resume = "Jane Doe jane.doe@example.com +1 415 555 0134";
+    const json = JSON.stringify({
+      error: { message: "Invalid value for 'temperature'.", type: "invalid_request_error" },
+      request: { messages: [{ role: "user", content: resume }] },
+    });
+    const text = `Bad request. Received body:\n{"messages":[{"content":"${resume}"}]}`;
+    for (const [body, expected] of [
+      [json, "Provider returned HTTP 400: Invalid value for 'temperature'."],
+      [text, "Provider returned HTTP 400."],
+      ["Bad Gateway", "Provider returned HTTP 400: Bad Gateway"],
+    ]) {
+      const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(400, body!) });
+      const error = (await provider
+        .complete(request())
+        .catch((caught: unknown) => caught)) as Error;
+      expect(error.message).toBe(expected);
+    }
+  });
+
+  it("keeps a key out of the provider's own error text", async () => {
+    const body = JSON.stringify({
+      error: { message: "Incorrect API key provided: sk-invented-0123456789." },
+    });
+    const provider = openAiCompatible({
+      apiKey: "sk-invented-0123456789",
+      fetch: fetchReturning(401, body),
+    });
+    const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
+    expect(error.message).toBe(
+      "Provider returned HTTP 401: Incorrect API key provided: [redacted].",
+    );
   });
 
   it("keeps other providers' keys and JSON key fields out of an error body too", async () => {
@@ -182,7 +216,7 @@ describe("openai-compatible transport", () => {
     });
     const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(401, echo) });
     const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
-    expect(error.message).toContain('"api_key":"[redacted]"');
+    expect(error.message).toBe("Provider returned HTTP 401.");
     expect(error.message).not.toMatch(/Invented|plainsecret/);
   });
 

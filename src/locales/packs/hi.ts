@@ -62,7 +62,8 @@ export const hi: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     दिसंबर: 12,
     दिसम्बर: 12,
   },
-  openEnded: ["वर्तमान", "अब तक", "आज तक", "जारी"],
+  // "से" after the start alone is "since": "मार्च 2020 से".
+  openEnded: ["वर्तमान", "अब तक", "अभी तक", "आज तक", "जारी", "से"],
   // "2019 से 2022 तक": "से" sits between the two ends; the trailing "तक" is left on the line.
   rangeWords: ["से"],
   titleWords: [

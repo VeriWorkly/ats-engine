@@ -20,6 +20,8 @@ type DateMatchers = {
   named: RegExp;
   season: RegExp;
   openEnded: RegExp;
+  /** A field opening with an open end: "Current role", not "Not current". */
+  openEndedStart: RegExp;
 };
 
 /** A two-digit year after an apostrophe: "Jan '20". */
@@ -66,14 +68,18 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
 
   // A range's end may be a year's last two digits ("2019–21"); `findDateRange` places them.
   const shortEnd = String.raw`\d{2}(?![\d./-])`;
+  // A month, with its zero, and a two-digit year ("06/21"), read only as a range's ends: alone,
+  // "10/10" is a rating, and "7/10 - 9/10" a score.
+  const monthYear = String.raw`(?<![\d./-])(?:0[1-9]|1[0-2])\s*\/\s*\d{2}(?![\d./])`;
 
   return {
     months,
     seasons,
     // Global so `findDateRange` can try the next candidate on a line. The second branch reads
-    // "Jan 2020 to date" (the "to" belongs to the open-ended phrase); the last a season alone.
+    // "Jan 2020 to date" (the "to" belongs to the open-ended phrase); then a season alone; the
+    // last a range of months and two-digit years ("06/21 - Present").
     range: new RegExp(
-      String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})`,
+      String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})|(${monthYear})${separator}(${monthYear}|${openEnded})`,
       "giu",
     ),
     single: new RegExp(date, "giu"),
@@ -83,8 +89,18 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
     ),
     season: new RegExp(String.raw`^(${seasonNames})[\s-]+(\d{4})$`, "u"),
     openEnded: new RegExp(`^${openEnded}$`, "iu"),
+    openEndedStart: new RegExp(`^\\s*${openEnded}`, "iu"),
   };
 });
+
+/**
+ * Whether a structured document's end field, holding no date, says the role or study is still
+ * going on, opening with words the policy and its packs read: "heute", "Current role", "Till
+ * now"; not "Not current".
+ */
+export function saysOngoing(end: string | undefined, rp: AtsEnginePolicy["resumeParse"]) {
+  return Boolean(end?.trim()) && buildMatchers(rp).openEndedStart.test(normalizeText(end!));
+}
 
 /**
  * One date as written. A two-digit year comes back as those digits for `findDateRange` to place.
@@ -121,6 +137,11 @@ function parseDate(
     const m = month(dayFirst ? second : first);
     return m ? { year: third, month: m } : null;
   }
+
+  // "06/21": the year's two digits, for `findDateRange` to place.
+  const monthYear = value.match(/^(\d{1,2})\s*\/\s*(\d{2})$/);
+  if (monthYear && month(Number(monthYear[1])))
+    return { year: Number(monthYear[2]), month: Number(monthYear[1]) };
 
   const numeric = value.match(/^(\d{1,2})\s*[./-]\s*(\d{4})$/);
   if (numeric && month(Number(numeric[1])))
@@ -167,8 +188,8 @@ export function parseDocumentDate(
   return isPlausibleDate(date, now) ? date : null;
 }
 
-/** A date written with a two-digit year: "21", "Jan '20". "0000" is a four-digit one. */
-const TWO_DIGIT_YEAR = /(?:^|['’‘])\d{2}$/u;
+/** A date written with a two-digit year: "21", "Jan '20", "06/21". "0000" is a four-digit one. */
+const TWO_DIGIT_YEAR = /(?:^|['’‘/])\d{2}$/u;
 
 /** A two-digit year in the latest century that keeps it at or before `latest`. */
 function withCentury(date: AtsParsedDate | null, latest: number): AtsParsedDate | null {
@@ -255,6 +276,9 @@ export function readingDatesAt(now: Date): Date {
   return reading;
 }
 
+/** A sentence going on: a space, then a lowercase letter or one of a script without case. Case-sensitive. */
+const SENTENCE_GOES_ON = /^[^\S\t]+[\p{Ll}\p{Lo}]/u;
+
 /** Every date holds two digits in a row; a line without them is not searched (the lookbehinds are costly). */
 const TWO_DIGITS = /\d\d/;
 
@@ -279,9 +303,15 @@ function searchDateRange(
       term = { range: { start, end, current: false }, matched: match[0] };
       continue;
     }
-    const endText = match[2] ?? match[3];
+    // An open end straight after a date, with no dash, that a lowercase or uncased word follows
+    // is a sentence ("Jan 2017 continuing support", "2017 से टीम"); a place after it is not
+    // ("Jun 2021 Present San Francisco").
+    if (match[3] !== undefined && SENTENCE_GOES_ON.test(line.slice(match.index + match[0].length)))
+      continue;
+    // Groups 6 and 7: a range of months and two-digit years.
+    const endText = match[2] ?? match[3] ?? match[7];
     const current = match[4] !== undefined || matchers.openEnded.test(endText.trim());
-    const startText = match[1] ?? match[4];
+    const startText = match[1] ?? match[4] ?? match[6];
     const start = placedStart(startText, rp, now);
     const shortEnd = !current && /^\d{2}$/.test(endText.trim());
     if (shortEnd) {

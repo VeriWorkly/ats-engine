@@ -131,6 +131,22 @@ describe("resume extraction", () => {
   it("rejects a file that is not the format it claims", async () => {
     await expect(extractResume(Buffer.from("not a zip"), "docx")).rejects.toThrow();
   });
+
+  // A CJK font with a predefined CMap is decoded through pdf.js's CMap files, which were never
+  // passed: the text came out empty.
+  it("reads text in a CJK font with a predefined CMap", async () => {
+    const utf16 = (line: string) =>
+      [...line].map((c) => c.charCodeAt(0).toString(16).padStart(4, "0")).join("");
+    const lines = ["山田 花子", "ソフトウェアエンジニア", "株式会社サンプル 2019年4月 - 現在"];
+    const content = lines
+      .map((line, i) => `BT /F2 12 Tf 50 ${750 - i * 20} Td <${utf16(line)}> Tj ET`)
+      .join("\n");
+    const font =
+      "<</Type/Font/Subtype/Type0/BaseFont/HeiseiMin-W3/Encoding/UniJIS-UCS2-H/DescendantFonts[<</Type/Font/Subtype/CIDFontType0/BaseFont/HeiseiMin-W3/CIDSystemInfo<</Registry(Adobe)/Ordering(Japan1)/Supplement 2>>/FontDescriptor<</Type/FontDescriptor/FontName/HeiseiMin-W3/Flags 4/FontBBox[0 -120 1000 880]/ItalicAngle 0/Ascent 880/Descent -120/CapHeight 700/StemV 80>>>>]>>";
+    const pdf = buildPdf(content, "/Font<</F2 7 0 R>>", "", [font]);
+    const { text: extracted } = await extractResume(pdf, "pdf");
+    expect(extracted.replace(/\s/g, "")).toBe(lines.join("").replace(/\s/g, ""));
+  });
 });
 
 describe("a missing PDF or DOCX reader", () => {

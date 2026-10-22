@@ -32,8 +32,9 @@ adversarial suite against a private policy when one is present.
 bounded in depth, array length and node count before it is validated, a policy or a locale pack
 nested deeper than 5 000 levels (or one that contains itself) is refused as invalid with
 `AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
-64 MB and hold at most 2 MB of the XML `mammoth` parses and 2 MB of page headers and footers (a
-part past that is neither read nor measured), and PDF text reading stops at the cap or
+64 MB and hold at most 2 MB of the XML `mammoth` parses, 2 MB of page headers and footers and
+8 MB of embedded HTML pages (`w:altChunk`, each read once however often it is named; a part past
+these is neither read nor measured), and PDF text reading stops at the cap or
 after the first 100 pages, whichever comes first (the page count still counts every page). PDF
 images have no size cap: pdf.js decodes every image in full, about 12 bytes a pixel, whatever
 its size, and a 420 KB file with one 144 MP image held 1.8 GB. The table pass decodes no image,
@@ -89,9 +90,15 @@ What does not depend on the model:
 
 - Every identity value a task returns (names, employers, titles, schools, email addresses, URLs,
   skills) must occur in the source text, and is dropped and reported in `rejected` if it does not.
-  Dates in parse repair must name a year the text contains.
+  An email address or URL must occur whole, not as words spread over the text. Dates in parse
+  repair must name a year the text contains, and a contact field it fills must hold that kind of
+  value (an email address; a phone number's characters and 7 to 15 digits; a name of up to eight
+  words without digits or "@").
 - Free text a model writes (an explanation, a recommendation) is advice and is not grounded:
   show it as the model's words, not as facts about the candidate.
+- A provider's error is quoted in the error message only in its own short words (a JSON body's
+  `error.message`, or a one-line text body, up to 200 characters, keys redacted). The rest of the
+  body, where a gateway may echo the request and the resume in it, is never quoted.
 - `analyze` redacts contact details before the request leaves, best effort and only these
   forms. The name as the parser read it, in any case or letter spacing, also as "Doe, Jane", with
   or without a middle initial, and inside a web address built from it (`janedoe.dev`); not
@@ -166,9 +173,11 @@ reads at most 20 MB. `npm run smoke` fails if the core, `/document`, `/format`, 
 and calls no model. It reads the files a tool call names, with the rights of the user running it,
 and nothing else; folders, pipes, devices, network paths and files over 20 MB are refused, and so
 is a `job_path` that is not a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file. It reads a PDF or
-DOCX in its own `/node/child` process, one per file, stopped after 60 seconds, so a file that
-exhausts memory, crashes the parser or never ends takes down that process and not the server;
-memory still needs an OS limit to stop it early (see **Size**). Its stdout carries only the protocol. Its answers include text from the resume, which the assistant
+DOCX in its own `/node/child` process, one per file, stopped after 60 seconds or when the call is
+cancelled, so a file that exhausts memory, crashes the parser or never ends takes down that
+process and not the server. It reads as many files at once as the machine has CPU cores; further
+calls wait their turn, so many calls at once cannot start a process each. Memory still needs an
+OS limit to stop a process early (see **Size**). Its stdout carries only the protocol. Its answers include text from the resume, which the assistant
 sends to its own model provider.
 
 **The GitHub Action.** Its inputs reach `run.mjs` as environment variables, never pasted into a

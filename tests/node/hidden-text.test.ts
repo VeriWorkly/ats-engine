@@ -18,6 +18,11 @@ const IMAGE = (x: number, y: number, w: number, h: number) =>
   // A 2x2 grey image: four bytes, white, black, black, white.
   `q ${w} 0 0 ${h} ${x} ${y} cm BI /W 2 /H 2 /CS /G /BPC 8 ID \xFF\x00\x00\xFF EI Q`;
 
+/** A 1pt border around 40,690 to 440,720: two rectangles filled even-odd. */
+const BORDER = "40 690 400 30 re 41 691 398 28 re f*";
+/** `GS1` paints nothing, `GS2` paints at 8% opacity, `GS3` at 99%. */
+const GSTATES = "/ExtGState<</GS1<</ca 0>>/GS2<</ca 0.08>>/GS3<</ca 0.99>>>>";
+
 async function hidden(content: string, resources = "") {
   const { layout } = await extractResume(buildPdf(`${visible}\n${content}`, resources), "pdf");
   return layout!;
@@ -39,8 +44,27 @@ describe("hidden text", () => {
     ["covered by a white box drawn after it", `0 g ${line(700)} 1 1 1 rg 40 690 400 30 re f`],
     // Positioned with a text matrix, as react-pdf does: pdf.js hands it over as a typed array.
     ["placed by a text matrix", `1 1 1 rg BT /F1 10 Tf 1 0 0 1 50 700 Tm (${KEYWORDS}) Tj ET`],
+    ["white inside a box's border", `0 g ${BORDER} 1 1 1 rg ${line(700)}`],
+    ["white on a faint tint", `q /GS2 gs 0 g 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`],
+    // A path too intricate to split, or layers too deep, is read as solid, never as unknown.
+    [
+      "white on a white box with junk moves in its path",
+      `1 1 1 rg 40 690 400 30 re ${Array.from({ length: 9 }, (_, i) => `${i} ${i} m`).join(" ")} f ${line(700)}`,
+    ],
+    [
+      "white on two white triangles",
+      `1 1 1 rg 40 690 m 440 690 l 440 720 l h 40 690 m 440 720 l 40 720 l h f* ${line(700)}`,
+    ],
+    [
+      "white on five stacked near-opaque white boxes",
+      `q /GS3 gs 1 1 1 rg ${"40 690 400 30 re f ".repeat(5)}Q 1 1 1 rg ${line(700)}`,
+    ],
+    [
+      "white on a white path of 150,000 points",
+      `1 1 1 rg 40 690 m ${"440 690 l ".repeat(150_000)}440 720 l 40 720 l h f ${line(700)}`,
+    ],
   ])("finds text %s", async (_, content) => {
-    const layout = await hidden(content, "/ExtGState<</GS1<</ca 0>>>>");
+    const layout = await hidden(content, GSTATES);
     expect(layout.hiddenTextChars).toBe(KEYWORDS.replace(/\s/g, "").length);
     expect(layout.hiddenText).toBe(KEYWORDS);
   });
@@ -50,8 +74,20 @@ describe("hidden text", () => {
     ["grey body text", `0.45 0.45 0.45 rg ${line(700)}`],
     ["text over a picture, as on a banner", `${IMAGE(40, 690, 400, 30)} 1 1 1 rg ${line(700)}`],
     ["a small footnote", `0 g ${line(60, "Page 1 of 2", 7)}`],
+    // A bordered box or chip, as Chrome draws it: its outline and inner edge filled even-odd.
+    ["dark text in a box with a dark border", `0.1 0.1 0.1 rg ${BORDER} 0 g ${line(700)}`],
+    ["dark text under a border drawn after it", `0 g ${line(700)} 0 g ${BORDER}`],
+    [
+      "dark text in a border wound the other way",
+      `0 g 40 690 m 440 690 l 440 720 l 40 720 l h 41 691 m 41 719 l 439 719 l 439 691 l h f ${line(700)}`,
+    ],
+    [
+      "dark text on a faint tint of its colour",
+      `q /GS2 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`,
+    ],
+    ["dark text on a fully transparent box", `q /GS1 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`],
   ])("does not flag %s", async (_, content) => {
-    expect((await hidden(content)).hiddenTextChars).toBe(0);
+    expect((await hidden(content, GSTATES)).hiddenTextChars).toBe(0);
   });
 
   it("does not flag the invisible OCR layer of a scan", async () => {

@@ -17,8 +17,9 @@ const BUDGETS = {
   "./job": 3.8,
   // Policy data, the language detection words and the French pack; room for one more pack.
   "./locales": 79.5,
-  // Core policy data plus redaction; room for the next policy fixes.
-  "./ai": 75,
+  // Core policy data plus redaction; room for the next policy fixes. 78: the audit fixes' policy
+  // data (countries, not-held and in-progress words, date words) took it to 75.1.
+  "./ai": 78,
   // Streamed, size-capped response reading.
   "./ai/openai-compatible": 2.4,
   "./ai/anthropic": 2.4,

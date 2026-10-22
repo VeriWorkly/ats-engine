@@ -65,7 +65,10 @@ export const resumeParseSchema = z.object({
     intermediate: "B1",
     [String.raw`elementary(?:\s+proficiency)?`]: "A2",
     basic: "A2",
+    [String.raw`school[\s-]level`]: "A2",
     beginner: "A1",
+    // Not "learning" alone: "machine learning".
+    [String.raw`(?:currently|still)\s+learning`]: "A1",
   }),
   /**
    * The words around a certification's dates and issuer ("Issued Mar 2022", "expires 2027",
@@ -122,7 +125,12 @@ export const resumeParseSchema = z.object({
     "ongoing",
     "to date",
     "till date",
+    "till now",
     "today",
+    "continuing",
+    // After the start alone: "Jun 2021 onwards".
+    "onwards",
+    "onward",
   ]),
   /**
    * Units of a duration written beside a date range ("4 yrs 9 mos"). A number before one is the
@@ -141,7 +149,7 @@ export const resumeParseSchema = z.object({
   /** Labels a resume writes its owner's name under: "Name: Jane Doe". */
   nameLabels: z._default(wordList("nameLabels"), ["name", "full name"]),
   /** Words between the two ends of a date range besides a dash: "2019 to 2022", "2019 bis 2022". */
-  rangeWords: z._default(wordList("rangeWords"), ["to", "until", "through"]),
+  rangeWords: z._default(wordList("rangeWords"), ["to", "until", "through", "thru"]),
   /** Words before a lone start date that make it a current role: "since 2019", "seit 03/2019". */
   sinceWords: z._default(wordList("sinceWords"), ["since"]),
   /** Words joining a job title to its employer on one line: "Engineer at Acme". */
