@@ -24,10 +24,15 @@ jobs:
       pull-requests: write
     outputs:
       # No changeset pending: the Version Packages pull request was merged (or there was none),
-      # and whatever is not yet on npm is published.
-      publish: ${{ steps.changesets.outputs.hasChangesets == 'false' }}
+      # and whatever is not yet on npm is published. Counted here, not read from the changesets
+      # action: with nothing pending it returns early and sets no `hasChangesets` output.
+      publish: ${{ steps.pending.outputs.publish }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - id: pending
+        run: |
+          if ls .changeset/*.md | grep -qv 'README.md$'; then publish=false; else publish=true; fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
