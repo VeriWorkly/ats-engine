@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { anthropic } from "../../src/ai/anthropic.js";
 import { AtsAiError, createAtsAi, LlmProviderError } from "../../src/ai/index.js";
@@ -25,6 +25,21 @@ function setup(...replies: Parameters<typeof scriptedProvider>) {
 
 const convert = (ai: ReturnType<typeof createAtsAi>, options = {}) =>
   ai.convertResume({ resumeText: SOURCE }, options);
+
+/** Runs `run` on fake timers, every wait it starts skipped. */
+async function withFakeTimers<T>(run: () => Promise<T>): Promise<T> {
+  vi.useFakeTimers();
+  try {
+    const pending = run();
+    await vi.runAllTimersAsync();
+    return await pending;
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
+const rateLimit = (retryAfterMs?: number) =>
+  new LlmProviderError("slow down", { status: 429, retryable: true, retryAfterMs });
 
 describe("task runner", () => {
   it("returns the result with usage, attempts, response id and prompt version", async () => {
@@ -55,7 +70,7 @@ describe("task runner", () => {
     ["an unclassified throw", new Error("socket hang up")],
   ])("retries %s and keeps the eventual result", async (_label, failure) => {
     const { ai, provider, onRetry } = setup(failure, { text: converted });
-    const outcome = await convert(ai);
+    const outcome = await withFakeTimers(() => convert(ai));
 
     expect(provider.calls).toHaveLength(2);
     expect(outcome.attempts).toBe(2);
@@ -183,5 +198,80 @@ describe("task runner", () => {
       attempts: 1,
     });
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+// Six calls 0 to 1 ms apart on a 429: a rate limit was hit again at once, and billed retries wasted.
+describe("waiting before a retry", () => {
+  afterEach(() => vi.useRealTimers());
+
+  const calledAt = async (provider: { calls: unknown[] }, ms: number) => {
+    await vi.advanceTimersByTimeAsync(ms);
+    return provider.calls.length;
+  };
+
+  it("waits 1 s, then twice as long each time, after a rate limit or a server fault", async () => {
+    vi.useFakeTimers();
+    const fault = new LlmProviderError("boom", { status: 503, retryable: true });
+    const provider = scriptedProvider(rateLimit(), fault, new Error("socket hang up"), converted);
+    const onRetry = vi.fn();
+    const ai = createAtsAi({
+      provider,
+      routes: { convertResume: { ...route, retries: 3 } },
+      hooks: { onRetry },
+    });
+    const pending = convert(ai);
+
+    expect(await calledAt(provider, 999)).toBe(1);
+    expect(await calledAt(provider, 1)).toBe(2);
+    expect(await calledAt(provider, 1_999)).toBe(2);
+    expect(await calledAt(provider, 1)).toBe(3);
+    expect(await calledAt(provider, 3_999)).toBe(3);
+    expect(await calledAt(provider, 1)).toBe(4);
+    expect((await pending).attempts).toBe(4);
+    expect(onRetry.mock.calls.map(([event]) => event.delayMs)).toEqual([1_000, 2_000, 4_000]);
+  });
+
+  it("retries a reply it could not read at once", async () => {
+    vi.useFakeTimers();
+    const provider = scriptedProvider("{", converted);
+    const ai = createAtsAi({ provider, routes: { convertResume: { ...route, retries: 1 } } });
+    const pending = convert(ai);
+    expect(await calledAt(provider, 0)).toBe(2);
+    expect((await pending).attempts).toBe(2);
+  });
+
+  it("waits as long as the provider's retry-after asks, and gives up when that is over a minute", async () => {
+    vi.useFakeTimers();
+    const provider = scriptedProvider(rateLimit(5_000), converted);
+    const ai = createAtsAi({ provider, routes: { convertResume: { ...route, retries: 2 } } });
+    const pending = convert(ai);
+    expect(await calledAt(provider, 4_999)).toBe(1);
+    expect(await calledAt(provider, 1)).toBe(2);
+    await pending;
+
+    const daily = scriptedProvider(rateLimit(3_600_000), converted);
+    const quota = createAtsAi({
+      provider: daily,
+      routes: { convertResume: { ...route, retries: 2 } },
+    });
+    await expect(convert(quota)).rejects.toMatchObject({
+      code: "provider",
+      status: 429,
+      attempts: 1,
+    });
+    expect(daily.calls).toHaveLength(1);
+  });
+
+  it("stops waiting the moment the caller aborts", async () => {
+    vi.useFakeTimers();
+    const provider = scriptedProvider(rateLimit(), converted);
+    const ai = createAtsAi({ provider, routes: { convertResume: { ...route, retries: 2 } } });
+    const controller = new AbortController();
+    const pending = convert(ai, { signal: controller.signal }).catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(500);
+    controller.abort();
+    expect(await pending).toMatchObject({ code: "aborted", attempts: 1 });
+    expect(provider.calls).toHaveLength(1);
   });
 });

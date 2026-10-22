@@ -11,6 +11,31 @@ import type { AtsLanguagePackInput } from "../schema.js";
  */
 const compound = (stem: string) => String.raw`\p{L}{0,30}${stem}`;
 
+/** Languages by their German names, keyed to the English ones. */
+const LANGUAGES = {
+  deutsch: "german",
+  englisch: "english",
+  französisch: "french",
+  spanisch: "spanish",
+  italienisch: "italian",
+  niederländisch: "dutch",
+  polnisch: "polish",
+  türkisch: "turkish",
+  russisch: "russian",
+  chinesisch: "chinese",
+  japanisch: "japanese",
+  arabisch: "arabic",
+  portugiesisch: "portuguese",
+};
+
+/**
+ * "Kenntnisse", alone or as a language's compound, in the dative too: "gute Kenntnisse", "guten
+ * Englischkenntnissen", "gute Deutsch- und Englischkenntnisse". Only languages: "gute
+ * Programmierkenntnisse" states no language level.
+ */
+const STEMS = [...Object.keys(LANGUAGES), "sprach", "fremdsprachen"].join("|");
+const KENNTNISSE = String.raw`(?:(?:${STEMS})-\s+(?:und|oder)\s+)?(?:${STEMS})?kenntnissen?`;
+
 /** The German language pack: recognised by its function words; region DE by default. */
 export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   id: "de",
@@ -61,15 +86,15 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   },
   // "Verhandlungssicher" is C1, as "fließend" is; "sehr gute Kenntnisse" B2, "gute Kenntnisse" B1.
   languageLevels: {
-    [String.raw`muttersprache|muttersprachlich(?:e[mnrs]?)?|muttersprachler(?:in)?`]: "C2",
+    [String.raw`muttersprache|muttersprachniveau|muttersprachlich(?:e[mnrs]?)?|muttersprachler(?:in)?`]:
+      "C2",
     [String.raw`zweisprachig(?:e[mnrs]?)?`]: "C1",
     [String.raw`verhandlungssicher(?:e[mnrs]?)?`]: "C1",
     [String.raw`fließend(?:e[mnrs]?)?`]: "C1",
-    [String.raw`sehr\s+gute?[mnrs]?(?:\s+kenntnisse)?`]: "B2",
-    [String.raw`gute?[mnrs]?\s+kenntnisse`]: "B1",
-    grundkenntnisse: "A2",
-    schulkenntnisse: "A2",
-    [String.raw`anfänger(?:in|kenntnisse)?`]: "A1",
+    [String.raw`sehr\s+gute?[mnrs]?(?:\s+${KENNTNISSE})?`]: "B2",
+    [String.raw`gute?[mnrs]?\s+${KENNTNISSE}`]: "B1",
+    [String.raw`(?:${STEMS})?(?:grund|basis|schul)kenntnissen?`]: "A2",
+    [String.raw`anfänger(?:in|kenntnissen?)?`]: "A1",
   },
   credentialWords: {
     issued: [String.raw`ausgestellt(?:\s+am)?`, String.raw`erworben(?:\s+am)?`, "erteilt"],
@@ -230,24 +255,20 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     clearance: [String.raw`sicherheitsüberprüfung`, String.raw`sicherheitsfreigabe`],
     // "Verhandlungssichere Englischkenntnisse", "fließend Deutsch".
     languagePatterns: [
-      String.raw`(?:fließende?s?|verhandlungssichere?s?|sehr\s+gute?)\s+(\p{L}+?)(?:kenntnisse|-)`,
+      String.raw`(?:fließende?[mnrs]?|verhandlungssichere?[mnrs]?|sehr\s+gute?[mnrs]?)\s+(\p{L}+?)(?:kenntnisse|-)`,
       // The adjective inflected before a bare name, too: "Verhandlungssicheres Englisch".
       String.raw`(?:fließend|verhandlungssicher)(?:e[mnrs]?)?\s+(?:in\s+)?(\p{L}+)`,
     ],
+    // Each also as its "-kenntnisse" compound, in the dative too: "Englischkenntnisse (C1)", "mit
+    // guten Englischkenntnissen".
     languageNames: {
-      deutsch: "german",
-      englisch: "english",
-      französisch: "french",
-      spanisch: "spanish",
-      italienisch: "italian",
-      niederländisch: "dutch",
-      polnisch: "polish",
-      türkisch: "turkish",
-      russisch: "russian",
-      chinesisch: "chinese",
-      japanisch: "japanese",
-      arabisch: "arabic",
-      portugiesisch: "portuguese",
+      ...LANGUAGES,
+      ...Object.fromEntries(
+        Object.entries(LANGUAGES).flatMap(([name, english]) => [
+          [`${name}kenntnisse`, english],
+          [`${name}kenntnissen`, english],
+        ]),
+      ),
     },
     // "Senior" and "Junior" are written in English. Not "Leiter", a manager's title.
     seniorityLevels: {

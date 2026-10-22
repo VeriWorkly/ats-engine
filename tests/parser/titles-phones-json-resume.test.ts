@@ -283,8 +283,58 @@ describe("education school names", () => {
     expect(schools("Stanford University, Sept 2018")).toEqual(["Stanford University"]);
   });
 
+  // DOCX tab stops and a PDF's column gaps part an education line as commas do; a range in
+  // brackets left its brackets behind ("University of Oregon ( )").
+  it.each([
+    "B.S. Computer Science\tUniversity of Oregon\t2018",
+    "B.S. Computer Science  University of Oregon  2018",
+    "University of Oregon\tB.S. Computer Science\t2014 - 2018",
+    "B.S. Computer Science, University of Oregon (2014 – 2018)",
+    "University of Oregon [2018]",
+  ])("reads the school between tab stops, wide gaps or bracketed dates: %j", (line) => {
+    expect(schools(line)).toEqual(["University of Oregon"]);
+  });
+
+  it("keeps a school whose own words a wide gap parts", () => {
+    expect(schools("Lakeview  University, B.S. Computer Science, 2018")).toEqual([
+      "Lakeview University",
+    ]);
+    // A gap after a joining word ("of") is inside the name, not between parts.
+    expect(schools("University of  California, Berkeley — B.S. Computer Science, 2018")).toEqual([
+      "University of California",
+    ]);
+    expect(schools("University of  Oregon\tB.S.\t2018")).toEqual(["University of Oregon"]);
+    // In capitals or title case too.
+    expect(schools("UNIVERSITY OF  CALIFORNIA, BERKELEY — B.S., 2018")).toEqual([
+      "UNIVERSITY OF CALIFORNIA",
+    ]);
+    expect(schools("UNIVERSITY OF  OREGON\tB.S. COMPUTER SCIENCE\t2018")).toEqual([
+      "UNIVERSITY OF OREGON",
+    ]);
+    expect(schools("University Of  Oregon\tB.S.\t2018")).toEqual(["University Of Oregon"]);
+  });
+
+  it("splits at a gap after a short word that is no joining word", () => {
+    expect(schools("University of Iowa\tB.S. Computer Science\t2018")).toEqual([
+      "University of Iowa",
+    ]);
+    expect(schools("University of Utah  B.S. Computer Science  2018")).toEqual([
+      "University of Utah",
+    ]);
+    expect(schools("BS\tStanford University\t2018")).toEqual(["Stanford University"]);
+    expect(schools("MBA\tHarvard Business School\t2020")).toEqual(["Harvard Business School"]);
+  });
+
+  it("drops brackets a spaced date range left empty", () => {
+    expect(schools("University of Oregon ( 2014 - 2018 )")).toEqual(["University of Oregon"]);
+  });
+
   it("stays linear on hostile input", () => {
     budget(() => schools("High School, ".repeat(4_000)));
+    budget(() => schools(`University${" \t".repeat(25_000)}x`));
+    budget(() => schools(`University ${"( ".repeat(25_000)}`));
+    budget(() => schools(`University ${"of \t ".repeat(10_000)}x`));
+    budget(() => schools(`UNIVERSITY ${"OF  ".repeat(12_000)}x`));
   });
 });
 

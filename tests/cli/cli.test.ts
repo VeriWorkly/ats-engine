@@ -114,6 +114,20 @@ describe("ats-engine check", () => {
     expect(printed).toContain("Missing soft skills (weigh less): communication, teamwork");
   });
 
+  it("reads a long posting file to 20,000 characters, and says when it cuts one", async () => {
+    const about = "Acme values ownership and curiosity in every team.\n".repeat(260);
+    const job = file("long.txt", `${about}Requirements\n- Kubernetes and Terraform`);
+    expect(await main(["check", file("r-long.txt", RESUME), "--job", job])).toBe(0);
+    expect(out.join("\n")).toMatch(/Missing keywords: kubernetes, terraform/);
+
+    out = [];
+    const longer = file("longer.txt", `${about}${about}Requirements\n- Kubernetes`);
+    expect(await main(["check", file("r-longer.txt", RESUME), "--job", longer])).toBe(0);
+    expect(out.join("\n")).toContain(
+      "The job posting is 26,545 characters; only its first 20,000 were read.",
+    );
+  });
+
   it("reads PDF and DOCX files, measuring a PDF's layout", async () => {
     const ops = LEFT_COLUMN.flatMap((line: string, index: number) => [
       text(45, 720 - index * 26, line),

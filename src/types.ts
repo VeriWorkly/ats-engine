@@ -120,7 +120,10 @@ export type AtsReport = {
    */
   matchedKeywordGroups: AtsKeywordGroups;
   missingKeywordGroups: AtsKeywordGroups;
-  /** Evidence of every failed check that stops an ATS reading the document (parse and extraction). */
+  /**
+   * Evidence of every failed check that stops an ATS reading the document (parse and extraction),
+   * then a note when the job posting was longer than `MAX_JOB_TEXT_CHARS` and cut.
+   */
   parsingWarnings: string[];
   strengths: string[];
   failedChecks: AtsRuleResult[];

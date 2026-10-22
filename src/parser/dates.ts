@@ -2,6 +2,7 @@ import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsParsedDate } from "../types.js";
 import { escapeRegex, normalizeText, wordListPattern } from "../text/text.js";
 import { memo } from "../util/memo.js";
+import { monthIndex, nowMonth } from "../util/months.js";
 
 // Date patterns are built from the policy's vocabulary (month names, "present") and compiled once per policy.
 
@@ -227,11 +228,6 @@ function placedStart(raw: string, rp: AtsEnginePolicy["resumeParse"], now: Date)
     : parsed;
 }
 
-/** A missing month is read generously: January for a start, December for an end. */
-function toIndex(date: AtsParsedDate, edge: "start" | "end") {
-  return date.year * 12 + (date.month ?? (edge === "start" ? 1 : 12));
-}
-
 /**
  * The first date range on the line that reads as a real span of time. A candidate is skipped when
  * either end is unreadable, a year is outside [1950, now + 10], or the range runs backwards; later
@@ -360,14 +356,11 @@ function searchDateRange(
 
     if (!isPlausibleDate(start, now)) continue;
     // A "since" date still to come dates no role ("Verfügbar ab 01/2027"): searched again from it.
-    if (
-      match[4] !== undefined &&
-      toIndex(start, "start") > now.getUTCFullYear() * 12 + now.getUTCMonth() + 1
-    ) {
+    if (match[4] !== undefined && monthIndex(start) > nowMonth(now)) {
       range.lastIndex = match.index + match[0].length - match[4].length;
       continue;
     }
-    if (!current && (!isPlausibleDate(end, now) || toIndex(end, "end") < toIndex(start, "start")))
+    if (!current && (!isPlausibleDate(end, now) || monthIndex(end, 12) < monthIndex(start)))
       continue;
     if (shortEnd && end && end.year > now.getUTCFullYear() + aheadYears) continue;
 

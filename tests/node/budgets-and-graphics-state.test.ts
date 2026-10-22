@@ -16,7 +16,7 @@ import {
   zipEntries,
   zipFiles,
 } from "../../src/node/docx.js";
-import { measureVisibility, seeThroughImages, type Box } from "../../src/node/hidden.js";
+import { measureVisibility, readImages, type Box } from "../../src/node/hidden.js";
 import { extractResume } from "../../src/node/index.js";
 import {
   buildDocxBody,
@@ -141,6 +141,16 @@ describe("form XObjects keep their own graphics state and matrix", () => {
 
   it("still finds white text inside a form", async () => {
     const layout = await pdfLayout("/Fm1 Do", XOBJECT, [form(`1 1 1 rg ${line(700)}`)]);
+    expect(layout.hiddenTextChars).toBe(KEYWORD_CHARS);
+  });
+
+  it("finds text outside a form's /BBox, which clips it", async () => {
+    const layout = await pdfLayout("/Fm1 Do", XOBJECT, [
+      stream(
+        "/Type/XObject/Subtype/Form/BBox[0 0 10 10]/Resources<</Font<</F1 4 0 R>>>>",
+        line(700),
+      ),
+    ]);
     expect(layout.hiddenTextChars).toBe(KEYWORD_CHARS);
   });
 });
@@ -308,7 +318,7 @@ describe("a page's images are decoded before the next page is read", () => {
         .filter((_, order) => list.fnArray[order] === OPS.paintImageXObject)
         .map((args) => String(args[0]));
       expect(ids).toHaveLength(1);
-      await seeThroughImages(OPS as unknown as Record<string, number>, list, page);
+      await readImages(OPS as unknown as Record<string, number>, list, page);
       expect(page.objs.has(ids[0]!)).toBe(true);
     } finally {
       await document.destroy();
@@ -1029,8 +1039,8 @@ describe("an image whose colour-key /Mask hides no pixel still covers the text u
       const list = (await page.getOperatorList()) as unknown as Parameters<
         typeof measureVisibility
       >[1];
-      const seeThrough = lookup ? await seeThroughImages(ops, list, page) : undefined;
-      const { hidden } = measureVisibility(ops, list, page.view as Box, seeThrough);
+      const pixels = lookup ? await readImages(ops, list, page) : undefined;
+      const { hidden } = measureVisibility(ops, list, page.view as Box, pixels);
       return hidden.join("").replace(/\s/g, "").length;
     } finally {
       await document.destroy();
@@ -1041,6 +1051,8 @@ describe("an image whose colour-key /Mask hides no pixel still covers the text u
     ["an opaque image", [image("", "ÿ")]],
     ["a colour-key mask that keys out no pixel", [image("/Mask[0 0]", "ÿ")]],
     ["a soft mask that is opaque throughout", [image("/SMask 8 0 R", "ÿ"), image("", "ÿ")]],
+    // 254 of 255 lets less through than an opaque shape does.
+    ["a soft mask a shade short of opaque", [image("/SMask 8 0 R", "ÿ"), image("", "þ")]],
   ])("counts %s as covering", async (_, extra) => {
     expect(await hiddenUnder(extra)).toBe(KEYWORD_CHARS);
   });
@@ -1048,12 +1060,36 @@ describe("an image whose colour-key /Mask hides no pixel still covers the text u
   it.each([
     ["a colour-key mask that keys out its pixel", [image("/Mask[255 255]", "ÿ")]],
     ["a soft mask that is transparent", [image("/SMask 8 0 R", "ÿ"), image("", "\u0000")]],
+    ["a soft mask at 80%", [image("/SMask 8 0 R", "ÿ"), image("", "Ì")]],
   ])("does not count %s", async (_, extra) => {
     expect(await hiddenUnder(extra)).toBe(0);
   });
 
   it("treats every masked image as see-through when its pixels are not looked up", async () => {
     expect(await hiddenUnder([image("/Mask[0 0]", "ÿ")], false)).toBe(0);
+  });
+
+  // A scan's OCR layer is invisible text over a picture of its words; over a blank image there are
+  // none to read.
+  const ocr = (pixels: string, size: number) =>
+    pdfLayout(
+      `q 612 0 0 720 0 0 cm /Im1 Do Q BT 3 Tr /F1 10 Tf 50 700 Td (${KEYWORDS}) Tj ET`,
+      "/XObject<</Im1 7 0 R>>",
+      [
+        stream(
+          `/Type/XObject/Subtype/Image/Width ${size}/Height ${size}/ColorSpace/DeviceGray/BitsPerComponent 8`,
+          pixels,
+        ),
+      ],
+    );
+
+  it("finds invisible text over a blank image", async () => {
+    expect((await ocr("ÿ", 1)).hiddenTextChars).toBe(KEYWORD_CHARS);
+    expect((await ocr("ÿÿÿÿ", 2)).hiddenTextChars).toBe(KEYWORD_CHARS);
+  });
+
+  it("does not flag invisible text over a picture of words", async () => {
+    expect((await ocr("ÿ\u0000\u0000ÿ", 2)).hiddenTextChars).toBe(0);
   });
 
   it("looks the pixels up when a PDF is extracted", async () => {
@@ -1099,7 +1135,7 @@ describe("nested tables and markup outside the elements stay linear", () => {
     const body = `${BODY}<w:p><w:r><w:rPr><w:vanish/></w:rPr><w:t><![CDATA[${KEYWORDS} <&>]]></w:t></w:r></w:p>`;
     const measured = measureDocx(buildDocxBody(body));
     expect(measured?.hiddenChars).toBe(KEYWORD_CHARS + 3);
-    expect(measured?.hiddenSample).toBe(`${KEYWORDS} <&>`);
+    expect(measured?.hiddenText).toBe(`${KEYWORDS} <&>`);
   });
 });
 

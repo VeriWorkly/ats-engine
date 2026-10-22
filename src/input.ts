@@ -2,6 +2,8 @@ import { fromJsonResume, isJsonResume } from "./document/jsonResume.js";
 import { renderResumeDocument } from "./document/render.js";
 import { resumeDocumentSchema } from "./document/schema.js";
 import { DOCUMENT_LIMITS, isResumeDocument, type AtsResumeDocument } from "./document/types.js";
+import { findName } from "./parser/contact.js";
+import { DEFAULT_POLICY } from "./policy/default.js";
 import { readHiddenCharacters, type HiddenCharacters } from "./text/characters.js";
 import { cut, normalizeText } from "./text/text.js";
 import { ENGLISH_ISSUES } from "./util/issues.js";
@@ -167,8 +169,12 @@ export function prepareResume(input: unknown): PreparedResume {
     document = validDocument(input);
     text = renderResumeDocument(document);
   } else if (isJsonResume(input)) {
+    const json = fromJsonResume(input);
+    // A `basics` that is only a string is held to a printed name's checks: not a headline.
+    if (typeof input.basics === "string")
+      json.basics.name = findName([json.basics.name], DEFAULT_POLICY).name;
     // The adapter's output should validate; if not, the caller gets `AtsInputError`, not a ZodError.
-    document = validDocument(fromJsonResume(input));
+    document = validDocument(json);
     text = renderResumeDocument(document);
   } else {
     text = flatten(input);

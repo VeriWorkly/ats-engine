@@ -155,6 +155,10 @@ function render(report: AtsReport, style: Style): string {
     if (hard.length) lines.push(`  Missing keywords: ${style.yellow(hard.join(", "))}`);
     if (soft.length)
       lines.push(`  Missing soft skills (weigh less): ${style.dim(soft.join(", "))}`);
+    // A posting cut short; the other warnings are failed checks, printed below.
+    for (const warning of report.parsingWarnings)
+      if (!report.failedChecks.some((rule) => rule.evidence === warning))
+        lines.push(`  ${style.yellow(warning)}`);
   }
 
   const read = [...report.locale.languages, report.locale.region].filter(Boolean);

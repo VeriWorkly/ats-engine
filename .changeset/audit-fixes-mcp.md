@@ -15,3 +15,9 @@
 - **Breaking:** a right-to-left Word resume no longer fails the invisible-characters check for the direction embeddings Word writes, and scores 10 points higher.
 - **Breaking:** a JSON Resume whose current role ends in "heute", "Current role" or another open end the engine reads, written alone, is current, with its full experience, not one month.
 - **Breaking:** `check_resume` reads the text of a Chinese, Japanese or Korean PDF whose font uses a standard CJK character map, which came out empty.
+- **Breaking:** `check_resume` and `match_job` read `job_text` and `job_path` to 20,000 characters instead of 12,000, so job match scores change for postings over 12,000 characters (a 12,681-character posting with its requirements last: 36 → 4). Past 20,000, `check_resume`'s `parsingWarnings` notes the cut.
+- **Breaking:** requirements follow the engine: "or related field" no longer stands in for a degree, and German "-kenntnisse" compounds and the language the resume's sentences are written in (at C1, when no languages are listed) count for a language requirement.
+- **Breaking:** `check_resume` reads a name followed by a title on the first line ("Mira Kestrel | Senior Software Engineer") when one email or profile link spells every word of it (mira.kestrel@…, mkestrel@…, linkedin.com/in/mira-kestrel), a school from a tab-separated education line, and a JSON Resume with empty entries first, no `basics`, or `work` as one object, and its score changes with them.
+- **Breaking:** `check_resume` finds hidden text in a PDF clipped out of view, drawn in a blend mode that leaves the page unchanged, or set on a blank image of its own colour, and scores such a file lower.
+- **Breaking:** `check_resume` measures a PDF's annotations for hidden text: a white box drawn over text is hidden text, and a highlight is not.
+- On Linux and macOS, `path` and `job_path` starting with `//` are read.

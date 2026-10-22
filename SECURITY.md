@@ -28,7 +28,8 @@ are operator-supplied: `parseAtsPolicy` checks that they compile, not that they 
 review a policy's patterns as you would code — `tests/integration/regressions.test.ts` re-runs the
 adversarial suite against a private policy when one is present.
 
-**Size.** Resume text is cut at 50 000 characters, postings at 20 000, a structured document is
+**Size.** Resume text is cut at 50 000 characters, postings at 20 000 (`MAX_JOB_TEXT_CHARS`, on
+every path; `check` says so in `parsingWarnings`), a structured document is
 bounded in depth, array length and node count before it is validated, a policy or a locale pack
 nested deeper than 5 000 levels (or one that contains itself) is refused as invalid with
 `AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
@@ -46,8 +47,10 @@ name is read to its first 255 characters. The CLI and the MCP server read only a
 regular file on this computer: a file over 20 MB is refused before it is opened, and is read through one handle
 no further than one byte past the limit, so a file that grows meanwhile is refused too; a folder, a
 pipe or a device (which reports no size and can stream without end) is refused before it is opened,
-and so is a network path (`\\host\share\…`, `//host/share/…`, `\\?\UNC\…`) or a device path
-(`\\.\…`); of the paths that start with two slashes, only the local long form `\\?\C:\…` is read.
+and on Windows so is a network path (`\\host\share\…`, `//host/share/…`, `\\?\UNC\…`) or a device
+path (`\\.\…`); of the paths that start with two slashes, only the local long form `\\?\C:\…` is
+read there. On Linux and macOS a path that starts with two slashes (`//tmp/cv.pdf`) is the local
+path it names, and is read.
 Only the path's form is checked: a mapped drive letter, a `subst` drive, a link or junction to a
 share, or an SMB or NFS mount looks local and is read over the network. A job posting is read only
 from a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file, before it is opened: its words come back as
@@ -98,7 +101,9 @@ What does not depend on the model:
 - Free text a model writes (an explanation, a recommendation) is advice and is not grounded:
   show it as the model's words, not as facts about the candidate.
 - A provider's error is quoted in the error message only in its own short words (a JSON body's
-  `error.message`, or a text body of one line, up to 200 characters, keys redacted). The rest of a
+  `error.message`, else its `message`, or a `detail` that is a string; the first entry of a list
+  of them; or a text body of one line; up to 200 characters, keys redacted). An error sent with
+  HTTP 200 (`{"error": …}`, `{"type": "error", …}`) is read the same way. The rest of a
   JSON body, and a text body that is longer or breaks a line (any line break: CR, LF, U+2028 and
   the like), where a gateway may echo the request and the resume in it, are never quoted. A
   one-line text body is quoted whole, so a gateway that echoes a short request on one line, or

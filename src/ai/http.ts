@@ -53,7 +53,54 @@ const platform = globalThis as unknown as {
     any(signals: AbortSignalLike[]): AbortSignalLike;
   };
   TextDecoder: new () => { decode(bytes: Uint8Array, options?: { stream: boolean }): string };
+  setTimeout(run: () => void, ms: number): unknown;
+  clearTimeout(timer: unknown): void;
 };
+
+/**
+ * Settles as `work` does, or rejects with the signal's reason once it aborts: a `fetch` a host
+ * passes may ignore the signal and never settle.
+ */
+function until<T>(work: Promise<T>, signal: AbortSignalLike): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const stop = () => reject(signal.reason);
+    if (signal.aborted) return stop();
+    signal.addEventListener("abort", stop, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener("abort", stop));
+  });
+}
+
+/** Waits `ms`; rejects with `AbortedError` at once when `signal` aborts first. */
+export function pause(ms: number, signal?: AbortSignalLike): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new AbortedError(signal.reason));
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const stop = () => {
+      platform.clearTimeout(timer);
+      reject(new AbortedError(signal?.reason));
+    };
+    const timer = platform.setTimeout(() => {
+      signal?.removeEventListener("abort", stop);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", stop, { once: true });
+  });
+}
+
+/**
+ * `retry-after` in milliseconds: decimal seconds, or an HTTP date (it starts with the day's name);
+ * undefined when absent or anything else (`0x10` and `1e3` are no seconds; a blank is not 0).
+ */
+function retryAfterMs(response: FetchResponseLike): number | undefined {
+  const value = typeof response.headers?.get === "function" && response.headers.get("retry-after");
+  if (!value) return undefined;
+  const ms = /^\s*[\d.]+\s*$/.test(value)
+    ? Number(value) * 1000
+    : /^\s*[a-z]/i.test(value)
+      ? Date.parse(value) - Date.now()
+      : Number.NaN;
+  return Number.isFinite(ms) ? Math.max(0, ms) : undefined;
+}
 
 /** The response's body as text, refused past `MAX_RESPONSE_BYTES`. */
 async function readLimited(response: FetchResponseLike): Promise<string> {
@@ -159,18 +206,35 @@ const MAX_PROVIDER_TEXT = 200;
 /** Any line break: a lone CR, a vertical tab, a form feed, NEL, U+2028 and U+2029 too. */
 const LINE_BREAK = /[\n\r\v\f\x85\p{Zl}\p{Zp}]/u;
 
+type ErrorBody = {
+  error?: unknown;
+  type?: unknown;
+  message?: unknown;
+  detail?: unknown;
+  /** An answer: OpenAI's `choices`, Anthropic's `content`. */
+  choices?: unknown[];
+  content?: unknown[];
+};
+
+/** A JSON body, or the first entry of a list of them (Gemini answers `[{"error": …}]`). */
+const bodyOf = (json: unknown) =>
+  (Array.isArray(json) ? json[0] : json) as ErrorBody | null | undefined;
+
 /**
  * What an error body says in the provider's own words: a JSON body's `error.message` (or a
- * `message` or `error` string), else a short one-line text body ("Bad Gateway"); "" otherwise. A
- * gateway may echo the request, the resume with it, around that text: the rest is never quoted.
- * A text body of one short line is quoted whole, so an echo that short is quoted too.
+ * `message`, `error` or `detail` string), else a short one-line text body ("Bad Gateway"); ""
+ * otherwise. A gateway may echo the request, the resume with it, around that text: the rest is
+ * never quoted. A text body of one short line is quoted whole, so an echo that short is too.
  */
 function providerSays(raw: string): string {
   let said: unknown = raw.trim();
   try {
-    const json = JSON.parse(raw) as Record<string, unknown> | null;
-    const error = json?.error as Record<string, unknown> | string | undefined;
-    said = typeof error === "string" ? error : (error?.message ?? json?.message);
+    const json = bodyOf(JSON.parse(raw));
+    const error = json?.error as { message?: unknown } | string | undefined;
+    said =
+      typeof error === "string"
+        ? error
+        : error?.message || json?.message || (typeof json?.detail === "string" && json.detail);
   } catch {
     // Not JSON: plain text, quoted only when it is a short line.
   }
@@ -196,24 +260,29 @@ export async function postJson(
   const timeout = platform.AbortSignal.timeout(options.timeoutMs ?? 120_000);
   const signal = options.signal ? platform.AbortSignal.any([options.signal, timeout]) : timeout;
 
-  let response: FetchResponseLike;
+  let response!: FetchResponseLike;
   let raw: string;
   try {
-    response = await fetchImpl(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...headers },
-      body: JSON.stringify(body),
+    raw = await until(
+      (async () => {
+        response = await fetchImpl(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...headers },
+          body: JSON.stringify(body),
+          signal,
+          redirect: "manual",
+        });
+        if (isRedirect(response)) {
+          const status = response.status >= 300 && response.status < 400;
+          throw new LlmProviderError(
+            `The provider at ${originOf(url)} answered with a redirect${status ? ` (HTTP ${response.status})` : ""}, which is never followed: it would take the API key and the request elsewhere. Set the base URL to the address the provider answers at.`,
+            { retryable: false, ...(status && { status: response.status }) },
+          );
+        }
+        return readLimited(response);
+      })(),
       signal,
-      redirect: "manual",
-    });
-    if (isRedirect(response)) {
-      const status = response.status >= 300 && response.status < 400;
-      throw new LlmProviderError(
-        `The provider at ${originOf(url)} answered with a redirect${status ? ` (HTTP ${response.status})` : ""}, which is never followed: it would take the API key and the request elsewhere. Set the base URL to the address the provider answers at.`,
-        { retryable: false, ...(status && { status: response.status }) },
-      );
-    }
-    raw = await readLimited(response);
+    );
   } catch (error) {
     if (error instanceof LlmProviderError) throw error;
     if (options.signal?.aborted) throw new AbortedError(error);
@@ -223,17 +292,17 @@ export async function postJson(
     });
   }
 
-  if (!response.ok) {
-    const said = providerSays(raw);
-    const excerpt = said && withoutSecrets(said, headers);
-    throw new LlmProviderError(
-      `Provider returned HTTP ${response.status}${excerpt ? `: ${excerpt}` : "."}`,
-      {
-        status: response.status,
-        retryable: isRetryableStatus(response.status),
-      },
-    );
-  }
+  const said = () => {
+    const excerpt = providerSays(raw);
+    return excerpt ? `: ${withoutSecrets(excerpt, headers)}` : ".";
+  };
+  const after = retryAfterMs(response);
+  if (!response.ok)
+    throw new LlmProviderError(`Provider returned HTTP ${response.status}${said()}`, {
+      status: response.status,
+      retryable: isRetryableStatus(response.status),
+      retryAfterMs: after,
+    });
 
   let json: unknown;
   try {
@@ -243,6 +312,26 @@ export async function postJson(
       status: response.status,
       retryable: true,
       cause: error,
+    });
+  }
+  // An error sent with HTTP 200 (`{"error": …}`, Anthropic's `{"type": "error", …}`), and no
+  // answer beside it: a gateway may add an empty `error` (`{}`, `null`) to every answer. Its own
+  // `code` says whether a retry can help, else its `type` or a bare string's words do.
+  const failed = bodyOf(json);
+  const error = failed?.error;
+  const { code, type, message } = Object(error) as Record<string, unknown>;
+  const words = typeof error === "string" ? error : type;
+  if (
+    !(failed?.choices ?? failed?.content)?.length &&
+    (failed?.type === "error" || words || code || message)
+  ) {
+    const status = typeof code === "number" && code >= 400 && code < 600 ? code : undefined;
+    throw new LlmProviderError(`Provider returned an error${said()}`, {
+      status,
+      retryable: status
+        ? isRetryableStatus(status)
+        : !/invalid|auth|permission|not.?found/i.test(String(words)),
+      retryAfterMs: after,
     });
   }
   if (!json || typeof json !== "object" || Array.isArray(json))

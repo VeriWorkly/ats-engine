@@ -233,6 +233,25 @@ describe("knockouts", () => {
     });
   });
 
+  // "Or a related field" widens the field of study; it lets no experience stand in for the degree.
+  it("reads 'or related field' as about the field, not as equivalent experience", () => {
+    for (const ask of [
+      "Master's degree in Computer Science or related field",
+      "Master's degree in Computer Science or a related field",
+      "PhD in Physics or related field",
+    ])
+      expect(one(ask), ask).toMatchObject({
+        kind: "education",
+        status: "missing",
+        detail: expect.not.stringMatching(/equivalent experience/),
+      });
+    // The field named meets it; another may be related, which the resume cannot show.
+    const ask = "Bachelor's degree in Computer Science or related field";
+    expect(one(ask)).toMatchObject({ kind: "education", status: "met" });
+    const physics = RESUME.replace("B.S. Computer Science", "B.S. Physics");
+    expect(one(ask, physics)).toMatchObject({ kind: "education", status: "partial" });
+  });
+
   it("finds a language the resume names", () => {
     expect(one("Fluent in Spanish")).toMatchObject({ kind: "language", status: "met" });
     expect(one("Fluent in German")).toMatchObject({ kind: "language", status: "missing" });

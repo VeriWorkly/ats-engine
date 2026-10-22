@@ -84,7 +84,9 @@ describe("post-nominals after the name", () => {
   });
 
   it("keeps a comma that is not followed by credentials", () => {
-    // "Doe, Jane" is not a name the parser accepts either way; the point is it is not cut.
+    // "Jane" is not cut as a credential: the line is read surname first, when the email spells
+    // both words, and is no name otherwise.
+    expect(check("Doe, Jane\njane.doe@example.com").parsed.name).toBe("Jane Doe");
     expect(check("Doe, Jane\njane@example.com").parsed.name).toBe("");
   });
 });
@@ -398,7 +400,8 @@ describe("the visibility index answers as a full scan does", () => {
     const below = drawn.filter((d) => d.order < order && inside(d));
     return {
       top: below[below.length - 1],
-      overImage: below.some((d) => d.kind === "image"),
+      // A blank image (its colour known) is no picture.
+      overImage: below.some((d) => d.kind === "image" && !d.fill),
       covered: drawn.some((d) => d.order > order && d.alpha >= 0.9 && inside(d)),
     };
   }
@@ -414,7 +417,8 @@ describe("the visibility index answers as a full scan does", () => {
         const box: [number, number, number, number] =
           random() < 0.05 ? [Number.NaN, 0, 1, 1] : [x, y, x + size, y + size * random()];
         const kind = random() < 0.3 ? "image" : random() < 0.1 ? "shading" : "shape";
-        return { box, order: i * 2, kind, fill: "#000000", alpha: random() < 0.5 ? 1 : 0.5 };
+        const fill = kind === "image" && random() < 0.5 ? "" : "#000000";
+        return { box, order: i * 2, kind, fill, alpha: random() < 0.5 ? 1 : 0.5 };
       });
       const points: Array<[number, number]> = Array.from({ length: 40 }, () => [
         random() * 900 - 150,

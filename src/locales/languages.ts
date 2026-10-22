@@ -162,6 +162,12 @@ export function isWrittenIn({ text, words }: Sample, pack: Detection, base?: Det
   );
 }
 
+/** Whether a line holds any of the language's detection words, or a letter of its script. */
+export const showsAny = (line: string, pack: Detection) => {
+  const { script, words } = detectionOf(pack);
+  return script ? line.search(script) >= 0 : sampleOf(line).words.some((word) => words.has(word));
+};
+
 /**
  * Whether a pack's language, rather than the policy's own, is what the text is written in: a
  * script pack always is; a Latin-script one unless the text holds more of the base's detection

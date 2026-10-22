@@ -341,6 +341,213 @@ describe("a language asked for", () => {
     expect(ask("Grundkenntnisse")?.status).toBe("missing");
   });
 
+  // "Englischkenntnisse" is English, in a resume's row and in a posting, with the level beside it.
+  it.each([
+    [
+      "Sehr gute Englischkenntnisse in Wort und Schrift",
+      "Verhandlungssichere Englischkenntnisse",
+      "partial",
+    ],
+    ["Englischkenntnisse (C1)", "Verhandlungssichere Englischkenntnisse", "met"],
+    ["Englischkenntnisse (Grundkenntnisse)", "Verhandlungssichere Englischkenntnisse", "missing"],
+    ["Deutschkenntnisse (B1)", "Deutsch auf C1-Niveau", "partial"],
+    ["Sehr gute Französischkenntnisse", "Gute Französischkenntnisse von Vorteil", "met"],
+    ["Französisch: gute Kenntnisse", "Gute Französischkenntnisse von Vorteil", "met"],
+    ["Englisch (C1)", "Englischkenntnisse", "met"],
+    ["Sehr gute Deutsch- und Englischkenntnisse", "Englisch (B2)", "met"],
+    // The level of a compound ask: "gute" is B1, in the dative too.
+    ["Englisch (A1)", "Gute Englischkenntnisse", "missing"],
+    ["Englisch – Grundkenntnisse", "Gute Englischkenntnisse", "partial"],
+    ["Englisch – Basiskenntnisse", "Fließende Englischkenntnisse", "missing"],
+    ["Englisch (Schulkenntnisse)", "Gute Englischkenntnisse", "partial"],
+    ["Französischkenntnisse (Schulkenntnisse)", "Gute Französischkenntnisse", "partial"],
+    ["Englisch (C1)", "Mit guten Englischkenntnissen", "met"],
+    ["Englisch (A2)", "Sehr guten Englischkenntnissen", "missing"],
+  ])("reads the German compound in %j against %j", (row, ask, status) => {
+    const resume = `Anna Schmidt\nanna@example.de\nBerufserfahrung\nBeraterin bei Beispiel GmbH seit 04/2021\n• Leitung von Projekten\nSprachen\n${row}`;
+    const report = check(resume, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
+      jobDescription: `Ihr Profil\n- ${ask}`,
+      now: NOW,
+      languages: ["de"],
+    });
+    expect(report.requirements[0]).toMatchObject({ kind: "language", status });
+    // One language asked, though the compound names it whole and in part.
+    expect(report.requirements[0]?.terms).toHaveLength(1);
+    if (status !== "missing") expect(report.requirements[0]?.evidence).toHaveLength(1);
+    // Named by the language, not the compound.
+    expect(report.requirements[0]?.detail ?? "").not.toMatch(/kenntnisse/i);
+    expect(report.requirements[0]?.terms[0]?.term).not.toMatch(/kenntnisse/i);
+  });
+
+  // The language a resume is written in shows it, at C1: never a native level from that alone.
+  describe("in the language the resume is written in", () => {
+    // Three sentence lines each: fewer show too little of a language to credit it.
+    const TWO_LINES = BASE.replace(
+      "for 2M users",
+      "for 2M users\n- Led the move of the billing system to the cloud with the platform team",
+    );
+    const ENGLISH = TWO_LINES.replace(
+      "platform team",
+      "platform team\n- Wrote the runbooks for the on-call rotation",
+    );
+    const GERMAN = `Anna Schmidt\nanna@example.de\nBerufserfahrung\nBeraterin bei Beispiel GmbH seit 04/2021\n• Leitung von Projekten mit Kunden aus der Industrie und dem Handel\n• Betreuung der Kunden bei der Einführung von Software für den Vertrieb\n• Schulung der Mitarbeiter für die neuen Systeme`;
+    const FRENCH = `Claire Martin\nclaire@example.fr\nExpérience professionnelle\nConsultante chez Exemple SA depuis 04/2021\n• Gestion des projets pour les clients dans le secteur bancaire\n• Suivi des ventes avec les équipes sur le terrain\n• Formation des équipes sur les nouveaux outils`;
+    // Each listing languages that leave its own off.
+    const ENGLISH_ROWS = `${ENGLISH}\nLanguages\nGerman: B2/C1`;
+    const GERMAN_ROWS = `${GERMAN}\nSprachen\nEnglisch (C1), Französisch (B2)`;
+    const SPANISH = `Lucía Pérez\nlucia@example.es\nExperiencia\nIngeniera en Acme desde 2019\n- Desarrollo de servicios de pagos con Go para una empresa de más de 200 personas\n- Responsable de la migración de los sistemas que usa el equipo`;
+    const ask = (resume: string, line: string) =>
+      check(resume, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
+        jobDescription: `Requirements\n- ${line}`,
+        now: NOW,
+      }).requirements[0];
+
+    it.each([
+      [ENGLISH, "Business fluent English"],
+      [ENGLISH, "English required"],
+      [GERMAN, "Fließend Deutsch"],
+      [GERMAN, "German required"],
+      [FRENCH, "Français courant"],
+    ])("is met: %#", (resume, line) => {
+      expect(ask(resume, line)).toMatchObject({ kind: "language", status: "met", evidence: [] });
+    });
+
+    it("is short of a native level, and says why", () => {
+      expect(ask(ENGLISH, "Native English speaker")).toMatchObject({
+        status: "partial",
+        detail: "English: C1 read from the language the resume is written in, C2 asked",
+      });
+      expect(ask(GERMAN, "Deutsch auf Muttersprachniveau")?.status).toBe("partial");
+    });
+
+    it("takes the language from the resume's words, not from the language it was read in", () => {
+      const found = check(ENGLISH, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
+        jobDescription: "Requirements\n- Fließend Deutsch",
+        now: NOW,
+        languages: ["de"],
+      }).requirements[0];
+      expect(found?.status).not.toBe("met");
+    });
+
+    it("leaves a stated row, and other languages, as they were", () => {
+      expect(ask(ENGLISH_ROWS, "Fluent German")).toMatchObject({ status: "partial" });
+      expect(ask(GERMAN_ROWS, "Fluent Spanish")?.status).toBe("missing");
+      // A resume in no language the policy reads is not taken for English.
+      expect(ask(SPANISH, "Fluent English")?.status).toBe("unverifiable");
+    });
+
+    // A list of languages would name the one written in; a line naming it states its level.
+    it.each([
+      [ENGLISH_ROWS, "Fluent English", "missing"],
+      [GERMAN_ROWS, "Fließend Deutsch", "missing"],
+      [`${ENGLISH}\nAdditional\nEnglish: basic`, "Fluent English", "missing"],
+      [`${ENGLISH}\nAdditional\nEnglish (A2)`, "Fluent English", "missing"],
+      [`${ENGLISH}\nOther: English – limited working proficiency`, "Fluent English", "missing"],
+    ])("is not credited past what the resume states: %#", (resume, line, status) => {
+      expect(ask(resume, line)?.status).toBe(status);
+    });
+
+    // Only the resume's own sentences count, never its headings and dates, nor those the engine
+    // writes for a structured document.
+    it.each([
+      `María García\nmaria@example.es\nSummary\nIngeniera de software con cinco años en sistemas de pagos.\nWork Experience\nIngeniera de Software, BBVA\nEne 2019 - Present\n- Diseñé el sistema de pagos en tiempo real\n- Dirigí la migración de la plataforma de datos a la nube\nEducation\nGrado en Ingeniería Informática, Universidad Politécnica de Madrid, 2016\nSkills\nJava, Python, Kafka`,
+      `Sanne de Vries\nsanne@example.nl\nSummary\nSoftware engineer met ervaring in betalingssystemen.\nWork Experience\nSoftware Engineer, Adyen\nJan 2019 - Present\n- Ontwikkelde het betalingssysteem\n- Leidde de migratie van het dataplatform naar de cloud\nEducation\nMSc Informatica, TU Delft, 2016\nSkills\nJava, Python`,
+    ])("is not English for English headings over other prose: %#", (resume) => {
+      expect(ask(resume, "Fluent English")?.status).toBe("unverifiable");
+    });
+
+    // Most of the sentence lines must hold the language's own words, whether or not the policy
+    // has a pack for the others: one English summary over Spanish bullets is no English resume.
+    const summaryOver = (bullets: string[]) =>
+      `Alex Morgan\nalex@example.com\nSummary\nSoftware engineer with five years of experience in payment systems and the teams that run them.\nExperience\nSoftware Engineer, Acme\nJan 2019 - Present\n${bullets.map((bullet) => `- ${bullet}`).join("\n")}\nEducation\nB.S. Computer Science, University of Oregon, 2016\nSkills\nJava, Python`;
+    it.each([
+      [
+        "Diseñé el sistema de pagos en tiempo real para la plataforma de los clientes",
+        "Dirigí la migración de la plataforma de datos a la nube con el equipo",
+        "Mantuve las aplicaciones de los clientes bancarios en la nube",
+      ],
+      [
+        "Projetei o sistema de pagamentos em tempo real para a plataforma dos clientes",
+        "Liderei a migração da plataforma de dados para a nuvem com a equipe",
+        "Mantive as aplicações dos clientes do banco na nuvem",
+      ],
+      [
+        "Ho progettato il sistema di pagamento in tempo reale per la piattaforma dei clienti",
+        "Ho guidato la migrazione della piattaforma dati verso il cloud con il team",
+        "Ho mantenuto le applicazioni dei clienti della banca nel cloud",
+      ],
+      [
+        "Ontwierp het realtime betalingssysteem voor het platform van de klanten",
+        "Leidde de migratie van het dataplatform naar de cloud met het team",
+        "Onderhield de applicaties van de klanten van de bank in de cloud",
+      ],
+      [
+        "Entwicklung des Zahlungssystems in Echtzeit für die Plattform der Kunden",
+        "Leitung der Migration der Datenplattform in die Cloud mit dem Team",
+        "Betreuung der Anwendungen für die Kunden der Bank in der Cloud",
+      ],
+      [
+        "J'ai conçu le système de paiement en temps réel pour la plateforme des clients",
+        "J'ai dirigé la migration de la plateforme de données vers le cloud avec l'équipe",
+        "J'ai maintenu les applications des clients de la banque dans le cloud",
+      ],
+    ])("is not English for an English summary over other bullets: %#", (...bullets) => {
+      expect(ask(summaryOver(bullets), "Fluent English")?.status).toBe("unverifiable");
+    });
+
+    it("needs a few sentence lines, and counts terse ones", () => {
+      expect(ask(TWO_LINES, "Fluent English")?.status).toBe("unverifiable");
+      // Terse bullets still hold English words; one without any is outnumbered.
+      const terse = summaryOver([
+        "Built payment APIs in Go; cut p99 latency 40%",
+        "Led migration to Kubernetes for 30 services",
+        "Cut cloud spend 30% via autoscaling",
+      ]);
+      expect(ask(terse, "Fluent English")?.status).toBe("met");
+      expect(ask(terse.replace(/^Summary\n.*\n/mu, ""), "Fluent English")?.status).toBe("met");
+    });
+
+    it("reads the sentence lines in linear time", () => {
+      for (const unit of [
+        "- Led the work with the team\n",
+        "Led the work with the team ",
+        "a b c ",
+      ])
+        expectFast(
+          () =>
+            ask(`${ENGLISH}\n${unit.repeat(Math.ceil(50_000 / unit.length))}`, "Fluent English"),
+          2_000,
+        );
+    });
+
+    it("is not English for a structured document in another language", () => {
+      const doc = {
+        basics: {
+          name: "João Silva",
+          email: "joao@example.com.br",
+          summary:
+            "Engenheiro de software com experiência em sistemas de pagamentos para bancos digitais.",
+        },
+        work: [
+          {
+            name: "Nubank",
+            position: "Engenheiro de Software",
+            startDate: "2019-01",
+            highlights: [
+              "Projetei o sistema de pagamentos em tempo real com a equipe",
+              "Liderei a migração da plataforma de dados para a nuvem",
+            ],
+          },
+        ],
+      };
+      for (const languages of [[], [{ language: "Português", fluency: "Nativo" }]])
+        for (const line of ["Fluent English", "Native English speaker"])
+          expect(ask({ ...doc, languages } as never, line)?.status, line).not.toMatch(
+            /met|partial/,
+          );
+    });
+  });
+
   it("is met by a row of a structured document", () => {
     const doc: AtsResumeDocument = {
       format: "ats-resume@1",

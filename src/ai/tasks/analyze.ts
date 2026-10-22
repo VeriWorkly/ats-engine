@@ -1,5 +1,6 @@
 import * as z from "zod/mini";
 
+import { MAX_JOB_TEXT_CHARS } from "../../job/index.js";
 import {
   groundingWords,
   isGrounded,
@@ -32,9 +33,6 @@ export type AnalyzeInput = {
   report: AtsReport;
   jobDescription?: string | undefined;
 };
-
-/** Job text beyond this adds cost, not signal. */
-const MAX_JOB_CHARS = 20_000;
 
 /** As much of the resume as the engine reads. */
 const MAX_RESUME_CHARS = 50_000;
@@ -110,7 +108,8 @@ export function analyzeSpec(
   input: AnalyzeInput,
   redact: boolean,
 ): TaskSpec<AtsAiInsights, AtsAiInsights> {
-  const job = input.jobDescription?.trim().slice(0, MAX_JOB_CHARS) ?? "";
+  // As much of the posting as the report was computed from.
+  const job = input.jobDescription?.trim().slice(0, MAX_JOB_TEXT_CHARS) ?? "";
   // Redacted with room past the cut, then cut where the redacted text diverges from the
   // redacted first MAX_RESUME_CHARS: a contact the cut falls in is never sent in part.
   const read = input.resumeText.slice(0, MAX_RESUME_CHARS + CUT_MARGIN);

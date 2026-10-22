@@ -390,6 +390,71 @@ describe("JSON Resume through the engine's front door", () => {
     expect(prepared.document?.sections[0]?.kind).toBe("experience");
   });
 
+  // The arrays were cut to 200 before empty entries were dropped: 200 empty ones hid every real one.
+  it("drops empty entries before cutting an array to its limit", () => {
+    const resume = {
+      basics: { name: "Mira Kestrel" },
+      work: [
+        ...Array.from({ length: 250 }, () => ({})),
+        null,
+        { startDate: "2010-01" },
+        {
+          name: "Globex Corp",
+          position: "Engineer",
+          startDate: "2019-01",
+          highlights: [...Array<string>(120).fill(""), "Built dashboards used by 40 teams"],
+        },
+      ],
+    };
+    const { parsed } = check(resume);
+    expect(parsed.roles).toMatchObject([{ employer: "Globex Corp", title: "Engineer" }]);
+    expect(prepareResume(resume).text).toContain("Built dashboards used by 40 teams");
+    // An array of nothing but empty entries is walked once, in linear time.
+    const empty = { basics: { name: "A" }, work: Array.from({ length: 200_000 }, () => ({})) };
+    expect(expectFast(() => prepareResume(empty), 500).document?.sections).toEqual([]);
+  });
+
+  const role = { name: "Globex Corp", position: "Engineer", startDate: "2019-01" };
+
+  // These were flattened to text, which reads no role.
+  it.each([
+    ["no basics", { work: [role] }],
+    ["basics that is not an object", { basics: "Mira Kestrel", work: [role] }],
+    ["work as one object", { basics: { name: "Mira Kestrel" }, work: role }],
+    ["no basics and work as one object", { work: role, education: [] }],
+  ])("reads a file with %s as structure", (_, resume) => {
+    expect(prepareResume(resume).document).not.toBeNull();
+    expect(check(resume).parsed.roles).toMatchObject([
+      { employer: "Globex Corp", title: "Engineer" },
+    ]);
+  });
+
+  // Read as text, such a file gave its name; read as structure, it was lost.
+  it("reads basics that are only a name as the name", () => {
+    expect(check({ basics: "Mira Kestrel", work: [role] }).parsed.name).toBe("Mira Kestrel");
+    // A name in a script without case is one run of characters.
+    expect(check({ basics: "王小明", work: [role] }).parsed.name).toBe("王小明");
+    // Particles between the capitalised words, as 0.16.0 read them.
+    expect(check({ basics: "Pieter van der Berg", work: [role] }).parsed.name).toBe(
+      "Pieter van der Berg",
+    );
+    expect(check({ basics: "Ana de la Cruz", work: [role] }).parsed.name).toBe("Ana de la Cruz");
+  });
+
+  // Held to the checks a name on a page gets: a headline or a heading is not one.
+  it.each(["Senior Software Engineer", "Work Experience", "Software Engineer at Hooli"])(
+    "reads no name from basics that are only %j",
+    (basics) => {
+      expect(check({ basics, work: [role] }).parsed.name).toBe("");
+    },
+  );
+
+  it("still flattens an object without basics whose roles are not spelled as JSON Resume's", () => {
+    const other = { name: "Mira Kestrel", work: [{ company: "Globex Corp", title: "Engineer" }] };
+    expect(prepareResume(other).document).toBeNull();
+    expect(prepareResume(other).text).toContain("Mira Kestrel");
+  });
+
   it("is not triggered by an object that merely has a basics key", () => {
     expect(prepareResume({ basics: { name: "A" } }).document).toBeNull();
   });

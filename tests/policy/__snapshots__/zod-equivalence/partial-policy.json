@@ -247,6 +247,17 @@
       "equivalence": [
         "or equal"
       ],
+      "relatedField": [
+        "or\\s+(?:(?:an?|another|other)\\s+)?related\\s+(?:field|discipline|area|subject)s?"
+      ],
+      "fieldAbbreviations": {
+        "cs": "computer science",
+        "ee": "electrical engineering",
+        "ai": "artificial intelligence",
+        "ml": "machine learning",
+        "hr": "human resources",
+        "ba": "business administration"
+      },
       "authorization": [
         "authori[sz]ed\\s+to\\s+work",
         "work\\s+authori[sz]ation",

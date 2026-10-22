@@ -1,5 +1,7 @@
 import { crc32, inflateRawSync } from "node:zlib";
 
+import { contrast, MIN_CONTRAST, paintOver } from "./hidden.js";
+
 /**
  * Hidden text in a Word document. A run is hidden when Word would not show it:
  * - marked hidden (`w:vanish`);
@@ -592,19 +594,11 @@ export function checkParsedXml(archive: DocxArchive | null): void {
   }
 }
 
-function luminance(hex: string) {
-  const channel = (offset: number) => {
-    const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
-    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
-}
-
 const isHex = (value: string | null | undefined): value is string =>
   !!value && /^[0-9a-f]{6}$/i.test(value);
 
 /** Contrast against white below 1.25:1 — white, or a grey too pale to read. */
-const nearWhite = (hex: string) => 1.05 / (luminance(hex) + 0.05) < 1.25;
+const nearWhite = (hex: string) => contrast(`#${hex}`, "#ffffff") < MIN_CONTRAST;
 
 /** An attribute value, quoted with either `"` or `'`. */
 const attr = (attrs: string, name: string) => {
@@ -627,14 +621,7 @@ function shading(attrs: string): string | null {
   const percent = /^pct(\d+)$/.exec(pattern);
   if (!percent || !isHex(color)) return "";
   const under = isHex(fill) ? fill : "FFFFFF";
-  const share = Math.min(Number(percent[1]), 100) / 100;
-  return [0, 2, 4]
-    .map((at) => {
-      const channel = (hex: string) => parseInt(hex.slice(at, at + 2), 16);
-      const mixed = Math.round(channel(color) * share + channel(under) * (1 - share));
-      return mixed.toString(16).padStart(2, "0");
-    })
-    .join("");
+  return paintOver(`#${color}`, `#${under}`, Number(percent[1]) / 100).slice(1);
 }
 
 /** Patterns over the XML stop at the next `<` as well as `>`, so an unclosed tag cannot scan to the end (quadratic). */
@@ -647,7 +634,6 @@ const PHOTO_MIN_POINTS = 50;
 
 export type DocxMeasure = {
   hiddenChars: number;
-  hiddenSample: string;
   /** All of the hidden text, in document order, to `MAX_HIDDEN_TEXT` characters. */
   hiddenText: string;
   /** Of it, what the text holds too: every hidden body run, and header/footer runs not marked hidden. */
@@ -718,7 +704,16 @@ const underTable = (table: OpenTable | undefined): string | null | undefined =>
 export const UNMEASURABLE_DOCX = `The document's text expands to more than ${MAX_XML_BYTES / 1024 / 1024} MB; it is not a resume.`;
 
 /** The most hidden text kept whole, in characters. */
-export const MAX_HIDDEN_TEXT = 5_000;
+const MAX_HIDDEN_TEXT = 5_000;
+
+/** Hidden text as the layout reports it: runs joined, whitespace collapsed, cut to `MAX_HIDDEN_TEXT`, counted whole. */
+export function hiddenSignals(runs: readonly string[]) {
+  const text = runs.join(" ").replace(/\s+/g, " ").trim();
+  return {
+    hiddenTextChars: text.replace(/\s/g, "").length,
+    hiddenText: text.slice(0, MAX_HIDDEN_TEXT),
+  };
+}
 
 /** XML text with its entity references decoded, as a parser gives it. */
 const xmlText = (text: string) =>
@@ -975,13 +970,11 @@ export function measureDocx(data: Uint8Array, archive = openDocx(data)): DocxMea
     count(xml, COMMENT_REFERENCE),
   );
 
-  const joined = (runs: string[]) => xmlText(runs.join(" ").replace(/\s+/g, " ").trim());
-  const decoded = joined(hidden);
+  const { hiddenTextChars, hiddenText } = hiddenSignals(hidden.map(xmlText));
   return {
-    hiddenText: decoded.slice(0, MAX_HIDDEN_TEXT),
-    hiddenTextRead: joined(read).slice(0, MAX_HIDDEN_TEXT),
-    hiddenChars: decoded.replace(/\s/g, "").length,
-    hiddenSample: decoded.slice(0, 80),
+    hiddenText,
+    hiddenTextRead: hiddenSignals(read.map(xmlText)).hiddenText,
+    hiddenChars: hiddenTextChars,
     tableCount,
     imageCount,
     trackedChanges,

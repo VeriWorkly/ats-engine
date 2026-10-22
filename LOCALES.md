@@ -169,8 +169,8 @@ the policy's.
 Everything else in a policy stays the policy's: `phrases`, `synonyms`, `implies`, `stemming`,
 what a right-to-work or clearance statement says (`requirements.needsSponsorship`,
 `noSponsorship`, `sponsorshipOffered`, `negation`, `notHeld`, `notHeldNearby`, `inProgress`,
-`citizenship`, `residence`, `countries`, `placeJoiners`, `clearanceLevels`),
-`numberWords`, `qualifiers`, `offerWords`, the `writing` and `advice` sections, and the rules
+`citizenship`, `residence`, `countries`, `placeJoiners`, `clearanceLevels`), the fields of
+study a posting abbreviates (`requirements.fieldAbbreviations`), `numberWords`, `qualifiers`, `offerWords`, the `writing` and `advice` sections, and the rules
 and their weights, which only a region pack's `rules` and `ageAdvice` adjust.
 
 `requirements.seniorityLevels` maps a seniority level's name to title words added to it:

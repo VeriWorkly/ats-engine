@@ -64,19 +64,27 @@ export interface LlmProvider {
 /**
  * A failed provider call. `retryable` is false for a rejection on the request's merits (a 4xx
  * other than 429); rate limits, server faults, timeouts and unreadable bodies are retryable.
+ * `retryAfterMs` is how long the provider asked to wait (its `retry-after`), when it said.
  */
 export class LlmProviderError extends Error {
   readonly status?: number;
   readonly retryable: boolean;
+  readonly retryAfterMs?: number;
 
   constructor(
     message: string,
-    options: { status?: number | undefined; retryable: boolean; cause?: unknown },
+    options: {
+      status?: number | undefined;
+      retryable: boolean;
+      retryAfterMs?: number | undefined;
+      cause?: unknown;
+    },
   ) {
     super(message, { cause: options.cause });
     this.name = "LlmProviderError";
     this.status = options.status;
     this.retryable = options.retryable;
+    this.retryAfterMs = options.retryAfterMs;
   }
 }
 

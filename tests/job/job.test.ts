@@ -40,8 +40,11 @@ describe("jobHtmlToText", () => {
     expect(jobHtmlToText("<p>Real text</p><div class='unterminated")).toBe("Real text");
   });
 
-  it("caps the output", () => {
-    expect(jobHtmlToText(`<p>${"word ".repeat(10_000)}</p>`)).toHaveLength(MAX_JOB_TEXT_CHARS);
+  // `check` cuts a posting at `MAX_JOB_TEXT_CHARS` and says so; cut here, nothing would.
+  it("keeps the whole text, and caps it only when asked", () => {
+    const html = `<p>${"word ".repeat(10_000)}</p>`;
+    expect(jobHtmlToText(html)).toHaveLength(49_999);
+    expect(jobHtmlToText(html, MAX_JOB_TEXT_CHARS)).toHaveLength(MAX_JOB_TEXT_CHARS);
   });
 
   // Hostile pages of the full 2 MB. The budget is loose on purpose: a linear pass takes well under

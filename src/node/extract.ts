@@ -4,8 +4,8 @@ import {
   checkParsedXml,
   docxChunks,
   docxMargins,
+  hiddenSignals,
   MAX_DOCX_EXPANDED_BYTES,
-  MAX_HIDDEN_TEXT,
   measureDocx,
   openDocx,
   UNMEASURABLE_DOCX,
@@ -202,15 +202,6 @@ async function extractDocx(data: Uint8Array): Promise<AtsExtraction> {
       trackedChanges: measured.trackedChanges,
       comments: measured.comments,
     },
-  };
-}
-
-/** Hidden text as the layout reports it: runs joined, whitespace collapsed. */
-function hiddenSignals(runs: readonly string[]) {
-  const text = runs.join(" ").replace(/\s+/g, " ").trim();
-  return {
-    hiddenTextChars: text.replace(/\s/g, "").length,
-    hiddenText: text.slice(0, MAX_HIDDEN_TEXT),
   };
 }
 

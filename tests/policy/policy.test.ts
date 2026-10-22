@@ -134,6 +134,38 @@ describe("parseAtsPolicy", () => {
     }
   });
 
+  /** Two weights of 1e308 summed to Infinity: the score read 100 while a category read 0. */
+  it("refuses a weight above 1,000 with the path to it", () => {
+    const pathsOf = (policy: unknown) => {
+      try {
+        parseAtsPolicy(policy);
+        return [];
+      } catch (error) {
+        expect(error).toBeInstanceOf(AtsPolicyError);
+        return (error as AtsPolicyError).issues.map((issue) => issue.path);
+      }
+    };
+    // JSON reads 1e999 as Infinity.
+    for (const weight of [1001, 1e308, JSON.parse("1e999") as number])
+      expect(pathsOf(withRule({ ...presenceRule, weight })), String(weight)).toEqual([
+        "rules.0.weight",
+      ]);
+    const bands = { ...presenceRule, kind: "bands", metric: "wordCount" };
+    expect(pathsOf(withRule({ ...bands, bands: [{ upTo: null, weight: 1e308 }] }))).toEqual([
+      "rules.0.bands.0.weight",
+    ]);
+    for (const field of [
+      "requiredWeight",
+      "preferredWeight",
+      "responsibilitiesWeight",
+      "defaultWeight",
+    ])
+      expect(
+        pathsOf({ ...MINIMAL, keywordMatch: { ...MINIMAL.keywordMatch, [field]: 1e308 } }),
+      ).toEqual([`keywordMatch.${field}`]);
+    expect(pathsOf(withRule({ ...presenceRule, weight: 1000 }))).toEqual([]);
+  });
+
   /** A policy can come from a host's JSON file: one nested past any real policy is refused, not a stack overflow, in the schema and in a key it drops. */
   it("refuses a policy nested 10,000 deep with AtsPolicyError", () => {
     for (const make of [(inner: unknown) => ({ a: inner }), (inner: unknown) => [inner]]) {

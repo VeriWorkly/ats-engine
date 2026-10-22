@@ -106,11 +106,24 @@ const YEAR = /(?<!\d)(?:19|20)\d{2}(?!\d)/g;
 const DEGREE_YEARS = 6;
 
 /**
- * The separators an education line's parts are printed between, kept by `split`. A dash's spaces
- * match from the start of their run (else a long run without a dash rescans from every position);
- * a comma between digits is decimal ("Note 1,7").
+ * The separators an education line's parts are printed between. A dash's spaces match from the
+ * start of their run (else a long run without a dash rescans from every position); a comma
+ * between digits is decimal ("Note 1,7").
  */
-const PART = /([|•·]|(?<!\d),|,(?!\d)|(?<!\s)\s+[–—-]\s+)/;
+const PART = /[|•·]|(?<!\d),|,(?!\d)|(?<!\s)\s+[–—-]\s+/;
+/**
+ * The same, and a tab stop or a column gap, as a DOCX or a PDF prints them; not one after a short
+ * word that joins the name's words: in lower case ("University of  Oregon", "Universität für
+ * Musik"), in title case up to three letters ("University Of  Oregon"), or in capitals after a word
+ * in capitals ("UNIVERSITY OF  OREGON"). "Iowa", "BS" or "MBA" before a gap is a part of its own.
+ */
+const GAPPED = new RegExp(
+  String.raw`${PART.source}|(?<!\s|(?:^|\s)(?:\p{Ll}{1,4}|\p{Lu}\p{Ll}{0,2}))(?<!\p{Lu}{2}\s\p{Lu}{1,4})(?:\s{2,}|\t)`,
+  "u",
+);
+
+/** Brackets a date range or a year was taken out of: "University of Oregon ( )". */
+const EMPTY_BRACKETS = /[([]\s*[)\]]/g;
 
 /** A month and year standing alone: "06/2011", "6.2011". */
 const MONTH_YEAR = /(?<![\d./-])\d{1,2}[./](?:19|20)\d{2}(?![\d./-])/g;
@@ -122,27 +135,34 @@ const NUMBERED_NOTE = /\([^()\d]{0,40}\d[^()]{0,40}\)/g;
  * The institution named in an education line, its date range already taken out: the part naming
  * the school, not the credential ("High School Diploma, Lincoln High School"); ending at its
  * comma (a campus, city or field of study cannot be told apart without vocabulary); a lone year
- * or month and year dropped.
+ * or month and year dropped. A tab stop or a column gap parts the line too, unless it only parts
+ * the school's own words ("Lakeview  University").
  */
 function schoolName(text: string, credential: string, policy: AtsEnginePolicy) {
   const { schools, schoolsAll } = matchersFor(policy.resumeParse);
-  const pieces = text.split(PART);
-  const name = (at: number) =>
-    pieces[at]
-      .replace(NUMBERED_NOTE, " ")
-      .replace(MONTH_YEAR, " ")
-      .replace(YEAR, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/(?<![\s,–—-])[\s,–—-]+$/, "");
-  // A school word alone is a heading ("SCHOOL"), not the name of one.
-  const named = (at: number) =>
-    at % 2 === 0 && schools.test(name(at)) && !onlySchoolWords(name(at));
-  const onlySchoolWords = (text: string) => text.replace(schoolsAll, "").trim() === "";
+  // Brackets a spaced range came out of ("( 2014 - 2018 )") would leave a gap inside them.
+  const unbracketed = text.replace(EMPTY_BRACKETS, " ");
+  for (const separator of [GAPPED, PART]) {
+    const pieces = unbracketed.split(separator);
+    const name = (at: number) =>
+      pieces[at]
+        .replace(NUMBERED_NOTE, " ")
+        .replace(MONTH_YEAR, " ")
+        .replace(YEAR, " ")
+        .replace(EMPTY_BRACKETS, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/(?<![\s,–—-])[\s,–—-]+$/, "");
+    // A school word alone is a heading ("SCHOOL"), not the name of one.
+    const named = (at: number) => schools.test(name(at)) && name(at).replace(schoolsAll, "").trim();
 
-  let at = pieces.findIndex((piece, i) => named(i) && !(credential && piece.includes(credential)));
-  if (at === -1) at = pieces.findIndex((_, i) => named(i));
-  return at === -1 ? "" : name(at);
+    let at = pieces.findIndex(
+      (piece, i) => named(i) && !(credential && piece.includes(credential)),
+    );
+    if (at === -1) at = pieces.findIndex((_, i) => named(i));
+    if (at !== -1) return name(at);
+  }
+  return "";
 }
 
 /** "Stanford University, B.S., 2018": the last plausible year on the line, when no range is. */

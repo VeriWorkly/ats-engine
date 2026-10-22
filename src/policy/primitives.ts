@@ -121,6 +121,9 @@ export const iscedDegrees = z.object({
 
 export const monthNumber = z.number().check(z.int(), z.gte(1), z.lte(12));
 
+/** A rule's weight: capped, so their sum cannot overflow to Infinity. */
+export const ruleWeight = z.number().check(z.gte(0), z.lte(1000));
+
 /** Season name to the first and last month it covers. */
 export const seasonRanges = z.record(
   z.string().check(z.minLength(1)),

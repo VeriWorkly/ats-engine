@@ -3,7 +3,7 @@ import type * as z from "zod/mini";
 import type { GroundingViolation } from "../repair/grounding.js";
 import { fnv1a } from "../util/hash.js";
 import { ENGLISH_ISSUES } from "../util/issues.js";
-import { AbortedError, type AbortSignalLike } from "./http.js";
+import { AbortedError, pause, type AbortSignalLike } from "./http.js";
 import {
   isRetryableStatus,
   LlmProviderError,
@@ -90,8 +90,22 @@ export class AtsAiError extends Error {
   }
 }
 
-/** Passed to `hooks.onRetry` before a retry, with the error the failed attempt raised. */
-export type AtsAiRetryEvent = { task: AtsAiTask; attempt: number; error: AtsAiError };
+/**
+ * Passed to `hooks.onRetry` before a retry, with the error the failed attempt raised and how long
+ * the runner waits before the next one. The runner always sets `delayMs`; it is optional so a
+ * handler typed for the event without it still fits.
+ */
+export type AtsAiRetryEvent = {
+  task: AtsAiTask;
+  attempt: number;
+  error: AtsAiError;
+  delayMs?: number;
+};
+
+/** The wait before the first retry of a provider failure; it doubles for each one after. */
+const RETRY_DELAY_MS = 1_000;
+/** The longest wait a provider's `retry-after` is honoured for; past it the error is final. */
+const MAX_RETRY_AFTER_MS = 60_000;
 
 export type RunContext = {
   provider: LlmProvider;
@@ -330,8 +344,10 @@ function classify(
 
 /**
  * Runs one task: build the request, call the provider, validate, retry what a retry can fix.
- * Retried up to `retries` times: malformed or empty output, rate limits, server faults and
- * timeouts. Not retried: refusals, truncation at `maxTokens`, 4xx other than 429, the caller's abort.
+ * Retried up to `retries` times: malformed or empty output (at once), rate limits, server faults
+ * and timeouts (after 1 s, then 2, 4, 8 and 16, or as long as the provider's `retry-after` asks,
+ * up to a minute). Not retried: refusals, truncation at `maxTokens`, 4xx other than 429, a
+ * `retry-after` over a minute, the caller's abort, which also ends a wait.
  */
 export async function runTask<Raw, Result>(
   context: RunContext,
@@ -371,10 +387,23 @@ export async function runTask<Raw, Result>(
       }
       raw = readReply(response, spec.schema, spec.usable);
     } catch (thrown) {
-      const { error, retryable } = classify(thrown, options.signal);
-      if (retryable && attempt <= route.retries) {
-        context.onRetry?.({ task: spec.task, attempt, error });
-        continue;
+      const failure = classify(thrown, options.signal);
+      let { error } = failure;
+      // A reply that did not read is asked for again at once; a provider failure is waited out.
+      const delayMs =
+        error.code !== "provider"
+          ? 0
+          : thrown instanceof LlmProviderError && thrown.retryAfterMs !== undefined
+            ? thrown.retryAfterMs
+            : RETRY_DELAY_MS * 2 ** (attempt - 1);
+      if (failure.retryable && attempt <= route.retries && delayMs <= MAX_RETRY_AFTER_MS) {
+        context.onRetry?.({ task: spec.task, attempt, error, delayMs });
+        try {
+          await pause(delayMs, options.signal);
+          continue;
+        } catch (aborted) {
+          ({ error } = classify(aborted, options.signal));
+        }
       }
       throw new AtsAiError(error.code, error.message, {
         status: error.status,

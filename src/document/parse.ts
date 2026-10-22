@@ -13,10 +13,8 @@ import type {
   AtsParsedResume,
   AtsParsedRole,
 } from "../types.js";
+import { monthIndex } from "../util/months.js";
 import type { AtsResumeDocument } from "./types.js";
-
-const dateValue = (date: { year: number; month: number | null } | null, fallbackMonth: number) =>
-  date ? date.year * 12 + (date.month ?? fallbackMonth) : null;
 
 /**
  * The recovered record for a structured document, read from its fields rather than parsed. Only
@@ -108,14 +106,11 @@ export function parseResumeDocument(
     }
   }
 
-  for (const role of roles) {
-    const start = dateValue(role.start, 1);
-    const end = dateValue(role.end, 12);
-    if (start !== null && end !== null && start > end) {
+  for (const role of roles)
+    if (role.start && role.end && monthIndex(role.start) > monthIndex(role.end, 12)) {
       role.start = null;
       role.end = null;
     }
-  }
 
   const { basics } = doc;
   return finalizeParsed(

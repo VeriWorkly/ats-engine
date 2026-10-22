@@ -1253,9 +1253,19 @@
       ],
       "equivalence": [
         "or\\s+equivalent",
-        "equivalent\\s+(?:practical\\s+|work\\s+)?experience",
-        "or\\s+related\\s+field"
+        "equivalent\\s+(?:practical\\s+|work\\s+)?experience"
       ],
+      "relatedField": [
+        "or\\s+(?:(?:an?|another|other)\\s+)?related\\s+(?:field|discipline|area|subject)s?"
+      ],
+      "fieldAbbreviations": {
+        "cs": "computer science",
+        "ee": "electrical engineering",
+        "ai": "artificial intelligence",
+        "ml": "machine learning",
+        "hr": "human resources",
+        "ba": "business administration"
+      },
       "authorization": [
         "authori[sz]ed\\s+to\\s+work",
         "work\\s+authori[sz]ation",
@@ -3657,15 +3667,14 @@
           "other": "^(?:profil|kurzprofil|zusammenfassung|[üu]ber\\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\\s+engagement|referenzen|pers[öo]nliche\\s+(?:daten|angaben))"
         },
         "languageLevels": {
-          "muttersprache|muttersprachlich(?:e[mnrs]?)?|muttersprachler(?:in)?": "C2",
+          "muttersprache|muttersprachniveau|muttersprachlich(?:e[mnrs]?)?|muttersprachler(?:in)?": "C2",
           "zweisprachig(?:e[mnrs]?)?": "C1",
           "verhandlungssicher(?:e[mnrs]?)?": "C1",
           "fließend(?:e[mnrs]?)?": "C1",
-          "sehr\\s+gute?[mnrs]?(?:\\s+kenntnisse)?": "B2",
-          "gute?[mnrs]?\\s+kenntnisse": "B1",
-          "grundkenntnisse": "A2",
-          "schulkenntnisse": "A2",
-          "anfänger(?:in|kenntnisse)?": "A1"
+          "sehr\\s+gute?[mnrs]?(?:\\s+(?:(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)-\\s+(?:und|oder)\\s+)?(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)?kenntnissen?)?": "B2",
+          "gute?[mnrs]?\\s+(?:(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)-\\s+(?:und|oder)\\s+)?(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)?kenntnissen?": "B1",
+          "(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)?(?:grund|basis|schul)kenntnissen?": "A2",
+          "anfänger(?:in|kenntnissen?)?": "A1"
         },
         "credentialWords": {
           "issued": [
@@ -3896,7 +3905,7 @@
             "sicherheitsfreigabe"
           ],
           "languagePatterns": [
-            "(?:fließende?s?|verhandlungssichere?s?|sehr\\s+gute?)\\s+(\\p{L}+?)(?:kenntnisse|-)",
+            "(?:fließende?[mnrs]?|verhandlungssichere?[mnrs]?|sehr\\s+gute?[mnrs]?)\\s+(\\p{L}+?)(?:kenntnisse|-)",
             "(?:fließend|verhandlungssicher)(?:e[mnrs]?)?\\s+(?:in\\s+)?(\\p{L}+)"
           ],
           "languageNames": {
@@ -3912,7 +3921,33 @@
             "chinesisch": "chinese",
             "japanisch": "japanese",
             "arabisch": "arabic",
-            "portugiesisch": "portuguese"
+            "portugiesisch": "portuguese",
+            "deutschkenntnisse": "german",
+            "deutschkenntnissen": "german",
+            "englischkenntnisse": "english",
+            "englischkenntnissen": "english",
+            "französischkenntnisse": "french",
+            "französischkenntnissen": "french",
+            "spanischkenntnisse": "spanish",
+            "spanischkenntnissen": "spanish",
+            "italienischkenntnisse": "italian",
+            "italienischkenntnissen": "italian",
+            "niederländischkenntnisse": "dutch",
+            "niederländischkenntnissen": "dutch",
+            "polnischkenntnisse": "polish",
+            "polnischkenntnissen": "polish",
+            "türkischkenntnisse": "turkish",
+            "türkischkenntnissen": "turkish",
+            "russischkenntnisse": "russian",
+            "russischkenntnissen": "russian",
+            "chinesischkenntnisse": "chinese",
+            "chinesischkenntnissen": "chinese",
+            "japanischkenntnisse": "japanese",
+            "japanischkenntnissen": "japanese",
+            "arabischkenntnisse": "arabic",
+            "arabischkenntnissen": "arabic",
+            "portugiesischkenntnisse": "portuguese",
+            "portugiesischkenntnissen": "portuguese"
           },
           "seniorityLevels": {
             "entry": [

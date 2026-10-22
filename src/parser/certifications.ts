@@ -2,6 +2,7 @@ import type { AtsEnginePolicy } from "../policy/schema.js";
 import { BULLET, BULLET_PREFIX, wordListPattern } from "../text/text.js";
 import type { AtsParsedCertification } from "../types.js";
 import { memo } from "../util/memo.js";
+import { monthIndex } from "../util/months.js";
 import { findDates } from "./dates.js";
 
 // Certifications as rows (name, issuer, earned, expiry): "AWS Certified Solutions Architect –
@@ -99,12 +100,6 @@ function tidy(text: string) {
   return value.slice(from, to).trim();
 }
 
-const monthIndex = (date: { year: number; month: number | null }) =>
-  date.year * 12 + (date.month ?? 1);
-/** The last month a date may mean: "2021" runs to December. */
-const lastMonth = (date: { year: number; month: number | null }) =>
-  date.year * 12 + (date.month ?? 12);
-
 type Dated = { date: AtsParsedCertification["date"]; expires: AtsParsedCertification["date"] };
 
 /**
@@ -194,7 +189,7 @@ function readCertification(
     }
   }
   // An expiry before the date earned was renewed past: "2019, expired 2021, renewed 2023".
-  if (dated.date && dated.expires && lastMonth(dated.expires) < monthIndex(dated.date))
+  if (dated.date && dated.expires && monthIndex(dated.expires, 12) < monthIndex(dated.date))
     dated.expires = null;
   rangeEnd &&= dated.expires !== null;
   if (!kept.length) return dated.date || dated.expires ? { row: null, dated, rangeEnd } : null;
@@ -220,9 +215,9 @@ const rangeEnds = new WeakSet<AtsParsedCertification>();
 export const statesExpiry = (row: AtsParsedCertification) =>
   row.expires !== null && !rangeEnds.has(row);
 
-/** The latest month a row is dated by, earned or expiring; null when it has no date. */
+/** The latest month a row is dated by, earned or expiring ("2021" runs to December); null when it has no date. */
 const latest = (row: AtsParsedCertification) => {
-  const months = [row.date, row.expires].flatMap((date) => (date ? [lastMonth(date)] : []));
+  const months = [row.date, row.expires].flatMap((date) => (date ? [monthIndex(date, 12)] : []));
   return months.length ? Math.max(...months) : null;
 };
 

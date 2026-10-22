@@ -1,20 +1,11 @@
 import { formatParsedDate } from "../format/index.js";
 import type { AtsParsedDate, AtsParsedRole } from "../types.js";
+import { monthIndex, nowMonth } from "../util/months.js";
 import { NO_FINDING, type Finding } from "./finding.js";
 
 const MAX_CONCURRENT = 2;
 const MIN_OVERLAP_MONTHS = 3;
 const MAX_CAREER_MONTHS = 50 * 12;
-
-const monthIndex = (date: AtsParsedDate, edge: "start" | "end") =>
-  date.year * 12 + (date.month ?? (edge === "start" ? 1 : 12)) - 1;
-
-/**
- * A role's last month for counting overlaps. A year with no month ends in January, not December,
- * so "2017 - 2020" then "2020 - 2024" is a handover, not a year-long overlap.
- */
-const overlapEnd = (date: AtsParsedDate) =>
-  date.month === null ? date.year * 12 : monthIndex(date, "end");
 
 /**
  * Dates in the work history that cannot all be true: a role starting after today, more than two
@@ -27,11 +18,11 @@ export function timelineIssues(
   now: Date,
 ): Finding | null {
   if (!roles.some((role) => role.start)) return null;
-  const today = now.getUTCFullYear() * 12 + now.getUTCMonth();
+  const today = nowMonth(now);
   const issues: string[] = [];
 
   for (const role of roles)
-    if (role.start && monthIndex(role.start, "start") > today + 1)
+    if (role.start && monthIndex(role.start) > today + 1)
       issues.push(
         `${role.title || "a role"} starts in ${formatParsedDate(role.start)}, after today`,
       );
@@ -39,10 +30,11 @@ export function timelineIssues(
   const spans = roles
     .filter((role): role is AtsParsedRole & { start: AtsParsedDate } => role.start !== null)
     // A role with no end that is not current spans its start month, as `monthsOfExperience` counts
-    // it.
+    // it. An end with no month ends in January, not December, so "2017 - 2020" then "2020 - 2024"
+    // is a handover, not a year-long overlap.
     .map((role) => {
-      const from = monthIndex(role.start, "start");
-      return [from, role.current ? today : role.end ? overlapEnd(role.end) : from];
+      const from = monthIndex(role.start);
+      return [from, role.current ? today : role.end ? monthIndex(role.end) : from];
     })
     .filter(([from, to]) => to >= from);
   // Bounded by a working life: a mistyped 1950 start costs 600 steps.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { check, DEFAULT_POLICY } from "../../src/index.js";
 import {
   extractJobPosting,
   jobHtmlToText,
@@ -58,6 +59,35 @@ describe("/job regressions", () => {
 
   it("normalises plain job text the same way everywhere", () => {
     expect(normalizeJobText("  Go \t and   Rust \n\n\n Remote  ")).toBe("Go and Rust\nRemote");
-    expect(normalizeJobText("x ".repeat(20_000))).toHaveLength(MAX_JOB_TEXT_CHARS);
+    expect(normalizeJobText("x ".repeat(20_000), 100)).toHaveLength(100);
+  });
+
+  // A file, a page or a paste was cut at 12,000 characters while `check` read 20,000: the
+  // requirements at the end of a long posting were dropped unseen, and the match went up.
+  it("reads a posting to the same length on every path, and says when it is cut", () => {
+    const about = Array.from(
+      { length: 240 },
+      (_, i) => `Fabrikam values ownership and curiosity in team ${i}.`,
+    ).join("\n");
+    const posting = `${about}\nRequirements:\n- 5+ years of Rust\n- Kubernetes in production\n- Terraform`;
+    const resume =
+      "Avery Quill\navery.quill@example.com\nExperience\nData Engineer, Fabrikam Ltd\nJan 2019 - Present\n- Built pipelines in Python and SQL\nSkills\nPython, SQL";
+    const now = new Date("2026-10-01");
+
+    expect(MAX_JOB_TEXT_CHARS).toBe(20_000);
+    for (const text of [normalizeJobText(posting), jobHtmlToText(`<pre>${posting}</pre>`)]) {
+      expect(text).toContain("Terraform");
+      const report = check(resume, DEFAULT_POLICY, { jobDescription: text, now });
+      expect(report.requirements).toHaveLength(3);
+      expect(report.missingKeywords).toContain("rust");
+      expect(report.parsingWarnings.join(" ")).not.toContain("posting");
+    }
+
+    const long = `${about}\n${about}\nRequirements:\n- 5+ years of Rust`;
+    const cut = check(resume, DEFAULT_POLICY, { jobDescription: normalizeJobText(long), now });
+    expect(cut.requirements).toHaveLength(0);
+    expect(cut.parsingWarnings).toContain(
+      `The job posting is ${long.length.toLocaleString("en")} characters; only its first 20,000 were read.`,
+    );
   });
 });

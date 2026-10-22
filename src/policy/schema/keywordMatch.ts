@@ -23,10 +23,10 @@ const jobSectionSchema = z.object({
 
 export const keywordMatchSchema = z
   .object({
-    requiredWeight: z.number().check(z.gt(0)),
-    preferredWeight: z.number().check(z.gt(0)),
-    responsibilitiesWeight: z.number().check(z.gt(0)),
-    defaultWeight: z.number().check(z.gt(0)),
+    requiredWeight: z.number().check(z.gt(0), z.lte(1000)),
+    preferredWeight: z.number().check(z.gt(0), z.lte(1000)),
+    responsibilitiesWeight: z.number().check(z.gt(0), z.lte(1000)),
+    defaultWeight: z.number().check(z.gt(0), z.lte(1000)),
     /**
      * Multiplier for terms that are not recognised skills and do not read as proper nouns or
      * acronyms in the posting, so ordinary words count but cannot outvote the skills asked for.
@@ -211,8 +211,28 @@ export const keywordMatchSchema = z
         equivalence: z._default(wordList("requirements.equivalence"), [
           String.raw`or\s+equivalent`,
           String.raw`equivalent\s+(?:practical\s+|work\s+)?experience`,
-          String.raw`or\s+related\s+field`,
         ]),
+        /**
+         * Words widening the degree's field ("or a related field"): no equivalent experience, and
+         * no alternative to the years beside the degree.
+         */
+        relatedField: z._default(wordList("requirements.relatedField"), [
+          String.raw`or\s+(?:(?:an?|another|other)\s+)?related\s+(?:field|discipline|area|subject)s?`,
+        ]),
+        /**
+         * Fields of study a posting abbreviates, each to the words it stands for: "CS" asked is
+         * held by "Computer Science" in a degree's own words, never in its school's name. Not
+         * "IT", "IS" or "ME", which are `stopwords` and so never a field asked, nor "CE", which is
+         * civil engineering as often as computer engineering.
+         */
+        fieldAbbreviations: z._default(z.record(term, term), {
+          cs: "computer science",
+          ee: "electrical engineering",
+          ai: "artificial intelligence",
+          ml: "machine learning",
+          hr: "human resources",
+          ba: "business administration",
+        }),
         authorization: z._default(wordList("requirements.authorization"), [
           String.raw`authori[sz]ed\s+to\s+work`,
           String.raw`work\s+authori[sz]ation`,

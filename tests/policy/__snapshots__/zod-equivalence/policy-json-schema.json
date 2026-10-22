@@ -66,7 +66,8 @@
                 },
                 "weight": {
                   "type": "number",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 1000
                 }
               },
               "required": [
@@ -151,7 +152,8 @@
                 },
                 "weight": {
                   "type": "number",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 1000
                 }
               },
               "required": [
@@ -220,7 +222,8 @@
                 },
                 "weight": {
                   "type": "number",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 1000
                 }
               },
               "required": [
@@ -329,7 +332,8 @@
                       },
                       "weight": {
                         "type": "number",
-                        "minimum": 0
+                        "minimum": 0,
+                        "maximum": 1000
                       },
                       "failEvidence": {
                         "type": "string",
@@ -434,7 +438,8 @@
                       },
                       "weight": {
                         "type": "number",
-                        "minimum": 0
+                        "minimum": 0,
+                        "maximum": 1000
                       },
                       "failEvidence": {
                         "type": "string",
@@ -537,7 +542,8 @@
                       },
                       "weight": {
                         "type": "number",
-                        "minimum": 0
+                        "minimum": 0,
+                        "maximum": 1000
                       },
                       "failEvidence": {
                         "type": "string",
@@ -625,7 +631,8 @@
                 },
                 "weight": {
                   "type": "number",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 1000
                 }
               },
               "required": [
@@ -648,19 +655,23 @@
         "properties": {
           "requiredWeight": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000
           },
           "preferredWeight": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000
           },
           "responsibilitiesWeight": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000
           },
           "defaultWeight": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000
           },
           "generalTermWeight": {
             "type": "number",
@@ -1089,12 +1100,33 @@
               "equivalence": {
                 "default": [
                   "or\\s+equivalent",
-                  "equivalent\\s+(?:practical\\s+|work\\s+)?experience",
-                  "or\\s+related\\s+field"
+                  "equivalent\\s+(?:practical\\s+|work\\s+)?experience"
                 ],
                 "minItems": 1,
                 "type": "array",
                 "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "relatedField": {
+                "default": [
+                  "or\\s+(?:(?:an?|another|other)\\s+)?related\\s+(?:field|discipline|area|subject)s?"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "fieldAbbreviations": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "additionalProperties": {
                   "type": "string",
                   "minLength": 1
                 }
@@ -5342,7 +5374,8 @@
                 },
                 "weight": {
                   "type": "number",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 1000
                 }
               },
               "required": [
@@ -5429,7 +5462,8 @@
                 },
                 "weight": {
                   "type": "number",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 1000
                 }
               },
               "required": [
@@ -5503,7 +5537,8 @@
                 },
                 "weight": {
                   "type": "number",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 1000
                 }
               },
               "required": [
@@ -5614,7 +5649,8 @@
                       },
                       "weight": {
                         "type": "number",
-                        "minimum": 0
+                        "minimum": 0,
+                        "maximum": 1000
                       },
                       "failEvidence": {
                         "type": "string",
@@ -5723,7 +5759,8 @@
                       },
                       "weight": {
                         "type": "number",
-                        "minimum": 0
+                        "minimum": 0,
+                        "maximum": 1000
                       },
                       "failEvidence": {
                         "type": "string",
@@ -5829,7 +5866,8 @@
                       },
                       "weight": {
                         "type": "number",
-                        "minimum": 0
+                        "minimum": 0,
+                        "maximum": 1000
                       },
                       "failEvidence": {
                         "type": "string",
@@ -5920,7 +5958,8 @@
                 },
                 "weight": {
                   "type": "number",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 1000
                 }
               },
               "required": [
@@ -5945,19 +5984,23 @@
         "properties": {
           "requiredWeight": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000
           },
           "preferredWeight": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000
           },
           "responsibilitiesWeight": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000
           },
           "defaultWeight": {
             "type": "number",
-            "exclusiveMinimum": 0
+            "exclusiveMinimum": 0,
+            "maximum": 1000
           },
           "generalTermWeight": {
             "type": "number",
@@ -6550,8 +6593,7 @@
               "equivalence": {
                 "default": [
                   "or\\s+equivalent",
-                  "equivalent\\s+(?:practical\\s+|work\\s+)?experience",
-                  "or\\s+related\\s+field"
+                  "equivalent\\s+(?:practical\\s+|work\\s+)?experience"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -6559,6 +6601,30 @@
                   "type": "string",
                   "minLength": 1
                 }
+              },
+              "relatedField": {
+                "default": [
+                  "or\\s+(?:(?:an?|another|other)\\s+)?related\\s+(?:field|discipline|area|subject)s?"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "fieldAbbreviations": {
+                "default": {
+                  "cs": "computer science",
+                  "ee": "electrical engineering",
+                  "ai": "artificial intelligence",
+                  "ml": "machine learning",
+                  "hr": "human resources",
+                  "ba": "business administration"
+                },
+                "type": "object",
+                "propertyNames": {},
+                "additionalProperties": {}
               },
               "authorization": {
                 "default": [
@@ -7081,6 +7147,8 @@
             "required": [
               "yearsPatterns",
               "equivalence",
+              "relatedField",
+              "fieldAbbreviations",
               "authorization",
               "countries",
               "placeJoiners",

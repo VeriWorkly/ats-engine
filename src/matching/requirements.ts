@@ -1,8 +1,9 @@
-import { isDatedLine } from "../checks/bullets.js";
+import { isDatedLine, readsAsSentence } from "../checks/bullets.js";
 import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../format/index.js";
 import { statesExpiry } from "../parser/certifications.js";
 import { degreeLevels } from "../parser/education.js";
 import { namesPlace } from "../parser/experience.js";
+import { isWrittenIn, sampleOf, showsAny } from "../locales/languages.js";
 import { canonicalLanguage, cefrLevel, compareCefr } from "../parser/languages.js";
 import { monthsOfExperience } from "../parser/tenure.js";
 import { labelledLine, type ResumeSection, type ResumeSectionKind } from "../parser/sections.js";
@@ -41,6 +42,56 @@ const MAX_EVIDENCE_LINES = 1_000;
 /** Years of dated work that let "or equivalent experience" stand in for a degree. */
 const EQUIVALENT_MONTHS = 24;
 const WEAK_LANGUAGE = /\b(?:beginner|basic|elementary|limited|a1|a2)\b/iu;
+/** The level writing a resume in a language shows of it: fluent, never native. */
+const WRITTEN_LEVEL: AtsCefrLevel = "C1";
+/** The sentence lines a resume needs to show the language it is written in. */
+const MIN_WRITTEN_LINES = 3;
+
+/** A language's English name from its ISO 639 code ("en" → "English"), where the runtime knows it. */
+function englishName(id: string) {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(id);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The languages, by English name, a resume is written in: of those it is read in
+ * (`resumeLanguages`, else the policy's own), each its sentences (bullets, a summary) show: at
+ * least `MIN_WRITTEN_LINES` of them, most holding the language's own detection words (or script),
+ * whether or not the policy has a pack for the others; not merely one a host asked to read it in.
+ * Never its headings, dates or names, which an engine writes in English for a structured document.
+ */
+export function writtenLanguages(
+  policy: AtsEnginePolicy,
+  resumeLanguages: readonly string[],
+  text: string,
+): string[] {
+  const names = policy.keywordMatch.requirements.languageNames;
+  const lines = text
+    .split("\n", MAX_EVIDENCE_LINES)
+    .map((line) => line.replace(BULLET_PREFIX, ""))
+    .filter((line) => readsAsSentence(line) && !isDatedLine(line, policy));
+  const sample = sampleOf(lines.join("\n"));
+  return (resumeLanguages.length ? resumeLanguages : [policy.text.language]).flatMap((id) => {
+    const pack = policy.locales.languages.find((candidate) => candidate.id === id);
+    const detection = pack ?? (id === policy.text.language ? policy.text : undefined);
+    // Each line judged by the language's own words, as one without any counts against it: one
+    // English summary over Spanish bullets is no English resume, though the policy reads no Spanish.
+    if (
+      !detection ||
+      lines.length < MIN_WRITTEN_LINES ||
+      lines.filter((line) => showsAny(line, detection)).length * 2 <= lines.length ||
+      !isWrittenIn(sample, detection)
+    )
+      return [];
+    const name = (pack?.name ?? englishName(id))?.toLowerCase();
+    const english = name && (own(names, name) ?? name);
+    // A language the policy knows: English names map to themselves.
+    return english && own(names, english) === english ? [english] : [];
+  });
+}
 
 /** A resume section with the heading line that opened it, when one did: "Certifications". */
 export type HeadedSection = ResumeSection & { heading?: string };
@@ -104,7 +155,10 @@ type Matchers = {
   /** A line that states a nationality: "Nationality: German". Never proof of a language. */
   nationality: RegExp;
   equivalence: RegExp;
-  /** Global, for cutting "or related field" out of the text between a degree and the years. */
+  /**
+   * Global, with `relatedField`: cut out of the text between a degree and the years. The field
+   * before one is the degree's, not the years'.
+   */
   equivalences: RegExp;
   /** The words a posting offers alternatives with: "or", "oder". */
   alternation: RegExp;
@@ -166,7 +220,8 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     ),
     nationality: new RegExp(`^\\s*${wordListPattern(km.nationalityLabels)}`, "iu"),
     equivalence: wordListRegex(r.equivalence),
-    equivalences: wordListRegex(r.equivalence, "gi"),
+    // Schema-defaulted; a hand-built policy may lack `relatedField`.
+    equivalences: wordListRegex([...r.equivalence, ...(r.relatedField ?? [])], "gi"),
     alternation: wordListRegex(km.alternationWords),
     preferred: wordListRegex(km.preferredMarkers),
     preferredAll: wordListRegex(km.preferredMarkers, "gi"),
@@ -638,7 +693,14 @@ function askedLanguages(
       return word === undefined || canonicalize(word, km, vocab) === null;
     })
     .map((match) => match[0].toLowerCase());
-  return [...new Set([...shaped, ...standalone])];
+  // Each language once, by whichever name: "Englischkenntnisse" is read as a whole and in part.
+  const seen = new Set<string>();
+  return [...shaped, ...standalone].filter((name) => {
+    const english = own(km.requirements.languageNames, name) ?? name;
+    if (seen.has(english)) return false;
+    seen.add(english);
+    return true;
+  });
 }
 
 /**
@@ -820,6 +882,8 @@ export function judgeRequirements(
   parsed: AtsParsedResume,
   policy: AtsEnginePolicy,
   now: Date,
+  /** The languages, by English name, the resume is written in (`writtenLanguages`). */
+  writtenIn: readonly string[] = [],
 ): AtsRequirement[] {
   const jobText = typeof jobDescription === "string" ? jobDescription.trim() : "";
   if (!jobText) return [];
@@ -1118,25 +1182,43 @@ export function judgeRequirements(
           named.test(entry.line) &&
           !WEAK_LANGUAGE.test(entry.line) &&
           !matchers.nationality.test(entry.line.replace(BULLET_PREFIX, ""));
-        // A spoken-language row decides, at the level asked; without one, a line naming it does.
+        // A spoken-language row decides, at the level asked; without one, a line naming it does;
+        // failing both, the language the resume's sentences are written in, at `WRITTEN_LEVEL`:
+        // only when no line names the language ("English: basic") and the resume lists no
+        // languages, which would have named it.
         const row = parsed.spokenLanguages.find(
           (spoken) => canonicalLanguage(spoken.language, policy) === english,
         );
+        const shown = !row && resumeLines.some(shows);
+        const written =
+          !row &&
+          writtenIn.includes(english) &&
+          !listsAny() &&
+          !sections.some((section) => section.kind === "languages") &&
+          !resumeLines.some((entry) => named.test(entry.line));
+        const have = row?.cefr ?? (written ? WRITTEN_LEVEL : null);
         const level = asked.get(name) ?? null;
-        const status: Status | null = row
-          ? !level || !row.cefr || compareCefr(row.cefr, level) >= 0
-            ? "met"
-            : belowLevel(row.cefr, level)
-          : resumeLines.some(shows)
-            ? "met"
-            : null;
-        const short = row?.cefr && level && compareCefr(row.cefr, level) < 0;
+        const short = have && level && compareCefr(have, level) < 0;
+        const status: Status | null =
+          row || written ? (short ? belowLevel(have!, level!) : "met") : shown ? "met" : null;
+        // A compound by the language it names: "Englischkenntnisse" as "Englisch".
+        const plainOf = (word: string) =>
+          word.slice(0, aliases.find((alias) => word.toLowerCase().startsWith(alias))?.length);
+        const plain = plainOf(name);
+        const label = row
+          ? plainOf(row.language)
+          : `${plain.charAt(0).toUpperCase()}${plain.slice(1)}`;
+        const by = written ? " from the language the resume is written in" : "";
         return {
-          name,
+          plain,
           shows,
           row,
           status,
-          detail: short ? `${row.language}: ${row.cefr} read, ${level} asked` : null,
+          detail: short
+            ? `${label}: ${have} read${by}, ${level} asked`
+            : written
+              ? `${label}: the resume is written in it`
+              : null,
         };
       });
       const met = states.filter((state) => state.status === "met").length;
@@ -1161,8 +1243,8 @@ export function judgeRequirements(
               : listsAny()
                 ? "missing"
                 : "unverifiable",
-        terms: states.map(({ name, status }) => ({
-          term: name,
+        terms: states.map(({ plain, status }) => ({
+          term: plain,
           found: status === "met" || status === "partial",
         })),
         evidence: [...new Set([...fromRows, ...fromLines])].slice(0, MAX_EVIDENCE),
@@ -1294,37 +1376,60 @@ export function judgeRequirements(
       qualifiersMet ? status : weaker(status, "partial");
 
     // The field counts only when it is a named subject ("Nursing"), not a plain word.
-    const educationHolds = new Set(
-      resumeLines
-        .filter((entry) => entry.rank === EVIDENCE_RANK.education)
-        .flatMap((entry) => [...entry.holds]),
-    );
-    const fieldMet =
+    const education = resumeLines.filter((entry) => entry.rank === EVIDENCE_RANK.education);
+    const educationHolds = new Set(education.flatMap((entry) => [...entry.holds]));
+    // A field the ask abbreviates ("CS") is held by the words it stands for ("Computer Science",
+    // `fieldAbbreviations`) in a degree's own words, never in its school's ("Colorado State").
+    const abbreviates = (label: string) => {
+      // Schema-defaulted; a hand-built policy may lack it.
+      const words = own(km.requirements.fieldAbbreviations ?? {}, label.toLowerCase());
+      const field = words && wordListRegex([escapeRegex(words)]);
+      return (
+        !!field &&
+        education.some((entry) =>
+          field.test(
+            parsed.education.reduce((line, { school }) => line.replace(school, " "), entry.line),
+          ),
+        )
+      );
+    };
+    // What the years are of ("BS in CS and 5+ years of Python") is not the degree's field.
+    const fieldMet = (yearsGroups: ReadonlySet<string>) =>
       skills.length === 0 ||
-      [...groups.values()].every((members) => members.some(([token]) => educationHolds.has(token)));
+      [...groups].every(
+        ([root, members]) =>
+          yearsGroups.has(root) ||
+          members.some(([token, label]) => educationHolds.has(token) || abbreviates(label)),
+      );
 
-    const degreeVerdict = degree
-      ? (() => {
-          const have = parsed.highestIsced;
-          const met = have !== null && have >= degree.isced;
-          const equivalent =
-            !met &&
-            matchers.equivalence.test(ask) &&
-            (parsed.monthsOfExperience ?? 0) >= EQUIVALENT_MONTHS;
-          return {
-            met,
-            status: (met && fieldMet ? "met" : met || equivalent ? "partial" : "missing") as Status,
-            detail: `${have === null ? "No degree read" : `${ISCED_LABELS[have]} read`}; ${ISCED_LABELS[degree.isced]} asked${equivalent ? ", or equivalent experience" : ""}`,
-          };
-        })()
-      : null;
+    const degreeVerdictOf = (yearsGroups: ReadonlySet<string>) => {
+      if (!degree) return null;
+      const have = parsed.highestIsced;
+      const met = have !== null && have >= degree.isced;
+      const equivalent =
+        !met &&
+        matchers.equivalence.test(ask) &&
+        (parsed.monthsOfExperience ?? 0) >= EQUIVALENT_MONTHS;
+      return {
+        met,
+        status: (met && fieldMet(yearsGroups)
+          ? "met"
+          : met || equivalent
+            ? "partial"
+            : "missing") as Status,
+        detail: `${have === null ? "No degree read" : `${ISCED_LABELS[have]} read`}; ${ISCED_LABELS[degree.isced]} asked${equivalent ? ", or equivalent experience" : ""}`,
+      };
+    };
+    const degreeVerdict = degreeVerdictOf(NONE);
 
     const askedYears = years ? yearsAsked(years[1], km) : null;
     if (years && askedYears !== null) {
       const have = parsed.monthsOfExperience === null ? null : parsed.monthsOfExperience / 12;
       // What the years are of: the named skills, else the plainer words, counted over the dated
       // roles naming them. Beside a degree, only the years' own clause counts ("BS in Computer
-      // Science and 5+ years" names the degree's field, not the years').
+      // Science and 5+ years" names the degree's field, not the years'), and only what follows a
+      // widened field or its equivalent ("BS in CS or a related field with 4+ years" asks for 4
+      // years of any work).
       const scope = levels.length
         ? (() => {
             const clauses = clauseBreak(policy.resumeParse);
@@ -1334,6 +1439,7 @@ export function judgeRequirements(
             );
             let head = ask.slice(degreeEnd, years.index).split(clauses).at(-1) ?? "";
             if (eitherAsk) head = head.split(matchers.alternation).at(-1) ?? "";
+            head = head.split(matchers.equivalences).at(-1) ?? "";
             const tail = ask.slice(years.index + years[0].length).split(clauses)[0] ?? "";
             const inClause = extractVocabulary(`${head} ${tail}`, km, vocab);
             return picked.filter(([token]) => inClause.has(token));
@@ -1377,20 +1483,19 @@ export function judgeRequirements(
         return { status: "partial", detail: counted };
       })();
       // "A Master's and 5+ years": as met as the weaker. "A Bachelor's or 4+ years": the stronger.
-      const status = !degreeVerdict
+      const degreeOf = degreeVerdictOf(scopeGroups);
+      const status = !degreeOf
         ? yearsVerdict.status
         : eitherAsk
-          ? stronger(yearsVerdict.status, degreeVerdict.status)
-          : weaker(yearsVerdict.status, degreeVerdict.status);
+          ? stronger(yearsVerdict.status, degreeOf.status)
+          : weaker(yearsVerdict.status, degreeOf.status);
       return {
         ...base,
         kind: "experience",
         status: qualified(status),
         terms,
         evidence: termEvidence,
-        detail: degreeVerdict
-          ? `${yearsVerdict.detail}; ${degreeVerdict.detail}`
-          : yearsVerdict.detail,
+        detail: degreeOf ? `${yearsVerdict.detail}; ${degreeOf.detail}` : yearsVerdict.detail,
       } satisfies AtsRequirement;
     }
 

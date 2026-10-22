@@ -56,11 +56,15 @@ export async function readFileBytes(
   path: string,
   { maxBytes = MAX_FILE_BYTES }: AtsReadFileOptions = {},
 ): Promise<Buffer> {
-  // Two leading slashes name another computer (`\\host\share`, `\\?\UNC\…`) or a device
-  // (`\\.\pipe\…`), except the local long form `\\?\C:\…`. Checked as given and as resolved: a
-  // relative path resolves onto a share when the working folder is one. Mapped drives and
-  // network mounts look local and are not caught.
-  if ([path, resolve(path)].some((form) => /^[\\/]{2}(?!\?\\[A-Za-z]:\\)/.test(form)))
+  // On Windows two leading slashes name another computer (`\\host\share`, `\\?\UNC\…`) or a
+  // device (`\\.\pipe\…`), except the local long form `\\?\C:\…`. Checked as given and as
+  // resolved: a relative path resolves onto a share when the working folder is one. Mapped drives
+  // and network mounts look local and are not caught. On Linux and macOS `//tmp/cv.txt` is
+  // `/tmp/cv.txt`, and a backslash is part of a file name.
+  if (
+    process.platform === "win32" &&
+    [path, resolve(path)].some((form) => /^[\\/]{2}(?!\?\\[A-Za-z]:\\)/.test(form))
+  )
     throw new AtsFileError(`${path} is a network share or a device, not a file on this computer.`);
   try {
     // Measured before it is opened: opening a device can act on it or wait.
