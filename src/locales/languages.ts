@@ -55,6 +55,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       openEnded: union(rp.openEnded, v.openEnded),
       rangeWords: union(rp.rangeWords, v.rangeWords),
       sinceWords: union(rp.sinceWords, v.sinceWords),
+      lineEndDateWords: union(rp.lineEndDateWords, v.lineEndDateWords),
       employerWords: union(rp.employerWords, v.employerWords),
       titleWords: union(rp.titleWords, v.titleWords),
       schoolWords: union(rp.schoolWords, v.schoolWords),

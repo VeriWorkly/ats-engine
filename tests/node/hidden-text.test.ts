@@ -20,8 +20,21 @@ const IMAGE = (x: number, y: number, w: number, h: number) =>
 
 /** A 1pt border around 40,690 to 440,720: two rectangles filled even-odd. */
 const BORDER = "40 690 400 30 re 41 691 398 28 re f*";
-/** `GS1` paints nothing, `GS2` paints at 8% opacity, `GS3` at 99%. */
-const GSTATES = "/ExtGState<</GS1<</ca 0>>/GS2<</ca 0.08>>/GS3<</ca 0.99>>>>";
+/**
+ * `GS1` paints nothing, `GS2` paints at 8% opacity, `GS4` at 30%, `GS5` 50%, `GS7` 70%, `GS8` 80%,
+ * `GS85` 85%, `GS9` 95%, `GS3` 99%.
+ */
+const GSTATES =
+  "/ExtGState<</GS1<</ca 0>>/GS2<</ca 0.08>>/GS3<</ca 0.99>>/GS4<</ca 0.3>>/GS5<</ca 0.5>>" +
+  "/GS7<</ca 0.7>>/GS8<</ca 0.8>>/GS85<</ca 0.85>>/GS9<</ca 0.95>>>>";
+/** A black band, and over it a white frame of `count` rectangles: outline, inner edge and specks. */
+const specked = (count: number) =>
+  `0 g 40 690 400 30 re f 1 1 1 rg 40 690 400 30 re 41 691 398 28 re ${Array.from(
+    { length: count - 2 },
+    (_, i) => `${300 + i * 4} 692 2 2 re`,
+  ).join(" ")} f*`;
+/** A picture under the middle of `line(700)`: what lies under a fill over it is unknown. */
+const PICTURE = IMAGE(100, 698, 100, 14);
 
 async function hidden(content: string, resources = "") {
   const { layout } = await extractResume(buildPdf(`${visible}\n${content}`, resources), "pdf");
@@ -46,7 +59,34 @@ describe("hidden text", () => {
     ["placed by a text matrix", `1 1 1 rg BT /F1 10 Tf 1 0 0 1 50 700 Tm (${KEYWORDS}) Tj ET`],
     ["white inside a box's border", `0 g ${BORDER} 1 1 1 rg ${line(700)}`],
     ["white on a faint tint", `q /GS2 gs 0 g 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`],
-    // A path too intricate to split, or layers too deep, is read as solid, never as unknown.
+    // A subpath that goes out and back along its own sides encloses nothing: it cuts no hole.
+    [
+      "on a box of its colour beside a flat subpath",
+      `0 g 40 690 400 30 re 40 690 m 440 690 l 440 720 l 440 690 l h f* 0 g ${line(700)}`,
+    ],
+    [
+      "on a reversed box of its colour beside a flat subpath",
+      `0 g 440 690 -400 30 re 40 690 m 440 690 l 440 720 l 440 690 l h f 0 g ${line(700)}`,
+    ],
+    [
+      "on a scaled box of its colour beside a flat subpath",
+      `q 2 0 0 2 0 0 cm 0 g 20 345 200 15 re 20 345 m 220 345 l 220 360 l 220 345 l h f* Q 0 g ${line(700)}`,
+    ],
+    // A hole under a few letters of it does not make the frame around it a border.
+    [
+      "on a box of its colour with a hole under its middle",
+      `0 g 40 690 400 30 re 138 692 20 26 re f* 0 g ${line(700)}`,
+    ],
+    [
+      "covered by a white box with a hole over its middle",
+      `0 g ${line(700)} 1 1 1 rg 40 690 400 30 re 138 692 20 26 re f*`,
+    ],
+    // A path too intricate to split, or layers too deep, is read as solid, never as unknown: a
+    // move with no line after it is no rectangle; past eight rectangles a path is not split.
+    [
+      "white on a white frame of nine rectangles over a black band",
+      `${specked(9)} 1 1 1 rg ${line(700)}`,
+    ],
     [
       "white on a white box with junk moves in its path",
       `1 1 1 rg 40 690 400 30 re ${Array.from({ length: 9 }, (_, i) => `${i} ${i} m`).join(" ")} f ${line(700)}`,
@@ -55,9 +95,47 @@ describe("hidden text", () => {
       "white on two white triangles",
       `1 1 1 rg 40 690 m 440 690 l 440 720 l h 40 690 m 440 720 l 40 720 l h f* ${line(700)}`,
     ],
+    // Fills that let less than a tenth of a picture under them show hide it, as one opaque fill.
     [
-      "white on five stacked near-opaque white boxes",
-      `q /GS3 gs 1 1 1 rg ${"40 690 400 30 re f ".repeat(5)}Q 1 1 1 rg ${line(700)}`,
+      "white on a near-opaque white box over a picture",
+      `${PICTURE} q /GS3 gs 1 1 1 rg 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`,
+    ],
+    [
+      "black on a 95% black box over a picture",
+      `${PICTURE} q /GS9 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`,
+    ],
+    [
+      "white on four half-opaque white boxes over a picture",
+      `${PICTURE} q /GS5 gs 1 1 1 rg ${"40 690 400 30 re f ".repeat(4)}Q 1 1 1 rg ${line(700)}`,
+    ],
+    // Layers of its own colour that cover 70% or more hide it whatever lies beneath: five 30%
+    // white boxes cover 83%.
+    [
+      "white on five 30% white boxes over a picture",
+      `${PICTURE} q /GS4 gs 1 1 1 rg ${"40 690 400 30 re f ".repeat(5)}Q 1 1 1 rg ${line(700)}`,
+    ],
+    // Five 30% layers still let 17% through; past four layers the next is read as opaque. Black
+    // and white in turn blend to the grey of the text, far from either layer's colour.
+    [
+      "grey on five 30% black and white boxes over a picture",
+      `${PICTURE} q /GS4 gs ${"0 g 40 690 400 30 re f 1 g 40 690 400 30 re f ".repeat(2)}0 g 40 690 400 30 re f Q 0.31 g ${line(700)}`,
+    ],
+    // A translucent box of the text's own colour, painted at 70% or more, leaves the text at most
+    // the contrast of 70% black on white: what lies beneath cannot make it readable.
+    ["black on an 85% black box", `q /GS85 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`],
+    ["black on an 80% black box", `q /GS8 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`],
+    ["black on a 70% black box", `q /GS7 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`],
+    [
+      "black on three half-opaque black boxes",
+      `q /GS5 gs 0 g ${"40 690 400 30 re f ".repeat(3)}Q 0 g ${line(700)}`,
+    ],
+    [
+      "navy on an 85% navy box",
+      `q /GS85 gs 0 0 0.3 rg 40 690 400 30 re f Q 0 0 0.3 rg ${line(700)}`,
+    ],
+    [
+      "white on an 85% white box over a black box",
+      `0 g 40 690 400 30 re f q /GS85 gs 1 1 1 rg 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`,
     ],
     [
       "white on a white path of 150,000 points",
@@ -78,6 +156,18 @@ describe("hidden text", () => {
     ["dark text in a box with a dark border", `0.1 0.1 0.1 rg ${BORDER} 0 g ${line(700)}`],
     ["dark text under a border drawn after it", `0 g ${line(700)} 0 g ${BORDER}`],
     [
+      "white text in a white frame of eight rectangles over a black band",
+      `${specked(8)} 1 1 1 rg ${line(700)}`,
+    ],
+    [
+      "dark text running out of a box with a dark border",
+      `0 g 40 690 150 30 re 41 691 148 28 re f* 0 g ${line(700)}`,
+    ],
+    [
+      "dark text under a border drawn after it that it runs out of",
+      `0 g ${line(700)} 0 g 40 690 150 30 re 41 691 148 28 re f*`,
+    ],
+    [
       "dark text in a border wound the other way",
       `0 g 40 690 m 440 690 l 440 720 l 40 720 l h 41 691 m 41 719 l 439 719 l 439 691 l h f ${line(700)}`,
     ],
@@ -86,6 +176,29 @@ describe("hidden text", () => {
       `q /GS2 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`,
     ],
     ["dark text on a fully transparent box", `q /GS1 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`],
+    [
+      "white text on a half-transparent dark band over a picture",
+      `${PICTURE} q /GS5 gs 0 g 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`,
+    ],
+    [
+      "white text on a half-transparent white band over a picture",
+      `${PICTURE} q /GS5 gs 1 1 1 rg 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`,
+    ],
+    [
+      "white text on an 85% navy band",
+      `q /GS85 gs 0 0 0.3 rg 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`,
+    ],
+    ["white text on an 80% black band", `q /GS8 gs 0 g 40 690 400 30 re f Q 1 1 1 rg ${line(700)}`],
+    ["black text on a 50% grey band", `q /GS5 gs 0.5 g 40 690 400 30 re f Q 0 g ${line(700)}`],
+    // A chip tinted with its text's colour, as `bg-blue-600/30 text-blue-600` draws it.
+    [
+      "blue text on a 30% tint of its blue",
+      `q /GS4 gs 0.2 0.4 0.8 rg 40 690 400 30 re f Q 0.2 0.4 0.8 rg ${line(700)}`,
+    ],
+    [
+      "black text on a half-transparent black box",
+      `q /GS5 gs 0 g 40 690 400 30 re f Q 0 g ${line(700)}`,
+    ],
   ])("does not flag %s", async (_, content) => {
     expect((await hidden(content, GSTATES)).hiddenTextChars).toBe(0);
   });

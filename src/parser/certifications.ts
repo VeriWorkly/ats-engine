@@ -82,8 +82,8 @@ function parts(line: string): string[] {
   return out.flatMap((part) => part.split(SPACED_DASH));
 }
 
-/** Brackets left empty by a date taken out: "Scrum Alliance (2019 - 2023)". */
-const EMPTY_BRACKETS = /\(\s*[–-]?\s*\)|\[\s*[–-]?\s*\]/gu;
+/** Brackets left empty by dates taken out: "Scrum Alliance (2019 - 2023)", "(2022, expires 2025)". */
+const EMPTY_BRACKETS = /\([\s,;:·–—-]*\)|\[[\s,;:·–—-]*\]/gu;
 const LEADING = new Set([..." \t,;:|·•–—-"]);
 const TRAILING = new Set([...LEADING, "("]);
 
@@ -101,6 +101,9 @@ function tidy(text: string) {
 
 const monthIndex = (date: { year: number; month: number | null }) =>
   date.year * 12 + (date.month ?? 1);
+/** The last month a date may mean: "2021" runs to December. */
+const lastMonth = (date: { year: number; month: number | null }) =>
+  date.year * 12 + (date.month ?? 12);
 
 type Dated = { date: AtsParsedCertification["date"]; expires: AtsParsedCertification["date"] };
 
@@ -130,8 +133,10 @@ function takeDates(
     rest += part.slice(from, label ? start + label.index : found.index);
     from = found.end;
     if (expiry) dated.expires ??= found.date;
-    else if (issued) dated.date ??= found.date;
-    else unlabelled.push(found.date);
+    // The latest date earned: a renewal after the first ("issued 2019, renewed 2023").
+    else if (issued) {
+      if (!dated.date || monthIndex(found.date) > monthIndex(dated.date)) dated.date = found.date;
+    } else unlabelled.push(found.date);
   }
   return tidy(rest + part.slice(from));
 }
@@ -166,7 +171,7 @@ function readCertification(
   line: string,
   policy: AtsEnginePolicy,
   now: Date,
-): { row: AtsParsedCertification | null; dated: Dated } | null {
+): { row: AtsParsedCertification | null; dated: Dated; rangeEnd: boolean } | null {
   const body = line.replace(BULLET_PREFIX, "").trim();
   if (!body || body.length > MAX_LINE || !/\p{L}|\p{N}/u.test(body)) return null;
   const rp = policy.resumeParse;
@@ -177,25 +182,69 @@ function readCertification(
     .filter((part) => !words.id.test(part))
     .map((part) => takeDates(part, rp, words, now, dated, unlabelled))
     .filter((part) => /\p{L}/u.test(part));
-  // Unlabelled dates: the first is when it was earned, a later one when it lapses ("2019 - 2023").
+  // Unlabelled dates: the first is when it was earned, the last after it the end of the range
+  // ("2019 - 2023", "2015–2018, 2021–2027"), kept as the expiry but not stated as one.
+  let rangeEnd = false;
+  const labelled = dated.expires !== null;
   for (const date of unlabelled) {
     if (!dated.date) dated.date = date;
-    else if (!dated.expires && monthIndex(date) > monthIndex(dated.date)) dated.expires = date;
+    else if (!labelled && monthIndex(date) > monthIndex(dated.expires ?? dated.date)) {
+      dated.expires = date;
+      rangeEnd = true;
+    }
   }
-  if (!kept.length) return dated.date || dated.expires ? { row: null, dated } : null;
+  // An expiry before the date earned was renewed past: "2019, expired 2021, renewed 2023".
+  if (dated.date && dated.expires && lastMonth(dated.expires) < monthIndex(dated.date))
+    dated.expires = null;
+  rangeEnd &&= dated.expires !== null;
+  if (!kept.length) return dated.date || dated.expires ? { row: null, dated, rangeEnd } : null;
 
   const [first, ...others] = kept;
   let [name, issuer] = others.length ? [first!, ""] : nameAndIssuer(first!, words);
   if (others.length) issuer = tidy(others[0]!.replace(words.issuerOpening, ""));
   name = name.slice(0, MAX_FIELD);
   if (!/\p{L}/u.test(name)) return null;
-  return { row: { name, issuer: issuer.slice(0, MAX_FIELD), ...dated }, dated };
+  const row = { name, issuer: issuer.slice(0, MAX_FIELD), ...dated };
+  if (rangeEnd) rangeEnds.add(row);
+  return { row, dated, rangeEnd };
 }
 
-/** Each certification once in a list, by name, in the order first read. */
+/** Rows whose `expires` is the end of a date range with no expiry word: "PMP, 2019 – 2023". */
+const rangeEnds = new WeakSet<AtsParsedCertification>();
+
+/**
+ * Whether a row states when it lapses: an expiry word before the date ("expired 2021", "valid
+ * until 2027") or a structured field. The end of an unlabelled range ("Google Data Analytics
+ * Certificate, 2021 – 2022") may be when a course ended, so it is kept but says nothing of a lapse.
+ */
+export const statesExpiry = (row: AtsParsedCertification) =>
+  row.expires !== null && !rangeEnds.has(row);
+
+/** The latest month a row is dated by, earned or expiring; null when it has no date. */
+const latest = (row: AtsParsedCertification) => {
+  const months = [row.date, row.expires].flatMap((date) => (date ? [lastMonth(date)] : []));
+  return months.length ? Math.max(...months) : null;
+};
+
+/**
+ * Each certification once in a list, by name, in the place first read. Listed again with later
+ * dates (a renewal), the later row replaces it; an undated row neither replaces nor is replaced.
+ */
 export function addCertifications(into: AtsParsedCertification[], rows: AtsParsedCertification[]) {
-  for (const row of rows)
-    if (!into.some((kept) => kept.name.toLowerCase() === row.name.toLowerCase())) into.push(row);
+  // Where each name is in the list: one lookup a row.
+  const places = new Map<string, number>();
+  into.forEach((kept, at) => places.set(kept.name.toLowerCase(), at));
+  for (const row of rows) {
+    const key = row.name.toLowerCase();
+    const at = places.get(key);
+    if (at === undefined) {
+      places.set(key, into.length);
+      into.push(row);
+      continue;
+    }
+    const [was, now] = [latest(into[at]!), latest(row)];
+    if (was !== null && now !== null && now > was) into[at] = row;
+  }
 }
 
 /**
@@ -210,25 +259,28 @@ export function parseCertifications(
 ): AtsParsedCertification[] {
   const plain = lines.some((line) => line.trim() && !BULLET.test(line));
   const rows: AtsParsedCertification[] = [];
-  const seen = new Set<string>();
+  let last: AtsParsedCertification | undefined;
   for (const line of lines) {
     if (plain && BULLET.test(line)) continue;
     const read = readCertification(line, policy, now);
     if (!read) continue;
-    const last = rows.at(-1);
     if (!read.row) {
       if (last) {
         last.date ??= read.dated.date;
-        last.expires ??= read.dated.expires;
+        if (!last.expires && read.dated.expires) {
+          last.expires = read.dated.expires;
+          if (read.rangeEnd) rangeEnds.add(last);
+        }
       }
       continue;
     }
-    const key = read.row.name.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
+    last = read.row;
     rows.push(read.row);
   }
-  return rows;
+  // Each certification once, by name; dates joined from the line below first.
+  const kept: AtsParsedCertification[] = [];
+  addCertifications(kept, rows);
+  return kept;
 }
 
 /** The items of a "Certifications: AWS Certified Developer (2021), PMP" line, each a row. */

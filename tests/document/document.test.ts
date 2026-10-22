@@ -330,9 +330,15 @@ describe("JSON Resume through the engine's front door", () => {
   // Only English "Present" and its kin made a role current; "heute" gave a one-month role.
   it.each([
     ["Current role", []],
+    ["Current position", []],
     ["Till now", []],
+    ["Present.", []],
+    ["- Present", []],
+    ["Continuing", []],
     ["heute", ["de"]],
+    ["bis heute", ["de"]],
     ["aujourd'hui", ["fr"]],
+    ["अभी तक", ["hi"]],
   ])("treats an end of %j as a current role", (endDate, languages) => {
     const resume = {
       basics: { name: "Jane Doe", email: "jane@example.com" },
@@ -346,16 +352,34 @@ describe("JSON Resume through the engine's front door", () => {
     expect(report.parsed.monthsOfExperience).toBeGreaterThanOrEqual(92);
   });
 
-  it.each(["soon", "Not current", "No longer current"])(
-    "still reads an end of %j as no end, not as current",
-    (endDate) => {
-      const resume = {
-        basics: { name: "Jane Doe" },
-        work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate }],
-      };
-      expect(check(resume).parsed.roles[0]).toMatchObject({ current: false, end: null });
-    },
-  );
+  // Only an end that is an open end as a whole is current: one that opens with one and goes on
+  // ("Current role ended 2020", "Heute nicht") is no end.
+  it.each([
+    ["soon", []],
+    ["Not current", []],
+    ["No longer current", []],
+    ["Current role ended 2020", []],
+    ["Till now (contract ended)", []],
+    ["Present 2021", []],
+    ["Now closed", []],
+    ["Ongoing until Mar 2021", []],
+    ["Continuing until 2020", []],
+    ["Current: no", []],
+    ["Present?", []],
+    ["Heute nicht", ["de"]],
+    ["jetzt nicht mehr", ["de"]],
+    ["से", ["hi"]],
+  ])("still reads an end of %j as no end, not as current", (endDate, languages) => {
+    const resume = {
+      basics: { name: "Jane Doe" },
+      work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate }],
+    };
+    const report = score(resume, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
+      now: NOW,
+      languages: languages as string[],
+    });
+    expect(report.parsed.roles[0]).toMatchObject({ current: false, end: null });
+  });
 
   it("reads only a bounded slice of a huge array", () => {
     const huge = {

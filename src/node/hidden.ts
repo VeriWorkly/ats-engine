@@ -11,13 +11,14 @@
  * - within 1.25:1 contrast of what lies beneath: the topmost shape filled before it (blended by
  *   its opacity with what lies under it; a border's inside is not its fill), else the white page
  *   (an image, gradient or pattern leaves the background unknown: benefit of the doubt);
+ * - on translucent fills of its own colour that together cover 70% or more of what lies beneath;
  * - covered by an image or an opaque shape drawn after it.
  *
  * Measured, not certain: path-drawn glyphs, clip regions and blend modes can still hide text this
  * does not see. It errs on the side of not accusing anyone.
  */
 
-import { indexDrawn, type Box, type Drawn } from "./surroundings.js";
+import { indexDrawn, OPAQUE, type Box, type Drawn } from "./surroundings.js";
 import { countRuledTables, pathRules } from "./tables.js";
 
 export type { Box };
@@ -27,6 +28,11 @@ type Matrix = [number, number, number, number, number, number];
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 const MIN_SIZE = 2;
 const MIN_CONTRAST = 1.25;
+/**
+ * Translucent fills of the text's own colour that cover this much of what lies beneath them hide
+ * it: at 70%, black text on black over white has 2.5:1 contrast, and over anything else less.
+ */
+const OWN_COLOUR = 0.7;
 
 function multiply(m1: Matrix, m2: Matrix): Matrix {
   return [
@@ -81,7 +87,11 @@ function mix(over: string, under: string, alpha: number) {
 /** A filled path's rectangles split into boxes; past this many, it is read as its bounding box. */
 const MAX_SUBPATHS = 8;
 
-/** The corners of an upright rectangle, or null: 4 points (5 when the first is repeated), each side level or plumb. */
+/**
+ * The corners of an upright rectangle, or null: 4 points (5 when the first is repeated), each side
+ * level or plumb. `turn` is its winding, 0 when it encloses nothing (a path out and back along
+ * the same line, or a rectangle of no width or height).
+ */
 function rectangle(points: ReadonlyArray<[number, number]>): { box: Box; turn: number } | null {
   const corners =
     points.length === 5 && points[4]![0] === points[0]![0] && points[4]![1] === points[0]![1]
@@ -99,30 +109,35 @@ function rectangle(points: ReadonlyArray<[number, number]>): { box: Box; turn: n
   const [[ax, ay], [bx, by]] = [corners[0]!, corners[2]!];
   return {
     box: [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)],
-    turn: area < 0 ? -1 : 1,
+    turn: Math.abs(area) < 1e-6 ? 0 : Math.sign(area),
   };
 }
 
 /**
  * What a filled path of upright rectangles covers, as boxes in page space, by each rectangle's
  * winding: a frame (`re re f*`, a bordered box) is its four sides, not the box around it.
+ * `holes`: the gaps it leaves inside its bounding box (a frame's inside), counted as boxes.
  * `undefined` for any other path (a curve, a slanted side, more than `MAX_SUBPATHS` rectangles),
- * or when `budget` (grid cells, shared across a page) runs out: the caller reads it as its
- * bounding box in its fill, as a solid shape.
+ * or when `budget` (boxes and holes, shared across a page) runs out: the caller reads it as its
+ * bounding box in its fill, as a solid shape. Each path split costs at least one box, so the work
+ * is bounded too: a grid of `2 * MAX_SUBPATHS` edges each way, each cell against every rectangle.
  */
 function filledBoxes(
   data: ArrayLike<number>,
   toPage: (x: number, y: number) => [number, number],
   evenOdd: boolean,
-  budget: { cells: number },
-): Box[] | undefined {
+  budget: { boxes: number },
+): { boxes: Box[]; holes: Box[] } | undefined {
   const subpaths: Array<{ box: Box; turn: number }> = [];
   let points: Array<[number, number]> = [];
   const close = () => {
     if (!points.length) return true;
     const found = rectangle(points);
     points = [];
-    return found ? subpaths.push(found) <= MAX_SUBPATHS : false;
+    if (!found) return false;
+    // One that encloses nothing fills nothing and cuts no hole.
+    if (found.turn) subpaths.push(found);
+    return subpaths.length <= MAX_SUBPATHS;
   };
   const point = (at: number) => toPage(Number(data[at]), Number(data[at + 1]));
   for (let at = 0; at < data.length;) {
@@ -139,30 +154,32 @@ function filledBoxes(
     else return undefined;
   }
   if (!close()) return undefined;
-  if (subpaths.length <= 1) return subpaths.length ? [subpaths[0]!.box] : undefined;
+  if (subpaths.length <= 1)
+    return subpaths.length ? { boxes: [subpaths[0]!.box], holes: [] } : undefined;
 
+  if (budget.boxes <= 0) return undefined;
   const edges = (low: 0 | 1, high: 2 | 3) =>
     [...new Set(subpaths.flatMap(({ box }) => [box[low], box[high]]))].sort((a, b) => a - b);
   const [xs, ys] = [edges(0, 2), edges(1, 3)];
-  if ((budget.cells -= xs.length * ys.length) < 0) return undefined;
   const boxes: Box[] = [];
+  const holes: Box[] = [];
   for (let row = 0; row + 1 < ys.length; row += 1) {
     const y = (ys[row]! + ys[row + 1]!) / 2;
-    let from: number | undefined;
-    for (let column = 0; column + 1 < xs.length; column += 1) {
-      const x = (xs[column]! + xs[column + 1]!) / 2;
+    const filled = xs.slice(1).map((right, column) => {
+      const x = (xs[column]! + right) / 2;
       let winding = 0;
       for (const { box, turn } of subpaths)
         if (x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]) winding += turn;
-      const filled = evenOdd ? winding % 2 !== 0 : winding !== 0;
-      if (filled) from ??= xs[column]!;
-      if (from !== undefined && (!filled || column + 2 === xs.length)) {
-        boxes.push([from, ys[row]!, filled ? xs[column + 1]! : xs[column]!, ys[row + 1]!]);
-        from = undefined;
+      return evenOdd ? winding % 2 !== 0 : winding !== 0;
+    });
+    // Each run of filled or empty cells along the row is one box.
+    for (let from = 0, to = 1; to <= filled.length; to += 1)
+      if (to === filled.length || filled[to] !== filled[from]) {
+        (filled[from] ? boxes : holes).push([xs[from]!, ys[row]!, xs[to]!, ys[row + 1]!]);
+        from = to;
       }
-    }
   }
-  return boxes;
+  return (budget.boxes -= boxes.length + holes.length) < 0 ? undefined : { boxes, holes };
 }
 
 /**
@@ -216,8 +233,11 @@ const MAX_MARKS = 2_000;
 const MAX_MASK_PAIRS = 100_000;
 /** Visible glyphs transparent runs are compared with, across a page; past this the rest are not. */
 const MAX_PIECE_CHECKS = 2_000_000;
-/** Grid cells spent splitting filled paths into boxes, across a page. */
-const MAX_FILL_CELLS = 1_000_000;
+/**
+ * Boxes and holes filled paths are split into, across a page. Each is a shape every run near it
+ * is checked against: past the cap, a path is one box.
+ */
+const MAX_FILL_BOXES = 2_000;
 /** Translucent fills looked through, one over another; the last is read as opaque. */
 const MAX_LAYERS = 4;
 
@@ -386,7 +406,7 @@ export function measureVisibility(
   ]);
   // Thin lines and bars, in page space, for `countRuledTables`.
   const rules: Box[] = [];
-  const fillCells = { cells: MAX_FILL_CELLS };
+  const fillBudget = { boxes: MAX_FILL_BOXES };
   const isImage = new Set(
     [
       ops.paintImageXObject,
@@ -527,19 +547,29 @@ export function measureVisibility(
         const [x0, y0, x1, y1] = Array.from(bounds as ArrayLike<number>);
         lastPath = boxThrough(state.ctm, [x0, y0, x1, y1]);
         if (isFill.has(op)) {
-          const boxes =
+          const split =
             ArrayBuffer.isView(data) || Array.isArray(data)
               ? filledBoxes(
                   data as ArrayLike<number>,
                   (x, y) => apply(state.ctm, x, y),
                   op === ops.eoFill || op === ops.eoFillStroke,
-                  fillCells,
+                  fillBudget,
                 )
-              : [lastPath];
+              : undefined;
           // Any other path is read as its bounding box, solid: a curve or a cheap pile of moves
           // must not leave white text on it unjudged.
-          for (const box of boxes ?? [lastPath])
+          for (const box of split?.boxes ?? [lastPath])
             paint({ box, order, kind: "shape", fill: state.fill });
+          // A hole paints nothing; under a soft mask its path may show anywhere or nowhere.
+          if (!maskDepth)
+            for (const box of split?.holes ?? [])
+              drawn.push({
+                box,
+                order,
+                kind: "hole",
+                fill: state.softMask ? "" : state.fill,
+                alpha: state.softMask ? 0 : state.alpha,
+              });
           const [mx0, my0, mx1, my1] = lastPath;
           if (
             !maskDepth &&
@@ -569,20 +599,43 @@ export function measureVisibility(
     pageBox,
   );
   // The colour seen at a point under `top`, the last fill there: blended by its opacity with what
-  // lies beneath it, else the white page; "" when unknown.
-  // Past `MAX_LAYERS` the fill counts as opaque: layers stacked to that depth must not leave the
-  // background unknown.
-  const shown = (point: [number, number], top: Drawn | undefined, depth = 0): string => {
+  // lies beneath it, else the white page; "" when unknown. `through`: how much of this layer the
+  // fills above it let show. A fill counts as opaque once what lies beneath it would show no more
+  // than an `OPAQUE` cover lets through (under a 99% fill, or four 50% ones), or past
+  // `MAX_LAYERS`: a picture under such layers must not leave the background unknown.
+  const shown = (
+    point: [number, number],
+    top: Drawn | undefined,
+    depth = 0,
+    through = 1,
+  ): string => {
     if (!top) return "#ffffff";
-    if (top.fill === "" || !(top.alpha < 1) || depth >= MAX_LAYERS) return top.fill;
-    const under = shown(point, around(point, top.order).top, depth + 1);
+    const beneath = through * (1 - top.alpha);
+    if (top.fill === "" || !(beneath > 1 - OPAQUE) || depth >= MAX_LAYERS) return top.fill;
+    const under = shown(point, around(point, top.order).top, depth + 1, beneath);
     return under && mix(top.fill, under, top.alpha);
   };
-  for (const { text, center, fill, order } of throughMask) {
-    const background = shown(center, around(center, order).top);
-    if (fill === "" || background === "" || contrast(fill, background) >= MIN_CONTRAST)
-      drawnGlyphs.add(cell(text, center));
-  }
+  // How much of `colour` the fills under a point lay down, from `top` down while each is within
+  // `MIN_CONTRAST` of it: one 85% box, or three 50% ones, of the text's own colour.
+  const ownCover = (point: [number, number], top: Drawn | undefined, colour: string) => {
+    let left = 1;
+    for (let layer = top, depth = 0; layer && depth <= MAX_LAYERS; depth += 1) {
+      if (layer.fill === "" || contrast(colour, layer.fill) >= MIN_CONTRAST) break;
+      left *= 1 - Math.min(1, Math.max(0, layer.alpha));
+      layer = around(point, layer.order).top;
+    }
+    return 1 - left;
+  };
+  // Whether `colour` is lost against what lies under a point: within `MIN_CONTRAST` of it, or on
+  // fills of its own colour that cover `OWN_COLOUR` or more, whatever lies beneath them.
+  const lost = (point: [number, number], top: Drawn | undefined, colour: string) => {
+    if (colour === "") return false;
+    const background = shown(point, top);
+    if (background !== "" && contrast(colour, background) < MIN_CONTRAST) return true;
+    return ownCover(point, top, colour) >= OWN_COLOUR;
+  };
+  for (const { text, center, fill, order } of throughMask)
+    if (!lost(center, around(center, order).top, fill)) drawnGlyphs.add(cell(text, center));
   // What the render mode paints glyphs with: outline in modes 1 and 5, outline and fill in 2 and 6
   // (seen if either is), else fill.
   const paintsOf = (run: Run) => [
@@ -635,6 +688,12 @@ export function measureVisibility(
     return target !== "" && spelt === target;
   };
 
+  // Where a quarter and three quarters of a run's width lie, on the line through its centre.
+  const quarters = ({ box: [x0, , x1], center: [, y] }: Run): Array<[number, number]> => [
+    [x0 + (x1 - x0) / 4, y],
+    [x1 - (x1 - x0) / 4, y],
+  ];
+
   const hidden: string[] = [];
   let previous: Run | undefined;
   let textChars = 0;
@@ -642,7 +701,19 @@ export function measureVisibility(
   for (const run of runs) {
     const chars = run.text.trim().length;
     textChars += chars;
-    const { top, overImage, covered } = around(run.center, run.order);
+    const at = around(run.center, run.order);
+    const { overImage } = at;
+    let { top, covered } = at;
+    // A run whose centre lies in a frame's hole is in the frame, unless the frame lies under (or
+    // over) both its quarter points: then the hole is under a few of its letters, and the rest
+    // are on the frame, as if it had none.
+    const { hole, holeOver } = at;
+    if (hole && hole.order > (top?.order ?? -Infinity)) {
+      const under = quarters(run).map((point) => around(point, run.order).top);
+      if (under.every((shape) => shape?.order === hole.order)) top = under[0];
+    }
+    if (!covered && holeOver)
+      covered = quarters(run).every((point) => around(point, run.order).covered);
 
     const unseen = run.mode === 3 || run.mode === 7;
     if (unseen) invisibleChars += chars;
@@ -663,10 +734,7 @@ export function measureVisibility(
       run.box[3] < pageBox[1] ||
       run.box[1] > pageBox[3];
     // An unknown background, or text in a pattern, gets the benefit of the doubt.
-    const background = shown(run.center, top);
-    const blended =
-      background !== "" &&
-      paints.every(({ colour }) => colour !== "" && contrast(colour, background) < MIN_CONTRAST);
+    const blended = paints.every(({ colour }) => lost(run.center, top, colour));
 
     if (!(invisible || transparent || tiny || offPage || blended || covered)) continue;
     // Runs one after another on a line are one text (Chrome draws a glyph at a time); a gap of a

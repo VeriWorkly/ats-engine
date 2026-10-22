@@ -1,17 +1,21 @@
 /** A rectangle in page points: x0, y0, x1, y1. */
 export type Box = [number, number, number, number];
 
-/** Something drawn on the page before or after a text run. `fill` is "#rrggbb" or "" (unknown). */
+/**
+ * Something drawn on the page before or after a text run. `fill` is "#rrggbb" or "" (unknown). A
+ * "hole" is where a filled path (a frame) leaves a gap inside its bounding box: it paints nothing,
+ * and `fill` and `alpha` are the path's.
+ */
 export type Drawn = {
   box: Box;
   order: number;
-  kind: "image" | "shape" | "shading";
+  kind: "image" | "shape" | "shading" | "hole";
   fill: string;
   alpha: number;
 };
 
 /** At or above this opacity, something drawn over text hides it. */
-const OPAQUE = 0.9;
+export const OPAQUE = 0.9;
 
 const contains = ([x0, y0, x1, y1]: Box, [x, y]: [number, number]) =>
   x >= x0 && x <= x1 && y >= y0 && y <= y1;
@@ -24,6 +28,10 @@ export type Surroundings = {
   overImage: boolean;
   /** Whether something opaque was drawn over it afterwards. */
   covered: boolean;
+  /** The last hole before the run that contains the point, if any. */
+  hole?: Drawn;
+  /** A hole that contains the point in an opaque path drawn after the run, if any. */
+  holeOver?: Drawn;
 };
 
 const GRID = 8;
@@ -40,6 +48,8 @@ type Cell = {
   full: Drawn[];
   /** The rest that overlap it, checked point by point. */
   partial: Drawn[];
+  /** Holes that overlap it, checked point by point. */
+  holes: Drawn[];
   firstFullImage: number;
   lastOpaqueFull: number;
 };
@@ -71,6 +81,7 @@ export function indexDrawn(
   const cells: Cell[] = Array.from({ length: GRID * GRID }, () => ({
     full: [],
     partial: [],
+    holes: [],
     firstFullImage: Infinity,
     lastOpaqueFull: -Infinity,
   }));
@@ -84,6 +95,10 @@ export function indexDrawn(
     for (let r = row(y0); r <= row(y1); r += 1)
       for (let c = column(x0); c <= column(x1); c += 1) {
         const cell = cells[r * GRID + c];
+        if (item.kind === "hole") {
+          cell.holes.push(item);
+          continue;
+        }
         const [cx0, cy0] = [ax0 + c * width, ay0 + r * height];
         const whole =
           x0 <= cx0 - slack &&
@@ -118,7 +133,7 @@ export function indexDrawn(
     let overImage = cell.firstFullImage < order;
     let covered = cell.lastOpaqueFull > order;
 
-    checks += cell.partial.length;
+    checks += cell.partial.length + cell.holes.length;
     if (checks > budget) throw new Error("Too much drawn in one place to measure.");
     for (const item of cell.partial) {
       if (!contains(item.box, point)) continue;
@@ -127,6 +142,14 @@ export function indexDrawn(
         if (item.kind === "image") overImage = true;
       } else if (item.order > order && item.alpha >= OPAQUE) covered = true;
     }
-    return { top, overImage, covered };
+    let hole: Drawn | undefined;
+    let holeOver: Drawn | undefined;
+    for (const item of cell.holes) {
+      if (!contains(item.box, point)) continue;
+      if (item.order < order) {
+        if (!hole || item.order > hole.order) hole = item;
+      } else if (item.order > order && item.alpha >= OPAQUE) holeOver = item;
+    }
+    return { top, overImage, covered, hole, holeOver };
   };
 }

@@ -130,10 +130,12 @@ export function analyzeSpec(
     task: "analyze",
     outputName: "ats_insights",
     schema: insightsSchema,
-    // A sparse analysis is one; an empty one is a reply in another shape.
-    usable: (insights) =>
-      insights.explanation.trim() !== "" ||
-      Object.values(insights).some((value) => Array.isArray(value) && value.length > 0),
+    // A sparse analysis is one; an empty one is a reply in another shape. Blank items, and
+    // keyword suggestions without a posting (dropped in `finish`), say nothing.
+    usable: ({ explanation, keywordOpportunities, ...lists }) =>
+      [explanation, ...(job ? keywordOpportunities : []), ...Object.values(lists).flat()].some(
+        (item) => item.trim() !== "",
+      ),
     jsonSchema,
     defaultPrompt: DEFAULT_ANALYZE_PROMPT,
     user: JSON.stringify({

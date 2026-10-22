@@ -199,25 +199,49 @@ describe("openai-compatible transport", () => {
     );
   });
 
+  // In the text an error quotes: a body that is not quoted passed whatever the redaction did.
   it("keeps other providers' keys and JSON key fields out of an error body too", async () => {
     // Keys of other services: Groq, Hugging Face, xAI, Replicate, Together.
-    const echo = JSON.stringify({
-      seen: [
-        "gsk_Invented0123456789",
-        "hf_Invented0123456789",
-        "xai-Invented0123456789",
-        "r8_Invented0123456789",
-        "tgp_v1_Invented0123456789",
-      ],
+    const keys = JSON.stringify({
+      error: {
+        message:
+          "Rejected gsk_Invented0123456789 hf_Invented0123456789 xai-Invented0123456789 " +
+          "r8_Invented0123456789 tgp_v1_Invented0123456789",
+      },
+    });
+    const members = `Rejected ${JSON.stringify({
       api_key: "plainsecret1",
       apiKey: "plainsecret2",
       "x-api-key": "plainsecret3",
       access_token: "plainsecret4",
-    });
-    const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(401, echo) });
+    })}`;
+    for (const [body, expected] of [
+      [keys, "Rejected [redacted] [redacted] [redacted] [redacted] [redacted]"],
+      [
+        members,
+        'Rejected {"api_key":"[redacted]","apiKey":"[redacted]","x-api-key":"[redacted]",' +
+          '"access_token":"[redacted]"}',
+      ],
+    ]) {
+      const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(401, body!) });
+      const error = (await provider
+        .complete(request())
+        .catch((caught: unknown) => caught)) as Error;
+      expect(error.message).toBe(`Provider returned HTTP 401: ${expected}`);
+    }
+  });
+
+  // A lone CR or a Unicode line separator ended a line too, and the echo after it was quoted.
+  it.each([
+    ["a lone CR", "\r"],
+    ["a line separator", String.fromCodePoint(0x2028)],
+    ["a paragraph separator", String.fromCodePoint(0x2029)],
+    ["a vertical tab", "\v"],
+  ])("does not quote a text body broken by %s", async (_label, gap) => {
+    const body = `Bad request.${gap}{"content":"Jane Doe jane.doe@example.com"}`;
+    const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(400, body) });
     const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
-    expect(error.message).toBe("Provider returned HTTP 401.");
-    expect(error.message).not.toMatch(/Invented|plainsecret/);
+    expect(error.message).toBe("Provider returned HTTP 400.");
   });
 
   it("treats an unreadable body and a network failure as retryable", async () => {

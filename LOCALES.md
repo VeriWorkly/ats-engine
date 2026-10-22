@@ -143,6 +143,7 @@ the policy's.
 | `openEnded`          | `resumeParse.openEnded`           | Words for a role that is still current                                                                                                              | `["heute", "aktuell"]`                          |
 | `rangeWords`         | `resumeParse.rangeWords`          | Words between the ends of a date range, besides a dash                                                                                              | `["bis"]`                                       |
 | `sinceWords`         | `resumeParse.sinceWords`          | Words before a lone start date that make the role current                                                                                           | `["seit"]`                                      |
+| `lineEndDateWords`   | `resumeParse.lineEndDateWords`    | Open ends and since words that are everyday words: they date a role only where the date ends the line or a column                                   | `["ab"]`                                        |
 | `employerWords`      | `resumeParse.employerWords`       | Words joining a job title to its employer on one line                                                                                               | `["bei"]`                                       |
 | `titleWords`         | `resumeParse.titleWords`          | Words that mark a job title                                                                                                                         | `["praktikant(?:in)?"]`                         |
 | `schoolWords`        | `resumeParse.schoolWords`         | Words that mark a school or university                                                                                                              | `["universität", "vidyalaya"]`                  |
@@ -167,8 +168,8 @@ the policy's.
 
 Everything else in a policy stays the policy's: `phrases`, `synonyms`, `implies`, `stemming`,
 what a right-to-work or clearance statement says (`requirements.needsSponsorship`,
-`noSponsorship`, `sponsorshipOffered`, `negation`, `notHeld`, `citizenship`, `residence`,
-`clearanceLevels`),
+`noSponsorship`, `sponsorshipOffered`, `negation`, `notHeld`, `notHeldNearby`, `inProgress`,
+`citizenship`, `residence`, `countries`, `placeJoiners`, `clearanceLevels`),
 `numberWords`, `qualifiers`, `offerWords`, the `writing` and `advice` sections, and the rules
 and their weights, which only a region pack's `rules` and `ageAdvice` adjust.
 

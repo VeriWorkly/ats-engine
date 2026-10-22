@@ -20,8 +20,12 @@ type DateMatchers = {
   named: RegExp;
   season: RegExp;
   openEnded: RegExp;
-  /** A field opening with an open end: "Current role", not "Not current". */
-  openEndedStart: RegExp;
+  /** A field that is an open end as a whole: "Current role", "- Present."; not "Present 2021". */
+  openEndedField: RegExp;
+  /** A field that is only a word between two dates: "से" alone is no open end. */
+  rangeWordOnly: RegExp;
+  /** An everyday word that dates a role only where its date ends the line: "onwards". */
+  lineEnd: RegExp;
 };
 
 /** A two-digit year after an apostrophe: "Jan '20". */
@@ -89,17 +93,26 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
     ),
     season: new RegExp(String.raw`^(${seasonNames})[\s-]+(\d{4})$`, "u"),
     openEnded: new RegExp(`^${openEnded}$`, "iu"),
-    openEndedStart: new RegExp(`^\\s*${openEnded}`, "iu"),
+    openEndedField: new RegExp(
+      String.raw`^[\s(\[]*(?:[‐‑‒–—―−~-]\s*)?${openEnded}[\s.)\]]*$`,
+      "iu",
+    ),
+    rangeWordOnly: new RegExp(String.raw`^\s*${wordListPattern(rp.rangeWords)}\s*$`, "iu"),
+    lineEnd: new RegExp(String.raw`^\s*${wordListPattern(rp.lineEndDateWords)}\s*$`, "iu"),
   };
 });
 
 /**
  * Whether a structured document's end field, holding no date, says the role or study is still
- * going on, opening with words the policy and its packs read: "heute", "Current role", "Till
- * now"; not "Not current".
+ * going on: the whole field is an open end the policy and its packs read ("heute", "Current
+ * role", "Till now"), not one with more after it ("Present 2021", "Heute nicht") nor a word that
+ * only joins two dates (Hindi "से").
  */
 export function saysOngoing(end: string | undefined, rp: AtsEnginePolicy["resumeParse"]) {
-  return Boolean(end?.trim()) && buildMatchers(rp).openEndedStart.test(normalizeText(end!));
+  if (!end?.trim()) return false;
+  const value = normalizeText(end);
+  const { openEndedField, rangeWordOnly } = buildMatchers(rp);
+  return openEndedField.test(value) && !rangeWordOnly.test(value);
 }
 
 /**
@@ -276,8 +289,11 @@ export function readingDatesAt(now: Date): Date {
   return reading;
 }
 
-/** A sentence going on: a space, then a lowercase letter or one of a script without case. Case-sensitive. */
-const SENTENCE_GOES_ON = /^[^\S\t]+[\p{Ll}\p{Lo}]/u;
+/**
+ * What may follow a date that ends its line or column: nothing but a full stop or a closing
+ * bracket, else a tab, a gap of two spaces or a bar.
+ */
+const ENDS_LINE_OR_COLUMN = /^(?:[\s.)\]]*$|[^\S\t]*\t|\s{2}|\s*[|·•])/u;
 
 /** Every date holds two digits in a row; a line without them is not searched (the lookbehinds are costly). */
 const TWO_DIGITS = /\d\d/;
@@ -292,7 +308,9 @@ function searchDateRange(
   const matchers = buildMatchers(rp);
   let term: { range: DateRange; matched: string } | null = null;
 
-  for (const match of line.matchAll(matchers.range)) {
+  // A copy, so a "since" read wrongly is searched again from its date ("Volvo AB 2018 – 2021").
+  const range = new RegExp(matchers.range);
+  for (let match = range.exec(line); match; match = range.exec(line)) {
     // Group 4 is the "since 2019" branch (a role still held); group 5 a season alone, kept for
     // when the line holds no range.
     if (match[5] !== undefined) {
@@ -303,21 +321,36 @@ function searchDateRange(
       term = { range: { start, end, current: false }, matched: match[0] };
       continue;
     }
-    // An open end straight after a date, with no dash, that a lowercase or uncased word follows
-    // is a sentence ("Jan 2017 continuing support", "2017 से टीम"); a place after it is not
-    // ("Jun 2021 Present San Francisco").
-    if (match[3] !== undefined && SENTENCE_GOES_ON.test(line.slice(match.index + match[0].length)))
-      continue;
     // Groups 6 and 7: a range of months and two-digit years.
     const endText = match[2] ?? match[3] ?? match[7];
     const current = match[4] !== undefined || matchers.openEnded.test(endText.trim());
+    const after = line.slice(match.index + match[0].length);
+    // An everyday open end ends its line or column: "Jun 2021 onwards", not "2020 onwards, growth
+    // of 30%" or "2017 से टीम का नेतृत्व किया". Any other may have a place after it ("Present remote").
+    if (endText !== undefined && matchers.lineEnd.test(endText) && !ENDS_LINE_OR_COLUMN.test(after))
+      continue;
+    // A span of two months with two-digit years ends its line or column too: "01/15 - 05/21", not
+    // "Rated 08/10 - 10/10 by users" or "Ran hackathon 09/15 - 09/17 at MIT".
+    if (match[6] !== undefined && !current && !ENDS_LINE_OR_COLUMN.test(after)) continue;
+    // So does an everyday since word's date ("ab 03/2020", not "Umsatz ab 2017 um 30 %"), the word
+    // not in capitals ("Volvo AB").
+    if (match[4] !== undefined) {
+      const word = match[0].slice(0, -match[4].length);
+      if (
+        matchers.lineEnd.test(word) &&
+        (/\p{Lu}{2}/u.test(word) || !ENDS_LINE_OR_COLUMN.test(after))
+      ) {
+        range.lastIndex = match.index + word.length;
+        continue;
+      }
+    }
     const startText = match[1] ?? match[4] ?? match[6];
     const start = placedStart(startText, rp, now);
     const shortEnd = !current && /^\d{2}$/.test(endText.trim());
     if (shortEnd) {
       if (!YEAR_ONLY.test(startText.trim())) continue;
       if (/^\d{4}-\d{2}$/.test(match[0].trim()) && Number(endText) <= 12) continue;
-      if (WORD_AFTER.test(line.slice(match.index + match[0].length))) continue;
+      if (WORD_AFTER.test(after)) continue;
     }
     const parsedEnd = current ? null : parseDate(endText, rp, "end");
     const end =
@@ -326,6 +359,14 @@ function searchDateRange(
         : parsedEnd;
 
     if (!isPlausibleDate(start, now)) continue;
+    // A "since" date still to come dates no role ("Verfügbar ab 01/2027"): searched again from it.
+    if (
+      match[4] !== undefined &&
+      toIndex(start, "start") > now.getUTCFullYear() * 12 + now.getUTCMonth() + 1
+    ) {
+      range.lastIndex = match.index + match[0].length - match[4].length;
+      continue;
+    }
     if (!current && (!isPlausibleDate(end, now) || toIndex(end, "end") < toIndex(start, "start")))
       continue;
     if (shortEnd && end && end.year > now.getUTCFullYear() + aheadYears) continue;

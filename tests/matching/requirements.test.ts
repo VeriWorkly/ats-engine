@@ -406,6 +406,12 @@ describe("the right to work, read for what the statement says", () => {
     ],
     // A heading naming the subject is no statement of it.
     ["Work Authorization\nAuthorized to work in the US", "Must have the right to work in the UK"],
+    // Only a list of places carries on past a comma; a bracket's place adds none.
+    ["Authorized to work in the US, based in London, UK", "Must have the right to work in the UK"],
+    ["Authorized to work in the US, relocating to the UK", "Must have the right to work in the UK"],
+    ["US citizen, UK", "Must have the right to work in the UK"],
+    ["Authorized to work in the US (Texas)", "Must have the right to work in the UK"],
+    ["Right to work in Germany and France", "Must be authorized to work in the United States"],
   ])("does not take a statement about another country as evidence: %s", (statement, ask) => {
     expect(authorized(statement, ask)).toMatchObject({
       kind: "authorization",
@@ -425,6 +431,107 @@ describe("the right to work, read for what the statement says", () => {
     ["US citizen", "Must be authorized to work in the United States"],
   ])("meets an ask about the country the statement names: %s", (statement, ask) => {
     expect(authorized(statement, ask)).toMatchObject({ kind: "authorization", status: "met" });
+  });
+
+  // Every country after the first comma or bracket was dropped, and a place the countries did not
+  // name made the line about other countries.
+  it.each([
+    ["Authorized to work in the US, Canada and the UK", "Must have the right to work in the UK"],
+    ["Authorized to work in the US, UK and EU", "Must have the right to work in the EU"],
+    ["Authorized to work in Canada, the US and Mexico", "Must be authorized to work in the US"],
+    ["Authorized to work in Canada, US", "Must be authorized to work in the US"],
+    ["Work authorization: Canada, USA", "Must be authorized to work in the United States"],
+    ["Right to work: UK, Ireland", "Must have the right to work in Ireland"],
+    [
+      "Authorized to work in Canada (PR) and the U.S. (TN visa)",
+      "Must be authorized to work in the US",
+    ],
+    [
+      "Work authorization: EU (Spain), UK (pre-settled status)",
+      "Must have the right to work in the UK",
+    ],
+    ["Authorized to work in America and Canada", "Must be authorized to work in the United States"],
+    ["Authorized to work in the States and the UK", "Must be authorized to work in the US"],
+    ["Right to work in Germany and the UK", "Must have the right to work in the EU"],
+    ["Authorized to work in Ontario and the US", "Must be authorized to work in Canada"],
+  ])("reads every country of a list: %s for %s", (statement, ask) => {
+    expect(authorized(statement, ask)).toMatchObject({ kind: "authorization", status: "met" });
+  });
+
+  // A nationality was no citizenship but the US's.
+  it.each([
+    ["Citizenship: Indian", "Must be an Indian citizen"],
+    ["Indian national", "Must be an Indian citizen"],
+    ["EU passport", "Must be an EU citizen"],
+    ["Citizen of an EU member state", "Must be an EU citizen"],
+    ["British passport holder", "Must be a British citizen"],
+    ["British national", "Must be a British citizen"],
+    ["Nationality: American", "Must be a U.S. citizen"],
+    ["Citizenship: U.S.", "Must be a U.S. citizen"],
+    ["Citizen of USA", "Must be a U.S. citizen"],
+    ["Dual US-UK citizen", "Must be a U.S. citizen"],
+    ["Dual US-UK citizen", "Must be a British citizen"],
+  ])("reads a nationality as that citizenship: %s for %s", (statement, ask) => {
+    expect(authorized(statement, ask)).toMatchObject({ kind: "authorization", status: "met" });
+  });
+
+  it.each([
+    ["Latin American national", "Must be a U.S. citizen"],
+    ["Indian national", "Must be a U.S. citizen"],
+    ["British passport holder", "Must be a U.S. citizen"],
+    ["Played for the Indian national team", "Must be an Indian citizen"],
+  ])("reads no other citizenship from a nationality: %s for %s", (statement, ask) => {
+    expect(authorized(statement, ask)).toMatchObject({
+      kind: "authorization",
+      status: "unverifiable",
+    });
+  });
+
+  // "Irish citizen" and "Latin American citizen" met a U.S. citizenship ask, and the country was
+  // read per line, not per clause.
+  it.each([
+    ["Irish citizen", "Must be a U.S. citizen"],
+    ["Irish citizen", "Must be a British citizen"],
+    ["Irish citizen", "Must be authorized to work in the United States"],
+    ["Citizen of Ireland", "US citizenship required"],
+    ["Latin American citizen", "Must be a U.S. citizen"],
+    ["Indian citizen; authorized to work in the US", "Must be a U.S. citizen"],
+    ["British citizen, previously worked in the US", "US citizenship required"],
+    ["Canadian citizen living in the US", "Must be a U.S. citizen"],
+  ])(
+    "meets a citizenship ask only with that country's citizenship: %s for %s",
+    (statement, ask) => {
+      expect(authorized(statement, ask)).toMatchObject({
+        kind: "authorization",
+        status: "unverifiable",
+      });
+    },
+  );
+
+  it.each([
+    // An Irish citizen may work in the UK and the EU, and a British or EU citizen in Ireland.
+    ["Irish citizen", "Must have the right to work in the UK"],
+    ["Irish citizen", "Must be authorized to work in the EU"],
+    ["British citizen", "Must have the right to work in Ireland"],
+    ["EU citizen", "Must have the right to work in Ireland"],
+    ["Dual US/Canadian citizen", "Must be a U.S. citizen"],
+    ["Indian citizen; authorized to work in the US", "Must be authorized to work in the US"],
+  ])("meets an ask with a clause about its country: %s for %s", (statement, ask) => {
+    expect(authorized(statement, ask)).toMatchObject({ kind: "authorization", status: "met" });
+  });
+
+  // A bare "US" beside another country was not read as the US.
+  it.each([
+    "Authorized to work in Canada and US",
+    "Authorized to work in Canada/US",
+    "Authorized to work in US & Canada",
+    "US Permanent Resident (Canadian citizen)",
+    "US work authorization; Canadian citizen",
+  ])("reads a bare US beside another country or a right to work: %s", (statement) => {
+    expect(authorized(statement, "Must be authorized to work in the United States")).toMatchObject({
+      status: "met",
+      evidence: [statement],
+    });
   });
 
   it("meets a citizenship-or-residence ask with either", () => {
@@ -572,6 +679,14 @@ describe("a clearance, compared by its level", () => {
     ["TS/SCI clearance (not obtained)", "TS/SCI clearance required"],
     ["Not currently cleared, TS/SCI previously", "TS/SCI clearance required"],
     ["Held TS/SCI clearance, not renewed", "TS/SCI clearance required"],
+    // A bracket or comma saying it is not held, or a negation alone, still is about it.
+    ["TS/SCI clearance (not granted)", "Active TS/SCI clearance required"],
+    ["Applied for TS/SCI clearance, not yet granted", "Active TS/SCI clearance required"],
+    ["TS/SCI clearance, not in use since 2018", "Active TS/SCI clearance required"],
+    ["TS/SCI clearance (no)", "Active TS/SCI clearance required"],
+    ["Secret clearance: No", "Secret clearance required"],
+    ["Active Secret clearance, no", "Secret clearance required"],
+    ["Held TS/SCI clearance, no longer active", "TS/SCI clearance required"],
   ])("takes no clearance from one not held: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("unverifiable");
   });
@@ -583,6 +698,12 @@ describe("a clearance, compared by its level", () => {
     ["Secret clearance, held without interruption since 2018", "Secret clearance required"],
     ["Active TS/SCI clearance; promotion to lead in progress", "TS/SCI clearance required"],
     ["TS/SCI clearance (active), polygraph in progress", "TS/SCI clearance required"],
+    // A "no" answering another label, or a "not" past a semicolon, is about something else.
+    ["U.S. Citizen; Active Secret clearance; Visa sponsorship: No", "Secret clearance required"],
+    ["Active Secret clearance; Relocation: No", "Secret clearance required"],
+    ["Top Secret clearance, active; polygraph: no", "Top Secret clearance required"],
+    ["Active TS/SCI clearance; no longer with Lockheed Martin", "TS/SCI clearance required"],
+    ["Active Top Secret clearance; not active duty military", "Top Secret clearance required"],
   ])("keeps a clearance beside a negation about something else: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("met");
   });
@@ -770,5 +891,23 @@ describe("cost", () => {
     const resume = Array.from({ length: 6_000 }, (_, i) => `- go k8s ${i}`).join("\n");
     const job = `Requirements\n${Array.from({ length: 30 }, (_, i) => `- Go, Kubernetes and tool${i}`).join("\n")}`;
     expect(expectFast(() => judge(job, resume, policy), 2_000)).toHaveLength(25);
+  });
+
+  it("reads countries in time on a long run of joiners and spaces", () => {
+    for (const run of ["and / & ".repeat(6_000), `in${" \t".repeat(25_000)}`]) {
+      const statement = `Authorized to work in Canada ${run}us; US citizen ${run}`;
+      expectFast(() => stating(statement, "Must be a U.S. citizen"), 1_000, run.slice(0, 8));
+    }
+  });
+
+  it("reads a long list of countries and brackets in time", () => {
+    for (const run of [", Canada and".repeat(4_000), " (PR), the US".repeat(4_000)]) {
+      const statement = `Authorized to work in the UK${run}; Right to work: EU${run}`;
+      expectFast(
+        () => stating(statement, "Must be authorized to work in the United States"),
+        1_000,
+        run.slice(0, 8),
+      );
+    }
   });
 });

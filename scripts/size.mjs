@@ -10,7 +10,8 @@ const { exports, version } = JSON.parse(readFileSync("package.json", "utf8"));
 /** Gzipped KB. */
 const BUDGETS = {
   // Core: policy data (word lists, place names, clearance levels) grows with each reading fix.
-  ".": 106,
+  // 108: the audit fixes' countries, certification and date-word reading took it to 106.4.
+  ".": 108,
   "./document": 3,
   "./format": 1.5,
   // Entity decoding, page-furniture skipping, JSON-LD requirements, hidden-element rules.

@@ -1108,7 +1108,7 @@
                   "(?:requires?|requiring|needs?|needing)\\s+sponsorship",
                   "work\\s+permit",
                   "(?:us|u\\.s\\.)\\s+citizen(?:ship)?",
-                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
+                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|(?<!(?:latin|south|central|north)\\s)american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
                   "green\\s+card",
                   "permanent\\s+resident"
                 ],
@@ -1126,10 +1126,14 @@
                     "patterns": [
                       "u\\.s\\.(?:a\\.)?",
                       "usa",
-                      "(?<=(?:the|in)\\s)us",
-                      "us(?=\\s+citizen)",
+                      "(?<=(?:(?:the|in|and)\\s{1,3}|[&/,:]\\s{0,3}))us",
+                      "us(?=\\s{0,3}[&/-])",
+                      "us(?=\\s+(?:citizen|national|passport|(?:lawful\\s+)?permanent\\s+residen|green\\s+card|work\\s+(?:authori[sz]|permit|visa)))",
                       "(?:the\\s+)?united\\s+states(?:\\s+of\\s+america)?",
-                      "american(?=\\s+citizen)",
+                      "the\\s+states",
+                      "(?<!(?:latin|south|central|north|of)\\s)america",
+                      "(?<!(?:latin|south|central|north)\\s)american(?=\\s+(?:citizen|national|passport))",
+                      "(?<=(?:citizenship|nationality)\\s{0,3}:\\s{0,3})american",
                       "green\\s+card"
                     ]
                   },
@@ -1142,7 +1146,11 @@
                       "british",
                       "england",
                       "scotland",
-                      "(?<!south\\s)wales"
+                      "(?<!south\\s)wales",
+                      "northern\\s+ireland"
+                    ],
+                    "citizensWorkIn": [
+                      "Ireland"
                     ]
                   },
                   {
@@ -1150,7 +1158,22 @@
                     "patterns": [
                       "e\\.?u\\.?",
                       "european\\s+union",
-                      "eea"
+                      "eea",
+                      "austria|belgium|bulgaria|croatia|cyprus|czechia|czech\\s+republic|denmark|estonia|finland|france|germany|greece|hungary|italy|latvia|lithuania|luxembourg|malta|(?:the\\s+)?netherlands|poland|portugal|romania|slovakia|slovenia|spain|sweden"
+                    ],
+                    "citizensWorkIn": [
+                      "Ireland"
+                    ]
+                  },
+                  {
+                    "name": "Ireland",
+                    "patterns": [
+                      "(?<!northern\\s)ireland",
+                      "irish"
+                    ],
+                    "citizensWorkIn": [
+                      "UK",
+                      "EU"
                     ]
                   },
                   {
@@ -1190,12 +1213,34 @@
                         "type": "string",
                         "minLength": 1
                       }
+                    },
+                    "citizensWorkIn": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     }
                   },
                   "required": [
                     "name",
                     "patterns"
                   ]
+                }
+              },
+              "placeJoiners": {
+                "default": [
+                  "and",
+                  "or",
+                  "in",
+                  "the",
+                  "both"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "needsSponsorship": {
@@ -1266,8 +1311,18 @@
                   "expired",
                   "lapsed",
                   "able\\s+to\\s+obtain",
-                  "former(?:ly)?",
-                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held|obtained|renewed|cleared)",
+                  "former(?:ly)?"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "notHeldNearby": {
+                "default": [
+                  "not\\s+(?:(?:currently|yet)\\s+)?(?:active|current|valid|held|obtained|renewed|cleared|granted|issued|approved|in\\s+use)",
                   "no\\s+longer"
                 ],
                 "minItems": 1,
@@ -1294,9 +1349,13 @@
               "citizenship": {
                 "default": [
                   "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",
-                  "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)",
-                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
-                  "citizen\\s+of\\s+(?:the\\s+)?(?:uk|u\\.k\\.|united\\s+kingdom|eu|european\\s+union|canada|australia|ireland|india)"
+                  "citizen\\s+of\\s+(?:the\\s+)?(?:us|u\\.s\\.(?:a\\.)?|usa|united\\s+states)",
+                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|(?<!(?:latin|south|central|north)\\s)american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
+                  "citizen\\s+of\\s+(?:the\\s+)?(?:uk|u\\.k\\.|united\\s+kingdom|eu|european\\s+union|canada|australia|ireland|india)",
+                  "citizen\\s+of\\s+an?\\s+(?:eu|e\\.u\\.|european\\s+union)\\s+(?:member\\s+)?(?:state|country|nation)",
+                  "(?:citizenship|nationality)\\s{0,3}:\\s{0,3}(?:the\\s+)?(?:us|u\\.s\\.(?:a\\.)?|usa|united\\s+states|uk|u\\.k\\.|united\\s+kingdom|eu|e\\.u\\.|british|american|canadian|australian|irish|indian|canada|australia|ireland|india)",
+                  "(?:us|u\\.s\\.|british|uk|u\\.k\\.|eu|e\\.u\\.|(?<!(?:latin|south|central|north)\\s)american|canadian|australian|irish|indian)\\s+national(?![\\s-]*\\p{L})",
+                  "(?:us|u\\.s\\.|british|uk|u\\.k\\.|eu|e\\.u\\.|(?<!(?:latin|south|central|north)\\s)american|canadian|australian|irish|indian)\\s+passport(?:\\s+holder)?"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -1844,7 +1903,9 @@
                   "earned",
                   "awarded",
                   "achieved",
-                  "completed"
+                  "completed",
+                  "renewed",
+                  "re-?certified"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -1988,6 +2049,8 @@
             "default": [
               "present",
               "current",
+              "current role",
+              "current position",
               "now",
               "ongoing",
               "to date",
@@ -2052,6 +2115,19 @@
           "sinceWords": {
             "default": [
               "since"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "lineEndDateWords": {
+            "default": [
+              "continuing",
+              "onwards",
+              "onward"
             ],
             "minItems": 1,
             "type": "array",
@@ -4335,6 +4411,14 @@
                     "minLength": 1
                   }
                 },
+                "lineEndDateWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "employerWords": {
                   "minItems": 1,
                   "type": "array",
@@ -4833,6 +4917,14 @@
                   }
                 },
                 "sinceWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "lineEndDateWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -6477,7 +6569,7 @@
                   "(?:requires?|requiring|needs?|needing)\\s+sponsorship",
                   "work\\s+permit",
                   "(?:us|u\\.s\\.)\\s+citizen(?:ship)?",
-                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
+                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|(?<!(?:latin|south|central|north)\\s)american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
                   "green\\s+card",
                   "permanent\\s+resident"
                 ],
@@ -6495,10 +6587,14 @@
                     "patterns": [
                       "u\\.s\\.(?:a\\.)?",
                       "usa",
-                      "(?<=(?:the|in)\\s)us",
-                      "us(?=\\s+citizen)",
+                      "(?<=(?:(?:the|in|and)\\s{1,3}|[&/,:]\\s{0,3}))us",
+                      "us(?=\\s{0,3}[&/-])",
+                      "us(?=\\s+(?:citizen|national|passport|(?:lawful\\s+)?permanent\\s+residen|green\\s+card|work\\s+(?:authori[sz]|permit|visa)))",
                       "(?:the\\s+)?united\\s+states(?:\\s+of\\s+america)?",
-                      "american(?=\\s+citizen)",
+                      "the\\s+states",
+                      "(?<!(?:latin|south|central|north|of)\\s)america",
+                      "(?<!(?:latin|south|central|north)\\s)american(?=\\s+(?:citizen|national|passport))",
+                      "(?<=(?:citizenship|nationality)\\s{0,3}:\\s{0,3})american",
                       "green\\s+card"
                     ]
                   },
@@ -6511,7 +6607,11 @@
                       "british",
                       "england",
                       "scotland",
-                      "(?<!south\\s)wales"
+                      "(?<!south\\s)wales",
+                      "northern\\s+ireland"
+                    ],
+                    "citizensWorkIn": [
+                      "Ireland"
                     ]
                   },
                   {
@@ -6519,7 +6619,22 @@
                     "patterns": [
                       "e\\.?u\\.?",
                       "european\\s+union",
-                      "eea"
+                      "eea",
+                      "austria|belgium|bulgaria|croatia|cyprus|czechia|czech\\s+republic|denmark|estonia|finland|france|germany|greece|hungary|italy|latvia|lithuania|luxembourg|malta|(?:the\\s+)?netherlands|poland|portugal|romania|slovakia|slovenia|spain|sweden"
+                    ],
+                    "citizensWorkIn": [
+                      "Ireland"
+                    ]
+                  },
+                  {
+                    "name": "Ireland",
+                    "patterns": [
+                      "(?<!northern\\s)ireland",
+                      "irish"
+                    ],
+                    "citizensWorkIn": [
+                      "UK",
+                      "EU"
                     ]
                   },
                   {
@@ -6559,6 +6674,13 @@
                         "type": "string",
                         "minLength": 1
                       }
+                    },
+                    "citizensWorkIn": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     }
                   },
                   "required": [
@@ -6566,6 +6688,21 @@
                     "patterns"
                   ],
                   "additionalProperties": false
+                }
+              },
+              "placeJoiners": {
+                "default": [
+                  "and",
+                  "or",
+                  "in",
+                  "the",
+                  "both"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
                 }
               },
               "needsSponsorship": {
@@ -6636,8 +6773,18 @@
                   "expired",
                   "lapsed",
                   "able\\s+to\\s+obtain",
-                  "former(?:ly)?",
-                  "not\\s+(?:currently\\s+)?(?:active|current|valid|held|obtained|renewed|cleared)",
+                  "former(?:ly)?"
+                ],
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "notHeldNearby": {
+                "default": [
+                  "not\\s+(?:(?:currently|yet)\\s+)?(?:active|current|valid|held|obtained|renewed|cleared|granted|issued|approved|in\\s+use)",
                   "no\\s+longer"
                 ],
                 "minItems": 1,
@@ -6664,9 +6811,13 @@
               "citizenship": {
                 "default": [
                   "(?:us|u\\.s\\.|united\\s+states)\\s+citizen(?:ship)?",
-                  "citizen\\s+of\\s+the\\s+(?:us|u\\.s\\.|united\\s+states)",
-                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
-                  "citizen\\s+of\\s+(?:the\\s+)?(?:uk|u\\.k\\.|united\\s+kingdom|eu|european\\s+union|canada|australia|ireland|india)"
+                  "citizen\\s+of\\s+(?:the\\s+)?(?:us|u\\.s\\.(?:a\\.)?|usa|united\\s+states)",
+                  "(?:british|uk|u\\.k\\.|eu|e\\.u\\.|(?<!(?:latin|south|central|north)\\s)american|canadian|australian|irish|indian)\\s+citizen(?:ship)?",
+                  "citizen\\s+of\\s+(?:the\\s+)?(?:uk|u\\.k\\.|united\\s+kingdom|eu|european\\s+union|canada|australia|ireland|india)",
+                  "citizen\\s+of\\s+an?\\s+(?:eu|e\\.u\\.|european\\s+union)\\s+(?:member\\s+)?(?:state|country|nation)",
+                  "(?:citizenship|nationality)\\s{0,3}:\\s{0,3}(?:the\\s+)?(?:us|u\\.s\\.(?:a\\.)?|usa|united\\s+states|uk|u\\.k\\.|united\\s+kingdom|eu|e\\.u\\.|british|american|canadian|australian|irish|indian|canada|australia|ireland|india)",
+                  "(?:us|u\\.s\\.|british|uk|u\\.k\\.|eu|e\\.u\\.|(?<!(?:latin|south|central|north)\\s)american|canadian|australian|irish|indian)\\s+national(?![\\s-]*\\p{L})",
+                  "(?:us|u\\.s\\.|british|uk|u\\.k\\.|eu|e\\.u\\.|(?<!(?:latin|south|central|north)\\s)american|canadian|australian|irish|indian)\\s+passport(?:\\s+holder)?"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -6932,11 +7083,13 @@
               "equivalence",
               "authorization",
               "countries",
+              "placeJoiners",
               "needsSponsorship",
               "noSponsorship",
               "sponsorshipOffered",
               "negation",
               "notHeld",
+              "notHeldNearby",
               "inProgress",
               "citizenship",
               "residence",
@@ -7295,7 +7448,9 @@
                   "earned",
                   "awarded",
                   "achieved",
-                  "completed"
+                  "completed",
+                  "renewed",
+                  "re-?certified"
                 ],
                 "minItems": 1,
                 "type": "array",
@@ -7446,6 +7601,8 @@
             "default": [
               "present",
               "current",
+              "current role",
+              "current position",
               "now",
               "ongoing",
               "to date",
@@ -7510,6 +7667,19 @@
           "sinceWords": {
             "default": [
               "since"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "lineEndDateWords": {
+            "default": [
+              "continuing",
+              "onwards",
+              "onward"
             ],
             "minItems": 1,
             "type": "array",
@@ -8201,6 +8371,7 @@
           "nameLabels",
           "rangeWords",
           "sinceWords",
+          "lineEndDateWords",
           "employerWords",
           "documentTitles",
           "nameParticles",
@@ -9887,6 +10058,14 @@
                     "minLength": 1
                   }
                 },
+                "lineEndDateWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "employerWords": {
                   "minItems": 1,
                   "type": "array",
@@ -10385,6 +10564,14 @@
                   }
                 },
                 "sinceWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "lineEndDateWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {

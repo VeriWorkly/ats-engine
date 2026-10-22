@@ -150,6 +150,49 @@ describe("a certification line becomes a row", () => {
     ]);
   });
 
+  // A renewal listed as a second row with the same name collapsed onto the first, lapsed one.
+  it.each([
+    "CISSP, ISC2, 2015, expired 2021\nCISSP, ISC2, 2023, expires 2029",
+    "CISSP, ISC2, 2023, expires 2029\nCISSP, ISC2, 2015, expired 2021",
+  ])("keeps the latest row of a certification listed twice: %s", (lines) => {
+    expect(certs(lines)).toEqual([
+      {
+        name: "CISSP",
+        issuer: "ISC2",
+        date: { year: 2023, month: null },
+        expires: { year: 2029, month: null },
+      },
+    ]);
+  });
+
+  it("reads a renewal after an expiry as the date earned", () => {
+    expect(certs("CISSP, ISC2, 2019, expired 2021, renewed 2023")).toEqual([
+      { name: "CISSP", issuer: "ISC2", date: { year: 2023, month: null }, expires: null },
+    ]);
+    expect(certs("PMP (PMI), issued 2016, renewed 2022, expires 2028")).toEqual([
+      {
+        name: "PMP",
+        issuer: "PMI",
+        date: { year: 2022, month: null },
+        expires: { year: 2028, month: null },
+      },
+    ]);
+  });
+
+  // The second date was taken as the expiry, and brackets emptied of dates stayed in the name.
+  it("reads the last of several ranges as the expiry, and drops emptied brackets", () => {
+    expect(certs("CISSP, ISC2, 2015–2018, 2021–2027")[0]).toMatchObject({
+      date: { year: 2015, month: null },
+      expires: { year: 2027, month: null },
+    });
+    expect(
+      certs("AWS Certified Developer – Associate (2019, renewed 2022; expires 2028)")[0],
+    ).toMatchObject({ name: "AWS Certified Developer – Associate", issuer: "" });
+    expect(certs("AWS Certified Data Analytics – Specialty (2022, expires 2025)")[0]?.name).toBe(
+      "AWS Certified Data Analytics – Specialty",
+    );
+  });
+
   it("keeps a year that is part of the name", () => {
     expect(certs("Windows Server 2019 Administrator\nMar 2022 Expires Mar 2025 CKA")).toEqual([
       { name: "Windows Server 2019 Administrator", issuer: "", date: null, expires: null },
@@ -249,6 +292,7 @@ describe("certification lines stay linear", () => {
     rep("from "),
     rep("credential id "),
     rep("2019 - "),
+    rep("(, ; "),
     `${rep(" ")}x`,
   ])("hostile certification line %#", (line) => {
     expectFast(() => parse(`Certifications\n${line}\nSkills\nCertifications: ${line}`), 1_500);

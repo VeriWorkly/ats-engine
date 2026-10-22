@@ -148,6 +148,9 @@ export const credentialWords = z.object({
     "awarded",
     "achieved",
     "completed",
+    // A renewal is earned again: "expired 2021, renewed 2023" is held.
+    "renewed",
+    String.raw`re-?certified`,
   ]),
   expires: z._default(wordList("credentialWords.expires"), [
     "expires",

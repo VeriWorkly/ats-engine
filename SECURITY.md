@@ -92,13 +92,17 @@ What does not depend on the model:
   skills) must occur in the source text, and is dropped and reported in `rejected` if it does not.
   An email address or URL must occur whole, not as words spread over the text. Dates in parse
   repair must name a year the text contains, and a contact field it fills must hold that kind of
-  value (an email address; a phone number's characters and 7 to 15 digits; a name of up to eight
-  words without digits or "@").
+  value (an email address; a phone number's characters and 7 to 15 digits, not a date range, an
+  IP address or years alone; a name of up to twelve capitalised words, not a heading, a job
+  title or an organisation).
 - Free text a model writes (an explanation, a recommendation) is advice and is not grounded:
   show it as the model's words, not as facts about the candidate.
 - A provider's error is quoted in the error message only in its own short words (a JSON body's
-  `error.message`, or a one-line text body, up to 200 characters, keys redacted). The rest of the
-  body, where a gateway may echo the request and the resume in it, is never quoted.
+  `error.message`, or a text body of one line, up to 200 characters, keys redacted). The rest of a
+  JSON body, and a text body that is longer or breaks a line (any line break: CR, LF, U+2028 and
+  the like), where a gateway may echo the request and the resume in it, are never quoted. A
+  one-line text body is quoted whole, so a gateway that echoes a short request on one line, or
+  puts it in `error.message`, has it quoted.
 - `analyze` redacts contact details before the request leaves, best effort and only these
   forms. The name as the parser read it, in any case or letter spacing, also as "Doe, Jane", with
   or without a middle initial, and inside a web address built from it (`janedoe.dev`); not

@@ -110,6 +110,8 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   ],
   rangeWords: ["bis"],
   sinceWords: ["seit", "ab"],
+  // "ab 03/2020" ends the line; "Umsatz ab 2017 um 30 % gesteigert" is a sentence.
+  lineEndDateWords: ["ab"],
   seasons: { frühjahr: [3, 5], frühling: [3, 5], sommer: [6, 8], herbst: [9, 11] },
   durationUnits: ["jahr", "jahre", "jahren", "monat", "monate", "monaten", "mon"],
   nameLabels: ["name", "vor- und nachname"],

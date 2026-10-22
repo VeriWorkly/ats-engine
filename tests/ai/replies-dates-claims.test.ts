@@ -165,11 +165,34 @@ describe("reasoning-model replies", () => {
   });
 
   // A reply in another shape parsed as an empty analysis: a paid call, nothing back, no error.
+  const WRAPPED = JSON.stringify({ analysis: { explanation: "Fine." } });
   it.each([
-    ["wrapped in another key", JSON.stringify({ analysis: { explanation: "Fine." } })],
+    ["wrapped in another key", WRAPPED],
+    // Only a bare wrapped reply was refused: in a fence or prose, its inner object was read.
+    ["wrapped in another key, in a fence", `\`\`\`json\n${WRAPPED}\n\`\`\``],
+    ["wrapped in another key, after prose", `Here you go: ${WRAPPED}`],
+    ["wrapped in another key, before prose", `${WRAPPED}\nHope this helps!`],
+    ["wrapped in another key, after an example", `Shape: {"note": 1}. Answer: ${WRAPPED}`],
+    // The outer object is the answer; a fragment inside it is not.
+    [
+      "whose answer fails the schema, holding an object that fits",
+      `Here: {"explanation": "Outer", "priorityOrder": [{"explanation": "Inner"}]}`,
+    ],
     ["with nothing in it", JSON.stringify({ explanation: " ", priorityOrder: [] })],
+    ["with only blank items", JSON.stringify({ priorityOrder: [" "], missingEvidence: [null] })],
+    // Without a posting, keyword suggestions are dropped: nothing would be left.
+    ["with only keyword suggestions and no posting", '{"keywordOpportunities": ["Kubernetes"]}'],
   ])("refuses a reply %s", async (_label, text) => {
     await expect(read(text)).rejects.toMatchObject({ code: "invalid_output" });
+  });
+
+  // Each object inside a nested reply was read to its end: 4.8 MB took 4.8 s, ten times a flat one.
+  it("reads a deeply nested reply after prose in bounded time", async () => {
+    const text = `x ${'{"a":'.repeat(800_000)}1${"}".repeat(800_000)}`;
+    await expectFastAsync(
+      () => expect(read(text)).rejects.toMatchObject({ code: "invalid_output" }),
+      1_500,
+    );
   });
 
   // Unclosed fences must not make the scan quadratic; a reply may run to 4 MB.

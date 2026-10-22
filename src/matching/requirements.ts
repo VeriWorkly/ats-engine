@@ -1,10 +1,11 @@
 import { isDatedLine } from "../checks/bullets.js";
 import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../format/index.js";
+import { statesExpiry } from "../parser/certifications.js";
 import { degreeLevels } from "../parser/education.js";
 import { namesPlace } from "../parser/experience.js";
 import { canonicalLanguage, cefrLevel, compareCefr } from "../parser/languages.js";
 import { monthsOfExperience } from "../parser/tenure.js";
-import type { ResumeSection, ResumeSectionKind } from "../parser/sections.js";
+import { labelledLine, type ResumeSection, type ResumeSectionKind } from "../parser/sections.js";
 import { policyRegex } from "../policy/regex.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import type { AtsCefrLevel, AtsParsedResume, AtsRequirement } from "../types.js";
@@ -118,11 +119,24 @@ type Matchers = {
   /** The same, global: blanked out to read what else a line says. */
   noSponsorshipAll: RegExp;
   negation: RegExp;
+  /** The same, global: blanked out to see whether a clause says anything else. */
+  negationAll: RegExp;
   notHeld: RegExp;
+  notHeldNearby: RegExp;
   citizenship: RegExp;
   residence: RegExp;
-  /** The countries a right to work is stated for, each by name. */
-  countries: Array<{ name: string; pattern: RegExp }>;
+  /**
+   * The countries a right to work is stated for, each by name and a global pattern too, with
+   * where its citizens work.
+   */
+  countries: Array<{
+    name: string;
+    pattern: RegExp;
+    all: RegExp;
+    citizensWorkIn: readonly string[];
+  }>;
+  /** Global: the words joining a list of places. */
+  placeJoiners: RegExp;
   clearance: RegExp;
   /** The same, global: where in a line each clearance is named. */
   clearanceAll: RegExp;
@@ -163,14 +177,19 @@ const matchersOf = memo((km: AtsEnginePolicy["keywordMatch"]): Matchers => {
     sponsorshipOffered: wordListRegex(r.sponsorshipOffered ?? ["(?!)"]),
     noSponsorshipAll: wordListRegex(r.noSponsorship, "gi"),
     negation: wordListRegex(r.negation),
+    negationAll: wordListRegex(r.negation, "gi"),
     notHeld: wordListRegex(r.notHeld),
+    // Schema-defaulted; a hand-built policy may lack these.
+    notHeldNearby: wordListRegex(r.notHeldNearby ?? ["(?!)"]),
     citizenship: wordListRegex(r.citizenship),
     residence: wordListRegex(r.residence),
-    // Schema-defaulted; a hand-built policy may lack it.
-    countries: (r.countries ?? []).map(({ name, patterns }) => ({
+    countries: (r.countries ?? []).map(({ name, patterns, citizensWorkIn }) => ({
       name,
       pattern: wordListRegex(patterns),
+      all: wordListRegex(patterns, "gi"),
+      citizensWorkIn: citizensWorkIn ?? [],
     })),
+    placeJoiners: wordListRegex(r.placeJoiners ?? ["(?!)"], "gi"),
     clearance: wordListRegex(r.clearance),
     clearanceAll: wordListRegex(r.clearance, "gi"),
     clearanceLevels: r.clearanceLevels
@@ -358,9 +377,11 @@ function askedClearanceRanks(text: string, matchers: Matchers) {
 /**
  * The clearances a resume line says are held, each as the text about it: from the clearance
  * named before it to the one named after. A not-held word anywhere in that text ("pending",
- * "expired", "not active"), or a negation in the clearance's own clause (cut at a semicolon,
- * comma or bracket), says it is not held: "Top Secret clearance (TS/SCI eligible)" holds Top
- * Secret, "Active TS/SCI clearance, no lapses since 2015" holds TS/SCI.
+ * "expired"), a negated one in its own sentence, cut at a semicolon ("not active", `notHeldNearby`),
+ * a negation in its own clause (cut at a comma or bracket too), or a negation alone in the clause
+ * after it ("(no)", ": no") says it is not held: "Top Secret clearance (TS/SCI eligible)" holds Top
+ * Secret, "Active TS/SCI clearance, no lapses since 2015" and "Active Secret clearance;
+ * Relocation: No" hold theirs.
  */
 function heldClearances(line: string, matchers: Matchers) {
   const named = [...line.matchAll(matchers.clearanceAll)];
@@ -369,11 +390,67 @@ function heldClearances(line: string, matchers: Matchers) {
     const from = before ? before.index + before[0].length : 0;
     const about = line.slice(from, named[at + 1]?.index ?? line.length);
     const where = match.index - from;
+    const sentence = about.slice(about.lastIndexOf(";", where) + 1).split(";", 1)[0]!;
     const start = Math.max(...[";", ",", "(", ")"].map((mark) => about.lastIndexOf(mark, where)));
     const end = about.slice(where).search(/[;,()]/u);
     const clause = about.slice(start + 1, end < 0 ? about.length : where + end);
-    return matchers.notHeld.test(about) || matchers.negation.test(clause) ? [] : [about];
+    // The clause next after its own, when a negation alone, answers for the clearance:
+    // "TS/SCI clearance (no)", "Secret clearance, no"; not another label's "Relocation: No".
+    const next = (end < 0 ? "" : about.slice(where + end))
+      .split(/[;,():]/u)
+      .find((part) => /\p{L}/u.test(part));
+    const answersNo = next !== undefined && !/\p{L}/u.test(next.replace(matchers.negationAll, ""));
+    return matchers.notHeld.test(about) ||
+      matchers.notHeldNearby.test(sentence) ||
+      matchers.negation.test(clause) ||
+      answersNo
+      ? []
+      : [about];
   });
+}
+
+const placeNamesIn = memo((rp: AtsEnginePolicy["resumeParse"]) =>
+  wordListRegex(rp.placeNames, "gi"),
+);
+
+/**
+ * What of a text lists places: each character marked as in a country's name (`countries`),
+ * another place's (`placeNames`) or a joiner (`placeJoiners`). `list` says whether a stretch names
+ * a place and nothing else ("Canada and the UK"); `unknown`, whether it names a place no country
+ * does ("Ontario"). Each pattern runs once over the text, so stretches are read in their length.
+ */
+function placeLists(text: string, matchers: Matchers, policy: AtsEnginePolicy) {
+  const [COUNTRY, PLACE, OTHER, JOINER] = [1, 2, 4, 8];
+  const marks = new Uint8Array(text.length);
+  const mark = (from: number, to: number, flag: number) => {
+    for (let i = from; i < to; i++) marks[i]! |= flag;
+  };
+  for (const { all } of matchers.countries)
+    for (const { index, 0: found } of text.matchAll(all))
+      mark(index, index + found.length, COUNTRY);
+  for (const { index, 0: found } of text.matchAll(placeNamesIn(policy.resumeParse))) {
+    const known = marks.subarray(index, index + found.length).some((flag) => flag & COUNTRY);
+    mark(index, index + found.length, known ? PLACE : PLACE | OTHER);
+  }
+  for (const { index, 0: found } of text.matchAll(matchers.placeJoiners))
+    mark(index, index + found.length, JOINER);
+  return {
+    list: (from: number, to: number) => {
+      let place = false;
+      for (let i = from; i < to; i++) {
+        if (marks[i]! & (COUNTRY | PLACE)) place = true;
+        else if (!marks[i] && /[\p{L}\p{N}]/u.test(text.charAt(i))) return false;
+      }
+      return place;
+    },
+    unknown: (from: number, to: number) => marks.subarray(from, to).some((flag) => flag & OTHER),
+    /** Where the stretch of places and joiners ending at `to` starts: "US/" in "Dual US/". */
+    from: (to: number) => {
+      let i = to;
+      while (i > 0 && (marks[i - 1] || !/[\p{L}\p{N}]/u.test(text.charAt(i - 1)))) i--;
+      return i;
+    },
+  };
 }
 
 /**
@@ -392,17 +469,36 @@ function judgeAuthorization(
   policy: AtsEnginePolicy,
 ): { status: Status | "unverifiable"; lines: Array<{ line: string }> } {
   const countriesIn = (text: string) =>
-    matchers.countries.filter(({ pattern }) => pattern.test(text)).map(({ name }) => name);
-  const asked = countriesIn(ask);
+    matchers.countries.filter(({ pattern }) => pattern.test(text));
+  // Where a statement gives the right to work: the countries it names, and where the citizens of
+  // those may work too when it states a citizenship ("Irish citizen": Ireland, the UK, the EU).
+  const rightsIn = (text: string) => {
+    const named = countriesIn(text);
+    const also = matchers.citizenship.test(text) ? named.flatMap((c) => c.citizensWorkIn) : [];
+    return [...named.map(({ name }) => name), ...also];
+  };
+  const asked = countriesIn(ask).map(({ name }) => name);
+  const about = (names: readonly string[]) =>
+    !asked.length || !names.length || names.some((name) => asked.includes(name));
+  // Whose citizenship a clause states: the countries its citizenships name, and those listed just
+  // before one ("Dual US/Canadian citizen"); not after ("Canadian citizen living in the US"), nor
+  // further before ("Authorized to work in the US. Also hold an EU passport").
+  const citizenshipAll = new RegExp(matchers.citizenship.source, "giu");
+  const citizenOf = (clause: string) => {
+    const { from } = placeLists(clause, matchers, policy);
+    return [...clause.matchAll(citizenshipAll)].flatMap(({ index, 0: found }) =>
+      countriesIn(clause.slice(from(index), index + found.length)).map(({ name }) => name),
+    );
+  };
   const phrases = new RegExp(matchers.authorization.source, "giu");
+  const statedAll = [phrases, citizenshipAll, new RegExp(matchers.residence.source, "giu")];
+  const states = (clause: string) =>
+    matchers.authorization.test(clause) ||
+    matchers.citizenship.test(clause) ||
+    matchers.residence.test(clause);
   const stated = lines.flatMap((entry) => {
     const { line } = entry;
-    if (
-      !matchers.authorization.test(line) &&
-      !matchers.citizenship.test(line) &&
-      !matchers.residence.test(line)
-    )
-      return [];
+    if (!states(line)) return [];
     // A heading or label alone ("Work Authorization") states nothing; "U.S. citizen" does.
     if (
       !matchers.citizenship.test(line) &&
@@ -410,44 +506,89 @@ function judgeAuthorization(
       !/[\p{L}\p{N}]/u.test(line.replace(phrases, ""))
     )
       return [];
-    const named = countriesIn(line);
-    if (asked.length && named.length && !named.some((country) => asked.includes(country)))
-      return [];
     const rest = line.replace(matchers.noSponsorshipAll, " ");
-    if (matchers.needsSponsorship.test(rest)) return [{ entry, says: line, needs: true }];
     // Clause by clause, so a negation about something else ("(no visa needed)", "not open to
-    // relocation") does not negate the statement.
-    const states = (clause: string) =>
-      matchers.authorization.test(clause) ||
-      matchers.citizenship.test(clause) ||
-      matchers.residence.test(clause);
-    const parts = rest.split(/[;,()]/u);
+    // relocation") does not negate the statement. Each clause with where it starts and whether
+    // it is in brackets.
+    const parts: Array<{ text: string; start: number; bracketed: boolean }> = [];
+    let depth = 0;
+    let offset = 0;
+    rest.split(/([;,()])/u).forEach((piece, at) => {
+      if (at % 2 === 0) parts.push({ text: piece, start: offset, bracketed: depth > 0 });
+      else depth = piece === "(" ? depth + 1 : piece === ")" ? Math.max(0, depth - 1) : depth;
+      offset += piece.length;
+    });
+    const { list, unknown } = placeLists(rest, matchers, policy);
+    // Each stating clause, with the clauses after it that list only places when it ends in one
+    // ("Authorized to work in the US, Canada and the UK"), passing over brackets ("Canada (PR)
+    // and the U.S. (TN visa)"). A place the countries do not name ("Ontario") leaves the line
+    // read as it stands.
+    let unknownPlace = false;
+    const clauses: string[] = [];
+    parts.forEach(({ text, start }, at) => {
+      if (!states(text)) return;
+      const end = Math.max(
+        0,
+        ...statedAll.flatMap((pattern) =>
+          [...text.matchAll(pattern)].map((found) => found.index + found[0].length),
+        ),
+      );
+      const tail = list(start + end, start + text.length);
+      let said = text;
+      if (tail) {
+        unknownPlace ||= unknown(start + end, start + text.length);
+        for (let next = at + 1; next < parts.length; next++) {
+          const part = parts[next]!;
+          if (states(part.text)) break;
+          if (part.bracketed || !/[\p{L}\p{N}]/u.test(part.text)) continue;
+          if (!list(part.start, part.start + part.text.length)) break;
+          unknownPlace ||= unknown(part.start, part.start + part.text.length);
+          said += `, ${part.text}`;
+        }
+      }
+      clauses.push(said);
+    });
+    const named = unknownPlace ? [] : rightsIn(line);
+    if (!about(named)) return [];
+    if (matchers.needsSponsorship.test(rest)) return [{ entry, says: [line], needs: true }];
     // A clause saying where it does not hold takes it back: "Authorized to work in Canada, not in
     // the US".
     if (
       parts.some(
-        (part) => !states(part) && matchers.negation.test(part) && namesPlace(part, policy),
+        ({ text }) => !states(text) && matchers.negation.test(text) && namesPlace(text, policy),
       )
     )
       return [];
-    const clauses = parts.filter(states);
-    const held = (clauses.length ? clauses : [rest]).filter(
-      (clause) => !matchers.negation.test(clause),
-    );
-    return held.length ? [{ entry, says: held.join(";"), needs: false }] : [];
+    // A clause naming only other countries says nothing of the one asked about ("Indian citizen;
+    // authorized to work in the US" holds no US citizenship); one naming none, what the line names.
+    const held = (clauses.length ? clauses : [rest]).filter((clause) => {
+      const where = unknownPlace ? [] : rightsIn(clause);
+      return !matchers.negation.test(clause) && about(where.length ? where : named);
+    });
+    return held.length ? [{ entry, says: held, needs: false }] : [];
   });
   const shown = stated.filter(({ needs }) => !needs);
   const needing = stated.filter(({ needs }) => needs).map(({ entry }) => entry);
   if (matchers.citizenship.test(ask) && !matchers.residence.test(ask)) {
-    const citizen = shown.filter(
-      ({ says }) =>
-        matchers.citizenship.test(says) &&
-        !matchers.residence.test(says) &&
-        !matchers.notHeld.test(says),
-    );
+    // A citizenship meets only an ask for its own country: an Irish citizen may work in the UK,
+    // but is no British citizen.
+    const citizen = shown.filter(({ says }) => {
+      const all = says.join(";");
+      return (
+        matchers.citizenship.test(all) &&
+        !matchers.residence.test(all) &&
+        !matchers.notHeld.test(all) &&
+        says.some((clause) => {
+          const of = citizenOf(clause);
+          return of.length > 0 && (!asked.length || of.some((name) => asked.includes(name)));
+        })
+      );
+    });
     if (citizen.length) return { status: "met", lines: citizen.map(({ entry }) => entry) };
     const against = [
-      ...shown.filter(({ says }) => matchers.residence.test(says)).map(({ entry }) => entry),
+      ...shown
+        .filter(({ says }) => matchers.residence.test(says.join(";")))
+        .map(({ entry }) => entry),
       ...needing,
     ];
     return { status: against.length ? "missing" : "unverifiable", lines: against };
@@ -756,21 +897,85 @@ export function judgeRequirements(
   // The certification rows, each with what it names: a credential asked for is met by one held.
   // Expired, dated after today or in progress (`inProgress`), a row is not held, and says why.
   // Schema-defaulted; a hand-built policy may lack it.
-  const inProgress = wordListRegex(km.requirements.inProgress ?? ["(?!)"]);
+  const inProgressAll = wordListRegex(km.requirements.inProgress ?? ["(?!)"], "gi");
+  // An in-progress word says the row is unfinished where it ends its clause ("CISSP (in
+  // progress)", "CISSP – in progress", "Currently pursuing: CISSP") or opens the name after any
+  // label ("Pursuing CISSP"). Followed by more words, it is about them ("Pursuing excellence:
+  // CISSP", "Azure Fundamentals - working towards AZ-104"); in brackets in the issuer, about the
+  // next item of a one-line list ("PMP (2019), Six Sigma Green Belt (in progress)"). After a
+  // credential word in its clause, it is a renewal under way ("PMP (PMI; renewal in progress)").
+  const { expires, issued } = policy.resumeParse.credentialWords;
+  const renewing = wordListRegex([...expires, ...issued]);
+  const unfinishedIn = (text: string, opening: boolean) => {
+    const colon = opening ? text.lastIndexOf(":") : text.length;
+    return [...text.matchAll(inProgressAll)].some((found) => {
+      const before = text.slice(0, found.index);
+      const clauseStart = Math.max(...[...":,;()[]|"].map((mark) => before.lastIndexOf(mark)));
+      if (renewing.test(before.slice(clauseStart + 1))) return false;
+      const after = text.slice(found.index + found[0].length);
+      const clauseEnd = after.search(/[:,;()[\]|]|\s[–—-]\s/u);
+      return (
+        !/\p{L}/u.test(clauseEnd < 0 ? after : after.slice(0, clauseEnd)) ||
+        (found.index > colon && !/\p{L}/u.test(text.slice(colon + 1, found.index)))
+      );
+    });
+  };
+  const BRACKETED = /\([^()]*\)|\[[^[\]]*\]/gu;
   const today = now.getUTCFullYear() * 12 + now.getUTCMonth() + 1;
   const monthOf = (date: { year: number; month: number | null }, edge: "start" | "end") =>
     date.year * 12 + (date.month ?? (edge === "start" ? 1 : 12));
-  const certificationRows = parsed.certifications.map((row) => ({
-    line: formatCertification(row),
-    holds: resumeCapabilities(extractVocabulary(`${row.name} ${row.issuer}`, km, vocab), vocab),
-    lapsed:
-      row.expires && monthOf(row.expires, "end") < today
-        ? `${row.name}: expired ${row.expires.year}`
-        : (row.date && monthOf(row.date, "start") > today) ||
-            inProgress.test(`${row.name} ${row.issuer}`)
-          ? `${row.name}: not yet held`
-          : null,
-  }));
+  const holdsOf = (text: string) => resumeCapabilities(extractVocabulary(text, km, vocab), vocab);
+  const certificationRows = parsed.certifications.flatMap((row) => {
+    const line = formatCertification(row);
+    // Bounded: a structured row's fields may be long.
+    const name = row.name.slice(0, 300);
+    const expired = row.expires && statesExpiry(row) && monthOf(row.expires, "end") < today;
+    const dated = expired || (row.date && monthOf(row.date, "start") > today);
+    const bracketed = !dated && unfinishedIn(name, true);
+    const lapsed = expired
+      ? `${row.name}: expired ${row.expires!.year}`
+      : dated || bracketed || unfinishedIn(row.issuer.slice(0, 300).replace(BRACKETED, " "), false)
+        ? `${row.name}: not yet held`
+        : null;
+    // Unfinished by a word in the name's own brackets, the row is an item of a one-line list and
+    // its issuer the next item ("Six Sigma Green Belt (in progress), PMP, 2019"): what only the
+    // issuer names is held. A date stays the whole row's.
+    if (bracketed && !unfinishedIn(name.replace(BRACKETED, " "), true)) {
+      const holds = holdsOf(row.name);
+      const others = [...holdsOf(row.issuer)].filter((token) => !holds.has(token));
+      return [
+        { line, holds, lapsed },
+        ...(others.length ? [{ line, holds: new Set(others), lapsed: null }] : []),
+      ];
+    }
+    return [{ line, holds: holdsOf(`${row.name} ${row.issuer}`), lapsed }];
+  });
+  // What only lapsed rows show is not held, whatever the ask's words ("Active CISSP", "CISSP
+  // required"): a skill a lapsed row names counts only from a line that is not a row, outside the
+  // certifications and a "Certifications:" line ("Ran services on AWS" beside "AWS Certified
+  // Developer (in progress)", "Ran Kubernetes clusters" beside an expired "Kubernetes" row).
+  const lapsedTokens = new Set<string>();
+  if (certificationRows.some((row) => row.lapsed)) {
+    const heldRows = new Set(
+      certificationRows.flatMap((row) => (row.lapsed ? [] : [...row.holds])),
+    );
+    const shownElsewhere = new Set(
+      resumeLines.flatMap((entry) =>
+        entry.kind === "certifications" ||
+        (entry.kind === "skills" &&
+          labelledLine(entry.line.replace(BULLET_PREFIX, ""), policy)?.kind === "certifications")
+          ? []
+          : [...entry.holds],
+      ),
+    );
+    for (const row of certificationRows)
+      if (row.lapsed)
+        for (const token of row.holds)
+          if (!heldRows.has(token) && !shownElsewhere.has(token)) {
+            lapsedTokens.add(token);
+            held.delete(token);
+          }
+  }
 
   // What each dated role's lines hold. A role is anchored on its dated line and the header lines
   // just above it naming its title or employer, never on a bullet that names an employer.
@@ -1209,13 +1414,36 @@ export function judgeRequirements(
       } satisfies AtsRequirement;
     }
 
-    const groupsStatus: Status = termsMet ? "met" : groupsMet > 0 ? "partial" : "missing";
+    // A skill only a lapsed row shows was sought, not held: partial, saying why.
+    const soughtRows = certificationRows.filter(
+      (row) =>
+        row.lapsed &&
+        [...groups.values()].some(
+          (members) =>
+            !members.some(([token]) => held.has(token)) &&
+            members.some(([token]) => lapsedTokens.has(token) && row.holds.has(token)),
+        ),
+    );
+    const groupsStatus: Status = termsMet
+      ? "met"
+      : groupsMet > 0 || soughtRows.length
+        ? "partial"
+        : "missing";
     const qualifierStatus: Status = qualifiersMet
       ? "met"
       : qualifiersShown.some(Boolean) || lapsedRows.length
         ? "partial"
         : "missing";
-    const lapsed = qualifiersMet ? [] : lapsedRows.map((row) => row.lapsed);
+    // Why a row naming the ask is not held; not a row naming something else ("Kubernetes:
+    // expired 2022" for "Azure certification", Azure being no skill the policy names).
+    const namesAsk = (row: (typeof certificationRows)[number]) =>
+      !picked.length || picked.some(([token]) => row.holds.has(token));
+    const lapsed = [
+      ...new Set([
+        ...(qualifiersMet ? [] : lapsedRows.filter(namesAsk).map((row) => row.lapsed)),
+        ...soughtRows.map((row) => row.lapsed),
+      ]),
+    ];
     return {
       ...base,
       kind: "skills",

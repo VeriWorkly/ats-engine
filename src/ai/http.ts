@@ -156,11 +156,14 @@ function withoutSecrets(text: string, headers: Record<string, string>): string {
 
 /** The most of a provider's own error text an error message quotes. */
 const MAX_PROVIDER_TEXT = 200;
+/** Any line break: a lone CR, a vertical tab, a form feed, NEL, U+2028 and U+2029 too. */
+const LINE_BREAK = /[\n\r\v\f\x85\p{Zl}\p{Zp}]/u;
 
 /**
  * What an error body says in the provider's own words: a JSON body's `error.message` (or a
  * `message` or `error` string), else a short one-line text body ("Bad Gateway"); "" otherwise. A
  * gateway may echo the request, the resume with it, around that text: the rest is never quoted.
+ * A text body of one short line is quoted whole, so an echo that short is quoted too.
  */
 function providerSays(raw: string): string {
   let said: unknown = raw.trim();
@@ -171,7 +174,7 @@ function providerSays(raw: string): string {
   } catch {
     // Not JSON: plain text, quoted only when it is a short line.
   }
-  return typeof said === "string" && said.length <= MAX_PROVIDER_TEXT && !said.includes("\n")
+  return typeof said === "string" && said.length <= MAX_PROVIDER_TEXT && !LINE_BREAK.test(said)
     ? said.trim()
     : "";
 }

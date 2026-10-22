@@ -121,6 +121,9 @@ export const resumeParseSchema = z.object({
   openEnded: z._default(z.array(z.string().check(z.minLength(1))).check(z.minLength(1)), [
     "present",
     "current",
+    // A JSON Resume end written out: "Current role".
+    "current role",
+    "current position",
     "now",
     "ongoing",
     "to date",
@@ -152,6 +155,12 @@ export const resumeParseSchema = z.object({
   rangeWords: z._default(wordList("rangeWords"), ["to", "until", "through", "thru"]),
   /** Words before a lone start date that make it a current role: "since 2019", "seit 03/2019". */
   sinceWords: z._default(wordList("sinceWords"), ["since"]),
+  /**
+   * Open ends and since words that are also everyday words, listed there too: one dates a role
+   * only where its date ends the line or a column ("Jun 2021 onwards", "Jun 2021 - Continuing |
+   * Remote"), not in a sentence ("2020 onwards, growth of 30%").
+   */
+  lineEndDateWords: z._default(wordList("lineEndDateWords"), ["continuing", "onwards", "onward"]),
   /** Words joining a job title to its employer on one line: "Engineer at Acme". */
   employerWords: z._default(wordList("employerWords"), ["at"]),
   /** What the top of a resume says in place of a name; never taken as the candidate's name. */

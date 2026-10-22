@@ -132,12 +132,15 @@ function resolveRoute(context: RunContext, task: AtsAiTask, options: AtsAiCallOp
   return { ...route, retries } as TaskRoute & { retries: number };
 }
 
-/** The object or array opening at `start`, to its matching close, skipping strings; or null. */
-function balancedFrom(text: string, start: number): string | null {
+/**
+ * Where the object or array opening at `start` closes (the index after it), skipping strings;
+ * -1 when it does not close within `limit` characters.
+ */
+function balancedEnd(text: string, start: number, limit: number): number {
   let depth = 0;
   let inString = false;
   let escaped = false;
-  for (let at = start; at < text.length; at += 1) {
+  for (let at = start; at < text.length && at - start < limit; at += 1) {
     const char = text[at];
     if (inString) {
       if (escaped) escaped = false;
@@ -147,59 +150,102 @@ function balancedFrom(text: string, start: number): string | null {
     else if (char === "{" || char === "[") depth += 1;
     else if (char === "}" || char === "]") {
       depth -= 1;
-      if (depth === 0) return text.slice(start, at + 1);
+      if (depth === 0) return at + 1;
     }
   }
-  return null;
+  return -1;
 }
 
-/** How many fences or opening braces are tried as the start of the answer. */
-const MAX_CANDIDATES = 20;
+/**
+ * What trying one candidate costs besides its length, in characters of the budget: parsing and
+ * fitting it. Two million "{}" in a 4 MB reply took 2.3 s, one at a time.
+ */
+const CANDIDATE_COST = 256;
 
 /**
  * The JSON in a reply that may wrap it in a fence, in prose, or after `<think>…</think>`
  * reasoning (whose opening tag a chat template may supply). The answer whole if it parses, else
  * the first fenced block or balanced JSON object that parses and `fits`: a reply may show an
- * example before its answer. Failing that, the first that parses, else the reply as it is.
+ * example before its answer. Failing that, the first that parses, else the reply as it is. An
+ * object that parsed is the reply's, fitting or not: nothing inside it is tried
+ * (`{"analysis": {…}}` is a reply in another shape). `truncated`: the reply was cut off at
+ * `maxTokens`, so only a closed fence or a whole top-level object that fits is read, and only when
+ * no object is left open after it (the answer itself cut off) and the cut is not in reasoning.
  */
-function unfence(text: string, fits: (value: unknown) => boolean): string {
-  const close = text.toLowerCase().lastIndexOf("</think>");
+function unfence(text: string, fits: (value: unknown) => boolean, truncated = false): string {
+  const lower = text.toLowerCase();
+  const close = lower.lastIndexOf("</think>");
   const answer = (close === -1 ? text : text.slice(close + "</think>".length)).trim();
+  // Cut off in its reasoning: an object there is an example, not the answer.
+  if (truncated && close === -1 && lower.includes("<think>")) return answer;
   let first: string | undefined;
-  const found = (candidate: string) => {
+  // Characters read as candidates (scanned, then parsed), so a nested reply costs what a flat
+  // one does: each object inside an unclosed or non-fitting one was read to the reply's end.
+  let budget = 0;
+  /** Whether the candidate fits, parses only, or is no JSON. */
+  const read = (candidate: string): "fits" | "parses" | "none" => {
+    budget -= candidate.length + CANDIDATE_COST;
     let value: unknown;
     try {
       value = JSON.parse(candidate);
     } catch {
-      return false;
+      return "none";
     }
     first ??= candidate;
-    return fits(value);
+    return fits(value) ? "fits" : "parses";
   };
-  // JSON whole is the answer, fitting or not: an object inside it is a part of it.
-  if (found(answer) || first) return answer;
+  if (read(answer) !== "none") return answer;
+  // Room for an example and the answer, each scanned and parsed, and as much again; at least
+  // twenty tries in a short reply.
+  budget = 3 * answer.length + 20 * CANDIDATE_COST;
+  /**
+   * A fitting candidate ending at `from`; in a cut-off reply, the reply as it is when an object
+   * after the candidate is left open (an example, then the answer cut off).
+   */
+  const answerFrom = (candidate: string, from: number): string => {
+    if (!truncated) return candidate;
+    for (let at = answer.indexOf("{", from); at !== -1;) {
+      const end = balancedEnd(answer, at, budget);
+      if (end === -1) return answer;
+      budget -= end - at;
+      at = answer.indexOf("{", end);
+    }
+    return candidate;
+  };
+  /** Fenced blocks that parsed, as [start, end): the brace scan does not look inside them. */
+  const parsed: Array<[number, number]> = [];
   // `indexOf`, not a lazy pattern: unclosed fences made that quadratic.
-  for (
-    let open = answer.indexOf("```"), fences = 0;
-    open !== -1 && fences < MAX_CANDIDATES;
-    open = answer.indexOf("```", open + 3), fences += 1
-  ) {
+  for (let open = answer.indexOf("```"); open !== -1; open = answer.indexOf("```", open + 3)) {
     const start = open + 3 + /^[a-z]{0,20}/i.exec(answer.slice(open + 3, open + 23))![0].length;
     const close = answer.indexOf("```", start);
-    if (close === -1) break;
+    if (close === -1 || budget <= 0) break;
     const block = answer.slice(start, close).trim();
-    if (/^[[{]/.test(block) && /[\]}]$/.test(block) && found(block)) return block;
+    if (!/^[[{]/.test(block) || !/[\]}]$/.test(block)) continue;
+    const status = read(block);
+    if (status === "fits") return answerFrom(block, close + 3);
+    if (status === "parses") parsed.push([start, close]);
   }
-  let tried = 0;
-  for (
-    let at = answer.indexOf("{");
-    at !== -1 && tried < MAX_CANDIDATES;
-    at = answer.indexOf("{", at + 1), tried += 1
-  ) {
-    const candidate = balancedFrom(answer, at);
-    if (candidate && found(candidate)) return candidate;
+  for (let at = answer.indexOf("{"), span = 0; at !== -1 && budget > 0;) {
+    while (span < parsed.length && parsed[span]![1] <= at) span += 1;
+    if (span < parsed.length && parsed[span]![0] <= at) {
+      at = answer.indexOf("{", parsed[span]![1]);
+      continue;
+    }
+    const end = balancedEnd(answer, at, budget);
+    budget -= end === -1 ? answer.length - at : end - at;
+    if (end === -1) {
+      // Cut off: every object after this one is inside it, a fragment of the answer.
+      if (truncated) break;
+      at = answer.indexOf("{", at + 1);
+      continue;
+    }
+    const candidate = answer.slice(at, end);
+    const status = read(candidate);
+    if (status === "fits") return answerFrom(candidate, end);
+    // An object that parsed is skipped whole; one that did not may hold the answer.
+    at = answer.indexOf("{", status === "parses" ? end : at + 1);
   }
-  return first ?? answer;
+  return truncated ? answer : (first ?? answer);
 }
 
 /** Parses one response. Throws an `AtsAiError` whose code says whether a retry can help. */
@@ -217,11 +263,17 @@ function readReply<Raw>(
 
   let json: unknown;
   try {
+    // A cut-off reply is not read for a fragment: retrying with the same limit is cut off again,
+    // so it is `truncated`, not `invalid_output`.
     json = JSON.parse(
-      unfence(response.text, (value) => {
-        const fitted = schema.safeParse(value);
-        return fitted.success && usable(fitted.data);
-      }),
+      unfence(
+        response.text,
+        (value) => {
+          const fitted = schema.safeParse(value);
+          return fitted.success && usable(fitted.data);
+        },
+        truncated,
+      ),
     );
   } catch (error) {
     throw truncated

@@ -118,21 +118,61 @@ describe("a certification not held", () => {
       "AWS certification required",
       "AWS Certified Solutions Architect: not yet held",
     ],
-  ])("is partial, and says why: %s", (row, ask, detail) => {
+    // Without a credential word in the ask, a lapsed row met it.
+    ["CISSP (expired 2021)", "Active CISSP", "CISSP: expired 2021"],
+    ["CISSP (expired 2021)", "CISSP required", "CISSP: expired 2021"],
+    ["CISSP (expired 2021)", "Must hold a current CISSP", "CISSP: expired 2021"],
+    ["CISSP (in progress)", "CISSP required", "CISSP: not yet held"],
+  ])("is partial, and says why: %s for %s", (row, ask, detail) => {
     const found = judge(listing(row), ask);
     expect(found).toMatchObject({ status: "partial", detail });
     expect(found.evidence[0]).toMatch(/^(?:CISSP|AWS Certified Solutions Architect)/);
   });
 
-  it("is met by a held row beside a lapsed one", () => {
-    const found = judge(
-      listing(
-        "AWS Certified Developer, Amazon Web Services, 2015, expired 2018\nAWS Certified Solutions Architect, Amazon Web Services, 2023, expires 2029",
-      ),
-      "AWS certification required",
-    );
+  // Rows with one name collapsed onto the first: a renewal listed below a lapsed row was partial.
+  it.each([
+    "AWS Certified Developer, Amazon Web Services, 2015, expired 2018\nAWS Certified Solutions Architect, Amazon Web Services, 2023, expires 2029",
+    "AWS Certified Solutions Architect, Amazon Web Services, 2015, expired 2018\nAWS Certified Solutions Architect, Amazon Web Services, 2023, expires 2029",
+  ])("is met by a held row beside a lapsed one: %s", (rows) => {
+    const found = judge(listing(rows), "AWS certification required");
     expect(found.status).toBe("met");
     expect(found.detail).toBeUndefined();
+    expect(found.evidence[0]).toBe(
+      "AWS Certified Solutions Architect, Amazon Web Services, 2023, expires 2029",
+    );
+  });
+
+  it.each([
+    "CISSP, ISC2, 2015, expired 2021\nCISSP, ISC2, 2023, expires 2029",
+    "CISSP (ISC2), 2019, expired 2021, renewed 2023",
+  ])("is met by a renewal: %s", (rows) => {
+    const found = judge(listing(rows), "CISSP certification required");
+    expect(found.status).toBe("met");
+    expect(found.detail).toBeUndefined();
+  });
+
+  it("still meets a skill the work history shows beside an unfinished certification in it", () => {
+    const resume = listing("AWS Certified Solutions Architect (in progress)");
+    expect(judge(resume, "Experience with AWS").status).toBe("met");
+    expect(judge(`${resume}\nCISM, ISACA, 2020`, "CISSP or CISM").status).toBe("met");
+  });
+
+  // An in-progress word anywhere in the name counted, a label's too.
+  it("reads an in-progress word in a label only when it ends the label", () => {
+    const ask = "CISSP certification required";
+    expect(judge(listing("Pursuing excellence: CISSP, ISC2, 2019"), ask).status).toBe("met");
+    expect(judge(listing("Currently pursuing: CISSP"), ask)).toMatchObject({
+      status: "partial",
+      detail: "Currently pursuing: CISSP: not yet held",
+    });
+    expect(judge(listing("Pursuing CISSP"), ask).status).toBe("partial");
+  });
+
+  it("stays fast with many lapsed rows", () => {
+    const rows = Array.from({ length: 2_000 }, (_, i) => `Cert ${i} AWS (expired 2020)`).join("\n");
+    const bullets = Array.from({ length: 1_000 }, (_, i) => `- Ran AWS service ${i}`).join("\n");
+    const resume = `${BASE}\n${bullets}\nCertifications\n${rows}`;
+    expectFast(() => judge(resume, "AWS required"), 1_500);
   });
 
   it("is met by a row with no expiry", () => {
@@ -143,6 +183,81 @@ describe("a certification not held", () => {
     expect(
       judge(listing("CISSP, ISC2 (no longer required to renew)"), "CISSP certification").status,
     ).toBe("met");
+  });
+
+  // An unlabelled second date was read as an expiry, and in-progress words of the next item in a
+  // one-line list as the row's own: each was partial.
+  it.each([
+    [
+      "Google Data Analytics Professional Certificate, Coursera, 2021 – 2022",
+      "Google Data Analytics Certificate",
+    ],
+    [
+      "Google Data Analytics Professional Certificate, Coursera, 2021 – 2022",
+      "Data analytics certification preferred",
+    ],
+    ["Six Sigma Green Belt, ASQ, 2018 – 2019", "Six Sigma"],
+    [
+      "Certificate in Project Management, UC Berkeley Extension, 2019 – 2020",
+      "Project management certificate",
+    ],
+    ["Tableau Desktop Specialist (2022–2023)", "Tableau certification"],
+    ["CISSP, ISC2, 2015–2018, 2021–2027", "CISSP certification required"],
+    ["PMP (2019), CSM (2020), Six Sigma Green Belt (in progress)", "PMP certification required"],
+    ["PMP (2019), Six Sigma Green Belt (in progress)", "PMP certification required"],
+    ["PMP · Six Sigma Green Belt (in progress)", "PMP certification required"],
+    [
+      "Microsoft Certified: Azure Fundamentals (AZ-900) - working towards AZ-104",
+      "Azure certification required",
+    ],
+    ["PMP (PMI, 2019; renewal in progress)", "PMP certification required"],
+    ["Six Sigma Green Belt (in progress), PMP, 2019", "PMP certification required"],
+    ["PMP, 2019, Six Sigma Green Belt (in progress)", "PMP certification required"],
+  ])("is met by a row with a range, in a list, or being renewed: %s for %s", (row, ask) => {
+    const found = judge(listing(row), ask);
+    expect(found.status).toBe("met");
+    expect(found.detail).toBeUndefined();
+  });
+
+  // The next item of a one-line list took the in-progress word of the item before it.
+  it("keeps an in-progress item of a one-line list not held, and only it", () => {
+    const row = listing("Six Sigma Green Belt (in progress), PMP, 2019");
+    expect(judge(row, "Six Sigma Green Belt certification")).toMatchObject({
+      status: "partial",
+      detail: "Six Sigma Green Belt (in progress): not yet held",
+    });
+    const issued = listing("AWS Certified Developer (in progress), Amazon Web Services");
+    expect(judge(issued, "AWS certification required").status).toBe("partial");
+  });
+
+  it("still reads an in-progress word at the end of the row, or opening it", () => {
+    const ask = "CISSP certification required";
+    for (const row of ["CISSP – in progress", "CISSP, currently pursuing", "Studying for CISSP"])
+      expect(judge(listing(row), ask).status, row).toBe("partial");
+  });
+
+  // A line naming an expired row's name lost the skill: "Kubernetes" in the skills and a role.
+  it("still meets a skill the work history shows beside an expired row named like it", () => {
+    const resume = listing("Kubernetes, CNCF, 2019, expired 2022");
+    expect(judge(resume, "Kubernetes experience").status).toBe("met");
+    expect(judge(resume, "5+ years of Kubernetes experience").status).toBe("met");
+    const scrum = `${BASE.replace("Experience\n", "Experience\nScrum Master, Globex Jan 2016 - Dec 2018\n- Coached 3 teams\n")}\nCertifications\nScrum Master, Scrum Alliance, 2016, expired 2018`;
+    expect(judge(scrum, "Experience as a Scrum Master").status).toBe("met");
+    // A "Certifications:" line among the skills is a row, not the work history.
+    const labelled = `${BASE}\nCertifications: CISSP (expired 2021)`;
+    expect(judge(labelled, "CISSP required")).toMatchObject({
+      status: "partial",
+      detail: "CISSP: expired 2021",
+    });
+  });
+
+  it("says nothing of an expired row that does not name the skill asked", () => {
+    const found = judge(
+      listing("Kubernetes, CNCF, 2019, expired 2022"),
+      "Azure certification required",
+    );
+    expect(found.status).toBe("missing");
+    expect(found.detail).toBeUndefined();
   });
 });
 

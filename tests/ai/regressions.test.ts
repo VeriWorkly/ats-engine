@@ -57,6 +57,57 @@ describe("AI layer regressions", () => {
     ]);
   });
 
+  // Compared whole, an address glued to a bracket, a guillemet or a bullet was not found.
+  it("keeps a link the document writes inside brackets, guillemets or after a bullet", async () => {
+    const source = "Jane Doe\nSite: [janedoe.dev]\nBlog: «blog.janedoe.dev»\n•github.com/janedoe·";
+    const provider = scriptedProvider(
+      JSON.stringify({
+        basics: { fullName: "Jane Doe" },
+        links: [
+          { label: "Site", url: "https://janedoe.dev" },
+          { label: "Blog", url: "https://blog.janedoe.dev" },
+          { label: "GitHub", url: "https://github.com/janedoe" },
+        ],
+      }),
+    );
+    const ai = createAtsAi({ provider, routes: { convertResume: route } });
+    const { result, rejected } = await ai.convertResume({ resumeText: source });
+
+    expect(result.links.map((link) => link.url)).toEqual([
+      "https://janedoe.dev",
+      "https://blog.janedoe.dev",
+      "https://github.com/janedoe",
+    ]);
+    expect(rejected).toEqual([]);
+  });
+
+  // Split on those marks, an address holding one in its path was not found.
+  it.each([
+    ["https://janedoe.dev/a·b", "https://janedoe.dev/a·b"],
+    ["janedoe.dev/[draft]", "https://janedoe.dev/[draft]"],
+    ["Site:[janedoe.dev/a·b]", "https://janedoe.dev/a·b"],
+    ["janedoe.dev·github.com/jdoe", "https://github.com/jdoe"],
+  ])("keeps a link written %j", async (written, url) => {
+    const provider = scriptedProvider(
+      JSON.stringify({ basics: { fullName: "Jane Doe" }, links: [{ label: "Site", url }] }),
+    );
+    const ai = createAtsAi({ provider, routes: { convertResume: route } });
+    const { result } = await ai.convertResume({ resumeText: `Jane Doe\n${written}\nEngineer` });
+    expect(result.links[0]!.url).toBe(url);
+  });
+
+  it("does not support part of an address's path by its marks", async () => {
+    const provider = scriptedProvider(
+      JSON.stringify({
+        basics: { fullName: "Jane Doe" },
+        links: [{ label: "Site", url: "https://janedoe.dev/a" }],
+      }),
+    );
+    const ai = createAtsAi({ provider, routes: { convertResume: route } });
+    const { result } = await ai.convertResume({ resumeText: "Jane Doe\njanedoe.dev/a·b" });
+    expect(result.links[0]!.url).toBe("");
+  });
+
   it("does not sell a repair that the merge cannot apply", () => {
     // The merge never edits rows the parser found, so a repair here would change nothing.
     const parsed = check(
@@ -133,8 +184,20 @@ describe("AI layer regressions", () => {
     );
   });
 
-  it("does not pay for the same truncation twice", async () => {
-    const provider = scriptedProvider({ text: '{"basics": {', finish: "length" });
+  // A cut-off reply holding a whole inner object was read for it and retried as invalid output.
+  it.each([
+    '{"basics": {',
+    '{"basics": {"fullName": "Jane Doe"}, "work": [{"company": "Acme", "position": "Eng',
+    'Here: ```json\n{"basics": {"fullName": "Jane Doe"}, "skills": [{"name": "Go"}, {"na',
+    // An example before an answer that was cut off.
+    'Shape: {"basics": {"fullName": "Jane Doe"}}. Answer: {"basics": {"fullName": "Jan',
+    '```json\n{"basics": {"fullName": "Jane Doe"}}\n```\nAnswer:\n```json\n{"basics": {"fu',
+    // Cut off in its reasoning: an object there is an example, not the answer.
+    '<think>The shape is {"basics": {"fullName": "Jane Doe"}} so I will',
+    // A whole reply in another shape, cut off in the prose after it.
+    '{"resume": {"basics": {"fullName": "Jane Doe"}}}\n\nNotes: I',
+  ])("does not pay for the same truncation twice: %j", async (text) => {
+    const provider = scriptedProvider({ text, finish: "length" });
     const ai = createAtsAi({ provider, routes: { convertResume: { ...route, retries: 2 } } });
 
     await expect(ai.convertResume({ resumeText: "x" })).rejects.toMatchObject({
@@ -142,6 +205,20 @@ describe("AI layer regressions", () => {
       attempts: 1,
     });
     expect(provider.calls).toHaveLength(1);
+  });
+
+  // A reply cut off in the prose after its answer was refused: one paid call, no result.
+  const ANSWER = JSON.stringify({ basics: { fullName: "Jane Doe" } });
+  it.each([
+    `\`\`\`json\n${ANSWER}\n\`\`\`\n\nNotes: I focused on the`,
+    `<think>ok</think>${ANSWER}\n\nAlso`,
+    `Here is the analysis:\n${ANSWER}\nLet me know if you'd like`,
+    `I kept {the order} as given. ${ANSWER}\nI could also`,
+  ])("reads a whole answer cut off in the prose after it: %j", async (text) => {
+    const provider = scriptedProvider({ text, finish: "length" });
+    const ai = createAtsAi({ provider, routes: { convertResume: route } });
+    const { result } = await ai.convertResume({ resumeText: "Jane Doe" });
+    expect(result.basics.fullName).toBe("Jane Doe");
   });
 
   it("reports a non-object body as a bad response, not a crash", async () => {
