@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
+
 /** The GitHub Action, run against the local build (ATS_ENGINE_CLI): needs `npm run build` first. */
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -96,6 +98,15 @@ describe("the GitHub Action", () => {
     expect(delimiters).toHaveLength(4);
     for (const delimiter of delimiters) expect(delimiter).toMatch(/^ATS_[0-9a-f]{32}$/);
     expect(new Set(delimiters).size).toBe(4);
+  });
+
+  it("reads the resume in the language input's language", () => {
+    const german = join(dir, "german.txt");
+    writeFileSync(german, LOCALE_FIXTURES.de[0]!.text);
+    const report = (inputs: Record<string, string>) =>
+      JSON.parse(readFileSync(action({ ATS_RESUME: german, ...inputs }).outputs.report!, "utf8"));
+    expect(report({}).locale.languages).toEqual(["de"]);
+    expect(report({ ATS_LANGUAGE: "en" }).locale.languages).toEqual([]);
   });
 
   it("fails the step with exit code 2 below min-score", () => {

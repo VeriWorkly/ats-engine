@@ -21,6 +21,7 @@ import { normalizeJobText } from "../../../src/job/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../../src/locales/index.js";
 import { extractResume, normalizeExtractedText } from "../../../src/node/extract.js";
 import { buildPdf, text } from "../../../tests/fixtures/buildPdf.js";
+import { LOCALE_FIXTURES } from "../../../tests/fixtures/locale-resumes.js";
 
 const SERVER = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const PACKAGE = fileURLToPath(new URL("../package.json", import.meta.url));
@@ -195,6 +196,22 @@ describe("ats-engine-mcp over stdio", () => {
     const report = check(normalizeExtractedText(RESUME.join("\n")), POLICY, { region: "US" });
     expect(result.structuredContent).toEqual(expectedCheck(report, false));
     expect(result.structuredContent!.job).toBeNull();
+  });
+
+  it("reads in the language a call names, as check() does, and refuses one no pack has", async () => {
+    const german = LOCALE_FIXTURES.de[0]!.text;
+    const detected = await call("check_resume", { text: german });
+    expect(detected.structuredContent).toMatchObject({
+      locale: { languages: ["de"], region: "DE" },
+    });
+    const english = await call("check_resume", { text: german, language: "EN" });
+    expect(english.structuredContent).toEqual(
+      expectedCheck(check(normalizeExtractedText(german), POLICY, { languages: ["en"] }), false),
+    );
+    expect(english.structuredContent).toMatchObject({ locale: { languages: [] } });
+    const unknown = await call("check_resume", { text: german, language: "xx" });
+    expect(unknown.isError).toBe(true);
+    expect(textOf(unknown)).toContain('Unknown language "xx"; use one of en, de, fr, hi.');
   });
 
   it("match_job returns only the match, the requirements and the missing keywords", async () => {

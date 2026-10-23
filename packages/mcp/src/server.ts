@@ -21,9 +21,11 @@ import { localizePolicy } from "@veriworkly/ats-engine/locales";
 import { z } from "zod";
 
 import {
+  checkLanguage,
   checkRegion,
   checkTarget,
   isUserError,
+  LANGUAGES,
   MAX_TEXT_CHARS,
   POLICY,
   readJob,
@@ -93,6 +95,17 @@ const targetInput = {
     .describe(
       `The applicant tracking system the user is applying through (${TARGETS.join(", ")}), to ` +
         "add its vendor's documented notes, each with its source. Advice only; never scored.",
+    ),
+};
+
+const languageInput = {
+  language: z
+    .string()
+    .optional()
+    .describe(
+      `Read the resume and the posting in this language (${LANGUAGES.join(", ")}; en: English ` +
+        "only). Default: detected from each. Give it only when the resume was read in the wrong " +
+        "language; a posting in another language needs that language.",
     ),
 };
 
@@ -286,10 +299,11 @@ async function answer(run: () => Promise<Answer>): Promise<CallToolResult> {
 
 /** `signal`: the call's, so cancelling it stops the file reading it started. */
 async function score(
-  args: ResumeArgs & JobArgs & { region?: string; target_ats?: string },
+  args: ResumeArgs & JobArgs & { language?: string; region?: string; target_ats?: string },
   signal: AbortSignal,
   includeLines = false,
 ) {
+  checkLanguage(args.language);
   checkRegion(args.region);
   checkTarget(args.target_ats);
   const { input, layout, file } = await readResume(args, signal);
@@ -302,6 +316,7 @@ async function score(
     file,
     targetAts: args.target_ats,
     region: args.region,
+    languages: args.language === undefined ? undefined : [args.language],
     includeLines,
   });
   return { report, layout, withJob: jobDescription !== undefined };
@@ -331,7 +346,13 @@ export function createServer(): McpServer {
         "skills). With a job posting it adds the job match score and each requirement judged. " +
         "Advice that is not scored (the file, age signals, a named ATS's documented notes) " +
         `comes apart from the score. ${DETERMINISTIC} ${INTENDED_USE} ${LOCAL}`,
-      inputSchema: { ...resumeInput, ...jobInput(false), ...regionInput, ...targetInput },
+      inputSchema: {
+        ...resumeInput,
+        ...jobInput(false),
+        ...languageInput,
+        ...regionInput,
+        ...targetInput,
+      },
       outputSchema: checkOutput,
       annotations: { title: "Check my resume", ...READ_ONLY },
     },
@@ -352,7 +373,7 @@ export function createServer(): McpServer {
         "requirement of the posting judged met, partial, missing or unverifiable with the " +
         `resume's own words as evidence, and the posting's keywords the resume lacks. ` +
         `${DETERMINISTIC} ${INTENDED_USE} ${LOCAL}`,
-      inputSchema: { ...resumeInput, ...jobInput(true), ...regionInput },
+      inputSchema: { ...resumeInput, ...jobInput(true), ...languageInput, ...regionInput },
       outputSchema: jobMatchOutput,
       annotations: { title: "Match my resume to a job", ...READ_ONLY },
     },

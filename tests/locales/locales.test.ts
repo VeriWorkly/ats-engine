@@ -9,6 +9,7 @@ import {
   withLocales,
 } from "../../src/locales/index.js";
 import { fieldChecks } from "../fixtures/accuracy.js";
+import { generateResumes, renderResume } from "../fixtures/generatedResumes.js";
 import { LOCALE_FIXTURES, type LocaleFixture } from "../fixtures/locale-resumes.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
@@ -301,6 +302,115 @@ describe("region conventions", () => {
       scoreImpact: 6,
     });
     expect(photo("Jane Doe\n+1 415 555 0199", false)).toBeUndefined();
+  });
+});
+
+// The guard every language pack, built in or new, must pass: attached, it leaves an English resume
+// exactly as the base reads it. A pack whose words leak into English fails here.
+describe("the language packs and English resumes", () => {
+  const regionsOnly = withLocales(DEFAULT_POLICY, { regions: BUILT_IN_LOCALES.regions });
+  // The reading, not the label: a dense run of lookalikes can still name "de" (N4 B24) while the
+  // German words it attaches change nothing.
+  const read = ({ engine: _engine, locale: _locale, ...report }: AtsReport) => report;
+  const LOOKALIKES = [
+    "Ravi Kumar",
+    "ravi@example.com | (212) 555-0199 | Des Moines, IA",
+    "Experience",
+    "Software Engineer, Volvo AB — Gothenburg",
+    "03/2018 – 06/2021",
+    "- Built a billing service with the team (Smith et al., ab test), MIT licence",
+    "- Moved data from Pune and Mumbai sites to the cloud, with Müller und Söhne GmbH",
+    "Education",
+    "BSc Computer Science, MIT, 2016",
+    "Skills",
+    "TypeScript, SQL",
+  ].join("\n");
+
+  it("leave every English resume as it reads with none attached", async () => {
+    const english = [
+      ...[...LOCALE_FIXTURES.en, ...LOCALE_FIXTURES["en-GB"], ...LOCALE_FIXTURES["en-IN"]].map(
+        (fixture) => fixture.text,
+      ),
+      LOOKALIKES,
+      ...(await Promise.all(
+        generateResumes(100).map(async (resume) => (await renderResume(resume, "text")).text),
+      )),
+    ];
+    // An English posting with words other languages use ("die", "ab", "mit").
+    const posting =
+      "Requirements\n- 5+ years of TypeScript and SQL\n- AB testing with Optimizely\n- Die-cut packaging design\n- Work with MIT-licensed libraries";
+    for (const text of english)
+      for (const jobDescription of [undefined, posting]) {
+        expect(text.length).toBeGreaterThan(100);
+        expect(read(check(text, { jobDescription })), text.slice(0, 60)).toEqual(
+          read(score(text, regionsOnly, { now: NOW, jobDescription })),
+        );
+      }
+  });
+});
+
+// Headings in capitals are a language's own words: only a word in capitals among lower-case ones
+// ("BSc, MIT, 2016") is an acronym. Invented people; short CVs where the headings tip the count.
+describe("words in capitals as language evidence", () => {
+  const SHORT_FR = [
+    "Thomas Martin",
+    "thomas.martin@example.fr | 06 98 76 54 32 | Nantes",
+    "EXPÉRIENCE PROFESSIONNELLE",
+    "Développeur web, Société Démo, Nantes    09/2021 – aujourd'hui",
+    "• Développement d'applications web en React et Node.js",
+    "• Gestion de la base de données clients",
+    "• Rédaction de la documentation technique",
+    "Stagiaire développeur, Exemple SAS, Rennes    02/2021 – 07/2021",
+    "• Création d'un outil de reporting en Python",
+    "FORMATION",
+    "Licence professionnelle développement web, IUT de Nantes    2020 – 2021",
+    "COMPÉTENCES",
+    "React, Node.js, Python, SQL",
+  ].join("\n");
+  const SHORT_DE = [
+    "Anna Schmidt",
+    "anna.schmidt@example.de | 0176 12345678 | München",
+    "BERUFSERFAHRUNG UND PRAKTIKA",
+    "Werkstudentin Datenanalyse, Muster AG    10/2022 – heute",
+    "• Datenanalyse mit Python",
+    "• Pflege von Dashboards in Power BI",
+    "Praktikantin Controlling, Beispiel GmbH    04/2022 – 09/2022",
+    "• Erstellung von Monatsberichten",
+    "AUSBILDUNG",
+    "B.Sc. Wirtschaftsinformatik, Universität Mannheim    2019 – 2023",
+    "KENNTNISSE",
+    "Python, SQL, Power BI, Excel",
+  ].join("\n");
+
+  it.each([
+    ["a short French CV", SHORT_FR, "fr"],
+    ["a short German CV", SHORT_DE, "de"],
+    ["a German CV written all in capitals", SHORT_DE.toUpperCase(), "de"],
+  ])("reads %s with capitalised headings in its language", (_, text, language) => {
+    const report = check(text);
+    expect(report.locale.languages).toEqual([language]);
+    expect(report.parsed.roles).toHaveLength(2);
+  });
+
+  it("reads a German posting with capitalised headings as German", () => {
+    const posting = [
+      "Backend-Entwickler (m/w/d) – Go",
+      "IHRE AUFGABEN",
+      "- Entwicklung neuer Microservices in Go",
+      "- Betrieb unserer Kubernetes-Plattform",
+      "IHR PROFIL",
+      "- Mehrjährige Berufserfahrung in der Backend-Entwicklung",
+      "- Sehr gute Kenntnisse in Go und PostgreSQL",
+      "- Fließend Deutsch und Englisch",
+      "WIR BIETEN",
+      "- 30 Tage Urlaub, Homeoffice",
+    ].join("\n");
+    const report = check(LOCALE_FIXTURES.en[0]!.text, { jobDescription: posting });
+    expect(report.locale.languages).toContain("de");
+    expect(report.requirements.find((row) => row.kind === "language")?.text).toBe(
+      "Fließend Deutsch und Englisch",
+    );
+    expect(report.missingKeywords).not.toContain("ihre");
   });
 });
 

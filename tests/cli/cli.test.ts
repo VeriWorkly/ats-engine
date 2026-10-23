@@ -7,6 +7,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { main, type CliContext } from "../../src/cli/main.js";
 import { PLAIN } from "../../src/cli/terminal.js";
 import { ENGINE_VERSION } from "../../src/version.js";
+import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
 import { buildDocx } from "../fixtures/buildDocx.js";
 import { buildPdf, LEFT_COLUMN, RIGHT_COLUMN, text } from "../fixtures/buildPdf.js";
 import {
@@ -79,6 +80,25 @@ describe("ats-engine check", () => {
     expect(printed).toContain(
       "Text as read:\nJane Doe\njane.doe@example.com | (415) 555-0199\nExperience",
     );
+  });
+
+  // Detection reads a German resume in German; --lang overrides it, in any case.
+  it("reads in the language --lang names, English with --lang en", async () => {
+    const german = file("de.txt", LOCALE_FIXTURES.de[0]!.text);
+    expect(await main(["check", german])).toBe(0);
+    expect(out.join("\n")).toContain("Read as    de, DE");
+    out.length = 0;
+    expect(await main(["check", german, "--lang", "EN"])).toBe(0);
+    // English only; the +49 number still names the region.
+    expect(out.join("\n")).toContain("Read as    DE");
+    out.length = 0;
+    expect(await main(["check", file("en.txt", RESUME), "--lang", "de"])).toBe(0);
+    expect(out.join("\n")).toContain("Read as    de");
+  });
+
+  it("refuses a --lang no pack has, naming the ones there are", async () => {
+    expect(await main(["check", file("x.txt", RESUME), "--lang", "xx"])).toBe(1);
+    expect(err.join("\n")).toContain('Unknown --lang "xx"; use one of en, de, fr, hi.');
   });
 
   it("matches against a job description, including a saved HTML page", async () => {
