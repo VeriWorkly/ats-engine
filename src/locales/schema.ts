@@ -67,6 +67,8 @@ const vocabularyShape = {
   sinceWords: optionalList("sinceWords"),
   /** Open ends and since words that date a role only where their date ends the line: "से". */
   lineEndDateWords: optionalList("lineEndDateWords"),
+  /** Time off dated like a role, which counts as none: "Elternzeit", "congé parental". */
+  leaveWords: optionalList("leaveWords"),
   employerWords: optionalList("employerWords"),
   titleWords: optionalList("titleWords"),
   schoolWords: optionalList("schoolWords"),

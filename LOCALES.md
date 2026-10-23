@@ -144,6 +144,7 @@ the policy's.
 | `rangeWords`         | `resumeParse.rangeWords`          | Words between the ends of a date range, besides a dash                                                                                              | `["bis"]`                                       |
 | `sinceWords`         | `resumeParse.sinceWords`          | Words before a lone start date that make the role current                                                                                           | `["seit"]`                                      |
 | `lineEndDateWords`   | `resumeParse.lineEndDateWords`    | Open ends and since words that are everyday words: they date a role only where the date ends the line or a column                                   | `["ab"]`                                        |
+| `leaveWords`         | `resumeParse.leaveWords`          | Time off a work history dates like a role: an entry whose whole title is one is no role and counts no months                                        | `["elternzeit", "mutterschutz"]`                |
 | `employerWords`      | `resumeParse.employerWords`       | Words joining a job title to its employer on one line                                                                                               | `["bei"]`                                       |
 | `titleWords`         | `resumeParse.titleWords`          | Words that mark a job title                                                                                                                         | `["praktikant(?:in)?"]`                         |
 | `schoolWords`        | `resumeParse.schoolWords`         | Words that mark a school or university                                                                                                              | `["universität", "vidyalaya"]`                  |
@@ -170,7 +171,8 @@ Everything else in a policy stays the policy's: `phrases`, `synonyms`, `implies`
 what a right-to-work or clearance statement says (`requirements.needsSponsorship`,
 `noSponsorship`, `sponsorshipOffered`, `negation`, `notHeld`, `notHeldNearby`, `inProgress`,
 `citizenship`, `residence`, `countries`, `placeJoiners`, `clearanceLevels`), the fields of
-study a posting abbreviates (`requirements.fieldAbbreviations`), `numberWords`, `qualifiers`, `offerWords`, the `writing` and `advice` sections, and the rules
+study a posting abbreviates (`requirements.fieldAbbreviations`), `numberWords`, `qualifiers`, `offerWords`,
+the taglines never read as a name (`resumeParse.notNames`), the `writing` and `advice` sections, and the rules
 and their weights, which only a region pack's `rules` and `ageAdvice` adjust.
 
 `requirements.seniorityLevels` maps a seniority level's name to title words added to it:

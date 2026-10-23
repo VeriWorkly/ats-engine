@@ -9,7 +9,9 @@ import {
   titleWordsOf,
 } from "./experience.js";
 import { isSectionHeading, sectionKind } from "./sections.js";
+import { knownTerms } from "../matching/vocabulary.js";
 import { memo } from "../util/memo.js";
+import { own } from "../util/own.js";
 
 // Email and link patterns match address grammars, not vocabulary, so they live here, not in the policy.
 
@@ -76,12 +78,29 @@ export function statesDateOfBirth(lines: string[], policy: AtsEnginePolicy) {
 }
 
 const nameVocabulary = memo(
-  ({ nameParticles, documentTitles, nameLabels }: AtsEnginePolicy["resumeParse"]) => ({
+  ({ nameParticles, documentTitles, nameLabels, notNames }: AtsEnginePolicy["resumeParse"]) => ({
     particles: new RegExp(`^(?:${nameParticles.join("|")})$`, "u"),
     titles: new RegExp(`^(?:${documentTitles.join("|")})$`, "iu"),
+    notNames: new RegExp(`^(?:${(notNames ?? ["(?!)"]).join("|")})$`, "iu"),
     label: new RegExp(String.raw`^${wordListPattern(nameLabels)}\s*[:：]\s*`, "iu"),
   }),
 );
+
+/**
+ * Whether a reading of a name is, as a whole, a tagline (`resumeParse.notNames`: "Open Source")
+ * or a term the policy knows ("Machine Learning"), or a word of it is a section heading: a tagline
+ * the email or a link spells. A name holding a term ("Sean Go", "Vue Nguyen") is still a name.
+ */
+function namesTerm(name: string, policy: AtsEnginePolicy) {
+  const km = policy.keywordMatch;
+  const whole = name.trim().replace(/\s+/gu, " ");
+  const lower = whole.toLowerCase();
+  return (
+    nameVocabulary(policy.resumeParse).notNames.test(lower.replace(/-/g, " ")) ||
+    knownTerms(km).has(own(km.synonyms, lower) ?? lower) ||
+    whole.split(" ").some((word) => isSectionHeading(word, policy))
+  );
+}
 
 /** Where a contact line puts one detail after the next. Spaces match from the start of their run to stay linear. */
 const CONTACT_SEPARATOR = /(?<!\s)\s*[|·•,]\s*|\t|\s{2,}|(?<!\s)\s+[–—-]\s+/;
@@ -197,7 +216,8 @@ export function findName(
     // spoken. Two skills or a place have the same shape ("Java, Spring", "Austin, TX"), so it is
     // read only when the email or a profile link spells it ("mira.kestrel@…",
     // "…/in/mira-kestrel"), never when the line names a state or a country or its given name is a
-    // state's code, and never over a name further down.
+    // state's code or it is a term the policy knows ("Learning, Machine"), and never over a name
+    // further down.
     const [surname = "", ...after] = candidate.text.split(",");
     const given = withoutPostNominals(after.join(","));
     const reversed =
@@ -206,7 +226,8 @@ export function findName(
       /^\S+$/u.test(surname.trim()) &&
       !namesPlace(candidate.text, policy) &&
       !code.test(given.text.trim()) &&
-      spelled(`${given.text.trim()} ${surname}`);
+      spelled(`${given.text.trim()} ${surname}`) &&
+      !namesTerm(`${given.text.trim()} ${surname.trim()}`, policy);
     const cut = reversed
       ? { text: `${given.text.trim()} ${surname.trim()}`, tail: given.tail }
       : withoutPostNominals(candidate.text);
@@ -227,6 +248,8 @@ export function findName(
     // before a title ("Acme Corp | Senior Engineer").
     if (isSectionHeading(name, policy) || titleWords.test(name)) return null;
     if (candidate.titled && organisation.test(name)) return null;
+    // A term the email or a link spells: "Open Source | Software Engineer" with github.com/open-source.
+    if (candidate.titled && namesTerm(name, policy)) return null;
     // "San Francisco, CA" loses its state like a credential, and is a place: the weakest reading,
     // with a name before a title or surname first, which are only ever on the first line.
     return { name, cut: cut.tail.length > 0, place: place || candidate.titled || reversed };

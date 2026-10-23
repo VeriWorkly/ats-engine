@@ -219,6 +219,15 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     ["phone", "ISBN: 978-3-16-148410-0"],
     ["phone", "Mobile: (US)"],
     ["phone", "1.2.3.4.5.6.7"],
+    // Capitals stand for digits only in a toll-free vanity number ("1-800-FLOWERS").
+    ["phone", "2019-2021 AB"],
+    ["phone", "1990 - 2024 ABC"],
+    ["phone", "2020 2021 2022 ABC"],
+    ["phone", "12345678 DE"],
+    ["phone", "(555) 010-2020 CELL"],
+    ["phone", "+44 20 7946 0958 UK"],
+    ["phone", "555-010-2020 USA"],
+    ["phone", "1-800-555-0199 CELL"],
     ["name", "EXPERIENCE"],
     ["name", "Senior Engineer, Acme Corporation"],
     ["name", "Built the thing."],
@@ -284,6 +293,16 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     ["+1-415-555-0134 (US)", "+1-415-555-0134"],
     ["Tel.: (+44) 7700 900123 (WhatsApp)", "(+44) 7700 900123"],
     ["+1 415 555 0134 x12 (work)", "+1 415 555 0134 x12"],
+    // Written as 0.16.0 filled them.
+    ["Tel: +1 415 555 0134", "+1 415 555 0134"],
+    ["+1 202 555 0143 extension 12", "+1 202 555 0143 extension 12"],
+    ["+1 415 555 0134 #12", "+1 415 555 0134 #12"],
+    ["1-800-FLOWERS", "1-800-FLOWERS"],
+    // A full toll-free number keeps its extension apart, as any other does.
+    ["+1 800 555 0199 EXT 12", "+1 800 555 0199 EXT 12"],
+    ["1-800-555-0199 EXT 1234", "1-800-555-0199 EXT 1234"],
+    ["1-800-GOT-JUNK", "1-800-GOT-JUNK"],
+    ["800-FLOWERS", "800-FLOWERS"],
   ])("fills the phone %j without its label", (value, expected) => {
     const { merged } = merge(emptyParsed, candidate({ phone: value }), `${SOURCE}\n${value}`);
     expect(merged.phone).toBe(expected);
@@ -642,6 +661,55 @@ describe("merge: tenure fields are grounded too", () => {
     // German, so "ab" is read.
     const source = `Berufserfahrung\nEngineer, Volvo AB\nEntwicklung von Software für Fahrzeuge und Prüfstände\n${line}`;
     expectFast(() => currentIn(source, 2017, "Volvo AB"), 500);
+  });
+
+  // The parser drops a dated leave; the model must not add it back as a role.
+  it.each([
+    ["Parental leave", "Experience\nParental leave, 03/2024 – Present"],
+    [
+      "Elternzeit",
+      "Berufserfahrung\nElternzeit ab 03/2024\nIch bin für die Entwicklung und den Betrieb der Plattform zuständig, mit dem Team in Berlin.",
+    ],
+    // The model put the leave in the employer, with no title.
+    ["", "Experience\nCareer Break, 03/2024 – Present", "Career Break"],
+  ])("does not add back a %j role", (title, source, employer = "") => {
+    const { merged } = mergeGrounded(
+      emptyParsed,
+      candidate({
+        roles: [{ title, employer, start: { year: 2024, month: 3 }, end: null, current: true }],
+      }),
+      source,
+      { policy: LOCALIZED, now: NOW },
+    );
+    expect(merged.roles).toEqual([]);
+    expect(merged.monthsOfExperience).toBeNull();
+  });
+
+  it("still adds a grounded role beside a dropped leave", () => {
+    const { merged } = mergeGrounded(
+      emptyParsed,
+      candidate({
+        roles: [
+          {
+            title: "Sabbatical",
+            employer: "",
+            start: { year: 2022, month: 1 },
+            end: null,
+            current: false,
+          },
+          {
+            title: "Engineer",
+            employer: "Globex Ltd",
+            start: { year: 2017, month: 1 },
+            end: null,
+            current: false,
+          },
+        ],
+      }),
+      "Experience\nEngineer, Globex Ltd\nJan 2017 - Dec 2021\nSabbatical, Jan 2022 – Jun 2022",
+      { policy: LOCALIZED, now: NOW },
+    );
+    expect(merged.roles).toMatchObject([{ title: "Engineer", employer: "Globex Ltd" }]);
   });
 
   it("rejects punctuation-only contact values", () => {

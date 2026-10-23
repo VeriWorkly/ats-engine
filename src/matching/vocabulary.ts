@@ -153,6 +153,40 @@ export const buildVocabulary = memo((km: AtsEnginePolicy["keywordMatch"]): Vocab
   return vocabulary;
 });
 
+/** Every term the policy names: its skills and soft skills, and both sides of its implications. */
+export const knownTerms = memo((km: AtsEnginePolicy["keywordMatch"]) => {
+  const vocab = buildVocabulary(km);
+  return new Set([...vocab.skillTokens, ...vocab.softTokens, ...[...vocab.implies].flat(2)]);
+});
+
+/** A programming symbol: "C++", "C#", "Node.js", ".NET". Not "U.S. English". */
+const SKILL_SYMBOL = /[+#]|\.(?:js|ts|net)\b/iu;
+/** A level after a language ("Spanish C1+"): its "+" is no programming symbol. */
+const TRAILING_LEVEL = /\s+\(?[abc][12]\+?\)?$/iu;
+
+/** The skills a posting may write as names (`proseNames.skills`), folded as every term is. */
+const namedSkills = memo(
+  (km: AtsEnginePolicy["keywordMatch"]) =>
+    new Set(km.proseNames.skills.map((skill) => canonicalize(skill, km, buildVocabulary(km)))),
+);
+
+/**
+ * Whether an item of a languages list is a skill rather than a spoken language: each of its terms
+ * a skill the policy knows ("Python", "Go", `proseNames.skills`), or it holds a programming
+ * symbol ("C++", "C#", "Node.js"). Never guessed from its shape: "ASL", "isiZulu" and "IRISH" are
+ * spoken. A language the policy names ("English", "Deutsch") never is a skill.
+ */
+export function isSkillItem(item: string, km: AtsEnginePolicy["keywordMatch"]) {
+  const text = item.trim();
+  if (own(km.requirements.languageNames, text.toLowerCase())) return false;
+  if (SKILL_SYMBOL.test(text.replace(TRAILING_LEVEL, ""))) return true;
+  const known = knownTerms(km);
+  const named = namedSkills(km);
+  return [...extractVocabulary(text, km, buildVocabulary(km)).values()].every(
+    ({ token, skill }) => skill || known.has(token) || named.has(token),
+  );
+}
+
 /**
  * Each phrase's pattern, compiled once. Keyed on the plural-suffix list, not `keywordMatch`: the
  * requirements judge passes a copy with a filtered phrase list that shares this array.

@@ -22,6 +22,12 @@ type HeaderMatchers = {
   /** The same, global, to take them out. */
   organisations: RegExp;
   verbOpener: RegExp;
+  /** A past-tense action verb that is no title word, opening a line: "Analysed", not "Lead". */
+  pastOpener: RegExp;
+  /** An everyday open end ("continuing", "onwards"), as a sentence may end in; not "Present". */
+  everydayEnd: RegExp;
+  /** A whole title that is time off: "Parental leave", "Elternzeit (Berlin)". */
+  leave: RegExp;
   duration: RegExp;
   /** One word of a department's name: "Product", "Management". */
   department: RegExp;
@@ -32,8 +38,15 @@ const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatc
   // employer. A lone "@" joins them too, spaced so an email address is never cut.
   const strong = String.raw`\s*[|·•]\s*|\s+[-–—@]\s+|\t+|\s{2,}|\s+${wordListPattern(rp.employerWords)}\s+`;
   const organisations = [...rp.organisationWords, ...rp.schoolWords];
+  const titleWords = wordListRegex(rp.titleWords);
+  // Past tenses: the content verbs, and the action verbs of a regular past form ("mentored").
+  const pastForm = new RegExp(`^(?:${(text.actionVerbForms ?? ["(?!)"]).join("|")})$`, "iu");
+  const past = [
+    ...text.contentLineVerbs,
+    ...text.actionVerbs.filter((verb) => pastForm.test(verb)),
+  ].filter((verb) => !titleWords.test(verb));
   return {
-    titleWords: wordListRegex(rp.titleWords),
+    titleWords,
     // "4 yrs 9 mos": how long, as LinkedIn prints beside the dates.
     duration: new RegExp(
       String.raw`(?<![\p{L}\p{N}])\d{1,2}\+?\s*${wordListPattern(rp.durationUnits)}\.?`,
@@ -47,6 +60,12 @@ const matchersOf = memo(({ resumeParse: rp, text }: AtsEnginePolicy): HeaderMatc
     organisation: wordListRegex(organisations),
     organisations: wordListRegex(organisations, "gi"),
     verbOpener: new RegExp(`^${wordListPattern(text.contentLineVerbs)}`, "iu"),
+    pastOpener: new RegExp(`^${wordListPattern(past.length ? past : ["(?!)"])}`, "iu"),
+    everydayEnd: wordListRegex(rp.lineEndDateWords?.length ? rp.lineEndDateWords : ["(?!)"]),
+    leave: new RegExp(
+      String.raw`^(?:${(rp.leaveWords ?? ["(?!)"]).join("|")})(?<rest>\s*[(\[].*)?$`,
+      "iu",
+    ),
     department: new RegExp(`^(?:${rp.departmentWords.join("|")})$`, "iu"),
   };
 });
@@ -108,6 +127,21 @@ export function isPlace(line: string, policy: AtsEnginePolicy, named = true) {
 /** A line opening with one of the policy's action verbs: a description, not a header. */
 export const opensWithVerb = (line: string, policy: AtsEnginePolicy) =>
   matchersOf(policy).verbOpener.test(line);
+
+/**
+ * Whether a role is time off (`resumeParse.leaveWords`): its whole title, or with no title its
+ * employer, is a leave ("Parental leave", "Elternzeit", a JSON Resume entry named "Career
+ * Break"). Such an entry is no role, wherever it is read from. A bracket or an employer naming a
+ * title or an organisation keeps it one: "Sabbatical (Visiting Researcher, Stanford)",
+ * "Sabbatical, Stanford University".
+ */
+export function isLeave(title: string, employer: string, policy: AtsEnginePolicy) {
+  const { leave, titleWords, organisation } = matchersOf(policy);
+  const found = leave.exec(title.trim() || employer.trim());
+  if (!found) return false;
+  const rest = `${found.groups?.rest ?? ""} ${title.trim() ? employer : ""}`;
+  return !titleWords.test(rest) && !organisation.test(rest);
+}
 
 /** A header longer than this ran to the page's width, so a short line under it continues it ("…Public" / "Health"). */
 const WRAP_WIDTH = 48;
@@ -268,6 +302,51 @@ function withoutPlace(parts: string[], policy: AtsEnginePolicy, sure: boolean): 
 }
 
 /**
+ * A dated line describing the work, not heading a role ("Analysed 2017 thru 2018 data",
+ * "Mentored two junior engineers since 2012."): it opens with a capitalised past-tense action
+ * verb, names no job title before its dates, and holds only lowercase words and numbers between
+ * the verb and them ("Mentored 2015 - 2019"; not "Integrated Device Technology 2019 - 2021"). Read
+ * only in a script with case: in one without, every word looks lowercase ("विकसित भारत फाउंडेशन").
+ * Words or a full stop after the dates make it a sentence ("… 2018 data", "… since 2012."); a line
+ * its dates end heads a role ("Founded startup 2017 – 2019", "Hired 2017 – 2019" under a title),
+ * unless an everyday open end closes it after words of its own ("Mentored 5 interns 2017 –
+ * continuing").
+ */
+function isDatedSentence(
+  line: string,
+  found: NonNullable<ReturnType<typeof findDateRange>>,
+  policy: AtsEnginePolicy,
+) {
+  const { titleWords, pastOpener, everydayEnd } = matchersOf(policy);
+  const { matched, range } = found;
+  const at = line.indexOf(matched);
+  const before = line.slice(0, at).trim();
+  const opener = pastOpener.exec(before)?.[0];
+  if (!opener || !/^\p{Lu}/u.test(opener) || titleWords.test(before)) return false;
+  const between = before.slice(opener.length);
+  if (/(?:^|\s)[^\s\p{Ll}\p{N}]/u.test(between)) return false;
+  const after = line.slice(at + matched.length).trim();
+  return (
+    /^(?:[.!?]|\p{Ll})/u.test(after) ||
+    (range.current && everydayEnd.test(matched) && /\S/.test(between))
+  );
+}
+
+/**
+ * The date range of a line that can head a role, or null: not a bullet, not a dated sentence
+ * (`isDatedSentence`), and not time off titled on the same line ("Parental leave, 03/2024 –
+ * Present"). What `parseRoles` anchors its roles on; a leave's title read from another line is
+ * dropped later.
+ */
+export function roleDates(line: string, policy: AtsEnginePolicy, now: Date) {
+  const found = BULLET.test(line) ? null : findDateRange(line, policy.resumeParse, now);
+  if (!found || isDatedSentence(line, found, policy)) return null;
+  const own = line.replace(found.matched, " ").replace(matchersOf(policy).duration, " ");
+  const { title, employer } = splitTitleAndEmployer(own, policy);
+  return isLeave(title, employer, policy) ? null : found;
+}
+
+/**
  * Recovers one row per job. A date range anchors each entry (the one element every work-history
  * block has, and what tenure needs). Title and employer are read from the same line, else the
  * line above (or two above, when stacked), else the line below for resumes that print dates first.
@@ -322,7 +401,7 @@ export function parseRoles(
 
   // Every dated line, with the header text it carries itself (a place beside the dates is none).
   const anchors = lines.flatMap((line, index) => {
-    const found = BULLET.test(line) ? null : findDateRange(line, rp, now);
+    const found = roleDates(line, policy, now);
     if (!found) return [];
     const remainder = line.replace(found.matched, " ").replace(duration, " ").trim();
     // A country or state names where only after the dates; before them "Infosys, India" is the employer.
@@ -445,6 +524,8 @@ export function parseRoles(
     if (!header && free(index + 1)) header = take(index + 1);
 
     const split = splitTitleAndEmployer(header, policy);
+    // Time off dated like a role is none: it counts no months and lends no title.
+    if (isLeave(split.title, split.employer, policy)) continue;
     let { employer } = split;
     // Several roles under one employer: its line names every role under it until a role names its
     // own. It opens a group only at the section start or after the previous role's bullets; else,

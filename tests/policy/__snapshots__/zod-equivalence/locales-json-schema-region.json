@@ -215,6 +215,14 @@
         "minLength": 1
       }
     },
+    "leaveWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "employerWords": {
       "minItems": 1,
       "type": "array",

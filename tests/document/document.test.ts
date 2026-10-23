@@ -284,6 +284,95 @@ describe("JSON Resume", () => {
     expect(doc.sections).toEqual([]);
     expect(() => check(doc)).not.toThrow();
   });
+
+  // As the text "Languages: Python, Go": programming languages are no spoken-language rows.
+  describe("with programming languages as its languages", () => {
+    const english = (languages: Array<{ language: string; fluency?: string }>) => ({
+      basics: { name: "Alex Morgan", email: "alex@example.com" },
+      work: [
+        {
+          name: "Acme",
+          position: "Software Engineer",
+          startDate: "2019-01",
+          highlights: [
+            "Led the move of the billing system to the cloud with the platform team",
+            "Wrote the runbooks for the on-call rotation",
+            "Built payment APIs in Go for the team that runs them",
+          ],
+        },
+      ],
+      languages,
+    });
+    const fluentEnglish = (resume: object) =>
+      check(resume as never, "Requirements\n- Fluent English").requirements[0];
+
+    it.each([
+      [[{ language: "Python" }, { language: "Go" }]],
+      [[{ language: "TypeScript", fluency: "Expert" }, { language: "C++" }, { language: "SQL" }]],
+    ])("gives no rows, and the language it is written in still counts: %#", (languages) => {
+      expect(check(english(languages) as never).parsed.spokenLanguages).toEqual([]);
+      expect(fluentEnglish(english(languages))).toMatchObject({
+        status: "met",
+        detail: "English: the resume is written in it",
+      });
+      const doc: AtsResumeDocument = {
+        format: ATS_DOCUMENT_FORMAT,
+        basics: { name: "Alex Morgan", email: "alex@example.com" },
+        sections: [
+          {
+            kind: "languages",
+            title: "Languages",
+            items: languages.map((l) => ({ language: l.language, level: l.fluency })),
+          },
+        ],
+      };
+      expect(check(doc).parsed.spokenLanguages).toEqual([]);
+    });
+
+    it("keeps the spoken languages beside them", () => {
+      const resume = english([
+        { language: "English", fluency: "B1" },
+        { language: "Deutsch", fluency: "Native speaker" },
+        { language: "Python" },
+      ]);
+      expect(check(resume as never).parsed.spokenLanguages.map(({ language }) => language)).toEqual(
+        ["English", "Deutsch"],
+      );
+      expect(fluentEnglish(resume)?.status).toBe("partial");
+      expect(fluentEnglish(english([{ language: "German" }, { language: "Python" }]))?.status).toBe(
+        "missing",
+      );
+    });
+
+    // A skill is one the policy knows or one with a programming symbol, never a guess from its
+    // shape: a sign language's initials and a language in capitals are spoken languages.
+    it.each([
+      "ASL",
+      "BSL",
+      "LSF",
+      "DGS",
+      "MSA",
+      "isiZulu",
+      "isiXhosa",
+      "KiSwahili",
+      "IGBO",
+      "FARSI",
+      "TWI",
+      "IRISH",
+      "WELSH",
+    ])("gives a row for %j", (language) => {
+      const rows = check(english([{ language, fluency: "Native speaker" }]) as never).parsed
+        .spokenLanguages;
+      expect(rows.map((row) => row.language)).toEqual([language]);
+    });
+
+    // A level's "+" and an abbreviation's dots are no programming symbols.
+    it.each(["Spanish C1+", "U.S. English"])("gives a row for the language in %j", (language) => {
+      const rows = check(english([{ language, fluency: "Fluent" }]) as never).parsed
+        .spokenLanguages;
+      expect(rows).toHaveLength(1);
+    });
+  });
 });
 
 describe("JSON Resume through the engine's front door", () => {
@@ -401,6 +490,88 @@ describe("JSON Resume through the engine's front door", () => {
       current: false,
       end: null,
     });
+  });
+
+  // Time off is no role, as in printed text: no months, no title for the seniority check.
+  it.each([
+    ["Parental leave", "2024-03", "Present", []],
+    ["Career break", "2024-03", "2025-06", []],
+    ["Sabbatical", "2024-03", "2024-09", []],
+    ["Sabbatical (travel)", "2024-03", "2024-09", []],
+    ["Elternzeit", "2024-03", "heute", ["de"]],
+    ["Congé parental", "2024-03", "aujourd'hui", ["fr"]],
+    // The leave as the entry's name, with no position.
+    ["", "2024-03", "2025-06", [], "Career Break"],
+  ] as Array<[string, string, string, string[], string?]>)(
+    "does not read a %j work entry as a role",
+    (position, startDate, endDate, languages, name) => {
+      const resume = {
+        basics: { name: "Jane Doe", email: "jane@example.com" },
+        work: [
+          { name: "Acme", position: "Senior Engineer", startDate: "2016-01", endDate: "2024-02" },
+          { name, position, startDate, endDate },
+        ],
+      };
+      const report = score(resume, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
+        now: NOW,
+        languages: languages as string[],
+        jobDescription: "Senior Software Engineer\nRequirements\n- Kafka",
+      });
+      expect(report.parsed.roles).toMatchObject([{ title: "Senior Engineer", employer: "Acme" }]);
+      expect(report.parsed.monthsOfExperience).toBe(98);
+      expect(report.requirements.find(({ kind }) => kind === "seniority")?.detail).toMatch(
+        /^Latest title senior/,
+      );
+    },
+  );
+
+  it("does not read a leave in an ats-resume document as a role", () => {
+    const doc: AtsResumeDocument = {
+      format: ATS_DOCUMENT_FORMAT,
+      basics: { name: "Jane Doe" },
+      sections: [
+        {
+          kind: "experience",
+          title: "Experience",
+          items: [
+            { title: "Engineer", employer: "Acme", start: "2016-01", end: "2024-02" },
+            { title: "Maternity leave", employer: "", start: "2024-03", current: true },
+          ],
+        },
+      ],
+    };
+    expect(check(doc).parsed).toMatchObject({
+      roles: [{ title: "Engineer" }],
+      monthsOfExperience: 98,
+    });
+  });
+
+  it("still reads a role whose title only mentions a leave", () => {
+    const { parsed } = check({
+      basics: { name: "Jane Doe" },
+      work: [
+        {
+          name: "State University",
+          position: "Visiting Professor (sabbatical)",
+          startDate: "2024-03",
+        },
+        { name: "Acme", position: "HR Manager, Parental Leave Programs", startDate: "2020-01" },
+        // Work done in a leave: a title in its bracket, or an organisation employing it.
+        {
+          name: "Stanford University",
+          position: "Sabbatical (Visiting Researcher)",
+          startDate: "2019-01",
+          endDate: "2020-01",
+        },
+        {
+          name: "State University",
+          position: "Sabbatical",
+          startDate: "2018-01",
+          endDate: "2018-06",
+        },
+      ],
+    });
+    expect(parsed.roles).toHaveLength(4);
   });
 
   it("reads only a bounded slice of a huge array", () => {

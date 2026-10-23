@@ -1111,6 +1111,12 @@
       "onwards",
       "onward"
     ],
+    "leaveWords": [
+      "(?:parental|maternity|paternity|family|medical|sick|study)\\s+leave",
+      "leave\\s+of\\s+absence",
+      "career\\s+break",
+      "sabbatical"
+    ],
     "employerWords": [
       "at"
     ],
@@ -1119,6 +1125,16 @@
       "résumé",
       "curriculum vitae",
       "cv"
+    ],
+    "notNames": [
+      "open source",
+      "data science",
+      "cloud native",
+      "machine learning",
+      "deep learning",
+      "artificial intelligence",
+      "full stack",
+      "big data"
     ],
     "nameParticles": [
       "van",

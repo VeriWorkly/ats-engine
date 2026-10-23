@@ -161,6 +161,18 @@ export const resumeParseSchema = z.object({
    * Remote"), not in a sentence ("2020 onwards, growth of 30%").
    */
   lineEndDateWords: z._default(wordList("lineEndDateWords"), ["continuing", "onwards", "onward"]),
+  /**
+   * Time off a work history dates like a role ("Parental leave, 03/2024 – Present", "Career
+   * break 2019 – 2020"). An entry whose whole title is one of these is no role: it adds no months
+   * of experience and no title. Matched whole, ignoring case; a bracket after it is allowed
+   * ("Sabbatical (travel)"), but not a title around it ("Visiting Professor (sabbatical)").
+   */
+  leaveWords: z._default(wordList("leaveWords"), [
+    String.raw`(?:parental|maternity|paternity|family|medical|sick|study)\s+leave`,
+    String.raw`leave\s+of\s+absence`,
+    String.raw`career\s+break`,
+    "sabbatical",
+  ]),
   /** Words joining a job title to its employer on one line: "Engineer at Acme". */
   employerWords: z._default(wordList("employerWords"), ["at"]),
   /** What the top of a resume says in place of a name; never taken as the candidate's name. */
@@ -169,6 +181,22 @@ export const resumeParseSchema = z.object({
     "résumé",
     "curriculum vitae",
     "cv",
+  ]),
+  /**
+   * Taglines a resume may open with that have a name's shape ("Open Source | Software Engineer"):
+   * never read as the name, though the email or a link spells them. Matched whole, ignoring case,
+   * with each hyphen or run of spaces read as one space. Read only to find the name; job matching
+   * never sees this list.
+   */
+  notNames: z._default(wordList("notNames"), [
+    "open source",
+    "data science",
+    "cloud native",
+    "machine learning",
+    "deep learning",
+    "artificial intelligence",
+    "full stack",
+    "big data",
   ]),
   /** Lowercase words a name may hold between its capitalised ones ("Ludwig van Beethoven"), for every language. */
   nameParticles: z._default(wordList("nameParticles"), [

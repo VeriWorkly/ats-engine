@@ -2168,6 +2168,20 @@
               "minLength": 1
             }
           },
+          "leaveWords": {
+            "default": [
+              "(?:parental|maternity|paternity|family|medical|sick|study)\\s+leave",
+              "leave\\s+of\\s+absence",
+              "career\\s+break",
+              "sabbatical"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "employerWords": {
             "default": [
               "at"
@@ -2185,6 +2199,24 @@
               "résumé",
               "curriculum vitae",
               "cv"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "notNames": {
+            "default": [
+              "open source",
+              "data science",
+              "cloud native",
+              "machine learning",
+              "deep learning",
+              "artificial intelligence",
+              "full stack",
+              "big data"
             ],
             "minItems": 1,
             "type": "array",
@@ -4451,6 +4483,14 @@
                     "minLength": 1
                   }
                 },
+                "leaveWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "employerWords": {
                   "minItems": 1,
                   "type": "array",
@@ -4957,6 +4997,14 @@
                   }
                 },
                 "lineEndDateWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "leaveWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -7756,6 +7804,20 @@
               "minLength": 1
             }
           },
+          "leaveWords": {
+            "default": [
+              "(?:parental|maternity|paternity|family|medical|sick|study)\\s+leave",
+              "leave\\s+of\\s+absence",
+              "career\\s+break",
+              "sabbatical"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "employerWords": {
             "default": [
               "at"
@@ -7773,6 +7835,24 @@
               "résumé",
               "curriculum vitae",
               "cv"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "notNames": {
+            "default": [
+              "open source",
+              "data science",
+              "cloud native",
+              "machine learning",
+              "deep learning",
+              "artificial intelligence",
+              "full stack",
+              "big data"
             ],
             "minItems": 1,
             "type": "array",
@@ -8440,8 +8520,10 @@
           "rangeWords",
           "sinceWords",
           "lineEndDateWords",
+          "leaveWords",
           "employerWords",
           "documentTitles",
+          "notNames",
           "nameParticles",
           "postNominals",
           "regionCodes",
@@ -10134,6 +10216,14 @@
                     "minLength": 1
                   }
                 },
+                "leaveWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "employerWords": {
                   "minItems": 1,
                   "type": "array",
@@ -10640,6 +10730,14 @@
                   }
                 },
                 "lineEndDateWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "leaveWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {

@@ -437,6 +437,35 @@ describe("a name with its headline on the first line", () => {
     },
   );
 
+  // A tagline (`resumeParse.notNames`) or a term the policy knows is no name, though the email or
+  // a link spells every word of it.
+  it.each([
+    ["Open Source", "github.com/open-source"],
+    ["Machine Learning", "machine.learning@example.com"],
+    ["Data Science", "linkedin.com/in/data-science"],
+    ["Full Stack", "full.stack@example.com"],
+    ["Cloud Native", "github.com/cloud-native"],
+  ])("reads no name from the term %j before a title, though %j spells it", (term, contact) => {
+    expect(name(top(`${term} | Software Engineer`, contact))).toBe("");
+    expect(name(top(`${term} | Software Engineer\nMira Kestrel`, contact))).toBe("Mira Kestrel");
+    const [given, surname] = term.split(" ");
+    expect(name(top(`${surname}, ${given}`, contact))).toBe("");
+    expect(name(top(`${surname}, ${given}\nMira Kestrel`, contact))).toBe("Mira Kestrel");
+  });
+
+  // A name holding a word that is a skill ("Go", "Vue", "Spark", "Rust") is still a name.
+  it.each([
+    ["Sean Go | Software Engineer", "sean.go@example.com", "Sean Go"],
+    ["Go Min-jun – Data Scientist", "linkedin.com/in/go-minjun", "Go Min-jun"],
+    ["Go, Sean", "sean.go@example.com", "Sean Go"],
+    ["Vue Nguyen | Software Engineer", "vue.nguyen@example.com", "Vue Nguyen"],
+    ["Spark Lee | Software Engineer", "spark.lee@example.com", "Spark Lee"],
+    ["Rust Cohle | Software Engineer", "rust.cohle@example.com", "Rust Cohle"],
+    ["Cohle, Rust", "rust.cohle@example.com", "Rust Cohle"],
+  ])("reads the name in %j, which %j spells", (line, contact, expected) => {
+    expect(name(top(line, contact))).toBe(expected);
+  });
+
   it("takes the name under a tagline the email spells in part", () => {
     expect(name(top("Data Science | Machine Learning Engineer\nJane Doe", "data.jane@x.com"))).toBe(
       "Jane Doe",

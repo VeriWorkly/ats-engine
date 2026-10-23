@@ -451,6 +451,48 @@ describe("a language asked for", () => {
       expect(ask(resume, line)?.status).toBe(status);
     });
 
+    // A "Languages" list of programming languages or other skills lists no spoken language,
+    // wherever it is: it neither blocks the credit nor gives a row.
+    it.each([
+      `${ENGLISH}\nSkills\nLanguages: Python, Go, SQL`,
+      `${ENGLISH}\nLanguages\nPython, Go`,
+      `${ENGLISH}\nLanguages\nTypeScript, Kubernetes\nRust`,
+      `${ENGLISH}\nLanguages\n- Java, C++, C#, Node.js (expert)\n- SQL and Kotlin`,
+    ])("is met over a languages list of skills: %#", (resume) => {
+      expect(ask(resume, "Fluent English")).toMatchObject({
+        status: "met",
+        detail: "English: the resume is written in it",
+      });
+      expect(ask(resume, "Native English speaker")?.status).toBe("partial");
+      const parsed = check(resume, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), { now: NOW });
+      expect(parsed.parsed.spokenLanguages).toEqual([]);
+    });
+
+    it("reads a long languages list of skills in linear time", () => {
+      for (const unit of ["Python, ", "(Go ", "[C++ ", "TypeScript / "])
+        expectFast(
+          () =>
+            ask(
+              `${ENGLISH}\nLanguages\n${unit.repeat(Math.ceil(50_000 / unit.length))}`,
+              "Fluent English",
+            ),
+          2_000,
+        );
+    });
+
+    // A list naming one spoken language is a languages list, whatever skills it names beside it.
+    it.each([
+      [`${ENGLISH}\nSkills\nLanguages: English (B1), Python`, "Fluent English", "partial"],
+      [`${ENGLISH}\nLanguages\nEnglish (B1), Python`, "Fluent English", "partial"],
+      [`${ENGLISH}\nSkills\nLanguages: German, Python`, "Fluent English", "missing"],
+      [`${ENGLISH}\nLanguages\nGerman, Python`, "Fluent English", "missing"],
+      // A language the policy does not know is no skill: the list is a languages list.
+      [`${ENGLISH}\nLanguages\nKlingon (fluent)`, "Fluent English", "unverifiable"],
+      [`${ENGLISH}\nLanguages\nPython, Klingon`, "Fluent English", "unverifiable"],
+    ])("is not credited over a list naming a spoken language: %#", (resume, line, status) => {
+      expect(ask(resume, line)?.status).toBe(status);
+    });
+
     // Only the resume's own sentences count, never its headings and dates, nor those the engine
     // writes for a structured document.
     it.each([

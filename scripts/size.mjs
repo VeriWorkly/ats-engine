@@ -10,17 +10,18 @@ const { exports, version } = JSON.parse(readFileSync("package.json", "utf8"));
 /** Gzipped KB. */
 const BUDGETS = {
   // Core: policy data (word lists, place names, clearance levels) grows with each reading fix.
-  // 110: the audit fixes' countries, certification, language, name and date-word reading took it to 109.1.
-  ".": 110,
+  // 111: the 0.17.0 audit fixes took it to 109.1, and 0.18.0's leave words, dated-sentence and
+  // tagline-name reading to 110.1.
+  ".": 111,
   "./document": 3,
   "./format": 1.5,
   // Entity decoding, page-furniture skipping, JSON-LD requirements, hidden-element rules.
   "./job": 3.8,
   // Policy data, the language detection words and the French pack; room for one more pack.
   "./locales": 79.5,
-  // Core policy data plus redaction; room for the next policy fixes. 78: the audit fixes' policy
-  // data (countries, not-held and in-progress words, date words) took it to 75.1.
-  "./ai": 78,
+  // Core policy data plus redaction; room for the next policy fixes. 79: the 0.17.0 audit fixes'
+  // policy data took it to 75.1, and 0.18.0's leave words and phone shapes to 78.0.
+  "./ai": 79,
   // Streamed, size-capped response reading. 2.7: errors sent with HTTP 200, `retry-after`, and a
   // timeout that holds when a host's fetch ignores the signal took them to 2.6.
   "./ai/openai-compatible": 2.7,

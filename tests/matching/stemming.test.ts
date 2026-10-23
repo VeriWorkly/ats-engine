@@ -242,6 +242,16 @@ describe("a verb is not the named skill its stem spells", () => {
       ),
     ).toEqual(["met", "met", "met", "met", "met"]);
   });
+
+  // "cloud native" and "data science" are no single terms: each word still meets its ask.
+  it("meets a word of a two-word field by that word", () => {
+    expect(
+      judged(
+        ["Built cloud native services on AWS", "Built a data science platform for 30 analysts"],
+        ["3+ years of cloud experience", "Strong data skills"],
+      ),
+    ).toEqual(["met", "met"]);
+  });
 });
 
 describe("words the rules keep apart", () => {
