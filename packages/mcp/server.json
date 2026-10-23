@@ -9,13 +9,13 @@
     "subfolder": "packages/mcp"
   },
   "websiteUrl": "https://docs.veriworkly.com/ats-engine/tools/mcp",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@veriworkly/ats-engine-mcp",
-      "version": "0.12.0",
+      "version": "0.13.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

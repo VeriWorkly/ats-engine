@@ -1,9 +1,0 @@
----
-"@veriworkly/ats-engine": minor
----
-
-Choose the language a resume is read in from the CLI, and acronyms no longer make English read as another language.
-
-- **Breaking:** a word in capitals among lower-case words no longer counts as evidence of a language. "MIT" in "BSc, MIT, 2016" and "AB" in "Volvo AB" are acronyms, not German "mit" and "ab". An English resume with a few of them was read with the German pack attached, which changed its reading: one with "MIT", "Volvo AB", "ab test" and "Müller und Söhne GmbH" met "AB testing with Optimizely" without naming Optimizely (job match 68); it now reads as English, as it does with no pack (partial, job match 52). Two terse English resumes full of acronyms from the review probes score higher (67 → 69, 66 → 69). A line all in capitals is a heading and still counts, so German and French CVs and postings with headings in capitals ("BERUFSERFAHRUNG UND PRAKTIKA", "EXPÉRIENCE PROFESSIONNELLE", "IHRE AUFGABEN") read as before. Compared with 0.18.0 on every locale fixture, the private graded resumes and 300 generated English resumes, each alone and with five postings (2,070 runs), and on the same fixtures with their headings in capitals, every report is the same.
-- New CLI option `--lang <code>` (`de`, `fr`, `hi`, or `en` for English only) reads the resume, and a posting, in that language instead of detecting it, as the library's `languages` option does. Use it when the resume was read in the wrong language; an English resume with a German posting reads best without it. An unknown code exits with code 1 and lists the ones there are. The GitHub Action takes the same as its `language` input.
-- A test now holds every English resume to reading the same with the language packs attached as with none, so a new pack cannot change how English is read.
