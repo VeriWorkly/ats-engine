@@ -122,16 +122,28 @@ type Sample = { text: string; words: string[] };
  * The words are taken from everything but email addresses and URLs, which spell names rather
  * than a language: "ananya.das@gmail.com" and "linkedin.com/in/ananya-das" are not German.
  * Split on whitespace rather than matched by a pattern, which a long unbroken token would make
- * quadratic.
+ * quadratic. A word in capitals among lower-case words is an acronym, no evidence of a language:
+ * "MIT" in "BSc, MIT, 2016" is not German "mit", nor "AB" in "Volvo AB". On a line all in
+ * capitals case says nothing, so a heading's words ("AUSBILDUNG UND STUDIUM") still count.
  */
 export function sampleOf(text: string): Sample {
   const sample = text.slice(0, DETECTION_SAMPLE);
-  const prose = sample
-    .split(/\s+/)
-    .filter((token) => !/[@/]/.test(token))
-    .join(" ");
-  return { text: sample, words: prose.toLowerCase().match(/\p{L}[\p{L}\p{M}]*/gu) ?? [] };
+  const words: string[] = [];
+  for (const line of sample.split("\n")) {
+    const prose = line
+      .split(/\s+/)
+      .filter((token) => !/[@/]/.test(token))
+      .join(" ");
+    const found = prose.match(/\p{L}[\p{L}\p{M}]*/gu) ?? [];
+    const lowerCase = found.some((word) => word !== word.toUpperCase());
+    for (const word of found) if (!lowerCase || !isAcronym(word)) words.push(word.toLowerCase());
+  }
+  return { text: sample, words };
 }
+
+/** Two or more letters, all capitals ("MIT", "DAS"); a script without case has none. */
+const isAcronym = (word: string) =>
+  word.length > 1 && word === word.toUpperCase() && word !== word.toLowerCase();
 
 /**
  * Whether the text is written, at least partly, in the pack's language.

@@ -17,6 +17,10 @@ inputs:
     description: Fail the step when the readiness score is below this number (0-100). Empty means never fail on the score.
     required: false
     default: ""
+  language:
+    description: Read the resume in this language (en, de, fr or hi; en means English only). Empty means detected from the resume. Needs version 0.19.0 or later.
+    required: false
+    default: ""
   region:
     description: Read the resume as from this country (US, GB, DE, FR or IN). Empty means inferred.
     required: false
@@ -59,6 +63,7 @@ runs:
         ATS_RESUME: ${{ inputs.resume }}
         ATS_JOB: ${{ inputs.job }}
         ATS_MIN_SCORE: ${{ inputs.min-score }}
+        ATS_LANGUAGE: ${{ inputs.language }}
         ATS_REGION: ${{ inputs.region }}
         ATS_TARGET: ${{ inputs.ats }}
         ATS_VERSION: ${{ inputs.version }}

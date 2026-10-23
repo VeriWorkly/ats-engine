@@ -27,6 +27,8 @@ import {
 export const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
 
 export const REGIONS = POLICY.locales.regions.map((pack) => pack.id);
+/** The policy's own language (English, read with no pack) and the bundled language packs. */
+export const LANGUAGES = [POLICY.text.language, ...POLICY.locales.languages.map((pack) => pack.id)];
 
 /** Pasted text longer than this is not a resume or a posting. */
 export const MAX_TEXT_CHARS = 200_000;
@@ -194,6 +196,11 @@ export async function readJob(
 export function checkRegion(region: string | undefined): void {
   if (region !== undefined && !REGIONS.includes(region.toUpperCase()))
     throw new ToolInputError(`Unknown region "${region}"; use one of ${REGIONS.join(", ")}.`);
+}
+
+export function checkLanguage(language: string | undefined): void {
+  if (language !== undefined && !LANGUAGES.includes(language.toLowerCase()))
+    throw new ToolInputError(`Unknown language "${language}"; use one of ${LANGUAGES.join(", ")}.`);
 }
 
 /** The applicant tracking systems the policy has documented notes on. */

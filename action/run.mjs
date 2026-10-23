@@ -10,6 +10,7 @@ const env = process.env;
 const resume = env.ATS_RESUME?.trim();
 const job = env.ATS_JOB?.trim();
 const minScoreText = env.ATS_MIN_SCORE?.trim();
+const language = env.ATS_LANGUAGE?.trim();
 const region = env.ATS_REGION?.trim();
 const target = env.ATS_TARGET?.trim();
 const version = env.ATS_VERSION?.trim() || "latest";
@@ -40,6 +41,7 @@ const peers = ["pdf-parse@2.4.5", "pdfjs-dist@5.4.296", "mammoth@1.12.0"];
 // Absolute: npx runs outside the repository.
 const cliArgs = ["check", resolve(resume), "--json"];
 if (job) cliArgs.push("--job", resolve(job));
+if (language) cliArgs.push("--lang", language);
 if (region) cliArgs.push("--region", region);
 if (target) cliArgs.push("--ats", target);
 const packages = [`@veriworkly/ats-engine@${version}`, ...peers];

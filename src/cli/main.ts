@@ -59,6 +59,7 @@ const KEY_NAMES = Object.values(PROVIDERS)
 const KEY_VARIABLES = `${KEY_NAMES.slice(0, 3).join(", ")},\n  ${KEY_NAMES.slice(3).join(", ")}`;
 
 const REGIONS = BUILT_IN_LOCALES.regions.map((pack) => pack.id).join(", ");
+const LANGUAGES = ["en", ...BUILT_IN_LOCALES.languages.map((pack) => pack.id)].join(", ");
 const TARGETS = Object.keys(DEFAULT_POLICY.advice.targets).join(", ");
 
 const USAGE = `Usage: ats-engine check <resume> [options]
@@ -74,6 +75,8 @@ Options:
   --policy <file>     Engine policy JSON (default: the bundled default policy)
   --json              Print the full report as JSON, advice included
   --min-score <n>     Exit with code 2 when the readiness score is below n
+  --lang <code>       Read the resume in this language (${LANGUAGES}; en: English only);
+                      default: detected from the resume
   --region <code>     Read the resume as from this country (${REGIONS}); default: inferred
   --text              Also print the text as an ATS reads it, line by line (with --json,
                       as the report's "lines")
@@ -233,6 +236,7 @@ function parseCheckArgs(argv: string[]) {
         policy: { type: "string" },
         json: { type: "boolean", default: false },
         "min-score": { type: "string" },
+        lang: { type: "string" },
         region: { type: "string" },
         text: { type: "boolean", default: false },
         ats: { type: "string" },
@@ -299,6 +303,10 @@ async function runCheck(argv: string[], context: CliContext): Promise<number> {
   const regions = policy.locales.regions.map((pack) => pack.id);
   if (values.region !== undefined && !regions.includes(values.region.toUpperCase()))
     throw new UsageError(`Unknown --region "${values.region}"; use one of ${regions.join(", ")}.`);
+  // The policy's own language reads with no pack.
+  const languages = [policy.text.language, ...policy.locales.languages.map((pack) => pack.id)];
+  if (values.lang !== undefined && !languages.includes(values.lang.toLowerCase()))
+    throw new UsageError(`Unknown --lang "${values.lang}"; use one of ${languages.join(", ")}.`);
   const targets = Object.keys(policy.advice.targets);
   if (values.ats !== undefined && !targets.includes(values.ats.toLowerCase()))
     throw new UsageError(`Unknown --ats "${values.ats}"; use one of ${targets.join(", ")}.`);
@@ -322,6 +330,7 @@ async function runCheck(argv: string[], context: CliContext): Promise<number> {
     file,
     targetAts,
     region: values.region,
+    languages: values.lang === undefined ? undefined : [values.lang],
     includeLines: values.text,
   });
   const belowMinimum = minScore !== null && report.readinessScore < minScore;
