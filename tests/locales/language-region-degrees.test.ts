@@ -81,7 +81,7 @@ Python, SQL, Power BI, Excel
   });
 
   it("still reads a German resume as German", () => {
-    expect(check(DE_RESUME).locale).toEqual({ languages: ["de"], region: "DE" });
+    expect(check(DE_RESUME).locale).toEqual({ languages: ["de"], region: "DE", unsupported: null });
   });
 });
 
@@ -115,7 +115,7 @@ Wir bieten
 - Ein tolles Team, das mit Ihnen wächst und bei dem Sie viel lernen werden
 `;
     const report = check(EN_RESUME, { jobDescription: posting });
-    expect(report.locale).toEqual({ languages: ["de"], region: null });
+    expect(report.locale).toEqual({ languages: ["de"], region: null, unsupported: null });
     expect(report.parsed.roles[0]?.start).toEqual({ year: 2019, month: 3 });
   });
 });
@@ -341,6 +341,17 @@ describe("dotted MBA and MBBS are Master's level", () => {
     expect(isced("एम.बी.ए.", HI_POLICY)).toBe(7);
   });
 
+  // Found unread by the multilingual bench (2026-10-23).
+  it.each([
+    ["बी.एससी. सांख्यिकी", 6],
+    ["बी.कॉम लेखा", 6],
+    ["बी.कॉम", 6],
+    ["एम.एससी. गणित", 7],
+    ["एम.कॉम", 7],
+  ])("reads %s at level %i", (line, level) => {
+    expect(isced(line, HI_POLICY)).toBe(level);
+  });
+
   it("reads M.B.B.S. at level 7", () => {
     expect(isced("M.B.B.S., AIIMS", IN_POLICY)).toBe(7);
     expect(isced("MBBS, AIIMS", IN_POLICY)).toBe(7);
@@ -550,5 +561,41 @@ describe("a capture-group name used twice is refused on every engine", () => {
       repeatedGroupName(a);
       repeatedGroupName(b);
     }, 250);
+  });
+});
+
+// Review findings (2026-10-24): degrees on resumes the author did not write.
+describe("degrees the review found unread", () => {
+  const ES_POLICY = localized(["es"], "ES");
+  it.each([
+    ["Especialización en Gerencia de Proyectos, Universidad Nacional", 7, ES_POLICY],
+    ["Ingeniería Civil Industrial, Universidad de Chile", 6, ES_POLICY],
+    ["पीएच.डी. (कंप्यूटर विज्ञान)", 8, HI_POLICY],
+  ])("reads %s at level %i", (line, level, policy) => {
+    expect(isced(line, policy)).toBe(level);
+  });
+});
+
+// Review finding (2026-10-24): a Portuguese resume from Portugal took Brazil's region.
+describe("Portugal", () => {
+  const text = [
+    "Inês Carvalho",
+    "ines.carvalho@example.pt | +351 912 345 678 | Lisboa",
+    "Experiência profissional",
+    "Engenheira de software, Exemplo Tecnologias, Lda., Porto    março de 2019 – atual",
+    "• Desenvolvimento de serviços de pagamento em Java",
+    "Formação académica",
+    "Mestrado em Engenharia Informática, Universidade de Exemplo, 2018",
+    "Ensino secundário, Escola Secundária de Exemplo, 2013",
+  ].join("\n");
+
+  it("reads a +351 number as Portugal, with its schooling and cities", () => {
+    const report = check(text, { languages: ["pt"] });
+    expect(report.locale).toMatchObject({ languages: ["pt"], region: "PT" });
+    expect(report.parsed.roles[0]).toMatchObject({
+      start: { year: 2019, month: 3 },
+      current: true,
+    });
+    expect(report.parsed.education.map((row) => row.isced)).toEqual([7, 3]);
   });
 });

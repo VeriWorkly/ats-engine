@@ -19,6 +19,8 @@ const LABEL_REACH = 40;
 
 type Words = {
   expires: RegExp;
+  /** An expiry word just after the date: "2027 तक वैध". */
+  expiresAfter: RegExp;
   issued: RegExp;
   /** Either label opening a text: what may follow a date that is still a date. */
   opening: RegExp;
@@ -31,11 +33,14 @@ type Words = {
 };
 
 const wordsOf = memo((rp: AtsEnginePolicy["resumeParse"]): Words => {
-  const { expires, issued, id, issuer } = rp.credentialWords;
+  const { expires, expiresAfter, issued, id, issuer } = rp.credentialWords;
   // Anchored at the end of a bounded slice, so each test is a short scan.
   const label = (list: readonly string[]) => new RegExp(`${wordListPattern(list)}[\\s:.]*$`, "iu");
   return {
     expires: label(expires),
+    expiresAfter: expiresAfter.length
+      ? new RegExp(`^[\\s:.]*${wordListPattern(expiresAfter)}`, "iu")
+      : /(?!)/u,
     issued: label(issued),
     opening: new RegExp(`^\\s*${wordListPattern([...expires, ...issued])}`, "iu"),
     id: new RegExp(`^\\s*(?:${id.join("|")})(?![\\p{L}\\p{M}])`, "iu"),
@@ -124,10 +129,11 @@ function takeDates(
     const label = expiry ?? issued;
     // An unlabelled year with a word straight after it is part of the name ("Windows Server 2019 Administrator").
     const after = part.slice(found.end, found.end + LABEL_REACH);
-    if (!label && WORD_AFTER.test(after) && !words.opening.test(after)) continue;
+    const trailing = label ? null : words.expiresAfter.exec(after);
+    if (!label && !trailing && WORD_AFTER.test(after) && !words.opening.test(after)) continue;
     rest += part.slice(from, label ? start + label.index : found.index);
-    from = found.end;
-    if (expiry) dated.expires ??= found.date;
+    from = found.end + (trailing?.[0].length ?? 0);
+    if (expiry || trailing) dated.expires ??= found.date;
     // The latest date earned: a renewal after the first ("issued 2019, renewed 2023").
     else if (issued) {
       if (!dated.date || monthIndex(found.date) > monthIndex(dated.date)) dated.date = found.date;

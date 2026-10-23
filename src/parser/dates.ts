@@ -53,6 +53,13 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
     .map((word) => escapeRegex(normalizeText(word)).replace(/\\?\s+/g, String.raw`\s*`))
     .join("|")})(?!${LETTER})`;
   const separator = String.raw`\s*(?:[‐‑‒–—―−~-]|${wordListPattern(rp.rangeWords)})\s*`;
+  // Between a month's name and its year: spaces, a dash or a slash ("Jan-2020", "jan/2019"), or a
+  // word a language writes there ("marzo de 2020").
+  const joiner = rp.monthYearJoiners.length
+    ? String.raw`(?:\s+${wordListPattern(rp.monthYearJoiners)}\s+|[\s/-]*)`
+    : String.raw`[\s/-]*`;
+  // A word that opens a range belongs to it: "from Jan 2020", "de marzo de 2020".
+  const opener = String.raw`(?:${wordListPattern(rp.rangeOpeners)}\s+)?`;
 
   const seasons = Object.fromEntries(
     Object.entries(rp.seasons).map(([name, span]) => [normalizeText(name).toLowerCase(), span]),
@@ -67,7 +74,7 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
    * name and is skipped. Numeric forms, longest first: a full date, month and year either way
    * round (not starting inside a full date), then a bare year.
    */
-  const date = String.raw`(?:(?:(?<!\d)${DAY_BEFORE})?(?<!${LETTER})(?:${monthNames})\.?[\s-]*(?:${DAY_AFTER}\d{4}(?!\d)|${SHORT_YEAR})|${seasonDate}|(?<!\d)\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{1,2}(?!\d)|(?<![\d./-])\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}(?![\d./-])|(?<!\d)\d{4}(?!\d))`;
+  const date = String.raw`(?:(?:(?<!\d)${DAY_BEFORE})?(?<!${LETTER})(?:${monthNames})\.?${joiner}(?:${DAY_AFTER}\d{4}(?!\d)|${SHORT_YEAR})|${seasonDate}|(?<!\d)\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{1,2}(?!\d)|(?<![\d./-])\d{1,2}\s*[./-]\s*\d{4}(?!\d)|(?<!\d)\d{4}\s*[./-]\s*\d{1,2}(?![\d./-])|(?<!\d)\d{4}(?!\d))`;
   // "since 2019": a start with no end is a current role.
   const since = wordListPattern(rp.sinceWords);
 
@@ -84,12 +91,12 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
     // "Jan 2020 to date" (the "to" belongs to the open-ended phrase); then a season alone; the
     // last a range of months and two-digit years ("06/21 - Present").
     range: new RegExp(
-      String.raw`(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})|(${monthYear})${separator}(${monthYear}|${openEnded})`,
+      String.raw`${opener}(${date})(?:${separator}(${date}|${openEnded}|${shortEnd})|\s+(${openEnded}))|${since}\s+(${date})|(${seasonDate})|(${monthYear})${separator}(${monthYear}|${openEnded})`,
       "giu",
     ),
     single: new RegExp(date, "giu"),
     named: new RegExp(
-      String.raw`^(?:${DAY_BEFORE})?(${monthNames})\.?[\s-]*${DAY_AFTER}(\d{4}|${SHORT_YEAR})$`,
+      String.raw`^(?:${DAY_BEFORE})?(${monthNames})\.?${joiner}${DAY_AFTER}(\d{4}|${SHORT_YEAR})$`,
       "u",
     ),
     season: new RegExp(String.raw`^(${seasonNames})[\s-]+(\d{4})$`, "u"),

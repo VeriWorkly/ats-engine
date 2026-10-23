@@ -1,3 +1,4 @@
+import type { AtsLocale } from "./locales/resolve.js";
 import type { AtsParsedResume } from "./types/parsed.js";
 
 export type * from "./types/layout.js";
@@ -135,8 +136,12 @@ export type AtsReport = {
   wordCount: number;
   /** The fields an ATS would recover from this document. See AtsParsedResume. */
   parsed: AtsParsedResume;
-  /** The locale packs the resume was read with: extra languages and the region; empty without packs. */
-  locale: { languages: string[]; region: string | null };
+  /**
+   * The locale packs the resume was read with (extra languages and the region; empty without
+   * packs), and `unsupported`: the language it is written in when no pack reads it ("it"), with
+   * a parsing warning that says so.
+   */
+  locale: AtsLocale;
   /** What produced this report: the engine version and a fingerprint of the policy as applied. */
   engine: { version: string; policy: string };
   /** The posting's requirements, each judged; empty without a job description. At most 25. */

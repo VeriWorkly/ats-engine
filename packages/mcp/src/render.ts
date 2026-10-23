@@ -47,6 +47,10 @@ export function renderCheck(report: AtsReport, verdict: AtsVerdict, withJob: boo
   ];
   const read = [...report.locale.languages, report.locale.region].filter(Boolean);
   if (read.length) lines.push(`Read as: ${read.join(", ")}`);
+  const language =
+    report.locale.unsupported &&
+    report.parsingWarnings.find((warning) => warning.includes("does not read yet"));
+  if (language) lines.push(`Language: ${language}`);
 
   lines.push("", "Categories:");
   for (const category of report.categories)

@@ -105,11 +105,13 @@ The resource `rubric://default` is the whole rubric as JSON.
 - Files over 20 MB are refused, and so are folders, pipes, devices and network paths
   (`\\host\share\…`; on Windows also `//host/share/…`). So is a PDF with no text layer: an ATS
   cannot read a scan either.
-- `language` (`check_resume`, `match_job`) is `en`, `de`, `fr` or `hi`; `en` reads English only.
+- `language` (`check_resume`, `match_job`) is `en`, `de`, `fr`, `hi`, `es` or `pt`; `en` reads English
+  only.
   Without it, the language is detected from the resume and from the posting. It sets the
   language of both, so give it only when the resume was read in the wrong one: `en` with a
   German posting reads the posting as English too.
-- `region` is `US`, `GB`, `DE`, `FR` or `IN`. Without it, the region is inferred from the resume.
+- `region` is `US`, `GB`, `DE`, `FR`, `IN`, `ES`, `BR` or `PT`. Without it, the region is inferred from the
+  resume.
 - `target_ats` is `greenhouse`, `lever` or `taleo`. It adds what that vendor documents publicly,
   each note with a link to the vendor's page. It never changes the score.
 

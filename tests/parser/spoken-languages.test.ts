@@ -204,3 +204,17 @@ describe("languages lines stay linear", () => {
     expectFast(() => parse(`Languages\n${line}\nSkills\nLanguages: ${line}`), 1_500);
   });
 });
+
+// Review finding (2026-10-24): Spain's other languages, written in Spanish.
+describe("Spain's languages in a Spanish resume", () => {
+  it("reads Valenciano, Gallego and Euskera as rows", () => {
+    const text = `${HEAD}\n${JOB}\nIdiomas\nEspañol (nativo), Valenciano (C1), Gallego (B2), Euskera (A2)`;
+    const rows = check(text, LOCALES, { now: NOW, languages: ["es"] }).parsed.spokenLanguages;
+    expect(rows.map((row) => [row.language, row.cefr])).toEqual([
+      ["Español", "C2"],
+      ["Valenciano", "C1"],
+      ["Gallego", "B2"],
+      ["Euskera", "A2"],
+    ]);
+  });
+});

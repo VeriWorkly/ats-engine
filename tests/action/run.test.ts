@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
+import { LOCALE_FIXTURES, ITALIAN_RESUME } from "../fixtures/locale-resumes.js";
 
 /** The GitHub Action, run against the local build (ATS_ENGINE_CLI): needs `npm run build` first. */
 
@@ -107,6 +107,14 @@ describe("the GitHub Action", () => {
       JSON.parse(readFileSync(action({ ATS_RESUME: german, ...inputs }).outputs.report!, "utf8"));
     expect(report({}).locale.languages).toEqual(["de"]);
     expect(report({ ATS_LANGUAGE: "en" }).locale.languages).toEqual([]);
+  });
+
+  it("says in the summary when the resume is in a language it does not read yet", () => {
+    const italian = join(dir, "italian.txt");
+    writeFileSync(italian, ITALIAN_RESUME);
+    expect(action({ ATS_RESUME: italian }).summary).toContain(
+      "This resume looks Italian, which the engine does not read yet",
+    );
   });
 
   it("fails the step with exit code 2 below min-score", () => {

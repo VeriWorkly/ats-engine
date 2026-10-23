@@ -73,12 +73,14 @@ export const engineTextSchema = z.prefault(
      * attached pack's language and not in `language`, is read in none (ISO 639 "und"), so rules
      * limited to some `languages` are dropped for it. A Latin-script one also needs more of its
      * words than `detectionWords` find. Empty: every resume no pack recognises is read in
-     * `language`.
+     * `language`. `id`, an ISO 639 code, names the language in the report; without it the
+     * report names the script, or "und" for an entry of words alone.
      */
     otherLanguages: z._default(
       z.array(
         z
           .object({
+            id: z.optional(z.string().check(z.regex(/^[a-z]{2,3}$/, "an ISO 639 language code"))),
             script: z.optional(scriptName),
             detectionWords: z._default(z.array(z.string().check(z.minLength(1))), []),
           })
@@ -91,22 +93,27 @@ export const engineTextSchema = z.prefault(
       [
         // Spanish, Portuguese, Italian, French, German, Dutch, Polish and Swedish: words not
         // shared with English, a place, a name or a web domain.
-        "con para por una desde como sus que más también años experiencia",
-        "em uma não são dos das pelo pela também ao para como",
-        "di della delle dei nel nella con sono che degli alla anni",
-        "une pour avec dans sur chez des du au aux les nous",
-        "und der für mit bei von eine sowie durch zur zum auf",
-        "het een voor naar zijn ook bij werkervaring jaar ervaring",
-        "oraz dla jest się doświadczenie pracy przez jako lat zespołu",
-        "och för att som inom samt erfarenhet utveckling arbetat ansvarig",
+        "es con para por una desde como sus que más también años experiencia",
+        "pt em uma não são dos das pelo pela também ao para como",
+        "it di della delle dei nel nella con sono che degli alla anni",
+        "fr une pour avec dans sur chez des du au aux les nous",
+        "de und der für mit bei von eine sowie durch zur zum auf",
+        "nl het een voor naar zijn ook bij werkervaring jaar ervaring",
+        "pl oraz dla jest się doświadczenie pracy przez jako lat zespołu",
+        "sv och för att som inom samt erfarenhet utveckling arbetat ansvarig",
       ]
-        .map((words): { script?: string; detectionWords: string[] } => ({
-          detectionWords: words.split(" "),
-        }))
+        .map((words): { id?: string; script?: string; detectionWords: string[] } => {
+          const [id, ...detectionWords] = words.split(" ");
+          return { id, detectionWords };
+        })
         .concat(
-          "Cyrillic Greek Arabic Hebrew Han Hangul Hiragana Katakana Thai Devanagari Bengali Tamil Telugu"
+          // A script one language writes names it; kana before Han, so Japanese is not named Chinese.
+          "Cyrillic Greek:el Arabic Hebrew:he Hiragana:ja Katakana:ja Han Hangul:ko Thai:th Devanagari Bengali Tamil:ta Telugu:te"
             .split(" ")
-            .map((script) => ({ script, detectionWords: [] })),
+            .map((entry) => {
+              const [script, id] = entry.split(":");
+              return { ...(id && { id }), script, detectionWords: [] };
+            }),
         ),
     ),
     contentLineVerbs: z._default(wordList("text.contentLineVerbs"), [

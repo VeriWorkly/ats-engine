@@ -144,6 +144,22 @@ const SHAPES: Record<string, string> = {
   // The GB region's credentials.
   "as level run": rep("AS level "),
   "pg dip run": rep("pg "),
+  // The Spanish and Portuguese packs: "Cargo en Empresa S.A.", month-year joiners, range openers.
+  "en employer run": rep("Analista en "),
+  "na employer run": rep("Analista na "),
+  "legal form dots run": rep("S. A. de "),
+  "month de year run": rep("marzo de 2020 "),
+  "de range run": rep("de 2019 a "),
+  "desde run": rep("desde "),
+  "ingeniería run": rep("ingeniería en "),
+  // Cities after an employer, opening words, slashed months, dotted abbreviations, date lines.
+  "city run": rep("Berlin, "),
+  "from range run": rep("from Jan 2020 "),
+  "month slash year run": rep("jan/"),
+  "dotted abbreviation run": rep("U.S. "),
+  "date line run": rep("Jan 2020 - Present\n"),
+  "expiry after date run": rep("2027 तक "),
+  "linkedin heading run": rep("Top-Kenntnisse "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -156,13 +172,13 @@ describe("50 KB adversarial input", () => {
     const html = `<p>${input}</p>`;
     expectFast(() => jobTextFromHtml(html), 1_500);
     // Every region's credential patterns, compiled only under its region.
-    for (const region of ["DE", "FR", "GB", "IN"])
+    for (const region of ["DE", "FR", "GB", "IN", "ES", "BR", "PT"])
       expectFast(
         () =>
           check(resume, POLICY, {
             now: NOW,
             jobDescription,
-            languages: ["de", "fr", "hi"],
+            languages: ["de", "fr", "hi", "es", "pt"],
             region,
           }),
         1_500,
@@ -180,7 +196,7 @@ describe("50 KB adversarial input", () => {
           check(resume, POLICY, {
             now: NOW,
             jobDescription: `Requirements\n- Fluent ${input}\n- ${input} certification`,
-            languages: ["de", "fr", "hi"],
+            languages: ["de", "fr", "hi", "es", "pt"],
           }),
         1_500,
       );

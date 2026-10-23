@@ -23,6 +23,7 @@ import {
   type AtsSeverity,
 } from "../index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../locales/index.js";
+import { unsupportedLanguageNote } from "../locales/languages.js";
 import {
   AtsFileError,
   parseJsonFile,
@@ -138,6 +139,7 @@ function render(report: AtsReport, style: Style): string {
   const field = (label: string, value: string) => `  ${style.dim(label.padEnd(9))}${value}`;
   const none = style.dim("—");
   const { parsed } = report;
+  const language = report.locale.unsupported && unsupportedLanguageNote(report.locale.unsupported);
 
   const readiness = toned(report.readinessScore);
   const lines = [
@@ -158,14 +160,15 @@ function render(report: AtsReport, style: Style): string {
     if (hard.length) lines.push(`  Missing keywords: ${style.yellow(hard.join(", "))}`);
     if (soft.length)
       lines.push(`  Missing soft skills (weigh less): ${style.dim(soft.join(", "))}`);
-    // A posting cut short; the other warnings are failed checks, printed below.
+    // A posting cut short; the other warnings are failed checks or the language, printed below.
     for (const warning of report.parsingWarnings)
-      if (!report.failedChecks.some((rule) => rule.evidence === warning))
+      if (!report.failedChecks.some((rule) => rule.evidence === warning) && warning !== language)
         lines.push(`  ${style.yellow(warning)}`);
   }
 
   const read = [...report.locale.languages, report.locale.region].filter(Boolean);
   if (read.length) lines.push(`${style.bold("Read as")}    ${read.join(", ")}`);
+  if (language) lines.push(style.yellow(language));
 
   lines.push("", style.bold("What an ATS reads:"));
   lines.push(field("Name", parsed.name || none));

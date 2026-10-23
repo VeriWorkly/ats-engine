@@ -12,7 +12,8 @@
  *   from a web page) are dependency-free for browser bundles.
  * - `/ai` runs the model-backed tasks with any provider (`/ai/openai-compatible`,
  *   `/ai/anthropic`); `/ai/testing` has test doubles and the eval harness.
- * - `/locales` reads resumes in German, French and Hindi and from the US, the UK, Germany, France
+ * - `/locales` reads resumes in German, French, Hindi, Spanish and Portuguese and from the US, the
+ *   UK, Germany, France, Spain, Brazil
  *   and India (`withLocales`), and is how a language or a country is contributed.
  * - `/node` reads PDF, DOCX and text files on Node — text, layout, hidden text — and `/node/child`
  *   is a forkable extraction process. The `ats-engine` CLI scores a file from the command line.

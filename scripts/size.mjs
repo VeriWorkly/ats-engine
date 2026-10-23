@@ -17,8 +17,10 @@ const BUDGETS = {
   "./format": 1.5,
   // Entity decoding, page-furniture skipping, JSON-LD requirements, hidden-element rules.
   "./job": 3.8,
-  // Policy data, the language detection words and the French pack; room for one more pack.
-  "./locales": 79.5,
+  // Policy data and every built-in pack. 87: the Spanish and Portuguese packs, the Spain, Brazil
+  // and Portugal regions, the city lists (decision D1) and LinkedIn headings added 9 KB; each
+  // new pack raises it again.
+  "./locales": 87,
   // Core policy data plus redaction; room for the next policy fixes. 79: the 0.17.0 audit fixes'
   // policy data took it to 75.1, and 0.18.0's leave words and phone shapes to 78.0.
   "./ai": 79,

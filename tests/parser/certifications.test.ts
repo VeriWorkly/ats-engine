@@ -282,6 +282,42 @@ describe("certifications in German and Hindi", () => {
       { name: "पीएमपी", issuer: "पीएमआई", date: null, expires: { year: 2027, month: null } },
     ]);
   });
+
+  // Found by the multilingual bench (2026-10-23): Hindi puts the word after the date.
+  it("reads a Hindi expiry written after its date", () => {
+    expect(
+      read(`${HEAD}\nप्रमाणपत्र\nProject Management Professional (PMP) (PMI), 2024 तक वैध`, "hi"),
+    ).toEqual([
+      {
+        name: "Project Management Professional (PMP)",
+        issuer: "PMI",
+        date: null,
+        expires: { year: 2024, month: null },
+      },
+    ]);
+  });
+
+  it("reads a French expiry with jusqu'en", () => {
+    expect(
+      read(
+        `${HEAD}\nCertifications\nGoogle Data Analytics Professional Certificate (Coursera), valable jusqu'en 2027`,
+        "fr",
+      ),
+    ).toEqual([
+      {
+        name: "Google Data Analytics Professional Certificate",
+        issuer: "Coursera",
+        date: null,
+        expires: { year: 2027, month: null },
+      },
+    ]);
+  });
+
+  it("still keeps a year a word follows in the name", () => {
+    expect(read(`${HEAD}\nप्रमाणपत्र\nWindows Server 2019 Administrator`, "hi")).toMatchObject([
+      { name: "Windows Server 2019 Administrator", expires: null },
+    ]);
+  });
 });
 
 describe("certification lines stay linear", () => {

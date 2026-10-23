@@ -3,7 +3,7 @@ import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../form
 import { statesExpiry } from "../parser/certifications.js";
 import { degreeLevels } from "../parser/education.js";
 import { namesPlace, roleDates } from "../parser/experience.js";
-import { isWrittenIn, sampleOf, showsAny } from "../locales/languages.js";
+import { englishName, isWrittenIn, sampleOf, showsAny } from "../locales/languages.js";
 import { canonicalLanguage, cefrLevel, compareCefr } from "../parser/languages.js";
 import { monthsOfExperience } from "../parser/tenure.js";
 import { labelledLine, type ResumeSection, type ResumeSectionKind } from "../parser/sections.js";
@@ -47,15 +47,6 @@ const WEAK_LANGUAGE = /\b(?:beginner|basic|elementary|limited|a1|a2)\b/iu;
 const WRITTEN_LEVEL: AtsCefrLevel = "C1";
 /** The sentence lines a resume needs to show the language it is written in. */
 const MIN_WRITTEN_LINES = 3;
-
-/** A language's English name from its ISO 639 code ("en" → "English"), where the runtime knows it. */
-function englishName(id: string) {
-  try {
-    return new Intl.DisplayNames(["en"], { type: "language" }).of(id);
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * The languages, by English name, a resume is written in: of those it is read in

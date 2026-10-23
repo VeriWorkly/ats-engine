@@ -12,13 +12,17 @@ const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\
 /** The Hindi language pack: recognised by Devanagari script; region IN by default. */
 export const hi: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   id: "hi",
+  cityNames:
+    "नई दिल्ली|दिल्ली|मुंबई|बेंगलुरु|बैंगलोर|हैदराबाद|चेन्नई|कोलकाता|पुणे|अहमदाबाद|जयपुर|लखनऊ|नोएडा|गुरुग्राम|गुड़गांव|चंडीगढ़|भोपाल|इंदौर|नागपुर|पटना|कानपुर|वाराणसी|सूरत|वडोदरा".split(
+      "|",
+    ),
   name: "हिन्दी",
   status: "community",
   maintainers: [],
   script: "Devanagari",
   defaultRegion: "IN",
   sections: {
-    experience: String.raw`^(?:कार्य\s*अनुभव|व्यावसायिक\s+अनुभव|कार्यानुभव|रोज़गार\s+इतिहास|अनुभव)`,
+    experience: String.raw`^(?:कार्य\s*अनुभव|व्यावसायिक\s+अनुभव|पेशेवर\s+अनुभव|प्रोफेशनल\s+अनुभव|कार्यानुभव|रोज़गार\s+इतिहास|अनुभव)`,
     education: String.raw`^(?:शैक्षिक\s+योग्यता|शैक्षणिक\s+योग्यता|शिक्षा|योग्यता)`,
     skills: String.raw`^(?:तकनीकी\s+कौशल|कौशल|दक्षताएँ|दक्षता|विशेषज्ञता)`,
     projects: String.raw`^(?:परियोजनाएँ|परियोजनाएं|परियोजना|प्रोजेक्ट्स|प्रोजेक्ट)`,
@@ -41,6 +45,7 @@ export const hi: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   credentialWords: {
     issued: [String.raw`जारी(?:\s+किया)?`, "प्राप्त"],
     expires: ["समाप्ति", "वैधता", String.raw`वैध\s+तक`],
+    expiresAfter: [String.raw`तक\s+वैध`],
     id: [String.raw`प्रमाणपत्र\s+संख्या`, "क्रमांक"],
   },
   months: {
@@ -87,6 +92,11 @@ export const hi: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "तकनीशियन",
     "शिक्षक",
     "प्रशिक्षु",
+    "वास्तुकार",
+    "आर्किटेक्ट",
+    "डिज़ाइनर",
+    "डिजाइनर",
+    "प्रशासक",
   ],
   schoolWords: [
     "विश्वविद्यालय",
@@ -102,10 +112,12 @@ export const hi: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   degrees: {
     "2": word(String.raw`दसवीं|हाई\s*स्कूल|मैट्रिक`),
     "3": word(String.raw`बारहवीं|इंटरमीडिएट|उच्चतर\s+माध्यमिक`),
-    "6": word(String.raw`स्नातक(?!ोत्तर)|बी\.?\s*ए\.?|बी\.?\s*टेक`),
+    "6": word(String.raw`स्नातक(?!ोत्तर)|बी\.?\s*ए\.?|बी\.?\s*टेक|बी\.?\s*एससी\.?|बी\.?\s*कॉम`),
     // "एम.बी.ए." dotted as well as run together; otherwise its "बी.ए." reads as a bachelor's.
-    "7": word(String.raw`स्नातकोत्तर|परास्नातक|एम\.?\s*ए\.?|एम\.?\s*बी\.?\s*ए\.?|एम\.?\s*टेक`),
-    "8": word(String.raw`पीएचडी|डॉक्टरेट`),
+    "7": word(
+      String.raw`स्नातकोत्तर|परास्नातक|एम\.?\s*ए\.?|एम\.?\s*बी\.?\s*ए\.?|एम\.?\s*टेक|एम\.?\s*एससी\.?|एम\.?\s*कॉम`,
+    ),
+    "8": word(String.raw`पीएच\.?\s*डी\.?|डॉक्टरेट`),
   },
   contentLineVerbs: ["किया", "की", "बनाया", "विकसित", "नेतृत्व", "प्रबंधन"],
   actionVerbs: [

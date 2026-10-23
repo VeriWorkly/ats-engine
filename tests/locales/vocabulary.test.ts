@@ -42,8 +42,9 @@ describe("German pack vocabulary for dates, durations and names", () => {
   it.each([
     ["Softwareentwicklerin, Acme GmbH, München, Bayern, Deutschland", "Acme GmbH"],
     ["Softwareentwicklerin | Acme | Wien, Österreich", "Acme"],
-    // A city-state is a city: no country after it, so it stays with the employer.
-    ["Softwareentwicklerin, Acme, Berlin", "Acme, Berlin"],
+    // A city the pack lists is where, with no country after it (decision D1).
+    ["Softwareentwicklerin, Acme, Berlin", "Acme"],
+    ["Softwareentwicklerin, Acme GmbH, München", "Acme GmbH"],
   ])("reads a German state or country as where in %j", (header, employer) => {
     const report = check(resume([header, "01/2020 – heute"]), policy, {
       now: NOW,
@@ -77,5 +78,307 @@ describe("region codes from a region pack", () => {
       "- Built APIs.",
     ].join("\n");
     expect(check(text, policy, { region: "IN", now: NOW }).parsed.name).toBe("Priya Raman");
+  });
+});
+
+// Decision D1 (2026-10-23): the packs list their larger cities, so a city after the employer, or on
+// a line of its own, is where the role is worked. Invented people and employers.
+describe("cities from the packs", () => {
+  const role = (lines: string[], options: Parameters<typeof check>[2] = {}) =>
+    check(["Name: Kim Lee", "kim@example.com", "", "Experience", ...lines].join("\n"), policy, {
+      now: NOW,
+      ...options,
+    }).parsed.roles[0];
+
+  it.each([
+    [
+      "Ingénieur logiciel, Ciel Bleu Logiciels SAS    Lille    09/2022 – aujourd'hui",
+      "Ciel Bleu Logiciels SAS",
+      ["fr"],
+    ],
+    [
+      "Analyste de données\tMont Clair Santé SARL, Paris\t09/2021 - 09/2025",
+      "Mont Clair Santé SARL",
+      ["fr"],
+    ],
+    ["डेटा विश्लेषक, Thar Insurance, चेन्नई, सितंबर 2021 – वर्तमान", "Thar Insurance", ["hi"]],
+    ["Software Engineer, Acme Ltd, Manchester    Jan 2020 – Present", "Acme Ltd", []],
+    ["Software Engineer, Globex Corp, Chicago    Jan 2020 – Present", "Globex Corp", []],
+    ["Software Engineer, Infosys, Pune    Jan 2020 – Present", "Infosys", []],
+  ])("reads the city in %j as where", (header, employer, languages) => {
+    expect(role([header], { languages })?.employer).toBe(employer);
+  });
+
+  it("reads a city on a line of its own as where, not as the employer", () => {
+    const found = role(["Ciel Bleu Logiciels SARL", "Ingénieur DevOps", "Paris", "2019 – 2021"], {
+      languages: ["fr"],
+    });
+    expect(found).toMatchObject({
+      employer: "Ciel Bleu Logiciels SARL",
+      title: "Ingénieur DevOps",
+    });
+  });
+
+  it("keeps an employer that only starts like a city, or is one word", () => {
+    expect(role(["Software Engineer, Paris Baguette    Jan 2020 – Present"])?.employer).toBe(
+      "Paris Baguette",
+    );
+    expect(role(["Software Engineer, London Stock Exchange Group    2020 – 2022"])?.employer).toBe(
+      "London Stock Exchange Group",
+    );
+  });
+});
+
+// Headings the multilingual bench found unread (2026-10-23): everything under them was lost.
+describe("section headings as people write them", () => {
+  it.each([
+    ["Weiterbildungen und Zertifikate", "de"],
+    ["Weiterbildung", "de"],
+    ["Fort- und Weiterbildung", "de"],
+  ])("reads certifications under %j", (heading, language) => {
+    const text = [
+      "Name: Kim Lee",
+      "kim@example.com",
+      heading,
+      "Certified Scrum Master, Scrum Alliance, 2023",
+    ].join("\n");
+    expect(
+      check(text, policy, { now: NOW, languages: [language] }).parsed.certifications,
+    ).toMatchObject([{ name: "Certified Scrum Master", issuer: "Scrum Alliance" }]);
+  });
+
+  // Under Skills until a heading it reads: the roles would be read as skills.
+  it.each(["पेशेवर अनुभव", "प्रोफेशनल अनुभव"])("reads the experience under %j", (heading) => {
+    const text = [
+      "नेहा वर्मा",
+      "neha.verma@example.in",
+      "तकनीकी कौशल",
+      "Python, SQL",
+      heading,
+      "डेटा विश्लेषक, Thar Insurance, 2021 – 2024",
+      "• बारह टीमों के लिए रिपोर्टिंग पाइपलाइन बनाई",
+    ].join("\n");
+    const { parsed } = check(text, policy, { now: NOW, languages: ["hi"] });
+    expect(parsed.skills).toEqual(["Python", "SQL"]);
+    expect(parsed.roles).toMatchObject([{ title: "डेटा विश्लेषक", employer: "Thar Insurance" }]);
+  });
+});
+
+// German compound titles, the feminine form included: an employer-first header puts them second.
+describe("German compound titles", () => {
+  it.each([
+    [
+      "Alpenwerk Maschinenbau | Produktmanagerin | 05/2013 - 04/2017",
+      "Produktmanagerin",
+      "Alpenwerk Maschinenbau",
+    ],
+    [
+      "Ostwind Lebensmittel SE — Marketingmanager — 03/2024 – heute",
+      "Marketingmanager",
+      "Ostwind Lebensmittel SE",
+    ],
+    ["Seewiese Studios | UX-Designerin | 2019 - 2021", "UX-Designerin", "Seewiese Studios"],
+  ])("reads the title in %j", (header, title, employer) => {
+    const report = check(resume([header]), policy, { now: NOW, languages: ["de"] });
+    expect(report.parsed.roles[0]).toMatchObject({ title, employer });
+  });
+});
+
+// Hindi titles the multilingual bench found unread in employer-first headers (2026-10-23).
+describe("Hindi titles", () => {
+  it.each([
+    ["Himgiri Media | समाधान वास्तुकार | 01/2022 - 07/2024", "समाधान वास्तुकार", "Himgiri Media"],
+    ["Ganga Logistics — यूएक्स डिज़ाइनर — 2024 से वर्तमान", "यूएक्स डिज़ाइनर", "Ganga Logistics"],
+    ["Narmada Energy | सिस्टम प्रशासक | 2019 - 2021", "सिस्टम प्रशासक", "Narmada Energy"],
+  ])("reads the title in %j", (header, title, employer) => {
+    const text = ["नेहा वर्मा", "neha.verma@example.in", "कार्य अनुभव", header].join("\n");
+    const report = check(text, policy, { now: NOW, languages: ["hi"] });
+    expect(report.parsed.roles[0]).toMatchObject({ title, employer });
+  });
+});
+
+// Review finding (2026-10-24): a line that is only a city's name may be the employer itself
+// ("Santander" the bank, "Cambridge" the university). Only after another employer is it where.
+describe("an employer named like a city", () => {
+  it.each([
+    [["Branch Manager", "Santander  2018 - Present", "- Grew deposits 20%"], "Santander"],
+    [["Research Fellow", "Cambridge  2014 - 2018", "- Ran clinical trials"], "Cambridge"],
+    [["Santander", "Branch Manager", "2018 - Present", "- Grew deposits 20%"], "Santander"],
+    [["Branch Manager  2018 - Present", "Santander", "- Grew deposits 20%"], "Santander"],
+  ])("keeps %j", (lines, employer) => {
+    const text = ["Jordan Blake", "jordan.blake@example.com", "Experience", ...lines].join("\n");
+    expect(check(text, policy, { now: NOW }).parsed.roles[0]?.employer).toBe(employer);
+  });
+});
+
+// LinkedIn's PDF export, in the member's language (review finding, 2026-10-24): its contact and
+// top-skills headings come first, so unread they took the name and lost the skills.
+describe("a LinkedIn export in each language", () => {
+  it.each([
+    [
+      "de",
+      "Kontakt",
+      "Top-Kenntnisse",
+      "Berufserfahrung",
+      "Januar 2020 - Heute (4 Jahre 10 Monate)",
+    ],
+    [
+      "fr",
+      "Coordonnées",
+      "Principales compétences",
+      "Expérience",
+      "janvier 2020 - Present (4 ans 10 mois)",
+    ],
+    [
+      "es",
+      "Contactar",
+      "Aptitudes principales",
+      "Experiencia",
+      "enero de 2020 - Present (4 años 10 meses)",
+    ],
+    [
+      "pt",
+      "Contato",
+      "Principais competências",
+      "Experiência",
+      "janeiro de 2020 - Present (4 anos 10 meses)",
+    ],
+  ])("reads the name and the top skills in %s", (language, contact, top, experience, dates) => {
+    const text = [
+      contact,
+      "www.linkedin.com/in/kimlee",
+      top,
+      "Controlling",
+      "SAP S/4HANA",
+      "Kim Lee",
+      "Senior Consultant",
+      experience,
+      "Exemplo Consulting",
+      "Senior Consultant",
+      dates,
+    ].join("\n");
+    const { parsed } = check(text, policy, { now: NOW, languages: [language] });
+    expect(parsed.name).toBe("Kim Lee");
+    expect(parsed.skills).toEqual(["Controlling", "SAP S/4HANA"]);
+    expect(parsed.roles[0]).toMatchObject({
+      title: "Senior Consultant",
+      employer: "Exemplo Consulting",
+    });
+  });
+});
+
+// "Cargo en Empresa": split only where a legal form ends the company (review, 2026-10-24); "en"
+// also sits inside titles ("Especialista en Marketing", "Ingeniero en Sistemas").
+describe("Spanish and Portuguese employer after en, na, em", () => {
+  const first = (line: string, language: string) =>
+    check(["Ana Lima", "ana@example.com", "Experiencia", line].join("\n"), policy, {
+      now: NOW,
+      languages: [language],
+    }).parsed.roles[0];
+
+  it.each([
+    [
+      "Diseñadora UX en Piedra Blanca Energía S.A.    2024 – presente",
+      "es",
+      "Diseñadora UX",
+      "Piedra Blanca Energía S.A.",
+    ],
+    [
+      "Ingeniero de software en Cielo Azul Software S.L.    2021 – 2024",
+      "es",
+      "Ingeniero de software",
+      "Cielo Azul Software S.L.",
+    ],
+    [
+      "Analista de dados na Exemplo Pagamentos Ltda.    2021 – 2024",
+      "pt",
+      "Analista de dados",
+      "Exemplo Pagamentos Ltda",
+    ],
+    [
+      "Especialista en Marketing, Acme S.A.    2019 – 2021",
+      "es",
+      "Especialista en Marketing",
+      "Acme S.A.",
+    ],
+    [
+      "Ingeniero en Sistemas Computacionales    2019 – 2021",
+      "es",
+      "Ingeniero en Sistemas Computacionales",
+      "",
+    ],
+  ])("reads %j", (line, language, title, employer) => {
+    expect(first(line, language)).toMatchObject({ title, employer });
+  });
+});
+
+// A German LinkedIn export holds German headings, months and durations but hardly a function
+// word; it is still German (review, 2026-10-24).
+describe("detecting a German LinkedIn export", () => {
+  it("reads it in German with no language given", () => {
+    const text = [
+      "Kontakt",
+      "www.linkedin.com/in/felixkrueger",
+      "Top-Kenntnisse",
+      "SAP S/4HANA",
+      "Prozessoptimierung",
+      "Controlling",
+      "Felix Krüger",
+      "Senior Consultant bei SAP",
+      "Walldorf, Baden-Württemberg, Deutschland",
+      "Berufserfahrung",
+      "SAP",
+      "Senior Consultant",
+      "Januar 2020 - Heute (4 Jahre 10 Monate)",
+      "Walldorf, Baden-Württemberg, Deutschland",
+      "Deloitte",
+      "Consultant",
+      "September 2016 - Dezember 2019 (3 Jahre 4 Monate)",
+      "Frankfurt am Main, Hessen, Deutschland",
+      "Ausbildung",
+      "Universität Mannheim",
+      "Master of Science, Betriebswirtschaftslehre · (2014 - 2016)",
+    ].join("\n");
+    const report = check(text, policy, { now: NOW });
+    expect(report.locale.languages).toEqual(["de"]);
+    expect(report.parsed.name).toBe("Felix Krüger");
+    expect(report.parsed.roles.map((role) => role.employer)).toEqual(["SAP", "Deloitte"]);
+  });
+});
+
+// Review findings (2026-10-24): Chile's cities, and Québec's CEGEP.
+describe("Chile and Québec", () => {
+  it("reads a Chilean city after the employer as where", () => {
+    const text = [
+      "Ana Rojas",
+      "ana@example.cl",
+      "Experiencia",
+      "Ingeniera de procesos, Codelco, Santiago    2019 – 2023",
+      "Analista, Minera Escondida, Antofagasta    2016 – 2019",
+    ].join("\n");
+    expect(
+      check(text, policy, { now: NOW, languages: ["es"] }).parsed.roles.map(
+        (role) => role.employer,
+      ),
+    ).toEqual(["Codelco", "Minera Escondida"]);
+  });
+
+  it("reads a CEGEP diploma as short-cycle tertiary", () => {
+    const text = [
+      "Julie Tremblay",
+      "julie@example.ca",
+      "Formation",
+      "Baccalauréat en informatique, Université Laval, 2020",
+      "DEC en techniques de l'informatique, Cégep du Vieux Montréal, 2017",
+    ].join("\n");
+    expect(
+      check(text, policy, { now: NOW, languages: ["fr"] }).parsed.education.map((row) => [
+        row.school,
+        row.isced,
+      ]),
+    ).toEqual([
+      ["Université Laval", 6],
+      ["Cégep du Vieux Montréal", 5],
+    ]);
   });
 });

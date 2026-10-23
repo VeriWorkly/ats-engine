@@ -7,9 +7,9 @@ import { deepFreeze, memo } from "../util/memo.js";
 import { own } from "../util/own.js";
 import {
   applyVocabulary,
-  baseLanguageOf,
   DETECTION_SAMPLE,
   isWrittenIn,
+  otherLanguageOf,
   outweighs,
   sampleOf,
   union,
@@ -117,7 +117,17 @@ function notAttached(kind: "region" | "language", id: string, packs: { id: strin
 }
 
 /** What `check` read a resume as. Packs are named by id; the policy's base vocabulary is not. */
-export type AtsLocale = { languages: string[]; region: string | null };
+export type AtsLocale = {
+  languages: string[];
+  region: string | null;
+  /**
+   * The language the resume is written in when the policy recognises it (`text.otherLanguages`)
+   * and no pack read here is that language: an ISO 639 code ("it"), a script ("Cyrillic"), or
+   * "und" for an entry with neither. It was read with the base vocabulary, and rules limited to
+   * some `languages` were dropped. Null otherwise.
+   */
+  unsupported: string | null;
+};
 
 /** Set the languages and the region a resume is read in, instead of detecting them. */
 export type AtsLocaleOptions = {
@@ -186,12 +196,16 @@ export function localizePolicy(
   const dateOrder = dateOrderIn(resumeText.slice(0, DETECTION_SAMPLE));
   const resumeSample = sampleOf(resumeText);
   // No pack's language: the base's, or "und" when the resume is not the base's either.
-  const orBase = (ids: string[]) =>
-    ids.length || options.languages || baseLanguageOf(policy, resumeSample) !== UNDETERMINED
-      ? ids
-      : [UNDETERMINED];
-  if (packs.length === 0 && regions.length === 0 && dateOrder === undefined)
-    return { policy, locale: { languages: [], region: null }, resumeLanguages: orBase([]) };
+  const unsupportedIn = (ids: string[]) =>
+    ids.length || options.languages ? null : (otherLanguageOf(policy, resumeSample) ?? null);
+  if (packs.length === 0 && regions.length === 0 && dateOrder === undefined) {
+    const unsupported = unsupportedIn([]);
+    return {
+      policy,
+      locale: { languages: [], region: null, unsupported },
+      resumeLanguages: unsupported ? [UNDETERMINED] : [],
+    };
+  }
 
   // Detected apart: a long English posting would dilute a German resume below the detection share.
   const posting =
@@ -227,7 +241,7 @@ export function localizePolicy(
       .map((pack) => regions.find((candidate) => candidate.id === pack.defaultRegion))
       .find(Boolean);
 
-  const locale: AtsLocale = {
+  const locale = {
     languages: languages.map((pack) => pack.id),
     region: region?.id ?? null,
   };
@@ -249,6 +263,11 @@ export function localizePolicy(
             localized.resumeParse.phoneRegions,
             regions.map((pack) => pack.phoneCountry),
           ),
+          // And any attached region's cities: "Acme Ltd, Manchester" with no +44 number.
+          cityNames: union(
+            localized.resumeParse.cityNames,
+            regions.flatMap((pack) => pack.cityNames ?? []),
+          ),
         },
       };
     if (dateOrder)
@@ -256,6 +275,12 @@ export function localizePolicy(
     // Shared across resumes, so frozen.
     cached.set(key, deepFreeze(localized));
   }
-  const resumeLanguages = orBase(leading.map((pack) => pack.id));
-  return { policy: localized, locale, resumeLanguages };
+  const read = leading.map((pack) => pack.id);
+  const other = unsupportedIn(read);
+  return {
+    policy: localized,
+    // A language a pack reads here (its words, not its bullets) is not one the engine cannot read.
+    locale: { ...locale, unsupported: other && !locale.languages.includes(other) ? other : null },
+    resumeLanguages: other ? [UNDETERMINED] : read,
+  };
 }

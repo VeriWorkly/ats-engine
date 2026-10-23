@@ -61,7 +61,7 @@ function report(overrides: Partial<AtsReport> = {}): AtsReport {
         spokenLanguages: "none",
       },
     },
-    locale: { languages: ["en"], region: null },
+    locale: { languages: ["en"], region: null, unsupported: null },
     engine: { version: "0.0.0", policy: "test" },
     requirements: [],
     advice: [],

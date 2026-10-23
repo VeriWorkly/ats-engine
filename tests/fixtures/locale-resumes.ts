@@ -43,7 +43,7 @@ export type LocaleFixture = {
 };
 
 export const LOCALE_FIXTURES: Record<
-  "en" | "en-GB" | "de" | "fr" | "hi" | "en-IN",
+  "en" | "en-GB" | "de" | "fr" | "hi" | "en-IN" | "es" | "pt",
   LocaleFixture[]
 > = {
   en: EN_FIXTURES,
@@ -744,4 +744,324 @@ Excel, SQL, Tally`,
       skills: ["Excel", "SQL", "Tally"],
     },
   ],
+  es: [
+    {
+      id: "es-backend",
+      text: `Lucía Fernández Ruiz
+lucia.fernandez@example.es | +34 612 345 678 | Madrid
+Perfil
+Ingeniera de software con siete años de experiencia en sistemas de pago y en la nube.
+Experiencia profesional
+Ingeniera de software sénior, Ejemplo Tecnología S.L.    enero 2021 – actualidad
+• Diseño de una plataforma de pagos para dos millones de clientes en España
+• Responsable de un equipo de seis personas y de la integración continua
+Ingeniera de software, Muestra Sistemas S.A.    03/2017 – 12/2020
+• Desarrollo de servicios REST en Java para la gestión de pedidos
+Formación
+Máster en Ingeniería de Software, Universidad de Ejemplo    2015 – 2017
+Grado en Ingeniería Informática, Universidad de Ejemplo    2011 – 2015
+Habilidades
+Go, Java, Kubernetes, PostgreSQL
+Idiomas
+Español (nativo), Inglés (avanzado, C1), Francés (básico)`,
+      locale: { languages: ["es"], region: "ES" },
+      name: "Lucía Fernández Ruiz",
+      email: "lucia.fernandez@example.es",
+      phone: "+34 612 345 678",
+      roles: [
+        {
+          title: "Ingeniera de software sénior",
+          employer: "Ejemplo Tecnología S.L.",
+          start: "2021-01",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Ingeniera de software",
+          employer: "Muestra Sistemas S.A.",
+          start: "2017-03",
+          current: false,
+          end: "2020-12",
+        },
+      ],
+      education: [
+        { school: "Universidad de Ejemplo", isced: 7, credential: "Máster" },
+        { school: "Universidad de Ejemplo", isced: 6, credential: "Grado" },
+      ],
+      skills: ["Go", "Java", "Kubernetes", "PostgreSQL"],
+      spokenLanguages: [
+        { language: "Español", cefr: "C2" },
+        { language: "Inglés", cefr: "C1" },
+        { language: "Francés", cefr: "A2" },
+      ],
+    },
+    {
+      id: "es-analista",
+      text: `Carlos Méndez Ortega
+carlos.mendez@example.com.mx | +52 55 1234 5678 | Ciudad de México
+Resumen profesional
+Analista de datos con cinco años de experiencia en el sector financiero.
+Experiencia laboral
+Analista de datos sénior | Banco Ejemplo S.A. de C.V. | 02/2022 – presente
+• Desarrollo de tableros en Power BI para el área de riesgos
+• Automatización de reportes mensuales con Python y SQL
+Analista de datos | Muestra Seguros | 06/2019 – 01/2022
+• Elaboración de modelos de predicción de cancelaciones
+Educación
+Licenciatura en Actuaría, Universidad Nacional de Ejemplo, 2019
+Certificaciones
+Power BI Data Analyst Associate, Microsoft, 2023
+Conocimientos técnicos
+Python, SQL, Power BI, Excel`,
+      locale: { languages: ["es"], region: "ES" },
+      name: "Carlos Méndez Ortega",
+      email: "carlos.mendez@example.com.mx",
+      phone: "+52 55 1234 5678",
+      roles: [
+        {
+          title: "Analista de datos sénior",
+          employer: "Banco Ejemplo S.A. de C.V.",
+          start: "2022-02",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Analista de datos",
+          employer: "Muestra Seguros",
+          start: "2019-06",
+          current: false,
+          end: "2022-01",
+        },
+      ],
+      education: [
+        { school: "Universidad Nacional de Ejemplo", isced: 6, credential: "Licenciatura" },
+      ],
+      skills: ["Python", "SQL", "Power BI", "Excel"],
+      certifications: [
+        { name: "Power BI Data Analyst Associate", issuer: "Microsoft", date: "2023", expires: "" },
+      ],
+    },
+    {
+      id: "es-practicas",
+      text: `Pablo Navarro Gil
+pablo.navarro@example.es
+612 345 789
+Valencia
+Experiencia
+Becario de desarrollo web
+Muestra Digital S.L.
+sept. 2023 – feb. 2024
+• Desarrollé componentes en React para la tienda en línea
+• Mejoré el tiempo de carga de la página principal en un 40 %
+Formación académica
+Grado en Ingeniería Informática
+Universidad de Valcourt
+2020 – 2024
+Bachillerato
+Instituto de Educación Secundaria Ejemplo
+2018 – 2020
+Habilidades
+JavaScript, React, Node.js, Git`,
+      locale: { languages: ["es"], region: "ES" },
+      name: "Pablo Navarro Gil",
+      email: "pablo.navarro@example.es",
+      phone: "612 345 789",
+      roles: [
+        {
+          title: "Becario de desarrollo web",
+          employer: "Muestra Digital S.L.",
+          start: "2023-09",
+          current: false,
+          end: "2024-02",
+        },
+      ],
+      education: [
+        { school: "Universidad de Valcourt", isced: 6, credential: "Grado" },
+        {
+          school: "Instituto de Educación Secundaria Ejemplo",
+          isced: 3,
+          credential: "Bachillerato",
+        },
+      ],
+      skills: ["JavaScript", "React", "Node.js", "Git"],
+    },
+  ],
+  pt: [
+    {
+      id: "pt-backend",
+      text: `Ana Paula Ribeiro
+ana.ribeiro@example.com.br | +55 11 98765-4321 | São Paulo, SP
+Resumo profissional
+Engenheira de software com oito anos de experiência em sistemas de pagamento.
+Experiência profissional
+Engenheira de software sênior, Exemplo Pagamentos Ltda.    jan. 2021 – atual
+• Desenvolvimento de uma plataforma de pagamentos para dois milhões de clientes
+• Liderança de uma equipe de cinco desenvolvedores
+Desenvolvedora back-end, Amostra Tecnologia S.A.    03/2017 – 12/2020
+• Implementação de serviços REST em Java e Spring Boot
+Formação acadêmica
+Mestrado em Ciência da Computação, Universidade de Exemplo    2015 – 2017
+Bacharelado em Sistemas de Informação, Universidade de Exemplo    2011 – 2014
+Habilidades
+Java, Go, Kubernetes, PostgreSQL
+Idiomas
+Português (nativo), Inglês (avançado), Espanhol (intermediário)`,
+      locale: { languages: ["pt"], region: "BR" },
+      name: "Ana Paula Ribeiro",
+      email: "ana.ribeiro@example.com.br",
+      phone: "+55 11 98765-4321",
+      roles: [
+        {
+          title: "Engenheira de software sênior",
+          employer: "Exemplo Pagamentos Ltda",
+          start: "2021-01",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Desenvolvedora back-end",
+          employer: "Amostra Tecnologia S.A.",
+          start: "2017-03",
+          current: false,
+          end: "2020-12",
+        },
+      ],
+      education: [
+        { school: "Universidade de Exemplo", isced: 7, credential: "Mestrado" },
+        { school: "Universidade de Exemplo", isced: 6, credential: "Bacharelado" },
+      ],
+      skills: ["Java", "Go", "Kubernetes", "PostgreSQL"],
+      spokenLanguages: [
+        { language: "Português", cefr: "C2" },
+        { language: "Inglês", cefr: "C1" },
+        { language: "Espanhol", cefr: "B1" },
+      ],
+    },
+    {
+      id: "pt-analista",
+      text: `Rafael Costa Lima
+rafael.lima@example.com.br | (21) 99876-5432 | Rio de Janeiro, RJ
+Experiência
+Analista de dados | Banco Amostra S.A. | 02/2022 – o momento
+• Criação de painéis no Power BI para a área de crédito
+• Automação de relatórios mensais com Python e SQL
+Analista de BI júnior | Exemplo Varejo Ltda. | 06/2019 – 01/2022
+• Elaboração de modelos de previsão de vendas
+Formação
+Graduação em Estatística, Universidade Federal de Exemplo, 2019
+Certificações
+Power BI Data Analyst Associate, Microsoft, 2023
+Conhecimentos
+Python, SQL, Power BI, Excel`,
+      locale: { languages: ["pt"], region: "BR" },
+      name: "Rafael Costa Lima",
+      email: "rafael.lima@example.com.br",
+      phone: "(21) 99876-5432",
+      roles: [
+        {
+          title: "Analista de dados",
+          employer: "Banco Amostra S.A.",
+          start: "2022-02",
+          current: true,
+          end: "",
+        },
+        {
+          title: "Analista de BI júnior",
+          employer: "Exemplo Varejo Ltda",
+          start: "2019-06",
+          current: false,
+          end: "2022-01",
+        },
+      ],
+      education: [{ school: "Universidade Federal de Exemplo", isced: 6, credential: "Graduação" }],
+      skills: ["Python", "SQL", "Power BI", "Excel"],
+      certifications: [
+        { name: "Power BI Data Analyst Associate", issuer: "Microsoft", date: "2023", expires: "" },
+      ],
+    },
+    {
+      id: "pt-estagio",
+      text: `Beatriz Almeida Santos
+beatriz.santos@example.com.br
++55 31 98888-7777
+Belo Horizonte
+Estágios
+Estagiária de desenvolvimento
+Amostra Digital Ltda.
+ago. 2023 – fev. 2024
+• Desenvolvi componentes em React para a loja virtual
+• Melhorei o tempo de carregamento da página inicial em 40%
+Formação
+Tecnólogo em Análise e Desenvolvimento de Sistemas
+Faculdade de Tecnologia Exemplo
+2021 – 2023
+Ensino médio
+Colégio Estadual Exemplo
+2018 – 2020
+Habilidades
+JavaScript, React, Node.js, Git`,
+      locale: { languages: ["pt"], region: "BR" },
+      name: "Beatriz Almeida Santos",
+      email: "beatriz.santos@example.com.br",
+      phone: "+55 31 98888-7777",
+      roles: [
+        {
+          title: "Estagiária de desenvolvimento",
+          employer: "Amostra Digital Ltda",
+          start: "2023-08",
+          current: false,
+          end: "2024-02",
+        },
+      ],
+      education: [
+        { school: "Faculdade de Tecnologia Exemplo", isced: 6, credential: "Tecnólogo" },
+        { school: "Colégio Estadual Exemplo", isced: 3, credential: "Ensino médio" },
+      ],
+      skills: ["JavaScript", "React", "Node.js", "Git"],
+    },
+  ],
 };
+
+// A resume in a language the engine recognises but has no pack for. Invented people.
+export const SPANISH_RESUME = `Lucía Fernández Ruiz
+lucia.fernandez@example.es | +34 612 345 678 | Madrid
+Perfil
+Ingeniera de software con siete años de experiencia en sistemas de pago y en la nube.
+Experiencia profesional
+Ingeniera de software sénior, Ejemplo Tecnología S.L.    enero 2021 – actualidad
+• Diseño de una plataforma de pagos para dos millones de clientes en España
+• Responsable de un equipo de seis personas y de la integración continua
+• Reducción del tiempo de despliegue de dos horas a diez minutos
+Ingeniera de software, Muestra Sistemas S.A.    03/2017 – 12/2020
+• Desarrollo de servicios REST en Java para la gestión de pedidos
+• Migración de la base de datos a PostgreSQL sin pérdida de servicio
+Formación
+Grado en Ingeniería Informática, Universidad de Ejemplo, 2017
+Habilidades
+Go, Java, Kubernetes, PostgreSQL`;
+
+export const RUSSIAN_RESUME = `Анна Петрова
+anna.petrova@example.ru | +7 912 345 67 89 | Москва
+Опыт работы
+Ведущий разработчик, ООО «Пример»    январь 2021 – настоящее время
+• Разработка платёжной платформы на Go для двух миллионов клиентов
+• Руководство командой из пяти разработчиков
+Разработчик, АО «Образец»    03/2017 – 12/2020
+• Разработка сервисов на Java для обработки заказов
+Образование
+Бакалавр информатики, Московский университет, 2017
+Навыки
+Go, Java, Kubernetes, PostgreSQL`;
+
+export const ITALIAN_RESUME = `Giulia Rossi
+giulia.rossi@example.it | +39 333 123 4567 | Milano
+Profilo
+Ingegnere del software con sette anni di esperienza nei sistemi di pagamento e nel cloud.
+Esperienza professionale
+Ingegnere del software senior, Esempio Tecnologie S.r.l.    gennaio 2021 – oggi
+• Progettazione di una piattaforma di pagamenti per due milioni di clienti
+• Responsabile di un team di sei persone e della integrazione continua
+Istruzione
+Laurea in Ingegneria Informatica, Università degli Studi di Esempio, 2017
+Competenze
+Go, Java, Kubernetes, PostgreSQL`;

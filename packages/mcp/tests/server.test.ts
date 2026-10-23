@@ -21,7 +21,7 @@ import { normalizeJobText } from "../../../src/job/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../../src/locales/index.js";
 import { extractResume, normalizeExtractedText } from "../../../src/node/extract.js";
 import { buildPdf, text } from "../../../tests/fixtures/buildPdf.js";
-import { LOCALE_FIXTURES } from "../../../tests/fixtures/locale-resumes.js";
+import { LOCALE_FIXTURES, ITALIAN_RESUME } from "../../../tests/fixtures/locale-resumes.js";
 
 const SERVER = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const PACKAGE = fileURLToPath(new URL("../package.json", import.meta.url));
@@ -211,7 +211,15 @@ describe("ats-engine-mcp over stdio", () => {
     expect(english.structuredContent).toMatchObject({ locale: { languages: [] } });
     const unknown = await call("check_resume", { text: german, language: "xx" });
     expect(unknown.isError).toBe(true);
-    expect(textOf(unknown)).toContain('Unknown language "xx"; use one of en, de, fr, hi.');
+    expect(textOf(unknown)).toContain('Unknown language "xx"; use one of en, de, fr, hi, es, pt.');
+  });
+
+  it("says when the resume is in a language it does not read yet", async () => {
+    const result = await call("check_resume", { text: ITALIAN_RESUME });
+    expect(result.structuredContent).toMatchObject({ locale: { unsupported: "it" } });
+    expect(textOf(result)).toContain(
+      "Language: This resume looks Italian, which the engine does not read yet",
+    );
   });
 
   it("match_job returns only the match, the requirements and the missing keywords", async () => {

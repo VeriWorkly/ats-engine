@@ -972,3 +972,78 @@ describe("German posting filler", () => {
     );
   });
 });
+
+// Review finding (2026-10-24): the date forms Spanish and Portuguese CVs and LinkedIn exports use,
+// and a word opening the range, which was left in the employer in every language ("Acme, from").
+describe("date ranges as Spanish, Portuguese and English write them", () => {
+  const role = (line: string, languages: string[] = []) =>
+    score(
+      `Ana Lima\nana@example.com\nExperience\n${line}\n- Built the billing service`,
+      LOCALIZED,
+      {
+        now: NOW,
+        languages,
+      },
+    ).parsed.roles[0];
+
+  it.each([
+    [
+      "Ingeniera de software, Ejemplo S.L., marzo de 2020 - presente",
+      "es",
+      { year: 2020, month: 3 },
+      null,
+    ],
+    [
+      "Ingeniera de software, Ejemplo S.L., de marzo de 2020 a la actualidad",
+      "es",
+      { year: 2020, month: 3 },
+      null,
+    ],
+    [
+      "Ingeniera de software, Ejemplo S.L., agosto de 2016 - febrero de 2020",
+      "es",
+      { year: 2016, month: 8 },
+      { year: 2020, month: 2 },
+    ],
+    [
+      "Ingeniera de software, Ejemplo S.L., Ene 2019 – Actual",
+      "es",
+      { year: 2019, month: 1 },
+      null,
+    ],
+    [
+      "Ingeniera de software, Ejemplo S.L., desde 2019 hasta 2021",
+      "es",
+      { year: 2019, month: null },
+      { year: 2021, month: null },
+    ],
+    [
+      "Analista de sistemas, Exemplo Ltda, março de 2018 a dezembro de 2021",
+      "pt",
+      { year: 2018, month: 3 },
+      { year: 2021, month: 12 },
+    ],
+    [
+      "Analista de sistemas, Exemplo Ltda, jan/2019 - dez/2021",
+      "pt",
+      { year: 2019, month: 1 },
+      { year: 2021, month: 12 },
+    ],
+    [
+      "Analista de sistemas, Exemplo Ltda, de março de 2018 até hoje",
+      "pt",
+      { year: 2018, month: 3 },
+      null,
+    ],
+    [
+      "Software Engineer, Acme Corp, from Jan 2020 to Present",
+      "en",
+      { year: 2020, month: 1 },
+      null,
+    ],
+  ])("reads %j", (line, language, start, end) => {
+    const found = role(line, language === "en" ? [] : [language]);
+    expect(found).toMatchObject({ start, end });
+    expect(found?.employer).toMatch(/^(?:Ejemplo S\.L\.|Exemplo Ltda|Acme Corp)$/);
+  });
+});

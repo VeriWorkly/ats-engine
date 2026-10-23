@@ -44,6 +44,7 @@ const vocabularyShape = {
     z.object({
       issued: optionalList("credentialWords.issued"),
       expires: optionalList("credentialWords.expires"),
+      expiresAfter: optionalList("credentialWords.expiresAfter"),
       issuer: optionalList("credentialWords.issuer"),
       id: optionalList("credentialWords.id"),
     }),
@@ -60,6 +61,12 @@ const vocabularyShape = {
   regionCodes: optionalList("regionCodes"),
   /** Countries and states in the pack's language: "Deutschland", "Bayern". */
   placeNames: optionalList("placeNames"),
+  /** Words opening a date range: "von", "du", "desde". */
+  rangeOpeners: optionalList("rangeOpeners"),
+  /** Words between a month and its year: "de" in "marzo de 2020". */
+  monthYearJoiners: optionalList("monthYearJoiners"),
+  /** Larger cities, in the pack's spelling: "München", "Lille", "पुणे". */
+  cityNames: optionalList("cityNames"),
   workplaceWords: optionalList("workplaceWords"),
   organisationWords: optionalList("organisationWords"),
   openEnded: optionalList("openEnded"),

@@ -7,7 +7,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { main, type CliContext } from "../../src/cli/main.js";
 import { PLAIN } from "../../src/cli/terminal.js";
 import { ENGINE_VERSION } from "../../src/version.js";
-import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
+import { LOCALE_FIXTURES, ITALIAN_RESUME } from "../fixtures/locale-resumes.js";
 import { buildDocx } from "../fixtures/buildDocx.js";
 import { buildPdf, LEFT_COLUMN, RIGHT_COLUMN, text } from "../fixtures/buildPdf.js";
 import {
@@ -98,7 +98,20 @@ describe("ats-engine check", () => {
 
   it("refuses a --lang no pack has, naming the ones there are", async () => {
     expect(await main(["check", file("x.txt", RESUME), "--lang", "xx"])).toBe(1);
-    expect(err.join("\n")).toContain('Unknown --lang "xx"; use one of en, de, fr, hi.');
+    expect(err.join("\n")).toContain('Unknown --lang "xx"; use one of en, de, fr, hi, es, pt.');
+  });
+
+  it("says once when the resume is in a language it does not read yet", async () => {
+    const italian = file("it.txt", ITALIAN_RESUME);
+    expect(await main(["check", italian])).toBe(0);
+    expect(
+      out.join("\n").match(/This resume looks Italian, which the engine does not read yet/g),
+    ).toHaveLength(1);
+    out.length = 0;
+    expect(await main(["check", italian, "--job", file("job.txt", "Requirements\n- Go")])).toBe(0);
+    expect(
+      out.join("\n").match(/This resume looks Italian, which the engine does not read yet/g),
+    ).toHaveLength(1);
   });
 
   it("matches against a job description, including a saved HTML page", async () => {

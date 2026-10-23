@@ -199,7 +199,14 @@ const checkOutput = {
   parsingWarnings: z.array(z.string()),
   strengths: z.array(z.string()),
   parsed: parsedResume.describe("The fields an ATS would store from this resume."),
-  locale: z.object({ languages: z.array(z.string()), region: z.string().nullable() }),
+  locale: z.object({
+    languages: z.array(z.string()),
+    region: z.string().nullable(),
+    unsupported: z
+      .string()
+      .nullable()
+      .describe('The language the resume is written in when the engine has no pack for it ("it").'),
+  }),
   engine: z.object({ version: z.string(), policy: z.string() }),
   advice: z
     .array(
