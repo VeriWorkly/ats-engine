@@ -91,9 +91,102 @@ describe("a degree or years offered as alternatives is met by either", () => {
   });
 
   it("keeps an alternative inside the degree's field as an AND with the years", () => {
-    const line = "Bachelor's in CS or related field and 4+ years of experience";
-    expect(one(line, resume({ roles: TEN_YEARS })).status).not.toBe("met");
-    expect(one(line, resume({ roles: ONE_YEAR, education: BACHELOR })).status).not.toBe("met");
+    for (const line of [
+      "Bachelor's in CS or related field and 4+ years of experience",
+      "Bachelor's in CS or a related field with 4+ years of experience",
+      "Bachelor's in CS or related field with 4+ years of experience",
+    ]) {
+      expect(one(line, resume({ roles: TEN_YEARS })).status, line).not.toBe("met");
+      expect(one(line, resume({ roles: ONE_YEAR, education: BACHELOR })).status, line).not.toBe(
+        "met",
+      );
+    }
+  });
+
+  it("reads the years after 'or a related field' as any work, not as work in the field", () => {
+    const MATHS = "B.S. Mathematics, State University 2015";
+    for (const line of [
+      "Bachelor's degree in CS or a related field with 4+ years of experience",
+      "Bachelor's degree in Computer Science or a related field with 4+ years of experience",
+      "Bachelor's in CS or related field with 4+ years of experience",
+      "Bachelor's degree in Computer Science or equivalent with 4+ years of experience",
+    ]) {
+      expect(one(line, resume({ roles: TEN_YEARS, education: BACHELOR })), line).toMatchObject({
+        status: "met",
+        detail: expect.stringMatching(/^10 years in the work history/),
+      });
+      // Another field may or may not be the related one.
+      expect(one(line, resume({ roles: TEN_YEARS, education: MATHS })).status, line).toBe(
+        "partial",
+      );
+    }
+    // The skill the years are of is not asked of the degree.
+    expect(
+      one(
+        "Bachelor's degree in Computer Science or a related field with 4+ years of Go experience",
+        resume({ roles: TEN_YEARS, education: BACHELOR }),
+      ).status,
+    ).toBe("met");
+    expect(
+      one(
+        "Master's degree in Computer Science or a related field with 4+ years of experience",
+        resume({ roles: TEN_YEARS, education: BACHELOR }),
+      ).status,
+    ).toBe("missing");
+  });
+
+  // An abbreviated field ("CS") is held by the words the policy says it stands for, in the
+  // degree's own words: never by initials ("Chemistry, Stanford"), nor by a school's name.
+  it.each([
+    "B.A. History, Colorado State University, 2014",
+    "B.A. History, California State University, Fullerton, 2014",
+    "B.A. English\tCleveland State University\t2014",
+    "B.S. Customer Service Management, Acme College, 2014",
+    "B.S. Cyber Security, Purdue University, 2014",
+    "B.S. Chemistry\tStanford University\t2014",
+    "B.A. Communication Studies, University of Texas, 2014",
+    "B.S. Mathematics, State University 2015",
+  ])("does not read %j as the CS asked", (education) => {
+    for (const line of [
+      "Bachelor's degree in CS",
+      "BS in CS or a related field",
+      "Bachelor's degree in CS or a related field with 4+ years of experience",
+    ])
+      expect(one(line, resume({ roles: TEN_YEARS, education })).status, line).toBe("partial");
+  });
+
+  it.each([
+    [
+      "Bachelor's degree in AI or a related field",
+      "B.F.A. Painting, Art Institute of Chicago, 2014",
+    ],
+    [
+      "Bachelor's degree in HR or a related field",
+      "B.A. Hotel Restaurant Management, Cornell University, 2014",
+    ],
+    ["Bachelor's degree in ML", "B.A. History, Machine Learning Institute, 2014"],
+  ])("does not read initials or a school's name as %j", (line, education) => {
+    expect(one(line, resume({ roles: TEN_YEARS, education })).status).toBe("partial");
+  });
+
+  it.each([
+    ["Bachelor's degree in CS", BACHELOR],
+    ["BS in CS or a related field", BACHELOR],
+    ["Bachelor's degree in AI", "B.S. Artificial Intelligence, State University 2015"],
+    ["Bachelor's degree in HR or a related field", "B.A. Human Resources, State University 2015"],
+    ["Bachelor's degree in EE", "B.S. Electrical Engineering, State University 2015"],
+  ])("reads %j from the words it stands for", (line, education) => {
+    expect(one(line, resume({ roles: TEN_YEARS, education })).status).toBe("met");
+  });
+
+  it("reads an abbreviated field in linear time", () => {
+    for (const unit of ["computer ", "computer\t", "Computer Science University, "]) {
+      const education = `B.S. ${unit.repeat(Math.ceil(50_000 / unit.length))}`;
+      expectFast(
+        () => one("Bachelor's degree in CS", resume({ roles: TEN_YEARS, education })),
+        2_000,
+      );
+    }
   });
 });
 
@@ -119,7 +212,8 @@ describe("a resume lists its languages only on a line that reads as a list of th
   it.each(["Launched checkout in the Chinese market", "Led UI polish for the checkout"])(
     "leaves a language unverifiable beside %j",
     (line) => {
-      expect(one("Fluent in English", resume({ roles: `${TEN_YEARS}\n- ${line}` }), P).status).toBe(
+      // Not English, which the resume is written in.
+      expect(one("Fluent in French", resume({ roles: `${TEN_YEARS}\n- ${line}` }), P).status).toBe(
         "unverifiable",
       );
     },

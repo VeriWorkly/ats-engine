@@ -2,7 +2,8 @@ name: GitHub Packages
 
 # Publishes a released version to GitHub's npm registry as well, so it is listed under the
 # repository's Packages. npmjs.com stays the primary registry. Started by the Release workflow
-# after each npm release, or by hand with the tag of an existing release.
+# after each npm release, or by hand with the tag of an existing release. Only from main, and
+# only an engine release tag: a branch name or another ref is refused before anything runs.
 on:
   workflow_dispatch:
     inputs:
@@ -16,11 +17,25 @@ permissions:
 
 jobs:
   publish:
+    # Run from main, as the Release workflow starts it; a run from another branch would use that
+    # branch's copy of this file.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
+      - name: Check the tag names an engine release
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! [[ "$TAG" =~ ^(@veriworkly/ats-engine@|v0\.1\.)[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::The tag input is not an engine release tag (@veriworkly/ats-engine@X.Y.Z)."
+            exit 1
+          fi
+      # A tag, never a branch of the same name. No token is left in .git/config: nothing here
+      # pushes, and `npm ci` runs dependency scripts.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
-          ref: ${{ inputs.tag }}
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22

@@ -18,11 +18,14 @@ export type AtsJobPosting = {
   requirements: string[];
 };
 
-/** Text beyond this adds cost to every downstream step and no signal. */
-export const MAX_JOB_TEXT_CHARS = 12_000;
+/**
+ * The most of a posting `check` and `analyze` read; `check` says in `parsingWarnings` when it cut
+ * one. The helpers here cut only when given `maxChars`, so the cut is made, and reported, once.
+ */
+export const MAX_JOB_TEXT_CHARS = 20_000;
 
-/** Plain job text: one trimmed line per non-blank line, capped at `maxChars`. */
-export function normalizeJobText(text: string, maxChars = MAX_JOB_TEXT_CHARS): string {
+/** Plain job text: one trimmed line per non-blank line, capped at `maxChars` when given. */
+export function normalizeJobText(text: string, maxChars = Number.POSITIVE_INFINITY): string {
   return text
     .split("\n")
     .map((line) => line.replace(/\s+/g, " ").trim())
@@ -40,7 +43,7 @@ export function normalizeJobText(text: string, maxChars = MAX_JOB_TEXT_CHARS): s
  * An element left unclosed drops everything after it. A `<` that cannot open a tag ("<5k") is
  * text.
  */
-export function jobHtmlToText(html: string, maxChars = MAX_JOB_TEXT_CHARS): string {
+export function jobHtmlToText(html: string, maxChars = Number.POSITIVE_INFINITY): string {
   return normalizeJobText(htmlText(html, true), maxChars);
 }
 
@@ -68,10 +71,7 @@ function textOf(value: unknown, depth = 0): string {
   if (depth > MAX_JSON_DEPTH) return "";
   // JSON-LD descriptions are often HTML escaped once more ("&lt;p&gt;"): unescape, then strip.
   if (typeof value === "string")
-    return jobHtmlToText(
-      value.includes("&lt;") ? decodeEntities(value) : value,
-      Number.POSITIVE_INFINITY,
-    );
+    return jobHtmlToText(value.includes("&lt;") ? decodeEntities(value) : value);
   if (Array.isArray(value))
     return value
       .map((item) => textOf(item, depth + 1))
@@ -173,7 +173,7 @@ const MIN_POSTING_DESCRIPTION_CHARS = 200;
  * The job text to match a resume against: the page's `JobPosting` when it publishes a real one,
  * its visible text otherwise.
  */
-export function jobTextFromHtml(html: string, maxChars = MAX_JOB_TEXT_CHARS): string {
+export function jobTextFromHtml(html: string, maxChars = Number.POSITIVE_INFINITY): string {
   const posting = extractJobPosting(html);
   if (!posting || posting.description.length < MIN_POSTING_DESCRIPTION_CHARS)
     return jobHtmlToText(html, maxChars);

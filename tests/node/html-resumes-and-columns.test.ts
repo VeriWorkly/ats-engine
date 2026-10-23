@@ -527,6 +527,27 @@ describe("a link added in two forms is added once", () => {
     );
     expect(added.endsWith("\nhttps://example.com/b")).toBe(true);
   });
+
+  // A cap of 1,000 addresses counted those the text shows: the 1,001st was never added.
+  it("adds a link after a thousand the text shows", () => {
+    const shown = Array.from({ length: 1_000 }, (_, index) => `https://example.com/p${index}`);
+    const text = `Jane Doe\n${shown.join("\n")}`;
+    expect(withLinks(text, [...shown, "https://www.linkedin.com/in/jane"])).toBe(
+      `${text}\nhttps://www.linkedin.com/in/jane`,
+    );
+  });
+
+  // Only the first 50,000 characters were searched, so a link shown later was added again.
+  it("does not add a link the text shows past 50,000 characters", () => {
+    const text = `${"Built payment services in Go. ".repeat(2_000)}\ngithub.com/jane`;
+    expect(withLinks(text, ["https://github.com/jane"])).toBe(text);
+  });
+
+  it("searches many addresses in bounded time", () => {
+    const shown = Array.from({ length: 2_500 }, (_, index) => `x${index}.example.com/a`).join(" ");
+    const targets = Array.from({ length: 100_000 }, (_, index) => `https://y${index}.example.org`);
+    expectFast(() => withLinks(shown, targets), 500);
+  });
 });
 
 describe("one stray byte does not turn a UTF-8 file into Windows-1252", () => {

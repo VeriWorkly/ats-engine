@@ -11,6 +11,7 @@ import {
   type AtsRepairCandidate,
   type AtsReport,
 } from "../../src/index.js";
+import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 const NOW = new Date("2026-09-30T00:00:00Z");
@@ -208,8 +209,26 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     ["phone", "2017 - 2019"],
     ["name", "jane.doe@example.com"],
     ["name", "(555) 010-2020"],
+    // Planted junk with a phone's characters, or a name's capitals.
+    ["phone", "2019 2020 2021"],
+    ["phone", "192.168.100.200"],
+    ["phone", "978-3-16-148410-0"],
+    ["phone", "+2017 - 2019"],
+    ["phone", "Years: 2019 2020 2021"],
+    ["phone", "192.168.100.200 (server)"],
+    ["phone", "ISBN: 978-3-16-148410-0"],
+    ["phone", "Mobile: (US)"],
+    ["name", "EXPERIENCE"],
+    ["name", "Senior Engineer, Acme Corporation"],
+    ["name", "Built the thing."],
+    // A title or an organisation word leads it, or two are in it.
+    ["name", "Head Chef"],
+    ["name", "Lead Engineer"],
+    ["name", "Acme Bank Corp"],
+    ["name", "Jane Doe, Engineer"],
   ] as const)("does not put a value that is not one in %s: %j", (field, value) => {
-    const { merged } = merge(emptyParsed, candidate({ [field]: value }), SOURCE);
+    // Written in the resume, so only its shape keeps it out.
+    const { merged } = merge(emptyParsed, candidate({ [field]: value }), `${SOURCE}\n${value}`);
     expect(merged[field]).toBe("");
   });
 
@@ -221,9 +240,80 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     ["phone", "+1 415 555 0134 x12"],
     ["phone", "+55 11 2019-2020"],
     ["name", "María José de la Cruz Fernández García"],
+    // Tested on the raw value, these were dropped: digits and dashes of other scripts and widths
+    // (Word puts U+2011 in a phone number), an extension after a comma, an area code in brackets.
+    ["phone", "+1 (415) 555‑0134"],
+    ["phone", "+1 415‐555‐0134"],
+    ["phone", "+1 415−555−0134"],
+    ["phone", "+1 415－555－0134"],
+    ["phone", "+١ ٤١٥ ٥٥٥ ٠١٣٤"],
+    ["phone", "＋１ ４１５ ５５５ ０１３４"],
+    ["phone", "(11) 2019-2020"],
+    ["phone", "+1 415 555 0134, ext. 12"],
+    ["name", "Jane Doe (she/her)"],
+    ["name", "John Smith 3rd"],
+    ["name", "Maria da Conceição dos Santos Pereira de Oliveira e Silva"],
+    ["name", "Doe, Jane"],
+    ["name", "张伟"],
+    ["email", "jane@bücher.de"],
+    ["email", "张伟@example.cn"],
+    // A surname that is a title or organisation word.
+    ["name", "Maria Head"],
+    ["name", "James Fellow"],
+    ["name", "Anna Bank"],
+    ["name", "Lena Officer"],
+    ["name", "Kim Co"],
   ] as const)("fills %s with %j", (field, value) => {
     const { merged } = merge(emptyParsed, candidate({ [field]: value }), `${SOURCE}\n${value}`);
     expect(merged[field]).toBe(value);
+  });
+
+  it.each([
+    ["+1 415 555 0134 (mobile)", "+1 415 555 0134"],
+    ["Mobile: +1 415 555 0134", "+1 415 555 0134"],
+    ["+1-415-555-0134 (US)", "+1-415-555-0134"],
+    ["Tel.: (+44) 7700 900123 (WhatsApp)", "(+44) 7700 900123"],
+    ["+1 415 555 0134 x12 (work)", "+1 415 555 0134 x12"],
+  ])("fills the phone %j without its label", (value, expected) => {
+    const { merged } = merge(emptyParsed, candidate({ phone: value }), `${SOURCE}\n${value}`);
+    expect(merged.phone).toBe(expected);
+  });
+
+  it.each([
+    ["Tom Cook", "Tom Cook"],
+    ["Lena Partner", "Lena Partner"],
+    ["Rosa Nurse", "Rosa Nurse"],
+    ["Senior Engineer", ""],
+    ["Chief Partner", ""],
+  ])("reads %j by a policy's own title words", (value, expected) => {
+    const rp = DEFAULT_POLICY.resumeParse;
+    const policy = {
+      ...DEFAULT_POLICY,
+      resumeParse: {
+        ...rp,
+        titleWords: [...rp.titleWords, "cook", "partner", "nurse", "senior", "chief"],
+      },
+    };
+    const { merged } = mergeGrounded(
+      emptyParsed,
+      candidate({ name: value }),
+      `${SOURCE}\n${value}`,
+      {
+        policy,
+        now: NOW,
+      },
+    );
+    expect(merged.name).toBe(expected);
+  });
+
+  // A surname may be a title or organisation word, but not a role's title or employer.
+  it.each([
+    ["Software Engineer", { title: "Software Engineer", employer: "Acme" }],
+    ["Initech Bank", { title: "Analyst", employer: "Initech Bank" }],
+  ])("does not take the role %j for the name", (value, role) => {
+    const roles = [{ ...role, start: null, end: null, current: false }];
+    const { merged } = merge(emptyParsed, candidate({ name: value, roles }), `${SOURCE}\n${value}`);
+    expect(merged.name).toBe("");
   });
 
   it("fills an email and a phone written as such", () => {
@@ -233,6 +323,20 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
       SOURCE,
     );
     expect(merged).toMatchObject({ email: "jane.doe@example.com", phone: "(555) 010-2020" });
+  });
+
+  it("judges a long contact value's shape in bounded time", () => {
+    // Grounded (whitespace folds), so only the shape checks see it.
+    const gap = " ".repeat(50_000);
+    const source = `${SOURCE}\n1 2 Jane Doe`;
+    expectFast(() => {
+      const { merged } = merge(
+        emptyParsed,
+        candidate({ phone: `1${gap}2`, name: `Jane${gap}Doe` }),
+        source,
+      );
+      expect(merged).toMatchObject({ phone: "", name: "" });
+    }, 500);
   });
 
   it("keeps dates, which the schema bounds rather than the substring check", () => {
@@ -414,6 +518,15 @@ describe("grounding: a shared source index", () => {
     const candidate = { skills: Array.from({ length: 500 }, (_, i) => `Skill number ${i}`) };
     expectFast(() => findGroundingViolations(candidate, source), 500);
   });
+
+  it("reads an address glued to a run of marks in bounded time", () => {
+    const source = `janedoe.dev/${"·".repeat(50_000)}x`;
+    expectFast(
+      () =>
+        expect(findGroundingViolations({ url: "https://janedoe.dev/x" }, source)).toHaveLength(1),
+      500,
+    );
+  });
 });
 
 describe("merge: tenure fields are grounded too", () => {
@@ -452,6 +565,73 @@ describe("merge: tenure fields are grounded too", () => {
     expect(
       merge(emptyParsed, candidate({ roles: [role] }), noPresent).merged.roles[0]!.current,
     ).toBe(false);
+  });
+
+  // "continuing", "ab" and "से" are open ends only where their date ends the line, as the parser
+  // reads them: a heading, a company's suffix or a city does not ground `current`.
+  const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
+  const currentIn = (source: string, start: number | null, employer: string) =>
+    mergeGrounded(
+      emptyParsed,
+      candidate({
+        roles: [
+          {
+            title: "Engineer",
+            employer,
+            start: start === null ? null : { year: start, month: 1 },
+            end: null,
+            current: true,
+          },
+        ],
+      }),
+      source,
+      { policy: LOCALIZED, now: NOW },
+    ).merged.roles[0]!.current;
+
+  it.each([
+    [
+      "Experience\nEngineer, Globex Ltd\n2017 - 2019\nContinuing Education\nAWS Solutions Architect course",
+      2017,
+      "Globex Ltd",
+    ],
+    [
+      "Berufserfahrung\nIngenieur, Volvo AB 2018 – 2021\nEntwicklung von Software für Fahrzeuge und Prüfstände",
+      2018,
+      "Volvo AB",
+    ],
+    [
+      "अनुभव\nइंजीनियर, Hooli\nजून 2018 - मार्च 2021, दिल्ली से\nटीम का नेतृत्व किया",
+      2018,
+      "Hooli",
+    ],
+    ["अनुभव\nइंजीनियर, Hooli दिल्ली से\nटीम का नेतृत्व किया", null, "Hooli"],
+  ])("does not keep current from an everyday word in %j", (source, start, employer) => {
+    expect(currentIn(source, start, employer)).toBe(false);
+  });
+
+  it.each([
+    ["Experience\nEngineer, Globex Ltd\nJan 2017 onwards", 2017, "Globex Ltd"],
+    ["Experience\nEngineer, Globex Ltd\nJan 2017 - Continuing", 2017, "Globex Ltd"],
+    ["Experience\nEngineer, Globex Ltd\nJan 2017 -\nContinuing", 2017, "Globex Ltd"],
+    [
+      "Berufserfahrung\nIngenieur, Volvo AB\nab 03/2018\nEntwicklung von Software für Fahrzeuge und Prüfstände",
+      2018,
+      "Volvo AB",
+    ],
+    ["अनुभव\nइंजीनियर, Hooli\nजून 2018 से\nटीम का नेतृत्व किया", 2018, "Hooli"],
+  ])("keeps current where %j says so", (source, start, employer) => {
+    expect(currentIn(source, start, employer)).toBe(true);
+  });
+
+  it.each([
+    ["spaces after a year", `2017${" ".repeat(50_000)}x`],
+    ["year and dash run", "2017 - ".repeat(7_000)],
+    ["since word and spaces", `2017 ab${" ".repeat(50_000)}x`],
+    ["since word and letters", `2017 ab ${"a".repeat(50_000)}`],
+  ])("reads a line of %s in linear time", (_, line) => {
+    // German, so "ab" is read.
+    const source = `Berufserfahrung\nEngineer, Volvo AB\nEntwicklung von Software für Fahrzeuge und Prüfstände\n${line}`;
+    expectFast(() => currentIn(source, 2017, "Volvo AB"), 500);
   });
 
   it("rejects punctuation-only contact values", () => {

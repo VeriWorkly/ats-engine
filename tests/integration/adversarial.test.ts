@@ -62,6 +62,7 @@ const SHAPES: Record<string, string> = {
   "month slash run": rep("1/12 "),
   "onwards run": rep("2021 onwards "),
   "ab run": rep("ab 06/2021 "),
+  "AB range run": rep("AB 2018 - "),
   "or run": rep("Go or "),
   "x or y commas": `${rep("a, b, ")} or c`,
   "mixed script": rep("aб"),

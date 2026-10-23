@@ -23,10 +23,10 @@ const jobSectionSchema = z.object({
 
 export const keywordMatchSchema = z
   .object({
-    requiredWeight: z.number().check(z.gt(0)),
-    preferredWeight: z.number().check(z.gt(0)),
-    responsibilitiesWeight: z.number().check(z.gt(0)),
-    defaultWeight: z.number().check(z.gt(0)),
+    requiredWeight: z.number().check(z.gt(0), z.lte(1000)),
+    preferredWeight: z.number().check(z.gt(0), z.lte(1000)),
+    responsibilitiesWeight: z.number().check(z.gt(0), z.lte(1000)),
+    defaultWeight: z.number().check(z.gt(0), z.lte(1000)),
     /**
      * Multiplier for terms that are not recognised skills and do not read as proper nouns or
      * acronyms in the posting, so ordinary words count but cannot outvote the skills asked for.
@@ -211,8 +211,28 @@ export const keywordMatchSchema = z
         equivalence: z._default(wordList("requirements.equivalence"), [
           String.raw`or\s+equivalent`,
           String.raw`equivalent\s+(?:practical\s+|work\s+)?experience`,
-          String.raw`or\s+related\s+field`,
         ]),
+        /**
+         * Words widening the degree's field ("or a related field"): no equivalent experience, and
+         * no alternative to the years beside the degree.
+         */
+        relatedField: z._default(wordList("requirements.relatedField"), [
+          String.raw`or\s+(?:(?:an?|another|other)\s+)?related\s+(?:field|discipline|area|subject)s?`,
+        ]),
+        /**
+         * Fields of study a posting abbreviates, each to the words it stands for: "CS" asked is
+         * held by "Computer Science" in a degree's own words, never in its school's name. Not
+         * "IT", "IS" or "ME", which are `stopwords` and so never a field asked, nor "CE", which is
+         * civil engineering as often as computer engineering.
+         */
+        fieldAbbreviations: z._default(z.record(term, term), {
+          cs: "computer science",
+          ee: "electrical engineering",
+          ai: "artificial intelligence",
+          ml: "machine learning",
+          hr: "human resources",
+          ba: "business administration",
+        }),
         authorization: z._default(wordList("requirements.authorization"), [
           String.raw`authori[sz]ed\s+to\s+work`,
           String.raw`work\s+authori[sz]ation`,
@@ -222,7 +242,7 @@ export const keywordMatchSchema = z
           String.raw`(?:requires?|requiring|needs?|needing)\s+sponsorship`,
           String.raw`work\s+permit`,
           String.raw`(?:us|u\.s\.)\s+citizen(?:ship)?`,
-          String.raw`(?:british|uk|u\.k\.|eu|e\.u\.|american|canadian|australian|irish|indian)\s+citizen(?:ship)?`,
+          String.raw`(?:british|uk|u\.k\.|eu|e\.u\.|(?<!(?:latin|south|central|north)\s)american|canadian|australian|irish|indian)\s+citizen(?:ship)?`,
           String.raw`green\s+card`,
           String.raw`permanent\s+resident`,
         ]),
@@ -230,27 +250,38 @@ export const keywordMatchSchema = z
          * The countries a right to work or a citizenship is stated for, each a name and the ways
          * of writing it. A statement naming only other countries than the posting asks about is
          * no evidence ("Authorized to work in the US" for a UK role); one naming none is read as
-         * it stands.
+         * it stands. A citizenship meets a citizenship asked only of its own country.
+         * `citizensWorkIn` names the other countries whose right to work its citizens hold: an
+         * Irish citizen may work in the UK and the EU, but is no British citizen.
          */
         countries: z._default(
           z.array(
             z.object({
               name: z.string().check(z.minLength(1)),
               patterns: wordList("requirements.countries"),
+              citizensWorkIn: z.optional(z.array(z.string().check(z.minLength(1)))),
             }),
           ),
           [
             {
               name: "US",
               patterns: [
-                // Not "us" the pronoun ("Tell us"): dotted, "USA", after "the"/"in", or before "citizen".
+                // Not "us" the pronoun ("Tell us"): dotted, "USA", after "the", "in" or "and",
+                // beside "&" or "/" ("Canada/US"), or before a word about the right to work.
                 String.raw`u\.s\.(?:a\.)?`,
                 "usa",
-                String.raw`(?<=(?:the|in)\s)us`,
-                String.raw`us(?=\s+citizen)`,
+                // Bounded, so a long run of spaces is not read back over at every position. After a
+                // comma or a colon in a list ("Canada, US", "Work authorization: US").
+                String.raw`(?<=(?:(?:the|in|and)\s{1,3}|[&/,:]\s{0,3}))us`,
+                String.raw`us(?=\s{0,3}[&/-])`,
+                String.raw`us(?=\s+(?:citizen|national|passport|(?:lawful\s+)?permanent\s+residen|green\s+card|work\s+(?:authori[sz]|permit|visa)))`,
                 String.raw`(?:the\s+)?united\s+states(?:\s+of\s+america)?`,
-                // Not "Latin American": only a citizen.
-                String.raw`american(?=\s+citizen)`,
+                String.raw`the\s+states`,
+                // Not Latin, South, Central or North America, nor "Bank of America".
+                String.raw`(?<!(?:latin|south|central|north|of)\s)america`,
+                // A citizen or a nationality, and not "Latin American".
+                String.raw`(?<!(?:latin|south|central|north)\s)american(?=\s+(?:citizen|national|passport))`,
+                String.raw`(?<=(?:citizenship|nationality)\s{0,3}:\s{0,3})american`,
                 String.raw`green\s+card`,
               ],
             },
@@ -265,18 +296,43 @@ export const keywordMatchSchema = z
                 "scotland",
                 // Not New South Wales.
                 String.raw`(?<!south\s)wales`,
+                String.raw`northern\s+ireland`,
               ],
+              citizensWorkIn: ["Ireland"],
             },
             {
               name: "EU",
-              patterns: [String.raw`e\.?u\.?`, String.raw`european\s+union`, "eea"],
+              patterns: [
+                String.raw`e\.?u\.?`,
+                String.raw`european\s+union`,
+                "eea",
+                // Its member states but Ireland, which has its own entry.
+                String.raw`austria|belgium|bulgaria|croatia|cyprus|czechia|czech\s+republic|denmark|estonia|finland|france|germany|greece|hungary|italy|latvia|lithuania|luxembourg|malta|(?:the\s+)?netherlands|poland|portugal|romania|slovakia|slovenia|spain|sweden`,
+              ],
+              citizensWorkIn: ["Ireland"],
+            },
+            // In the EU, and sharing a right to work with the UK.
+            {
+              name: "Ireland",
+              patterns: [String.raw`(?<!northern\s)ireland`, "irish"],
+              citizensWorkIn: ["UK", "EU"],
             },
             { name: "Canada", patterns: ["canada", "canadian"] },
             { name: "Australia", patterns: ["australia", "australian"] },
-            // Not Ireland: an Irish citizen may work in the EU and the UK as well.
             { name: "India", patterns: ["india", "indian"] },
           ],
         ),
+        /**
+         * Words joining the places a right to work is stated for, so a list of them runs on past
+         * a comma: "Authorized to work in the US, Canada and the UK".
+         */
+        placeJoiners: z._default(wordList("requirements.placeJoiners"), [
+          "and",
+          "or",
+          "in",
+          "the",
+          "both",
+        ]),
         /**
          * What a statement about the right to work says. A line matching `noSponsorship` is read
          * without those words first, so their "no" and "not" are not its negation. `needsSponsorship`
@@ -333,8 +389,15 @@ export const keywordMatchSchema = z
           "lapsed",
           String.raw`able\s+to\s+obtain`,
           String.raw`former(?:ly)?`,
-          // In a clause of its own: "Secret clearance (not active)", "TS/SCI (not obtained)".
-          String.raw`not\s+(?:currently\s+)?(?:active|current|valid|held|obtained|renewed|cleared)`,
+        ]),
+        /**
+         * Negated words that say a clearance is not held, read in its own sentence (up to a
+         * semicolon), past a comma or a bracket: "Secret clearance (not active)", "TS/SCI
+         * clearance, not yet granted". Not further: "Active Top Secret clearance; not active duty
+         * military" holds Top Secret.
+         */
+        notHeldNearby: z._default(wordList("requirements.notHeldNearby"), [
+          String.raw`not\s+(?:(?:currently|yet)\s+)?(?:active|current|valid|held|obtained|renewed|cleared|granted|issued|approved|in\s+use)`,
           String.raw`no\s+longer`,
         ]),
         /**
@@ -354,9 +417,15 @@ export const keywordMatchSchema = z
          */
         citizenship: z._default(wordList("requirements.citizenship"), [
           String.raw`(?:us|u\.s\.|united\s+states)\s+citizen(?:ship)?`,
-          String.raw`citizen\s+of\s+the\s+(?:us|u\.s\.|united\s+states)`,
-          String.raw`(?:british|uk|u\.k\.|eu|e\.u\.|american|canadian|australian|irish|indian)\s+citizen(?:ship)?`,
+          String.raw`citizen\s+of\s+(?:the\s+)?(?:us|u\.s\.(?:a\.)?|usa|united\s+states)`,
+          String.raw`(?:british|uk|u\.k\.|eu|e\.u\.|(?<!(?:latin|south|central|north)\s)american|canadian|australian|irish|indian)\s+citizen(?:ship)?`,
           String.raw`citizen\s+of\s+(?:the\s+)?(?:uk|u\.k\.|united\s+kingdom|eu|european\s+union|canada|australia|ireland|india)`,
+          String.raw`citizen\s+of\s+an?\s+(?:eu|e\.u\.|european\s+union)\s+(?:member\s+)?(?:state|country|nation)`,
+          // A nationality: "Citizenship: Indian", "British national", "EU passport holder"; not
+          // "the Indian national team".
+          String.raw`(?:citizenship|nationality)\s{0,3}:\s{0,3}(?:the\s+)?(?:us|u\.s\.(?:a\.)?|usa|united\s+states|uk|u\.k\.|united\s+kingdom|eu|e\.u\.|british|american|canadian|australian|irish|indian|canada|australia|ireland|india)`,
+          String.raw`(?:us|u\.s\.|british|uk|u\.k\.|eu|e\.u\.|(?<!(?:latin|south|central|north)\s)american|canadian|australian|irish|indian)\s+national(?![\s-]*\p{L})`,
+          String.raw`(?:us|u\.s\.|british|uk|u\.k\.|eu|e\.u\.|(?<!(?:latin|south|central|north)\s)american|canadian|australian|irish|indian)\s+passport(?:\s+holder)?`,
         ]),
         residence: z._default(wordList("requirements.residence"), [
           String.raw`green\s+card`,

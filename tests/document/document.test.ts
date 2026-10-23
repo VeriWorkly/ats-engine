@@ -330,9 +330,15 @@ describe("JSON Resume through the engine's front door", () => {
   // Only English "Present" and its kin made a role current; "heute" gave a one-month role.
   it.each([
     ["Current role", []],
+    ["Current position", []],
     ["Till now", []],
+    ["Present.", []],
+    ["- Present", []],
+    ["Continuing", []],
     ["heute", ["de"]],
+    ["bis heute", ["de"]],
     ["aujourd'hui", ["fr"]],
+    ["अभी तक", ["hi"]],
   ])("treats an end of %j as a current role", (endDate, languages) => {
     const resume = {
       basics: { name: "Jane Doe", email: "jane@example.com" },
@@ -346,16 +352,34 @@ describe("JSON Resume through the engine's front door", () => {
     expect(report.parsed.monthsOfExperience).toBeGreaterThanOrEqual(92);
   });
 
-  it.each(["soon", "Not current", "No longer current"])(
-    "still reads an end of %j as no end, not as current",
-    (endDate) => {
-      const resume = {
-        basics: { name: "Jane Doe" },
-        work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate }],
-      };
-      expect(check(resume).parsed.roles[0]).toMatchObject({ current: false, end: null });
-    },
-  );
+  // Only an end that is an open end as a whole is current: one that opens with one and goes on
+  // ("Current role ended 2020", "Heute nicht") is no end.
+  it.each([
+    ["soon", []],
+    ["Not current", []],
+    ["No longer current", []],
+    ["Current role ended 2020", []],
+    ["Till now (contract ended)", []],
+    ["Present 2021", []],
+    ["Now closed", []],
+    ["Ongoing until Mar 2021", []],
+    ["Continuing until 2020", []],
+    ["Current: no", []],
+    ["Present?", []],
+    ["Heute nicht", ["de"]],
+    ["jetzt nicht mehr", ["de"]],
+    ["से", ["hi"]],
+  ])("still reads an end of %j as no end, not as current", (endDate, languages) => {
+    const resume = {
+      basics: { name: "Jane Doe" },
+      work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate }],
+    };
+    const report = score(resume, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
+      now: NOW,
+      languages: languages as string[],
+    });
+    expect(report.parsed.roles[0]).toMatchObject({ current: false, end: null });
+  });
 
   it("reads only a bounded slice of a huge array", () => {
     const huge = {
@@ -364,6 +388,71 @@ describe("JSON Resume through the engine's front door", () => {
     };
     const prepared = expectFast(() => prepareResume(huge), 500);
     expect(prepared.document?.sections[0]?.kind).toBe("experience");
+  });
+
+  // The arrays were cut to 200 before empty entries were dropped: 200 empty ones hid every real one.
+  it("drops empty entries before cutting an array to its limit", () => {
+    const resume = {
+      basics: { name: "Mira Kestrel" },
+      work: [
+        ...Array.from({ length: 250 }, () => ({})),
+        null,
+        { startDate: "2010-01" },
+        {
+          name: "Globex Corp",
+          position: "Engineer",
+          startDate: "2019-01",
+          highlights: [...Array<string>(120).fill(""), "Built dashboards used by 40 teams"],
+        },
+      ],
+    };
+    const { parsed } = check(resume);
+    expect(parsed.roles).toMatchObject([{ employer: "Globex Corp", title: "Engineer" }]);
+    expect(prepareResume(resume).text).toContain("Built dashboards used by 40 teams");
+    // An array of nothing but empty entries is walked once, in linear time.
+    const empty = { basics: { name: "A" }, work: Array.from({ length: 200_000 }, () => ({})) };
+    expect(expectFast(() => prepareResume(empty), 500).document?.sections).toEqual([]);
+  });
+
+  const role = { name: "Globex Corp", position: "Engineer", startDate: "2019-01" };
+
+  // These were flattened to text, which reads no role.
+  it.each([
+    ["no basics", { work: [role] }],
+    ["basics that is not an object", { basics: "Mira Kestrel", work: [role] }],
+    ["work as one object", { basics: { name: "Mira Kestrel" }, work: role }],
+    ["no basics and work as one object", { work: role, education: [] }],
+  ])("reads a file with %s as structure", (_, resume) => {
+    expect(prepareResume(resume).document).not.toBeNull();
+    expect(check(resume).parsed.roles).toMatchObject([
+      { employer: "Globex Corp", title: "Engineer" },
+    ]);
+  });
+
+  // Read as text, such a file gave its name; read as structure, it was lost.
+  it("reads basics that are only a name as the name", () => {
+    expect(check({ basics: "Mira Kestrel", work: [role] }).parsed.name).toBe("Mira Kestrel");
+    // A name in a script without case is one run of characters.
+    expect(check({ basics: "王小明", work: [role] }).parsed.name).toBe("王小明");
+    // Particles between the capitalised words, as 0.16.0 read them.
+    expect(check({ basics: "Pieter van der Berg", work: [role] }).parsed.name).toBe(
+      "Pieter van der Berg",
+    );
+    expect(check({ basics: "Ana de la Cruz", work: [role] }).parsed.name).toBe("Ana de la Cruz");
+  });
+
+  // Held to the checks a name on a page gets: a headline or a heading is not one.
+  it.each(["Senior Software Engineer", "Work Experience", "Software Engineer at Hooli"])(
+    "reads no name from basics that are only %j",
+    (basics) => {
+      expect(check({ basics, work: [role] }).parsed.name).toBe("");
+    },
+  );
+
+  it("still flattens an object without basics whose roles are not spelled as JSON Resume's", () => {
+    const other = { name: "Mira Kestrel", work: [{ company: "Globex Corp", title: "Engineer" }] };
+    expect(prepareResume(other).document).toBeNull();
+    expect(prepareResume(other).text).toContain("Mira Kestrel");
   });
 
   it("is not triggered by an object that merely has a basics key", () => {

@@ -1,8 +1,14 @@
 import { adviceFor, targetOf } from "../advice/index.js";
 import { prepareResume, type AtsResumeInput, type PreparedResume } from "../input.js";
+import { MAX_JOB_TEXT_CHARS } from "../job/index.js";
 import { localizePolicy, type AtsLocaleOptions } from "../locales/resolve.js";
 import { computeJobMatch } from "../matching/jobMatch.js";
-import { judgeRequirements, withHeadings, type HeadedSection } from "../matching/requirements.js";
+import {
+  judgeRequirements,
+  withHeadings,
+  writtenLanguages,
+  type HeadedSection,
+} from "../matching/requirements.js";
 import { readingDatesAt } from "../parser/dates.js";
 import { DEFAULT_POLICY } from "../policy/default.js";
 import { policyFingerprint } from "../policy/fingerprint.js";
@@ -14,9 +20,6 @@ import { rollUpCategories } from "./categories.js";
 import { readResume } from "./context.js";
 import { scoreRules, strengthsOf } from "./score.js";
 import { caughtGaming } from "./verdict.js";
-
-/** Postings past this are cut: every step that reads a posting is linear in it. */
-const MAX_JOB_DESCRIPTION_CHARS = 20_000;
 
 /** Format metrics that measure how the text extracts, not choices like length. */
 const EXTRACTION_METRICS = new Set(["columnRatio", "tableCount", "letterSpacedLines"]);
@@ -372,7 +375,10 @@ function hiddenCover(hidden: string, texts: readonly string[]): number[] | undef
 
 /** Everything `check` reads besides the resume and the policy. */
 export type AtsCheckOptions = {
-  /** Enables job match scoring. Read up to its first 20 000 characters. */
+  /**
+   * Enables job match scoring. Read up to its first 20,000 characters (`MAX_JOB_TEXT_CHARS`); a
+   * longer one is cut there, and `parsingWarnings` says so.
+   */
   jobDescription?: string | undefined;
   /**
    * The employer that posted the job (`extractJobPosting`'s `company`); its words are left out of
@@ -422,11 +428,10 @@ export function check(
   const { layout } = options;
   const now = readingDatesAt(options.now ?? new Date());
   // Untyped callers send anything; only a string is a posting. Normalised like the resume, so a
-  // pasted no-break or zero-width space cannot split a word.
-  const jobDescription =
-    typeof options.jobDescription === "string"
-      ? normalizeText(options.jobDescription.slice(0, MAX_JOB_DESCRIPTION_CHARS))
-      : undefined;
+  // pasted no-break or zero-width space cannot split a word. Cut first: every step that reads a
+  // posting is linear in it.
+  const posting = typeof options.jobDescription === "string" ? options.jobDescription : undefined;
+  const jobDescription = posting && normalizeText(posting.slice(0, MAX_JOB_TEXT_CHARS));
   // Refused before any work, like an unknown region.
   const target = targetOf(basePolicy, options.targetAts);
   const prepared = prepareResume(resume);
@@ -500,14 +505,19 @@ export function check(
     matchedKeywordGroups: jobMatch.matchedGroups,
     missingKeywordGroups: jobMatch.missingGroups,
     // What stops an ATS reading the document: parse checks and the format checks that measure
-    // extraction. Length and a photo are format choices and stay out.
+    // extraction. Length and a photo are format choices and stay out. Then a posting cut short.
     parsingWarnings: failedChecks
       .filter(
         (rule) =>
           rule.category === "parse" ||
           (rule.category === "format" && EXTRACTION_METRICS.has(metricOf.get(rule.id) ?? "")),
       )
-      .map((rule) => rule.evidence),
+      .map((rule) => rule.evidence)
+      .concat(
+        posting && posting.length > MAX_JOB_TEXT_CHARS
+          ? `The job posting is ${posting.length.toLocaleString("en")} characters; only its first ${MAX_JOB_TEXT_CHARS.toLocaleString("en")} were read.`
+          : [],
+      ),
     strengths: strengthsOf(active, results),
     failedChecks,
     prioritizedFixes: [...failedChecks]
@@ -522,16 +532,22 @@ export function check(
     parsed,
     locale,
     engine: { version: ENGINE_VERSION, policy: policyFingerprint(policy) },
-    requirements: judgeRequirements(jobDescription, shownSections, parsed, policy, now).map(
-      (requirement) =>
-        changed
-          ? {
-              ...requirement,
-              evidence: requirement.evidence.map((line) =>
-                line.replaceAll(BREAK, " ").replace(/\s+/g, " ").trim(),
-              ),
-            }
-          : requirement,
+    requirements: judgeRequirements(
+      jobDescription,
+      shownSections,
+      parsed,
+      policy,
+      now,
+      jobDescription ? writtenLanguages(policy, resumeLanguages, prepared.text) : [],
+    ).map((requirement) =>
+      changed
+        ? {
+            ...requirement,
+            evidence: requirement.evidence.map((line) =>
+              line.replaceAll(BREAK, " ").replace(/\s+/g, " ").trim(),
+            ),
+          }
+        : requirement,
     ),
     // Read after the score is final, from nothing the score reads: advice cannot move it.
     advice: adviceFor(policy, { parsed, lines, now, file: options.file, layout, target }),

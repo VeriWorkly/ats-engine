@@ -448,21 +448,30 @@ export function joinPages(pages: readonly PageLines[]): string {
 
 /** At most this many link targets are added to a document's text. */
 const MAX_LINKS = 50;
-/** Distinct link targets looked for in the text; the rest are not added. */
-const MAX_LINKS_CHECKED = 1_000;
-/** Text searched for a link: what extraction keeps (`MAX_EXTRACTED_CHARS`). */
-const SHOWN_CHARS = 50_000;
+/** Characters searched for link targets in all: a thousand searches of a 50,000-character text. */
+const MAX_SEARCHED_CHARS = 50_000_000;
+/** A ".", "@" or "/" inside an address, not ending it: what a shown address's word holds. */
+const ADDRESS_MARK = /[.@/]./;
 
 /**
  * `text` with the web and email targets of its links that it does not already show, one per line
  * at the end: a link reading "LinkedIn" carries its URL only in the target.
+ *
+ * An address has no space, so the text shows it inside one word; one with a mark
+ * (`ADDRESS_MARK`) is looked for among the words that have one, a few hundred characters in a
+ * resume, not in the whole text. The searches stop after `MAX_SEARCHED_CHARS`.
  */
 export function withLinks(text: string, targets: readonly string[]): string {
-  const shown = text.slice(0, SHOWN_CHARS).toLowerCase();
+  const lowered = text.toLowerCase();
+  const marked = lowered
+    .split(/\s+/)
+    .filter((word) => ADDRESS_MARK.test(word))
+    .join("\n");
   const missing = new Map<string, string>();
   const checked = new Set<string>();
+  let searched = 0;
   for (const target of targets) {
-    if (missing.size >= MAX_LINKS || checked.size >= MAX_LINKS_CHECKED) break;
+    if (missing.size >= MAX_LINKS) break;
     if (target.length > 500) continue;
     const bare = target.trim().replace(/^mailto:([^?]*).*$/i, "$1");
     if (!/^(?:https?:\/\/\S+|[^\s@/:]+@[^\s@/]+)$/i.test(bare)) continue;
@@ -471,7 +480,10 @@ export function withLinks(text: string, targets: readonly string[]): string {
     while (/[/?#]$/.test(core)) core = core.slice(0, -1);
     if (checked.has(core)) continue;
     checked.add(core);
-    if (!shown.includes(core)) missing.set(core, bare);
+    const words = ADDRESS_MARK.test(core) ? marked : lowered;
+    searched += words.length;
+    if (searched > MAX_SEARCHED_CHARS) break;
+    if (!words.includes(core)) missing.set(core, bare);
   }
   return missing.size ? `${text}\n${[...missing.values()].join("\n")}` : text;
 }

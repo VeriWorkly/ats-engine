@@ -65,6 +65,8 @@ const vocabularyShape = {
   openEnded: optionalList("openEnded"),
   rangeWords: optionalList("rangeWords"),
   sinceWords: optionalList("sinceWords"),
+  /** Open ends and since words that date a role only where their date ends the line: "से". */
+  lineEndDateWords: optionalList("lineEndDateWords"),
   employerWords: optionalList("employerWords"),
   titleWords: optionalList("titleWords"),
   schoolWords: optionalList("schoolWords"),

@@ -10,7 +10,8 @@ const { exports, version } = JSON.parse(readFileSync("package.json", "utf8"));
 /** Gzipped KB. */
 const BUDGETS = {
   // Core: policy data (word lists, place names, clearance levels) grows with each reading fix.
-  ".": 106,
+  // 110: the audit fixes' countries, certification, language, name and date-word reading took it to 109.1.
+  ".": 110,
   "./document": 3,
   "./format": 1.5,
   // Entity decoding, page-furniture skipping, JSON-LD requirements, hidden-element rules.
@@ -20,12 +21,14 @@ const BUDGETS = {
   // Core policy data plus redaction; room for the next policy fixes. 78: the audit fixes' policy
   // data (countries, not-held and in-progress words, date words) took it to 75.1.
   "./ai": 78,
-  // Streamed, size-capped response reading.
-  "./ai/openai-compatible": 2.4,
-  "./ai/anthropic": 2.4,
+  // Streamed, size-capped response reading. 2.7: errors sent with HTTP 200, `retry-after`, and a
+  // timeout that holds when a host's fetch ignores the signal took them to 2.6.
+  "./ai/openai-compatible": 2.7,
+  "./ai/anthropic": 2.7,
   "./ai/testing": 1.5,
-  // Zip reader (a JSZip port), PDF and DOCX readers, table detection and DOCX XML guards.
-  "./node": 22.5,
+  // Zip reader (a JSZip port), PDF and DOCX readers, table detection and DOCX XML guards. 23: clip
+  // paths, blend modes and blank images in the hidden-text check took it to 22.7.
+  "./node": 23,
 };
 
 /**

@@ -62,21 +62,35 @@ describe("the size limit", () => {
 });
 
 describe("what is not a file on this computer", () => {
-  // A UNC path is read over SMB and a device can stream without end: refused before the path is touched.
-  it.each([
-    String.raw`\\host\share\cv.txt`,
-    "//host/share/cv.txt",
-    String.raw`\\?\UNC\host\share\cv.txt`,
-    String.raw`\\.\pipe\cv.txt`,
-    "//./pipe/cv.txt",
-    String.raw`\\?\GLOBALROOT\Device\cv.txt`,
-  ])("refuses %s", async (path) => {
+  // A UNC path is read over SMB and a device can stream without end: refused before the path is
+  // touched. Windows paths: on Linux and macOS they name local files (below).
+  it
+    .skipIf(process.platform !== "win32")
+    .each([
+      String.raw`\\host\share\cv.txt`,
+      "//host/share/cv.txt",
+      String.raw`\\?\UNC\host\share\cv.txt`,
+      String.raw`\\.\pipe\cv.txt`,
+      "//./pipe/cv.txt",
+      String.raw`\\?\GLOBALROOT\Device\cv.txt`,
+    ])("refuses %s", async (path) => {
     const message = /is a network share or a device, not a file on this computer\.$/;
     await expect(readFileBytes(path)).rejects.toBeInstanceOf(AtsFileError);
     await expect(readFileBytes(path)).rejects.toThrow(message);
     await expect(readResumeFile(path)).rejects.toThrow(message);
     await expect(readJobFile(path)).rejects.toThrow(message);
   });
+
+  // `//tmp/cv.txt` was refused as a network share on Linux, where it is `/tmp/cv.txt`.
+  it.skipIf(process.platform === "win32")(
+    "reads a path with two leading slashes on Linux and macOS, where it is a local path",
+    async () => {
+      const path = `/${file("slashes.txt", RESUME)}`;
+      expect(path.startsWith("//")).toBe(true);
+      expect((await readResumeFile(path)).input).toBe(RESUME);
+      expect((await readJobFile(path)).text).toContain("Engineer at Acme");
+    },
+  );
 
   it.skipIf(process.platform !== "win32")(
     "still reads a local file by its long-path form, \\\\?\\C:\\…",

@@ -13,6 +13,7 @@ import type {
   AtsParsedLanguage,
   AtsParsedRole,
 } from "../types.js";
+import { monthIndex, nowMonth } from "../util/months.js";
 import { own } from "../util/own.js";
 
 /** The display band of a score: `scoreTone`. */
@@ -129,12 +130,8 @@ export function roleSpanMonths(
   now: Date = new Date(),
 ): number {
   if (!role.start) return 0;
-  const from = role.start.year * 12 + (role.start.month ?? 1) - 1;
-  const to = role.current
-    ? now.getUTCFullYear() * 12 + now.getUTCMonth()
-    : role.end
-      ? role.end.year * 12 + (role.end.month ?? 12) - 1
-      : from;
+  const from = monthIndex(role.start);
+  const to = role.current ? nowMonth(now) : role.end ? monthIndex(role.end, 12) : from;
   return Math.max(0, to - from + 1);
 }
 

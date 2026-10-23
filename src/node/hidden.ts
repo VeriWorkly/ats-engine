@@ -3,21 +3,26 @@
  * pdf.js's operator list, keeping the graphics state a renderer keeps, and calls a run hidden when
  * a person looking at the page would not see it:
  *
- * - invisible render mode (`3 Tr`), unless over an image (the OCR layer of a scan);
+ * - invisible render mode (`3 Tr`), unless over an image that is not blank (the OCR layer of a
+ *   scan);
  * - fully transparent (`ca 0`), unless the same text is drawn visibly in the same place (the
  *   selectable copy Chrome lays over text with a shadow, outline or gradient fill);
  * - smaller than 2pt;
- * - off the page;
- * - within 1.25:1 contrast of what lies beneath: the topmost shape filled before it (blended by
- *   its opacity with what lies under it; a border's inside is not its fill), else the white page
- *   (an image, gradient or pattern leaves the background unknown: benefit of the doubt);
- * - covered by an image or an opaque shape drawn after it.
+ * - wholly outside the clip (the page, a form's box, the paths `W` clips to, each by its bounds);
+ * - within 1.25:1 contrast of what lies beneath, after its blend mode: the topmost shape or blank
+ *   image filled before it (blended by its opacity with what lies under it; a border's inside is
+ *   not its fill), else the white page (a picture, gradient or pattern leaves the background
+ *   unknown: benefit of the doubt);
+ * - on translucent fills of its own colour that together cover 70% or more of what lies beneath;
+ * - covered by an image or an opaque shape drawn after it. A shape drawn in a blend mode covers it
+ *   only when, blended with the text and what lies beneath alike, they are within 1.25:1 (a
+ *   highlighter's Multiply leaves dark text dark); one in a mode this does not know covers nothing.
  *
- * Measured, not certain: path-drawn glyphs, clip regions and blend modes can still hide text this
- * does not see. It errs on the side of not accusing anyone.
+ * Measured, not certain: path-drawn glyphs, clips that are not rectangles and shapes drawn in a
+ * blend mode can still hide text this does not see. It errs on the side of not accusing anyone.
  */
 
-import { indexDrawn, type Box, type Drawn } from "./surroundings.js";
+import { indexDrawn, OPAQUE, type Box, type Drawn } from "./surroundings.js";
 import { countRuledTables, pathRules } from "./tables.js";
 
 export type { Box };
@@ -26,7 +31,12 @@ type Matrix = [number, number, number, number, number, number];
 
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 const MIN_SIZE = 2;
-const MIN_CONTRAST = 1.25;
+export const MIN_CONTRAST = 1.25;
+/**
+ * Translucent fills of the text's own colour that cover this much of what lies beneath them hide
+ * it: at 70%, black text on black over white has 2.5:1 contrast, and over anything else less.
+ */
+const OWN_COLOUR = 0.7;
 
 function multiply(m1: Matrix, m2: Matrix): Matrix {
   return [
@@ -51,6 +61,10 @@ function boxThrough(m: Matrix, [x0, y0, x1, y1]: Box): Box {
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
 }
 
+/** pdf.js hands numbers over as an array or a typed array, by version. */
+const isList = (value: unknown): value is ArrayLike<number> =>
+  Array.isArray(value) || ArrayBuffer.isView(value);
+
 /** Relative luminance of a "#rrggbb" colour (WCAG 2). */
 function luminance(hex: string) {
   const channel = (offset: number) => {
@@ -60,28 +74,48 @@ function luminance(hex: string) {
   return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
 }
 
-function contrast(a: string, b: string) {
+/** The WCAG 2 contrast ratio of two "#rrggbb" colours. */
+export function contrast(a: string, b: string) {
   const [la, lb] = [luminance(a), luminance(b)];
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/** The "#rrggbb" seen where `over` is painted at opacity `alpha` on `under`. */
-function mix(over: string, under: string, alpha: number) {
+/**
+ * Blend modes, as pdf.js names them, that can leave what lies beneath as it was: a channel of what
+ * is painted (`t`) over one beneath (`b`), from 0 to 1. Any other is read as normal.
+ */
+const BLENDS: Record<string, (t: number, b: number) => number> = {
+  multiply: (t, b) => t * b,
+  screen: (t, b) => t + b - t * b,
+  darken: Math.min,
+  lighten: Math.max,
+  difference: (t, b) => Math.abs(t - b),
+  exclusion: (t, b) => t + b - 2 * t * b,
+};
+
+/** The "#rrggbb" seen where `over` is painted at opacity `alpha`, in blend mode `mode`, on `under`. */
+export function paintOver(over: string, under: string, alpha = 1, mode = "") {
   const a = Math.min(1, Math.max(0, alpha));
-  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16);
+  const f = BLENDS[mode] ?? ((t: number) => t);
+  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16) / 255;
   return `#${[1, 3, 5]
-    .map((at) =>
-      Math.round(a * channel(over, at) + (1 - a) * channel(under, at))
+    .map((at) => {
+      const b = channel(under, at);
+      return Math.round(255 * (a * f(channel(over, at), b) + (1 - a) * b))
         .toString(16)
-        .padStart(2, "0"),
-    )
+        .padStart(2, "0");
+    })
     .join("")}`;
 }
 
 /** A filled path's rectangles split into boxes; past this many, it is read as its bounding box. */
 const MAX_SUBPATHS = 8;
 
-/** The corners of an upright rectangle, or null: 4 points (5 when the first is repeated), each side level or plumb. */
+/**
+ * The corners of an upright rectangle, or null: 4 points (5 when the first is repeated), each side
+ * level or plumb. `turn` is its winding, 0 when it encloses nothing (a path out and back along
+ * the same line, or a rectangle of no width or height).
+ */
 function rectangle(points: ReadonlyArray<[number, number]>): { box: Box; turn: number } | null {
   const corners =
     points.length === 5 && points[4]![0] === points[0]![0] && points[4]![1] === points[0]![1]
@@ -99,30 +133,35 @@ function rectangle(points: ReadonlyArray<[number, number]>): { box: Box; turn: n
   const [[ax, ay], [bx, by]] = [corners[0]!, corners[2]!];
   return {
     box: [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)],
-    turn: area < 0 ? -1 : 1,
+    turn: Math.abs(area) < 1e-6 ? 0 : Math.sign(area),
   };
 }
 
 /**
  * What a filled path of upright rectangles covers, as boxes in page space, by each rectangle's
  * winding: a frame (`re re f*`, a bordered box) is its four sides, not the box around it.
+ * `holes`: the gaps it leaves inside its bounding box (a frame's inside), counted as boxes.
  * `undefined` for any other path (a curve, a slanted side, more than `MAX_SUBPATHS` rectangles),
- * or when `budget` (grid cells, shared across a page) runs out: the caller reads it as its
- * bounding box in its fill, as a solid shape.
+ * or when `budget` (boxes and holes, shared across a page) runs out: the caller reads it as its
+ * bounding box in its fill, as a solid shape. Each path split costs at least one box, so the work
+ * is bounded too: a grid of `2 * MAX_SUBPATHS` edges each way, each cell against every rectangle.
  */
 function filledBoxes(
   data: ArrayLike<number>,
   toPage: (x: number, y: number) => [number, number],
   evenOdd: boolean,
-  budget: { cells: number },
-): Box[] | undefined {
+  budget: { boxes: number },
+): { boxes: Box[]; holes: Box[] } | undefined {
   const subpaths: Array<{ box: Box; turn: number }> = [];
   let points: Array<[number, number]> = [];
   const close = () => {
     if (!points.length) return true;
     const found = rectangle(points);
     points = [];
-    return found ? subpaths.push(found) <= MAX_SUBPATHS : false;
+    if (!found) return false;
+    // One that encloses nothing fills nothing and cuts no hole.
+    if (found.turn) subpaths.push(found);
+    return subpaths.length <= MAX_SUBPATHS;
   };
   const point = (at: number) => toPage(Number(data[at]), Number(data[at + 1]));
   for (let at = 0; at < data.length;) {
@@ -139,37 +178,41 @@ function filledBoxes(
     else return undefined;
   }
   if (!close()) return undefined;
-  if (subpaths.length <= 1) return subpaths.length ? [subpaths[0]!.box] : undefined;
+  if (subpaths.length <= 1)
+    return subpaths.length ? { boxes: [subpaths[0]!.box], holes: [] } : undefined;
 
+  if (budget.boxes <= 0) return undefined;
   const edges = (low: 0 | 1, high: 2 | 3) =>
     [...new Set(subpaths.flatMap(({ box }) => [box[low], box[high]]))].sort((a, b) => a - b);
   const [xs, ys] = [edges(0, 2), edges(1, 3)];
-  if ((budget.cells -= xs.length * ys.length) < 0) return undefined;
   const boxes: Box[] = [];
+  const holes: Box[] = [];
   for (let row = 0; row + 1 < ys.length; row += 1) {
     const y = (ys[row]! + ys[row + 1]!) / 2;
-    let from: number | undefined;
-    for (let column = 0; column + 1 < xs.length; column += 1) {
-      const x = (xs[column]! + xs[column + 1]!) / 2;
+    const filled = xs.slice(1).map((right, column) => {
+      const x = (xs[column]! + right) / 2;
       let winding = 0;
       for (const { box, turn } of subpaths)
         if (x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]) winding += turn;
-      const filled = evenOdd ? winding % 2 !== 0 : winding !== 0;
-      if (filled) from ??= xs[column]!;
-      if (from !== undefined && (!filled || column + 2 === xs.length)) {
-        boxes.push([from, ys[row]!, filled ? xs[column + 1]! : xs[column]!, ys[row + 1]!]);
-        from = undefined;
+      return evenOdd ? winding % 2 !== 0 : winding !== 0;
+    });
+    // Each run of filled or empty cells along the row is one box.
+    for (let from = 0, to = 1; to <= filled.length; to += 1)
+      if (to === filled.length || filled[to] !== filled[from]) {
+        (filled[from] ? boxes : holes).push([xs[from]!, ys[row]!, xs[to]!, ys[row + 1]!]);
+        from = to;
       }
-    }
   }
-  return boxes;
+  return (budget.boxes -= boxes.length + holes.length) < 0 ? undefined : { boxes, holes };
 }
 
 /**
  * `fill` and `stroke` are "#rrggbb", or "" when not flat (a pattern, a gradient). `alpha` and
  * `strokeAlpha` are `ca` and `CA`. `softMask`: a soft mask is in force, so what is painted may show
- * through anywhere or nowhere. `lineWidth` is the pen (`w`) in user space. The text state
- * (`Tf`, `Tz` as a factor, `TL`, `Tr`) is saved and restored by `q`/`Q` too.
+ * through anywhere or nowhere. `lineWidth` is the pen (`w`) in user space. `blend` is the blend
+ * mode, as pdf.js names it, or "" when normal. `clip` bounds what may show, in page space: the page, narrowed by each
+ * clip set since. The text state (`Tf`, `Tz` as a factor, `TL`, `Tr`) is saved and restored by
+ * `q`/`Q` too.
  */
 type GraphicsState = {
   ctm: Matrix;
@@ -178,6 +221,8 @@ type GraphicsState = {
   alpha: number;
   strokeAlpha: number;
   softMask: boolean;
+  blend: string;
+  clip: Box;
   lineWidth: number;
   fontSize: number;
   hScale: number;
@@ -216,8 +261,11 @@ const MAX_MARKS = 2_000;
 const MAX_MASK_PAIRS = 100_000;
 /** Visible glyphs transparent runs are compared with, across a page; past this the rest are not. */
 const MAX_PIECE_CHECKS = 2_000_000;
-/** Grid cells spent splitting filled paths into boxes, across a page. */
-const MAX_FILL_CELLS = 1_000_000;
+/**
+ * Boxes and holes filled paths are split into, across a page. Each is a shape every run near it
+ * is checked against: past the cap, a path is one box.
+ */
+const MAX_FILL_BOXES = 2_000;
 /** Translucent fills looked through, one over another; the last is read as opaque. */
 const MAX_LAYERS = 4;
 
@@ -258,67 +306,78 @@ type ObjectStore = { get(objId: string, callback: (data: unknown) => void): unkn
 export type PageObjects = { objs: ObjectStore; commonObjs: ObjectStore };
 
 /**
- * Which of a page's masked images can be seen through: those whose decoded pixels hold an alpha
- * below 255. Pass the result to `measureVisibility`.
+ * What a decoded image lets show: null when a pixel's alpha is below `OPAQUE` (as a translucent
+ * shape lets what is under it show) or its pixels are unreadable (a bitmap, or none: the benefit
+ * of the doubt); else its colour ("#rrggbb") when it is one colour throughout, so it shows no
+ * words; else "". pdf.js's ImageKind: 1 a bit a pixel and 2 RGB, both opaque (a 1-bit image is not
+ * read for a colour); 3 RGBA. Linear: the colour is read up to the first pixel that differs.
+ */
+function pixelsOf(image: unknown): string | null {
+  const { kind, data } = (image ?? {}) as { kind?: unknown; data?: unknown };
+  if (kind === 1) return "";
+  if (!(data instanceof Uint8ClampedArray) || (kind !== 2 && kind !== 3)) return null;
+  const step = kind === 2 ? 3 : 4;
+  if (step > 3)
+    for (let at = 3; at < data.length; at += 4) if (data[at]! < 255 * OPAQUE) return null;
+  if (data.length < step) return "";
+  for (let at = step; at < data.length; at += 1) if (data[at] !== data[at % step]) return "";
+  return `#${((1 << 24) | (data[0]! << 16) | (data[1]! << 8) | data[2]!).toString(16).slice(1)}`;
+}
+
+/**
+ * What each image a page paints lets show (`pixelsOf`), by id. Pass the result to
+ * `measureVisibility`.
  *
  * pdf.js sends an image's pixels apart from the operator list, possibly after it, so this waits for
- * each (`waitMs` at most). Pixels that do not arrive, or arrive unreadable (a bitmap), are taken
- * as see-through: the benefit of the doubt.
+ * each (`waitMs` at most); pixels that do not arrive are unreadable.
  *
- * It waits for the page's other images too: a page closed before its images decode leaves them
- * decoding behind it (six 48 MP pages held 1.4 GB). Images in a pattern, a Type3 glyph or a soft
- * mask, or slower than `waitMs`, still decode after the page.
+ * It waits for every image: a page closed before its images decode leaves them decoding behind it
+ * (six 48 MP pages held 1.4 GB). Images in a pattern, a Type3 glyph or a soft mask, or slower than
+ * `waitMs`, still decode after the page.
  */
-export async function seeThroughImages(
+export async function readImages(
   ops: Ops,
   list: OperatorList,
   page: PageObjects,
   waitMs = 2_000,
-): Promise<Set<string>> {
-  const ids = new Map<string, boolean>();
+): Promise<Map<string, string | null>> {
+  const ids = new Set<string>();
   list.fnArray.forEach((fn, order) => {
     const id = list.argsArray[order]?.[0];
-    if (fn === ops.paintImageXObject && typeof id === "string")
-      ids.set(id, ids.get(id) || ownMask(ops, list, order));
+    if (fn === ops.paintImageXObject && typeof id === "string") ids.add(id);
   });
-  const seeThrough = new Set<string>();
+  const pixels = new Map<string, string | null>();
   await Promise.all(
-    [...ids].map(async ([id, masked]) => {
+    [...ids].map(async (id) => {
       const store = id.startsWith("g_") ? page.commonObjs : page.objs;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const image = await Promise.race([
         new Promise<unknown>((resolve) => store.get(id, resolve)),
         new Promise<undefined>((resolve) => (timer = setTimeout(() => resolve(undefined), waitMs))),
       ]).finally(() => clearTimeout(timer));
-      if (!masked) return;
-      const { kind, data } = (image ?? {}) as { kind?: unknown; data?: unknown };
-      // pdf.js's ImageKind: 1 grey, 2 RGB — no alpha, opaque — and 3 RGBA.
-      if (kind === 1 || kind === 2) return;
-      if (kind === 3 && data instanceof Uint8ClampedArray) {
-        for (let at = 3; at < data.length; at += 4) if (data[at]! < 255) return seeThrough.add(id);
-        return;
-      }
-      seeThrough.add(id);
+      pixels.set(id, pixelsOf(image));
     }),
   );
-  return seeThrough;
+  return pixels;
 }
 
-/** `seeThrough`: the masked images (`seeThroughImages`) whose pixels let what is under them show; without it every masked image does. */
+/** `pixels`: what the page's images let show (`readImages`); without it every masked image is see-through and only inline images can be blank. */
 export function measureVisibility(
   ops: Ops,
   list: OperatorList,
   pageBox: Box,
-  seeThrough?: ReadonlySet<string>,
+  pixels?: ReadonlyMap<string, string | null>,
 ): PageVisibility {
   const stack: GraphicsState[] = [];
-  let state: GraphicsState = {
+  const initial: GraphicsState = {
     ctm: IDENTITY,
     fill: "#000000",
     stroke: "#000000",
     alpha: 1,
     strokeAlpha: 1,
     softMask: false,
+    blend: "",
+    clip: pageBox,
     lineWidth: 1,
     fontSize: 0,
     // Horizontal scaling (`Tz`), as a factor: it narrows glyphs and their advance alike.
@@ -326,10 +385,21 @@ export function measureVisibility(
     leading: 0,
     mode: 0,
   };
+  let state = initial;
   let textMatrix: Matrix = IDENTITY;
   let lineMatrix: Matrix = IDENTITY;
   // The last path built, in page space: a shading (`sh`) fills the clip it sets.
   let lastPath: Box | null = null;
+  const set = (change: Partial<GraphicsState>) => void (state = { ...state, ...change });
+  const transform = (matrix: ArrayLike<number>) =>
+    set({ ctm: multiply(state.ctm, Array.from(matrix) as Matrix) });
+  // A `W` or `W*` seen: the next path narrows the clip. pdf.js lists it before the path.
+  let clipNext = false;
+  /** Narrows the clip to a box in page space. A NaN corner leaves it unknown: it hides nothing. */
+  const clipTo = ([x0, y0, x1, y1]: Box) => {
+    const [cx0, cy0, cx1, cy1] = state.clip;
+    set({ clip: [Math.max(cx0, x0), Math.max(cy0, y0), Math.min(cx1, x1), Math.min(cy1, y1)] });
+  };
   // Inside a soft mask's own content: listed among the page's operators, but not painted.
   let maskDepth = 0;
 
@@ -364,15 +434,19 @@ export function measureVisibility(
           });
       }
     // Through a mask it may show anywhere or nowhere: it covers nothing for certain, and text on
-    // it has no known background.
-    drawn.push(masked ? { ...item, fill: "", alpha: 0 } : { ...item, alpha: state.alpha });
+    // it has no known background. A blend mode not modelled here covers as a normal fill does.
+    drawn.push(
+      masked
+        ? { ...item, fill: "", alpha: 0 }
+        : { ...item, alpha: state.alpha, blend: BLENDS[state.blend] ? state.blend : "" },
+    );
   };
   /** An image's own mask lets what is under it show — unless its pixels say it hides nothing. */
   const masksItself = (fn: number, order: number) => {
     if (!ownMask(ops, list, order)) return false;
     const id = list.argsArray[order]?.[0];
-    if (!seeThrough || fn !== ops.paintImageXObject || typeof id !== "string") return true;
-    return seeThrough.has(id);
+    if (!pixels || fn !== ops.paintImageXObject || typeof id !== "string") return true;
+    return pixels.get(id) === null;
   };
   const isFill = new Set([ops.fill, ops.eoFill, ops.fillStroke, ops.eoFillStroke]);
   const fillsRules = new Set([...isFill, ops.closeFillStroke, ops.closeEOFillStroke]);
@@ -386,7 +460,7 @@ export function measureVisibility(
   ]);
   // Thin lines and bars, in page space, for `countRuledTables`.
   const rules: Box[] = [];
-  const fillCells = { cells: MAX_FILL_CELLS };
+  const fillBudget = { boxes: MAX_FILL_BOXES };
   const isImage = new Set(
     [
       ops.paintImageXObject,
@@ -444,61 +518,68 @@ export function measureVisibility(
     const args = list.argsArray[order] ?? [];
     if (fn === ops.save) stack.push({ ...state });
     else if (fn === ops.restore) state = stack.pop() ?? state;
-    else if (fn === ops.transform)
-      state = {
-        ...state,
-        ctm: multiply(state.ctm, Array.from(args as ArrayLike<number>) as Matrix),
-      };
-    // A form XObject is drawn inside its own `q … Q`, through its own matrix.
+    else if (fn === ops.transform) transform(args as ArrayLike<number>);
+    // A form XObject is drawn inside its own `q … Q`, through its own matrix, clipped to its box.
     else if (fn === ops.paintFormXObjectBegin) {
       stack.push({ ...state });
-      const matrix = args[0];
-      if (Array.isArray(matrix) || ArrayBuffer.isView(matrix))
-        state = {
-          ...state,
-          ctm: multiply(state.ctm, Array.from(matrix as ArrayLike<number>) as Matrix),
-        };
-    } else if (fn === ops.paintFormXObjectEnd) state = stack.pop() ?? state;
+      const [matrix, bbox] = args;
+      if (isList(matrix)) transform(matrix);
+      if (isList(bbox) && bbox.length === 4) clipTo(boxThrough(state.ctm, Array.from(bbox) as Box));
+    } else if (fn === ops.paintFormXObjectEnd || fn === ops.endAnnotation)
+      state = stack.pop() ?? state;
+    // An annotation is drawn after the page, as pdf.js draws it: from a fresh state, clipped to
+    // its rectangle, its appearance placed through `transform × matrix`. Nothing the page set
+    // without `q` (a clip, a colour, a transparency) reaches it.
+    else if (fn === ops.beginAnnotation) {
+      stack.push({ ...state });
+      const [, rect, place, matrix] = args;
+      state = initial;
+      clipNext = false;
+      lastPath = null;
+      if (isList(rect) && rect.length === 4) {
+        const [x0, y0, x1, y1] = Array.from(rect);
+        clipTo([Math.min(x0!, x1!), Math.min(y0!, y1!), Math.max(x0!, x1!), Math.max(y0!, y1!)]);
+      }
+      if (isList(place)) transform(place);
+      if (isList(matrix)) transform(matrix);
+    } else if (fn === ops.clip || fn === ops.eoClip) clipNext = true;
     else if ((fn === ops.beginGroup || fn === ops.endGroup) && isSoftMaskGroup(args[0])) {
       // A new mask's glyphs replace the last one's.
       if (fn === ops.beginGroup && !maskDepth) maskGlyphs = [];
       maskDepth = Math.max(0, maskDepth + (fn === ops.beginGroup ? 1 : -1));
-    } else if (fn === ops.setFillRGBColor && typeof args[0] === "string")
-      state = { ...state, fill: args[0] };
-    else if (fn === ops.setStrokeRGBColor && typeof args[0] === "string")
-      state = { ...state, stroke: args[0] };
+    } else if (fn === ops.setFillRGBColor && typeof args[0] === "string") set({ fill: args[0] });
+    else if (fn === ops.setStrokeRGBColor && typeof args[0] === "string") set({ stroke: args[0] });
     // pdf.js turns every flat colour into RGB; what is left for `scn` is a pattern.
-    else if (fn === ops.setFillColorN) state = { ...state, fill: "" };
-    else if (fn === ops.setStrokeColorN) state = { ...state, stroke: "" };
+    else if (fn === ops.setFillColorN) set({ fill: "" });
+    else if (fn === ops.setStrokeColorN) set({ stroke: "" });
     else if (fn === ops.setGState && Array.isArray(args[0]))
       for (const entry of args[0] as unknown[]) {
         if (!Array.isArray(entry)) continue;
         const [key, value] = entry as [unknown, unknown];
-        if (key === "ca" && typeof value === "number") state = { ...state, alpha: value };
-        else if (key === "CA" && typeof value === "number")
-          state = { ...state, strokeAlpha: value };
-        else if (key === "SMask") state = { ...state, softMask: value === true };
-        else if (key === "LW" && typeof value === "number") state = { ...state, lineWidth: value };
+        if (key === "ca" && typeof value === "number") set({ alpha: value });
+        else if (key === "CA" && typeof value === "number") set({ strokeAlpha: value });
+        else if (key === "SMask") set({ softMask: value === true });
+        else if (key === "BM" && typeof value === "string")
+          set({ blend: value === "source-over" ? "" : value });
+        else if (key === "LW" && typeof value === "number") set({ lineWidth: value });
       }
-    else if (fn === ops.setLineWidth) state = { ...state, lineWidth: Number(args[0]) || 0 };
+    else if (fn === ops.setLineWidth) set({ lineWidth: Number(args[0]) || 0 });
     else if (fn === ops.beginText) textMatrix = lineMatrix = IDENTITY;
-    else if (fn === ops.setFont) state = { ...state, fontSize: Number(args[1]) || 0 };
+    else if (fn === ops.setFont) set({ fontSize: Number(args[1]) || 0 });
     else if (fn === ops.setHScale)
-      state = {
-        ...state,
-        hScale: Number.isFinite(Number(args[0])) ? Number(args[0]) / 100 : 1,
-      };
-    else if (fn === ops.setTextRenderingMode) state = { ...state, mode: Number(args[0]) || 0 };
-    else if (fn === ops.setLeading) state = { ...state, leading: Number(args[0]) || 0 };
+      set({ hScale: Number.isFinite(Number(args[0])) ? Number(args[0]) / 100 : 1 });
+    else if (fn === ops.setTextRenderingMode) set({ mode: Number(args[0]) || 0 });
+    else if (fn === ops.setLeading) set({ leading: Number(args[0]) || 0 });
     else if (fn === ops.moveText) moveText(Number(args[0]), Number(args[1]));
     else if (fn === ops.setLeadingMoveText) {
-      state = { ...state, leading: -Number(args[1]) };
+      set({ leading: -Number(args[1]) });
       moveText(Number(args[0]), Number(args[1]));
     } else if (fn === ops.setTextMatrix) {
       // pdf.js passes the matrix as a typed array, wrapped or not by version.
       const inner = args[0];
-      const matrix = Array.isArray(inner) || ArrayBuffer.isView(inner) ? inner : args;
-      textMatrix = lineMatrix = Array.from(matrix as ArrayLike<number>).map(Number) as Matrix;
+      textMatrix = lineMatrix = Array.from((isList(inner) ? inner : args) as ArrayLike<number>).map(
+        Number,
+      ) as Matrix;
     } else if (fn === ops.nextLine) moveText(0, -state.leading);
     else if (fn === ops.showText || fn === ops.showSpacedText) show(args[0], order);
     else if (fn === ops.nextLineShowText || fn === ops.nextLineSetSpacingShowText) {
@@ -512,10 +593,10 @@ export function measureVisibility(
         fillsRules.has(op) && state.alpha > 0,
         strokes.has(op) && state.strokeAlpha > 0,
       ];
-      if (!maskDepth && (filled || stroked) && (ArrayBuffer.isView(data) || Array.isArray(data))) {
+      if (!maskDepth && (filled || stroked) && isList(data)) {
         const [a, b, c, d] = state.ctm;
         pathRules(
-          data as ArrayLike<number>,
+          data,
           (x, y) => apply(state.ctm, x, y),
           filled,
           stroked ? state.lineWidth * Math.sqrt(Math.abs(a * d - b * c)) : undefined,
@@ -523,23 +604,35 @@ export function measureVisibility(
         );
       }
       const bounds = args[2];
-      if (Array.isArray(bounds) || ArrayBuffer.isView(bounds)) {
-        const [x0, y0, x1, y1] = Array.from(bounds as ArrayLike<number>);
-        lastPath = boxThrough(state.ctm, [x0, y0, x1, y1]);
+      const clips = clipNext;
+      clipNext = false;
+      if (isList(bounds)) {
+        lastPath = boxThrough(state.ctm, Array.from(bounds) as Box);
+        // What a path clips to lies within its bounds: text wholly outside them is not drawn.
+        if (clips) clipTo(lastPath);
         if (isFill.has(op)) {
-          const boxes =
-            ArrayBuffer.isView(data) || Array.isArray(data)
-              ? filledBoxes(
-                  data as ArrayLike<number>,
-                  (x, y) => apply(state.ctm, x, y),
-                  op === ops.eoFill || op === ops.eoFillStroke,
-                  fillCells,
-                )
-              : [lastPath];
+          const split = isList(data)
+            ? filledBoxes(
+                data,
+                (x, y) => apply(state.ctm, x, y),
+                op === ops.eoFill || op === ops.eoFillStroke,
+                fillBudget,
+              )
+            : undefined;
           // Any other path is read as its bounding box, solid: a curve or a cheap pile of moves
           // must not leave white text on it unjudged.
-          for (const box of boxes ?? [lastPath])
+          for (const box of split?.boxes ?? [lastPath])
             paint({ box, order, kind: "shape", fill: state.fill });
+          // A hole paints nothing; under a soft mask its path may show anywhere or nowhere.
+          if (!maskDepth)
+            for (const box of split?.holes ?? [])
+              drawn.push({
+                box,
+                order,
+                kind: "hole",
+                fill: state.softMask ? "" : state.fill,
+                alpha: state.softMask ? 0 : state.alpha,
+              });
           const [mx0, my0, mx1, my1] = lastPath;
           if (
             !maskDepth &&
@@ -556,11 +649,15 @@ export function measureVisibility(
     // A one-pixel stencil mask (`BI /IM true`) paints its unit square in the fill colour.
     else if (fn === ops.paintSolidColorImageMask)
       paint({ box: boxThrough(state.ctm, [0, 0, 1, 1]), order, kind: "shape", fill: state.fill });
-    else if (isImage.has(fn))
+    else if (isImage.has(fn)) {
+      // A blank image is a shape of its colour; any other's colour is unknown.
+      const image = args[0];
+      const fill = (typeof image === "string" ? pixels?.get(image) : pixelsOf(image)) ?? "";
       paint(
-        { box: boxThrough(state.ctm, [0, 0, 1, 1]), order, kind: "image", fill: "" },
+        { box: boxThrough(state.ctm, [0, 0, 1, 1]), order, kind: "image", fill },
         state.softMask || masksItself(fn, order),
       );
+    }
   });
 
   const around = indexDrawn(
@@ -569,20 +666,67 @@ export function measureVisibility(
     pageBox,
   );
   // The colour seen at a point under `top`, the last fill there: blended by its opacity with what
-  // lies beneath it, else the white page; "" when unknown.
-  // Past `MAX_LAYERS` the fill counts as opaque: layers stacked to that depth must not leave the
-  // background unknown.
-  const shown = (point: [number, number], top: Drawn | undefined, depth = 0): string => {
+  // lies beneath it, else the white page; "" when unknown. `through`: how much of this layer the
+  // fills above it let show. A fill counts as opaque once what lies beneath it would show no more
+  // than an `OPAQUE` cover lets through (under a 99% fill, or four 50% ones), or past
+  // `MAX_LAYERS`: a picture under such layers must not leave the background unknown.
+  const shown = (
+    point: [number, number],
+    top: Drawn | undefined,
+    depth = 0,
+    through = 1,
+  ): string => {
     if (!top) return "#ffffff";
-    if (top.fill === "" || !(top.alpha < 1) || depth >= MAX_LAYERS) return top.fill;
-    const under = shown(point, around(point, top.order).top, depth + 1);
-    return under && mix(top.fill, under, top.alpha);
+    const beneath = through * (1 - top.alpha);
+    if (top.fill === "" || !(beneath > 1 - OPAQUE) || depth >= MAX_LAYERS) return top.fill;
+    const under = shown(point, around(point, top.order).top, depth + 1, beneath);
+    return under && paintOver(top.fill, under, top.alpha);
   };
-  for (const { text, center, fill, order } of throughMask) {
-    const background = shown(center, around(center, order).top);
-    if (fill === "" || background === "" || contrast(fill, background) >= MIN_CONTRAST)
-      drawnGlyphs.add(cell(text, center));
-  }
+  // How much of `colour` the fills under a point lay down, from `top` down while each is within
+  // `MIN_CONTRAST` of it: one 85% box, or three 50% ones, of the text's own colour.
+  const ownCover = (point: [number, number], top: Drawn | undefined, colour: string) => {
+    let left = 1;
+    for (let layer = top, depth = 0; layer && depth <= MAX_LAYERS; depth += 1) {
+      if (layer.fill === "" || contrast(colour, layer.fill) >= MIN_CONTRAST) break;
+      left *= 1 - Math.min(1, Math.max(0, layer.alpha));
+      layer = around(point, layer.order).top;
+    }
+    return 1 - left;
+  };
+  // Whether `colour`, painted in blend mode `mode`, is lost against what lies under a point: within
+  // `MIN_CONTRAST` of it, or on fills of its own colour that cover `OWN_COLOUR` or more, whatever
+  // lies beneath them.
+  const lost = (point: [number, number], top: Drawn | undefined, colour: string, mode = "") => {
+    if (colour === "") return false;
+    const background = shown(point, top);
+    if (
+      background !== "" &&
+      contrast(paintOver(colour, background, 1, mode), background) < MIN_CONTRAST
+    )
+      return true;
+    return ownCover(point, top, colour) >= OWN_COLOUR;
+  };
+  // Whether `colour`, painted in blend mode `mode`, is lost once `over` (opaque fills drawn after it
+  // in a blend mode) are blended with it and with what lies beneath alike: a white Screen hides
+  // black text, a yellow Multiply does not. A fill of unknown colour or blend mode hides nothing.
+  const blendedAway = (
+    point: [number, number],
+    top: Drawn | undefined,
+    colour: string,
+    mode: string,
+    over: Drawn[],
+  ) => {
+    let under = shown(point, top);
+    if (!colour || !under) return false;
+    let text = paintOver(colour, under, 1, mode);
+    for (const { fill, alpha, blend = "" } of over) {
+      if (!fill || !BLENDS[blend]) return false;
+      [text, under] = [paintOver(fill, text, alpha, blend), paintOver(fill, under, alpha, blend)];
+    }
+    return contrast(text, under) < MIN_CONTRAST;
+  };
+  for (const { text, center, fill, order } of throughMask)
+    if (!lost(center, around(center, order).top, fill)) drawnGlyphs.add(cell(text, center));
   // What the render mode paints glyphs with: outline in modes 1 and 5, outline and fill in 2 and 6
   // (seen if either is), else fill.
   const paintsOf = (run: Run) => [
@@ -635,6 +779,12 @@ export function measureVisibility(
     return target !== "" && spelt === target;
   };
 
+  // Where a quarter and three quarters of a run's width lie, on the line through its centre.
+  const quarters = ({ box: [x0, , x1], center: [, y] }: Run): Array<[number, number]> => [
+    [x0 + (x1 - x0) / 4, y],
+    [x1 - (x1 - x0) / 4, y],
+  ];
+
   const hidden: string[] = [];
   let previous: Run | undefined;
   let textChars = 0;
@@ -642,12 +792,27 @@ export function measureVisibility(
   for (const run of runs) {
     const chars = run.text.trim().length;
     textChars += chars;
-    const { top, overImage, covered } = around(run.center, run.order);
+    const at = around(run.center, run.order);
+    const { overImage } = at;
+    let { top, covered } = at;
+    // A run whose centre lies in a frame's hole is in the frame, unless the frame lies under (or
+    // over) both its quarter points: then the hole is under a few of its letters, and the rest
+    // are on the frame, as if it had none.
+    const { hole, holeOver } = at;
+    if (hole && hole.order > (top?.order ?? -Infinity)) {
+      const under = quarters(run).map((point) => around(point, run.order).top);
+      if (under.every((shape) => shape?.order === hole.order)) top = under[0];
+    }
+    if (!covered && holeOver)
+      covered = quarters(run).every((point) => around(point, run.order).covered);
+    const paints = paintsOf(run);
+    const { over } = at;
+    if (!covered && over)
+      covered = paints.every(({ colour }) => blendedAway(run.center, top, colour, run.blend, over));
 
     const unseen = run.mode === 3 || run.mode === 7;
     if (unseen) invisibleChars += chars;
     const invisible = unseen && !overImage;
-    const paints = paintsOf(run);
     // Fully transparent, unless the same text is drawn where it lies (as glyphs or a gradient's
     // mask): Chrome's selectable copy hides nothing.
     const transparent =
@@ -657,18 +822,19 @@ export function measureVisibility(
       ) &&
       !copied(run);
     const tiny = run.size < MIN_SIZE;
-    const offPage =
-      run.box[2] < pageBox[0] ||
-      run.box[0] > pageBox[2] ||
-      run.box[3] < pageBox[1] ||
-      run.box[1] > pageBox[3];
+    // Off the page, or outside a clip: one with no area shows nothing.
+    const [cx0, cy0, cx1, cy1] = run.clip;
+    const clipped =
+      cx1 <= cx0 ||
+      cy1 <= cy0 ||
+      run.box[2] < cx0 ||
+      run.box[0] > cx1 ||
+      run.box[3] < cy0 ||
+      run.box[1] > cy1;
     // An unknown background, or text in a pattern, gets the benefit of the doubt.
-    const background = shown(run.center, top);
-    const blended =
-      background !== "" &&
-      paints.every(({ colour }) => colour !== "" && contrast(colour, background) < MIN_CONTRAST);
+    const blended = paints.every(({ colour }) => lost(run.center, top, colour, run.blend));
 
-    if (!(invisible || transparent || tiny || offPage || blended || covered)) continue;
+    if (!(invisible || transparent || tiny || clipped || blended || covered)) continue;
     // Runs one after another on a line are one text (Chrome draws a glyph at a time); a gap of a
     // space's width is a space.
     const gap = previous ? run.box[0] - previous.box[2] : NaN;

@@ -203,6 +203,26 @@ describe("a verb is not the named skill its stem spells", () => {
     ).toEqual(["missing", "missing", "missing", "missing"]);
   });
 
+  // The "&" rule dropped a skill glued to another skill.
+  it("meets each of two skills joined by &, but not a letter of an abbreviation", () => {
+    expect(
+      judged(
+        ["Wrote C&C++ firmware", "Built AI&ML pipelines", "Ran Q&A and M&A reviews", "Led R&D"],
+        ["Experience with C", "AI", "ML", "R"],
+      ),
+    ).toEqual(["met", "met", "met", "missing"]);
+  });
+
+  // Dropping the letters of "P&L" on the posting side too left its ask with nothing to match.
+  it("meets an abbreviation joined by & by the same abbreviation", () => {
+    expect(
+      judged(
+        ["Owned the P&L for a $40M business unit", "Led M&A due diligence on 6 acquisitions"],
+        ["P&L responsibility", "P&L ownership", "Full P&L accountability", "M&A experience", "Q&A"],
+      ),
+    ).toEqual(["met", "met", "met", "met", "missing"]);
+  });
+
   it("still meets a skill by its plural, and a plain word by its other forms", () => {
     expect(
       judged(

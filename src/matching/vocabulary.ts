@@ -221,7 +221,7 @@ export function extractVocabulary(
   }
 
   function addWord(word: string, index: number) {
-    const raw = word.replace(TRAILING, "");
+    let raw = word.replace(TRAILING, "");
     if (!raw || vocab.stopwords.has(raw) || vocab.stopwords.has(stem(raw, km.stemming))) return;
 
     // A one- or two-letter word is a skill only with a capital ("R", "Go", "AI"), and a single
@@ -232,8 +232,12 @@ export function extractVocabulary(
       const written = text.slice(index, index + raw.length);
       if (written === raw) return;
       if (raw.length === 1 && word.endsWith(".")) return;
-      // "R&D", "Q&A": a letter glued to another by "&" is part of a word, not the skill R.
-      if (text[index - 1] === "&" || text[index + raw.length] === "&") return;
+      // "R&D", "P&L": two lone letters joined by "&" are one word, read at the first, never the
+      // skill R. Glued to a longer word, a lone letter is dropped; "&" between two longer words
+      // joins two skills ("C&C++", "AI&ML").
+      const glued = gluedToLetter(text, index, index + raw.length);
+      if (glued === "after" && raw.length === 1) raw = lower.slice(index, index + 3);
+      else if (glued) return;
       shortSkill = true;
     }
 
@@ -249,6 +253,20 @@ export function extractVocabulary(
   }
 
   return map;
+}
+
+const LONE_BEFORE = /(?:^|[^\p{L}\p{M}\p{N}+#])\p{L}$/u;
+const LONE_AFTER = /^\p{L}(?![\p{L}\p{M}\p{N}+#])/u;
+
+/**
+ * Which side of the word from `start` to `end` is glued by "&" to a single letter ("R&D": "D" is
+ * glued before, "R" after), or null.
+ */
+function gluedToLetter(text: string, start: number, end: number) {
+  if (text[start - 1] === "&" && LONE_BEFORE.test(text.slice(Math.max(0, start - 3), start - 1)))
+    return "before";
+  if (text[end] === "&" && LONE_AFTER.test(text.slice(end + 1, end + 3))) return "after";
+  return null;
 }
 
 /** The resume's literal terms plus everything they imply (Terraform: "infrastructure as code"). */

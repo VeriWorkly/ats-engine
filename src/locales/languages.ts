@@ -55,6 +55,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       openEnded: union(rp.openEnded, v.openEnded),
       rangeWords: union(rp.rangeWords, v.rangeWords),
       sinceWords: union(rp.sinceWords, v.sinceWords),
+      lineEndDateWords: union(rp.lineEndDateWords, v.lineEndDateWords),
       employerWords: union(rp.employerWords, v.employerWords),
       titleWords: union(rp.titleWords, v.titleWords),
       schoolWords: union(rp.schoolWords, v.schoolWords),
@@ -160,6 +161,12 @@ export function isWrittenIn({ text, words }: Sample, pack: Detection, base?: Det
     (!own || hits.length > words.filter((word) => own.has(word)).length)
   );
 }
+
+/** Whether a line holds any of the language's detection words, or a letter of its script. */
+export const showsAny = (line: string, pack: Detection) => {
+  const { script, words } = detectionOf(pack);
+  return script ? line.search(script) >= 0 : sampleOf(line).words.some((word) => words.has(word));
+};
 
 /**
  * Whether a pack's language, rather than the policy's own, is what the text is written in: a

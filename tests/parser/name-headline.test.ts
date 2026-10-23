@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_POLICY, check } from "../../src/index.js";
+import { expectFast } from "../fixtures/timing.js";
 
 const name = (text: string) => check(text, DEFAULT_POLICY).parsed.name;
 
@@ -277,6 +278,211 @@ describe("a name that is also a place", () => {
         `${person}\nAustin, Texas, United States | person@example.com\nExperience\nSoftware Engineer, Georgia Pacific\nJan 2020 - Present`,
       ),
     ).toBe(person);
+  });
+});
+
+describe("a name with its headline on the first line", () => {
+  const top = (first: string, second = "mira.kestrel@example.com | +1 415 555 0134") =>
+    `${first}\n${second}\nEXPERIENCE\nSenior Software Engineer, Globex Corp\tJan 2020 - Present\n- Built dashboards used by 40 teams`;
+
+  it.each([
+    ["Mira Kestrel | Senior Software Engineer", "Mira Kestrel"],
+    ["Mira Kestrel — Senior Software Engineer", "Mira Kestrel"],
+    ["Mira Kestrel - Senior Software Engineer", "Mira Kestrel"],
+    ["MIRA KESTREL · Data Analyst", "MIRA KESTREL"],
+    ["Mira Kestrel, Senior Software Engineer", "Mira Kestrel"],
+    // Surname first, read in the order the name is spoken.
+    ["Kestrel, Mira", "Mira Kestrel"],
+    ["Kestrel, Mira, PhD", "Mira Kestrel"],
+  ])("reads %j as %j", (first, expected) => {
+    expect(name(top(first))).toBe(expected);
+  });
+
+  it.each([
+    "Senior Software Engineer",
+    "Data Analyst | Senior Software Engineer",
+    "Experience | Skills",
+    "Berlin, Germany",
+    // An employer before the title, and a row of skills, have a name's shape.
+    "Acme Corp | Senior Engineer",
+    "Globex Inc. — Data Analyst",
+    "Python, Go",
+    "Kubernetes, Docker",
+    // "Surname, Given" is read only when the email or a profile link spells it.
+    "Java, Spring",
+    "Excel, PowerPoint",
+    "Sales, Marketing",
+    "Agile, Scrum",
+    "Remote, Worldwide",
+    "Munich, Bavaria",
+    "Lyon, Rhône",
+    "Professional, Reliable",
+    "Husband, Father",
+    // A tagline before a title: the part before it is a name only when the email spells it.
+    "New York | Software Engineer",
+    "United States | Software Engineer",
+    "Hong Kong | Analyst",
+    "Machine Learning | Data Scientist",
+    "San Francisco | Software Engineer",
+    "Career Objective | Engineer",
+    "Hire Me | Engineer",
+  ])("reads no name from a line that is only a title, a heading or a place: %j", (first) => {
+    expect(name(top(first))).toBe("");
+  });
+
+  it("reads a name under a line that only looks surname-first", () => {
+    expect(name(top("Bengaluru, Karnataka", "Priya Raman"))).toBe("Priya Raman");
+  });
+
+  it.each([
+    ["KESTREL, MIRA", "mira.kestrel@example.com | +1 415 555 0134"],
+    ["Kestrel, Mira", "mkestrel@example.com | +1 415 555 0134"],
+    ["Kestrel, Mira", "linkedin.com/in/mira-kestrel | +1 415 555 0134"],
+    ["Smith, Jane", "linkedin.com/in/jane-smith"],
+  ])("reads %j surname first when %j spells it", (first, second) => {
+    const [surname, given] = first.split(", ");
+    expect(name(top(first, second))).toBe(`${given} ${surname}`);
+  });
+
+  it.each([
+    "jd1987@example.com | +1 415 555 0134",
+    // Every word is spelled, not one of them.
+    "mira@example.com | +1 415 555 0134",
+  ])("reads no name surname first that %j does not spell", (second) => {
+    expect(name(top("Kestrel, Mira", second))).toBe("");
+  });
+
+  // A city and its state, or two skills, have the shape of "Surname, Given": that reading never
+  // outranks a name further down, and a state code is never a given name.
+  it.each([
+    ["Austin, TX", "austin.lee@example.com"],
+    ["Charlotte, NC", "charlotte.h@example.com"],
+    ["Jackson, MS", "jackson.lee@example.com"],
+    ["Madison, WI", "madison.k@example.com"],
+    ["Sydney, NSW", "sydney.chen@example.com"],
+    ["Adelaide, SA", "adelaide@example.com"],
+    ["Java, Spring", "java.dev@example.com"],
+    ["Python, Django", "python.jane@example.com"],
+    ["Sales, Marketing", "sales@example.com"],
+    ["Remote, Worldwide", "jane.remote@example.com"],
+    ["Hello, World", "hello@janedoe.com"],
+    ["Resume, Updated", "jane.resume@example.com"],
+    ["Austin, TX", "austin.tx@example.com"],
+    ["Lee, Robert", "robert.e.lee@example.com"],
+    ["Smith, Jane", "linkedin.com/in/jane-smith"],
+  ])("never reads %j (with %j) surname first over the name below it", (first, second) => {
+    const [surname, given] = first.split(", ");
+    const over = name(top(`${first}\nJane Doe`, second));
+    // As 0.16.0, "Sydney, NSW" reads as "Sydney" with a credential.
+    expect(over).toBe(["Sydney", "Adelaide"].includes(surname!) ? surname : "Jane Doe");
+    if (given === given!.toUpperCase()) expect(name(top(first, second))).not.toContain(given);
+  });
+
+  it.each([
+    ["linkedin.com/in/mira-kestrel | +1 415 555 0134"],
+    ["linkedin.com/in/mira-kestrel-12ab | +1 415 555 0134"],
+    ["https://www.linkedin.com/in/mira-kestrel/ | +1 415 555 0134"],
+    ["mkestrel@example.com | +1 415 555 0134"],
+  ])("reads a name before a title that %j spells", (linked) => {
+    expect(name(top("Mira Kestrel | Senior Software Engineer", linked))).toBe("Mira Kestrel");
+  });
+
+  // A city with its state is the weakest reading of all (0.16.0 read "San Francisco").
+  it.each(["Mira Kestrel | Senior Software Engineer", "Kestrel, Mira"])(
+    "reads %j over a city and its state",
+    (first) => {
+      expect(name(top(`${first}\nSan Francisco, CA`))).toBe("Mira Kestrel");
+    },
+  );
+
+  it("reads no name before a title when the contact spells only one of its words", () => {
+    expect(name(top("Mira Kestrel | Senior Software Engineer", "mira@example.com"))).toBe("");
+  });
+
+  // The email or a profile link spells one word of a tagline, a city or an employer: the name is
+  // the one under it, as in 0.16.0, and there is none without one.
+  it.each([
+    ["San Francisco | Software Engineer", "Francisco Lopez", "francisco.lopez@example.com"],
+    ["San Jose | Software Engineer", "Jose Ramirez", "jose.ramirez@example.com"],
+    ["San Diego | Data Analyst", "Diego Torres", "diego.torres@example.com"],
+    ["Santa Clara | Product Manager", "Clara Weiss", "clara.weiss@example.com"],
+    ["St. Louis | Software Engineer", "Louis Martin", "louis.martin@example.com"],
+    ["Los Angeles | Software Engineer", "Carlos Angeles", "carlos.angeles@example.com"],
+    ["Port Elizabeth | Engineer", "Elizabeth Naidoo", "elizabeth.naidoo@example.com"],
+    ["Mount Vernon | Analyst", "Vernon Price", "vernon@example.com"],
+    ["Morgan Stanley | Associate", "Morgan Lee", "morgan.lee@example.com"],
+    ["Wells Fargo | Analyst", "Sam Wells", "sam.wells@example.com"],
+    ["Goldman Sachs | Analyst", "Rachel Goldman", "rachel.goldman@example.com"],
+    ["Ford Motor | Mechanical Engineer", "Henry Ford", "henry.ford@example.com"],
+    ["Ernst Young | Auditor", "Ernst Becker", "ernst.becker@example.com"],
+    ["Jane Street | Quant Researcher", "Jane Doe", "jane.doe@example.com"],
+    ["Doe Family | Software Engineer", "Jane Doe", "jane.doe@example.com"],
+    ["Cloud Native | DevOps Engineer", "Jane Cloud", "jane.cloud@example.com"],
+    ["Hello World | Software Engineer", "Jane Doe", "hello@janedoe.com"],
+    ["Full Stack | Software Engineer", "Jane Doe", "jane.fullstack@example.com"],
+    // Words of a link's address, not of its owner.
+    [
+      "Based In Berlin | Software Engineer",
+      "Jane Doe",
+      "jane@example.com · linkedin.com/in/jane-doe",
+    ],
+    ["Linked In | Software Engineer", "Jane Doe", "jane@example.com · linkedin.com/in/jane-doe"],
+    ["Github Star | Software Engineer", "Jane Doe", "jane@example.com · github.com/janedoe"],
+    ["Medium Writer | Software Engineer", "Jane Doe", "jane@example.com · medium.com/@janedoe"],
+  ])(
+    "takes the name under %j, not the line, when it is spelled in part",
+    (tag, person, contact) => {
+      expect(name(top(`${tag}\n${person}`, contact))).toBe(person);
+      expect(name(top(tag, contact))).toBe("");
+    },
+  );
+
+  it("takes the name under a tagline the email spells in part", () => {
+    expect(name(top("Data Science | Machine Learning Engineer\nJane Doe", "data.jane@x.com"))).toBe(
+      "Jane Doe",
+    );
+  });
+
+  it("stays linear on a long line before a title and a long profile link that spells it", () => {
+    const words = Array.from({ length: 4_000 }, (_, i) =>
+      [26 ** 2, 26, 1]
+        .map((unit) => String.fromCharCode(97 + (Math.floor(i / unit) % 26)))
+        .join(""),
+    );
+    const line = words.map((word) => `X${word}`).join(" ");
+    const link = `linkedin.com/in/${words
+      .reverse()
+      .map((word) => `x${word}`)
+      .join("-")}`;
+    expect(expectFast(() => name(`${line} | Software Engineer\n${link}`), 500)).toBe("");
+  });
+
+  // As 0.16.0: nothing tells a name before a title from a tagline there.
+  it("reads no name before a title that nothing else on the page spells", () => {
+    const unspelled = "jd1987@example.com | +1 415 555 0134";
+    expect(name(top("Mira Kestrel | Engineer", unspelled))).toBe("");
+  });
+
+  // A tagline over the name, with a title after it, has the shape of "Name | Title".
+  it.each([
+    "Los Angeles",
+    "San Francisco",
+    "Hong Kong",
+    "New Delhi",
+    "United States",
+    "Bay Area",
+    "Open Source",
+    "About Me",
+    "Data Science",
+    "Machine Learning",
+    "US Citizen",
+    "Top Secret",
+    "Career Objective",
+    "Personal Profile",
+    "Available Immediately",
+    "Team Player",
+  ])("takes the name under a tagline %j before a title", (tagline) => {
+    expect(name(top(`${tagline} | Software Engineer\nJane Doe`))).toBe("Jane Doe");
   });
 });
 

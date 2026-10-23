@@ -2,6 +2,7 @@ import type { AtsEnginePolicy } from "../policy/schema.js";
 import { wordListPattern } from "../text/text.js";
 import {
   isPlace,
+  namesPlace,
   organisationWordsOf,
   placeWords,
   splitTitleAndEmployer,
@@ -87,17 +88,27 @@ const CONTACT_SEPARATOR = /(?<!\s)\s*[|·•,]\s*|\t|\s{2,}|(?<!\s)\s+[–—-]\
 
 /**
  * The part of a line that could be the name: after a "Name:" label, and on a contact line with an
- * email or number, the part before the first separator (`split`), plus the part after a comma
- * (`tail`: "NY" in "New York, NY | jane@…").
+ * email or number, or a line with a job title after its first separator that the email or a
+ * profile link spells (`spells`: "Mira Kestrel | Data Analyst" with mira.kestrel@…), the part
+ * before that separator (`split`), plus the part after a comma (`tail`: "NY" in "New York, NY |
+ * jane@…").
+ * Any tagline has the shape of "Name | Title" ("Los Angeles | Software Engineer").
  */
-function nameCandidate(line: string, label: RegExp) {
+function nameCandidate(
+  line: string,
+  label: RegExp,
+  titleWords: RegExp,
+  spells: (text: string) => boolean,
+) {
   const value = line.replace(label, "");
-  if (!EMAIL.test(value) && !/\d/.test(value)) return { text: value, split: false, tail: [] };
   const parts = value.split(CONTACT_SEPARATOR);
   const first = parts[0] ?? "";
+  const titled = !EMAIL.test(value) && !/\d/.test(value);
+  if (titled && !(titleWords.test(parts[1] ?? "") && spells(first)))
+    return { text: value, tail: [] };
   if (EMAIL.test(first) || /\d/.test(first) || first === value) return null;
   const comma = value.slice(first.length).trimStart().startsWith(",");
-  return { text: first, split: true, tail: comma && parts[1] ? [parts[1].trim()] : [] };
+  return { text: first, split: true, tail: comma && parts[1] ? [parts[1].trim()] : [], titled };
 }
 
 /**
@@ -119,6 +130,7 @@ export function findName(
   const { particles, titles, label } = nameVocabulary(policy.resumeParse);
   const trimmed = lines.map((line) => line.trim()).filter(Boolean);
   const titleWords = titleWordsOf(policy);
+  const organisation = organisationWordsOf(policy);
   const { code, postNominal } = placeWords(policy);
   // A comma tail of state codes and no credential ("Austin, TX 78701"); "MD" reads as the credential.
   const isPlaceTail = (tail: readonly string[]) =>
@@ -128,10 +140,9 @@ export function findName(
 
   // A letter-spaced name can lose its word gap ("JANEDOE"); when the email's name parts spell it
   // exactly ("jane.doe@…"), split it where they split.
+  const header = trimmed.slice(0, 12).join("\n");
   const emailParts =
-    trimmed
-      .slice(0, 12)
-      .join("\n")
+    header
       .match(EMAIL)?.[0]
       ?.split("@")[0]
       ?.split(/[._-]+/)
@@ -150,15 +161,57 @@ export function findName(
       })
       .join(" ");
   };
+  // The words of the email's name part, and of each link's last path part ("mira-kestrel" in
+  // "linkedin.com/in/mira-kestrel/", not "linkedin" or "in"), without accents.
+  const plain = (word: string) =>
+    word
+      .normalize("NFD")
+      .replace(/[^\p{L}]/gu, "")
+      .toLowerCase();
+  const handles = [
+    emailParts.join(" "),
+    ...(header.match(LINK) ?? []).map((link) => link.split("/").filter(Boolean).pop()!),
+  ].map((handle) => new Set(handle.split(/[^\p{L}\p{M}]+/u).map(plain)));
+  // Whether one email or one link spells every word of a name, particles aside ("mira.kestrel@…"),
+  // or its initials and surname ("mkestrel@…").
+  const spelled = (text: string) => {
+    const forms = text
+      .split(/\s+/)
+      .filter((word) => !particles.test(word))
+      .map(plain);
+    const initials =
+      forms
+        .map((form) => form[0])
+        .join("")
+        .slice(0, -1) + forms.at(-1);
+    // A one-word name is never split from its title or read surname first: no need to refuse it.
+    return handles.some((words) => words.has(initials) || forms.every((form) => words.has(form)));
+  };
 
   /** The name a line holds, or null. */
   const nameIn = (line: string, index: number, firstLine: boolean) => {
-    const candidate = nameCandidate(line, label);
+    const candidate = nameCandidate(line, label, titleWords, spelled);
     if (candidate === null || titles.test(candidate.text)) return null;
 
-    const cut = withoutPostNominals(candidate.text);
+    // "Kestrel, Mira" at the very top: a one-word surname first, read in the order the name is
+    // spoken. Two skills or a place have the same shape ("Java, Spring", "Austin, TX"), so it is
+    // read only when the email or a profile link spells it ("mira.kestrel@…",
+    // "…/in/mira-kestrel"), never when the line names a state or a country or its given name is a
+    // state's code, and never over a name further down.
+    const [surname = "", ...after] = candidate.text.split(",");
+    const given = withoutPostNominals(after.join(","));
+    const reversed =
+      index === 0 &&
+      after.length > 0 &&
+      /^\S+$/u.test(surname.trim()) &&
+      !namesPlace(candidate.text, policy) &&
+      !code.test(given.text.trim()) &&
+      spelled(`${given.text.trim()} ${surname}`);
+    const cut = reversed
+      ? { text: `${given.text.trim()} ${surname.trim()}`, tail: given.tail }
+      : withoutPostNominals(candidate.text);
+    const place = !reversed && isPlaceTail(candidate.split ? candidate.tail : cut.tail);
     const name = spelledByEmail(cut.text.trim());
-    const place = isPlaceTail(candidate.split ? candidate.tail : cut.tail);
     // "New York, NY | jane@…" opens with the city, not the name.
     if (candidate.split && place) return null;
     const words = name.split(/\s+/);
@@ -170,10 +223,13 @@ export function findName(
     // Particles sit between the words they join, never at the ends.
     if (particles.test(words[0]) || particles.test(words[words.length - 1])) return null;
     if (named.length === 1 && index > 0) return null;
-    // A headline ("Senior Software Engineer") has the shape of a name.
+    // A headline ("Senior Software Engineer") has the shape of a name, and so does an employer
+    // before a title ("Acme Corp | Senior Engineer").
     if (isSectionHeading(name, policy) || titleWords.test(name)) return null;
-    // "San Francisco, CA" loses its state like a credential, and is a place: the weakest reading.
-    return { name, cut: cut.text.trim() !== candidate.text.trim(), place };
+    if (candidate.titled && organisation.test(name)) return null;
+    // "San Francisco, CA" loses its state like a credential, and is a place: the weakest reading,
+    // with a name before a title or surname first, which are only ever on the first line.
+    return { name, cut: cut.tail.length > 0, place: place || candidate.titled || reversed };
   };
 
   // A name directly above a headline ("LUCAS MOREAU" over "Senior Product Designer") is the name
@@ -199,7 +255,6 @@ export function findName(
   const exported = () => {
     const profile = trimmed.slice(0, 40).findIndex((line) => LINKEDIN_PROFILE.test(line));
     if (profile === -1) return "";
-    const organisation = organisationWordsOf(policy);
     let skills = false;
     for (let at = profile + 1; at < Math.min(trimmed.length, 40); at += 1) {
       const line = trimmed[at]!;
@@ -220,6 +275,7 @@ export function findName(
   // cut is still the name; one whose cut tail is a state is a place, taken only when no other name
   // is found. Under a sidebar's list heading a name is more likely one of its rows, so a name over
   // a headline further down comes first; one over the email is the name, before any further down.
+  // A name before a title or surname first is on the first line, so it comes before a place.
   let onlyHeadingsAbove = true;
   let place = "";
   let listed = false;

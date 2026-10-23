@@ -1,10 +1,10 @@
 import * as z from "zod/mini";
 
-import { checkPatternWithFlags, regexFlags, regexString } from "../primitives.js";
+import { checkPatternWithFlags, regexFlags, regexString, ruleWeight } from "../primitives.js";
 
 const bandSchema = z.object({
   upTo: z.nullable(z.number()),
-  weight: z.number().check(z.gte(0)),
+  weight: ruleWeight,
   /** Evidence and fix for this band in place of the rule's own, for rules failing on both sides. */
   failEvidence: z.optional(z.string().check(z.minLength(1))),
   fix: z.optional(z.string().check(z.minLength(1))),
@@ -62,7 +62,7 @@ const minWordsRule = z.object({
   ...ruleBase.shape,
   kind: z.literal("min-words"),
   min: z.number().check(z.int(), z.gt(0)),
-  weight: z.number().check(z.gte(0)),
+  weight: ruleWeight,
 });
 
 const presenceRule = z
@@ -77,7 +77,7 @@ const presenceRule = z
      * each line (for `^`/`$`), `heading` only lines shaped like section headings.
      */
     scope: z._default(z.enum(["document", "line", "heading"]), "document"),
-    weight: z.number().check(z.gte(0)),
+    weight: ruleWeight,
   })
   .check(z.superRefine(checkPatternWithFlags));
 
@@ -86,7 +86,7 @@ const positionRule = z.object({
   ...ruleBase.shape,
   kind: z.literal("position"),
   windowFraction: z.number().check(z.gte(0), z.lte(1)),
-  weight: z.number().check(z.gte(0)),
+  weight: ruleWeight,
 });
 
 const bandsRule = z
@@ -184,7 +184,7 @@ const sectionRule = z.object({
   ...ruleBase.shape,
   kind: z.literal("section"),
   section: z.enum(["experience", "education", "skills", "projects"]),
-  weight: z.number().check(z.gte(0)),
+  weight: ruleWeight,
 });
 
 export const ruleSchema = z.discriminatedUnion("kind", [

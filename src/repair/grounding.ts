@@ -39,6 +39,32 @@ const bare = (address: string) =>
     .replace(/^www\./i, "")
     .replace(/(?<!\/)\/+$/, "");
 
+/** A bracket, a guillemet or a bullet, which a document glues to an address. */
+const MARK = String.raw`[\[\]{}\p{Pi}\p{Pf}•·]`;
+const MARKS = new RegExp(`${MARK}+`, "u");
+const IS_MARK = new RegExp(`^${MARK}$`, "u");
+
+/** Without marks at its ends: a loop, as `${MARK}+$` rescans a run of marks from each one. */
+function trimMarks(text: string) {
+  let start = 0;
+  let end = text.length;
+  while (start < end && IS_MARK.test(text[start]!)) start += 1;
+  while (end > start && IS_MARK.test(text[end - 1]!)) end -= 1;
+  return text.slice(start, end);
+}
+
+/**
+ * The addresses one token may be: as written ("janedoe.dev/[draft]"), and split at the marks
+ * before its path, each without marks at its ends ("[janedoe.dev]", "janedoe.dev·github.com/x").
+ * A mark inside a path is part of it: "janedoe.dev/a·b" is not "janedoe.dev/a".
+ */
+function addressesIn(token: string): string[] {
+  const path = token.search(/(?<!\/)\/(?!\/)/);
+  const pieces = (path === -1 ? token : token.slice(0, path)).split(MARKS);
+  if (path !== -1) pieces[pieces.length - 1] += token.slice(path);
+  return [token, ...pieces.map(trimMarks)];
+}
+
 /** Whether an address occurs in the source as one of its tokens: "github.com/jane" is not "github.com/janedoe". */
 function addressGrounded(value: string, normalized: string) {
   const target = bare(value);
@@ -53,14 +79,16 @@ function addressGrounded(value: string, normalized: string) {
     text
       // An icon glyph glued to the address separates it like a space.
       .split(/[\s|,;<>()"'\p{So}\p{Co}]+/u)
-      .some(
-        (token) =>
-          bare(
-            token
-              // A label ("Email:"), not part of the address; "https://" is kept.
-              .replace(/^\p{L}+:(?!\/\/)/u, "")
-              .replace(/(?<![.:;!?])[.:;!?]+$/, ""),
-          ) === target,
+      .some((token) =>
+        addressesIn(token).some(
+          (address) =>
+            bare(
+              address
+                // A label ("Email:"), not part of the address; "https://" is kept.
+                .replace(/^\p{L}+:(?!\/\/)/u, "")
+                .replace(/(?<![.:;!?])[.:;!?]+$/, ""),
+            ) === target,
+        ),
       ),
   );
 }

@@ -2,8 +2,8 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 import type { AtsLayoutSignals } from "../types.js";
-import { MAX_HIDDEN_TEXT } from "./docx.js";
-import { measureVisibility, seeThroughImages } from "./hidden.js";
+import { hiddenSignals } from "./docx.js";
+import { measureVisibility, readImages } from "./hidden.js";
 import type { Box } from "./surroundings.js";
 import { joinPages, pageText, withLinks, type PdfTextItem } from "./lines.js";
 import { optional } from "./peer.js";
@@ -103,11 +103,7 @@ async function readPdf(
               ops,
               list,
               page.view as Box,
-              await seeThroughImages(
-                ops,
-                list,
-                page as unknown as Parameters<typeof seeThroughImages>[2],
-              ),
+              await readImages(ops, list, page as unknown as Parameters<typeof readImages>[2]),
             );
             // A loop, not `push(...)`: a spread of many runs overflows the stack.
             for (const run of seen.hidden) hidden.push(run);
@@ -149,7 +145,7 @@ async function readPdf(
       page.cleanup();
     }
 
-    const hiddenText = hidden.join(" ").replace(/\s+/g, " ").trim();
+    const signals = hiddenSignals(hidden);
 
     // Description fields no reader sees, where an instruction to an AI can hide.
     let metadataText: string | undefined;
@@ -177,10 +173,9 @@ async function readPdf(
         columnRatio,
         pageCount: document.numPages,
         ...(visibilityRead && {
-          hiddenTextChars: hiddenText.replace(/\s/g, "").length,
-          hiddenText: hiddenText.slice(0, MAX_HIDDEN_TEXT),
+          ...signals,
           // Every text item, hidden or not, is read into a line, so the text holds all hidden text.
-          hiddenTextRead: hiddenText.slice(0, MAX_HIDDEN_TEXT),
+          hiddenTextRead: signals.hiddenText,
           imageOnlyPages,
           imageCount,
         }),

@@ -1,17 +1,23 @@
 /** A rectangle in page points: x0, y0, x1, y1. */
 export type Box = [number, number, number, number];
 
-/** Something drawn on the page before or after a text run. `fill` is "#rrggbb" or "" (unknown). */
+/**
+ * Something drawn on the page before or after a text run. `fill` is "#rrggbb" or "" (unknown; an
+ * image's is known only when it is blank, one colour throughout). A
+ * "hole" is where a filled path (a frame) leaves a gap inside its bounding box: it paints nothing,
+ * and `fill` and `alpha` are the path's. `blend`: its blend mode as pdf.js names it, when not normal.
+ */
 export type Drawn = {
   box: Box;
   order: number;
-  kind: "image" | "shape" | "shading";
+  kind: "image" | "shape" | "shading" | "hole";
   fill: string;
   alpha: number;
+  blend?: string;
 };
 
 /** At or above this opacity, something drawn over text hides it. */
-const OPAQUE = 0.9;
+export const OPAQUE = 0.9;
 
 const contains = ([x0, y0, x1, y1]: Box, [x, y]: [number, number]) =>
   x >= x0 && x <= x1 && y >= y0 && y <= y1;
@@ -20,10 +26,19 @@ const contains = ([x0, y0, x1, y1]: Box, [x, y]: [number, number]) =>
 export type Surroundings = {
   /** The last thing drawn before the run that contains the point. */
   top: Drawn | undefined;
-  /** Whether an image was drawn there before the run. */
+  /** Whether an image that is not blank (its `fill` unknown) was drawn there before the run. */
   overImage: boolean;
-  /** Whether something opaque was drawn over it afterwards. */
+  /** Whether something opaque was drawn over it afterwards, in the normal blend mode. */
   covered: boolean;
+  /**
+   * What opaque was drawn over it afterwards in another blend mode (a highlighter's Multiply), in
+   * drawing order: whether it hides the point depends on the colours it blends with.
+   */
+  over?: Drawn[];
+  /** The last hole before the run that contains the point, if any. */
+  hole?: Drawn;
+  /** A hole that contains the point in an opaque path drawn after the run, if any. */
+  holeOver?: Drawn;
 };
 
 const GRID = 8;
@@ -40,6 +55,8 @@ type Cell = {
   full: Drawn[];
   /** The rest that overlap it, checked point by point. */
   partial: Drawn[];
+  /** Holes that overlap it, checked point by point. */
+  holes: Drawn[];
   firstFullImage: number;
   lastOpaqueFull: number;
 };
@@ -71,6 +88,7 @@ export function indexDrawn(
   const cells: Cell[] = Array.from({ length: GRID * GRID }, () => ({
     full: [],
     partial: [],
+    holes: [],
     firstFullImage: Infinity,
     lastOpaqueFull: -Infinity,
   }));
@@ -84,18 +102,24 @@ export function indexDrawn(
     for (let r = row(y0); r <= row(y1); r += 1)
       for (let c = column(x0); c <= column(x1); c += 1) {
         const cell = cells[r * GRID + c];
+        if (item.kind === "hole") {
+          cell.holes.push(item);
+          continue;
+        }
         const [cx0, cy0] = [ax0 + c * width, ay0 + r * height];
         const whole =
           x0 <= cx0 - slack &&
           y0 <= cy0 - slack &&
           x1 >= cx0 + width + slack &&
           y1 >= cy0 + height + slack;
-        if (!whole) {
+        // One in a blend mode is checked point by point too, so it is found when drawn after a run.
+        if (!whole || item.blend) {
           cell.partial.push(item);
           continue;
         }
         cell.full.push(item);
-        if (item.kind === "image") cell.firstFullImage = Math.min(cell.firstFullImage, item.order);
+        if (item.kind === "image" && !item.fill)
+          cell.firstFullImage = Math.min(cell.firstFullImage, item.order);
         if (item.alpha >= OPAQUE) cell.lastOpaqueFull = Math.max(cell.lastOpaqueFull, item.order);
       }
   }
@@ -118,15 +142,26 @@ export function indexDrawn(
     let overImage = cell.firstFullImage < order;
     let covered = cell.lastOpaqueFull > order;
 
-    checks += cell.partial.length;
+    checks += cell.partial.length + cell.holes.length;
     if (checks > budget) throw new Error("Too much drawn in one place to measure.");
+    let over: Drawn[] | undefined;
     for (const item of cell.partial) {
       if (!contains(item.box, point)) continue;
       if (item.order < order) {
         if (!top || item.order > top.order) top = item;
-        if (item.kind === "image") overImage = true;
-      } else if (item.order > order && item.alpha >= OPAQUE) covered = true;
+        if (item.kind === "image" && !item.fill) overImage = true;
+      } else if (item.order > order && item.alpha >= OPAQUE)
+        if (item.blend) (over ??= []).push(item);
+        else covered = true;
     }
-    return { top, overImage, covered };
+    let hole: Drawn | undefined;
+    let holeOver: Drawn | undefined;
+    for (const item of cell.holes) {
+      if (!contains(item.box, point)) continue;
+      if (item.order < order) {
+        if (!hole || item.order > hole.order) hole = item;
+      } else if (item.order > order && item.alpha >= OPAQUE) holeOver = item;
+    }
+    return { top, overImage, covered, over, hole, holeOver };
   };
 }

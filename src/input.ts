@@ -2,6 +2,8 @@ import { fromJsonResume, isJsonResume } from "./document/jsonResume.js";
 import { renderResumeDocument } from "./document/render.js";
 import { resumeDocumentSchema } from "./document/schema.js";
 import { DOCUMENT_LIMITS, isResumeDocument, type AtsResumeDocument } from "./document/types.js";
+import { findName } from "./parser/contact.js";
+import { DEFAULT_POLICY } from "./policy/default.js";
 import { readHiddenCharacters, type HiddenCharacters } from "./text/characters.js";
 import { cut, normalizeText } from "./text/text.js";
 import { ENGLISH_ISSUES } from "./util/issues.js";
@@ -45,6 +47,33 @@ export type PreparedResume = {
 // Caller-controlled JSON can nest as deep as a body limit allows: cap the walk against stack overflow.
 const MAX_FLATTEN_DEPTH = 24;
 const MAX_TEXT_CHARS = 50_000;
+
+/** Text normalised at a time: a whole number of lines, unless one line is longer. */
+const CHUNK_CHARS = 100_000;
+/** The most of a paste read to fill `MAX_TEXT_CHARS`, past what normalising removes. */
+const MAX_READ_CHARS = 2_000_000;
+
+/**
+ * The first `MAX_TEXT_CHARS` of the text once normalised, and the raw text read for them. Read a
+ * chunk at a time until that much is kept: a 40 MB paste is not read through (it took one to two
+ * seconds), and invisible characters, which normalising removes, do not use up the cut (100,000
+ * of them before a resume left nothing of it). A paste of only those stops at `MAX_READ_CHARS`.
+ */
+function normalizedHead(text: string) {
+  let kept = "";
+  let at = 0;
+  while (at < text.length && at < MAX_READ_CHARS && kept.trimStart().length < MAX_TEXT_CHARS) {
+    let end = at + CHUNK_CHARS;
+    if (end < text.length) {
+      // At a line's end, so a CR LF or a letter and its accent are normalised together.
+      const line = text.lastIndexOf("\n", end - 1);
+      end = line >= at ? line + 1 : at + cut(text.slice(at, end), CHUNK_CHARS).length;
+    }
+    kept += normalizeText(text.slice(at, end));
+    at = end;
+  }
+  return { canonical: cut(kept.trim(), MAX_TEXT_CHARS), read: text.slice(0, at) };
+}
 
 /** Keys go on their own line so "experience" reads as a heading. Stops at the text budget. */
 function flatten(value: unknown): string {
@@ -140,23 +169,23 @@ export function prepareResume(input: unknown): PreparedResume {
     document = validDocument(input);
     text = renderResumeDocument(document);
   } else if (isJsonResume(input)) {
+    const json = fromJsonResume(input);
+    // A `basics` that is only a string is held to a printed name's checks: not a headline.
+    if (typeof input.basics === "string")
+      json.basics.name = findName([json.basics.name], DEFAULT_POLICY).name;
     // The adapter's output should validate; if not, the caller gets `AtsInputError`, not a ZodError.
-    document = validDocument(fromJsonResume(input));
+    document = validDocument(json);
     text = renderResumeDocument(document);
   } else {
     text = flatten(input);
   }
 
-  // Cut before it is read through, with room for what normalising removes (invisible
-  // characters, CR LF), then to the limit.
-  const canonical = cut(normalizeText(cut(text, MAX_TEXT_CHARS * 2)).trim(), MAX_TEXT_CHARS);
+  const { canonical, read } = normalizedHead(text);
 
   return Object.freeze({
     text: canonical,
     // Count what the engine reads: structured inputs are rendered first, so stripped unknown keys cannot smuggle characters.
-    hidden: readHiddenCharacters(
-      typeof input === "string" ? cut(input, MAX_TEXT_CHARS * 2) : canonical,
-    ),
+    hidden: readHiddenCharacters(typeof input === "string" ? read : canonical),
     document,
     [PREPARED]: true as const,
   });

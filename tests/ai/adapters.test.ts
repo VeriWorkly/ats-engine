@@ -199,25 +199,49 @@ describe("openai-compatible transport", () => {
     );
   });
 
+  // In the text an error quotes: a body that is not quoted passed whatever the redaction did.
   it("keeps other providers' keys and JSON key fields out of an error body too", async () => {
     // Keys of other services: Groq, Hugging Face, xAI, Replicate, Together.
-    const echo = JSON.stringify({
-      seen: [
-        "gsk_Invented0123456789",
-        "hf_Invented0123456789",
-        "xai-Invented0123456789",
-        "r8_Invented0123456789",
-        "tgp_v1_Invented0123456789",
-      ],
+    const keys = JSON.stringify({
+      error: {
+        message:
+          "Rejected gsk_Invented0123456789 hf_Invented0123456789 xai-Invented0123456789 " +
+          "r8_Invented0123456789 tgp_v1_Invented0123456789",
+      },
+    });
+    const members = `Rejected ${JSON.stringify({
       api_key: "plainsecret1",
       apiKey: "plainsecret2",
       "x-api-key": "plainsecret3",
       access_token: "plainsecret4",
-    });
-    const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(401, echo) });
+    })}`;
+    for (const [body, expected] of [
+      [keys, "Rejected [redacted] [redacted] [redacted] [redacted] [redacted]"],
+      [
+        members,
+        'Rejected {"api_key":"[redacted]","apiKey":"[redacted]","x-api-key":"[redacted]",' +
+          '"access_token":"[redacted]"}',
+      ],
+    ]) {
+      const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(401, body!) });
+      const error = (await provider
+        .complete(request())
+        .catch((caught: unknown) => caught)) as Error;
+      expect(error.message).toBe(`Provider returned HTTP 401: ${expected}`);
+    }
+  });
+
+  // A lone CR or a Unicode line separator ended a line too, and the echo after it was quoted.
+  it.each([
+    ["a lone CR", "\r"],
+    ["a line separator", String.fromCodePoint(0x2028)],
+    ["a paragraph separator", String.fromCodePoint(0x2029)],
+    ["a vertical tab", "\v"],
+  ])("does not quote a text body broken by %s", async (_label, gap) => {
+    const body = `Bad request.${gap}{"content":"Jane Doe jane.doe@example.com"}`;
+    const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(400, body) });
     const error = (await provider.complete(request()).catch((caught: unknown) => caught)) as Error;
-    expect(error.message).toBe("Provider returned HTTP 401.");
-    expect(error.message).not.toMatch(/Invented|plainsecret/);
+    expect(error.message).toBe("Provider returned HTTP 400.");
   });
 
   it("treats an unreadable body and a network failure as retryable", async () => {
@@ -245,6 +269,175 @@ describe("openai-compatible transport", () => {
       message: "Provider request timed out.",
       retryable: true,
     });
+  });
+
+  // A `fetch` that never settles and ignores the signal held the call past `timeoutMs`, forever.
+  it("gives up at timeoutMs even when the fetch ignores the signal", async () => {
+    const deaf = vi.fn<FetchLike>(() => new Promise(() => {}));
+    const started = performance.now();
+    await expect(
+      openAiCompatible({ apiKey: "k", fetch: deaf, timeoutMs: 20 }).complete(request()),
+    ).rejects.toMatchObject({ message: "Provider request timed out.", retryable: true });
+    expect(performance.now() - started).toBeLessThan(1_000);
+
+    // The caller's own abort is an abort, never retried.
+    const controller = new AbortController();
+    const pending = anthropic({ apiKey: "k", fetch: deaf }).complete(
+      request({ signal: controller.signal }),
+    );
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("reads retry-after, in seconds or as a date, onto the error", async () => {
+    const answer = (value: string) =>
+      vi.fn<FetchLike>(async () => ({
+        ok: false,
+        status: 429,
+        headers: { get: (name: string) => (name === "retry-after" ? value : null) },
+        text: async () => "",
+      }));
+    const after = async (value: string) =>
+      (
+        (await openAiCompatible({ apiKey: "k", fetch: answer(value) })
+          .complete(request())
+          .catch((caught: unknown) => caught)) as LlmProviderError
+      ).retryAfterMs;
+    expect(await after("7")).toBe(7_000);
+    expect(await after("0.5")).toBe(500);
+    const date = await after(new Date(Date.now() + 30_000).toUTCString());
+    expect(date).toBeGreaterThan(28_000);
+    expect(date).toBeLessThanOrEqual(30_000);
+    expect(await after(new Date(Date.now() - 30_000).toUTCString())).toBe(0);
+    expect(await after("soon")).toBeUndefined();
+    // Only decimal seconds: `Number` would read these as 16 s and 1,000 s.
+    expect(await after("0x10")).toBeUndefined();
+    expect(await after("1e3")).toBeUndefined();
+    expect(await after("-1")).toBeUndefined();
+    // No digit is no number of seconds: a blank is the normal backoff, never 0 s.
+    expect(await after(" ")).toBeUndefined();
+    expect(await after(" 3 ")).toBe(3_000);
+  });
+
+  // An error sent with HTTP 200 read as an empty reply: "invalid_output: Empty response", retried.
+  it.each([
+    [
+      "an OpenAI-compatible error",
+      { error: { message: "Model overloaded, try later", code: 503 } },
+      "Provider returned an error: Model overloaded, try later",
+      { status: 503, retryable: true },
+    ],
+    [
+      "an OpenAI-compatible rejection",
+      { error: { message: "Invalid model id", code: 400 } },
+      "Provider returned an error: Invalid model id",
+      { status: 400, retryable: false },
+    ],
+    [
+      "an Anthropic error",
+      { type: "error", error: { type: "overloaded_error", message: "Overloaded" } },
+      "Provider returned an error: Overloaded",
+      { retryable: true },
+    ],
+    [
+      "an Anthropic rejection",
+      { type: "error", error: { type: "invalid_request_error", message: "Bad schema" } },
+      "Provider returned an error: Bad schema",
+      { retryable: false },
+    ],
+    [
+      "a Gemini error list",
+      [{ error: { code: 429, message: "Quota exceeded", status: "RESOURCE_EXHAUSTED" } }],
+      "Provider returned an error: Quota exceeded",
+      { status: 429, retryable: true },
+    ],
+    [
+      "an error that echoes the request and the key",
+      {
+        error: { message: "Bad key sk-invented-0123456789" },
+        request: { messages: [{ content: "Jane Doe jane.doe@example.com" }] },
+      },
+      "Provider returned an error: Bad key [redacted]",
+      { retryable: true },
+    ],
+    // A bare string is judged by its words, as an error's `type` is.
+    [
+      "a rejection as a bare string",
+      { error: "Invalid API key" },
+      "Provider returned an error: Invalid API key",
+      { retryable: false },
+    ],
+    [
+      "a missing model as a bare string",
+      { error: "Model not found" },
+      "Provider returned an error: Model not found",
+      { retryable: false },
+    ],
+    [
+      "an outage as a bare string",
+      { error: "Upstream busy, try again" },
+      "Provider returned an error: Upstream busy, try again",
+      { retryable: true },
+    ],
+  ])("reads %s sent with HTTP 200 as a provider error", async (_label, body, message, fields) => {
+    for (const make of [openAiCompatible, anthropic]) {
+      const provider = make({ apiKey: "sk-invented-0123456789", fetch: fetchReturning(200, body) });
+      const error = await provider.complete(request()).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(LlmProviderError);
+      expect(error).toMatchObject({ message, ...fields });
+    }
+  });
+
+  // A gateway that adds an empty `error` to every answer: each one failed, and was retried.
+  it.each([
+    ["null", null],
+    ["an empty object", {}],
+    ["an empty string", ""],
+    ["false", false],
+    ["an error with a message", { message: "partial outage elsewhere" }],
+  ])("reads an answer sent beside an error that is %s as the answer", async (_label, error) => {
+    const text = '{"name":"Jane","tags":null}';
+    const openAi = { choices: [{ message: { content: text }, finish_reason: "stop" }], error };
+    const claude = { type: "message", content: [{ type: "text", text }], stop_reason: "end_turn" };
+    await expect(
+      openAiCompatible({ apiKey: "k", fetch: fetchReturning(200, openAi) }).complete(request()),
+    ).resolves.toMatchObject({ text, finish: "stop" });
+    await expect(
+      anthropic({ apiKey: "k", fetch: fetchReturning(200, { ...claude, error }) }).complete(
+        request(),
+      ),
+    ).resolves.toMatchObject({ text, finish: "stop" });
+  });
+
+  it("reads an empty error with no answer as an empty reply, not as a provider error", async () => {
+    const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(200, { error: {} }) });
+    await expect(provider.complete(request())).resolves.toMatchObject({ text: "" });
+  });
+
+  it.each([
+    [
+      "FastAPI's detail",
+      { detail: "Model not loaded" },
+      "Provider returned HTTP 422: Model not loaded",
+    ],
+    [
+      "a Gemini error list",
+      [{ error: { code: 422, message: "API key not valid", status: "INVALID_ARGUMENT" } }],
+      "Provider returned HTTP 422: API key not valid",
+    ],
+    [
+      "a top-level message beside an empty one",
+      { error: { message: "" }, message: "Context too long" },
+      "Provider returned HTTP 422: Context too long",
+    ],
+    [
+      "FastAPI's validation list, which echoes the input",
+      { detail: [{ loc: ["body"], msg: "bad", input: "Jane Doe jane.doe@example.com" }] },
+      "Provider returned HTTP 422.",
+    ],
+  ])("quotes %s in an error", async (_label, body, message) => {
+    const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(422, body) });
+    await expect(provider.complete(request())).rejects.toMatchObject({ message, status: 422 });
   });
 
   it("refuses to start without an API key", () => {

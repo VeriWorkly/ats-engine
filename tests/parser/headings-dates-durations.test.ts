@@ -395,6 +395,7 @@ describe("date spellings that dropped the role", () => {
     ["Engineer, Hooli 06/21 - Present", "en"],
     ["Ingenieur, Hooli 06/2021 – bis heute", "de"],
     ["Ingenieur, Hooli ab 06/2021", "de"],
+    ["Ingenieur, Hooli\nAb 06/2021", "de"],
     ["इंजीनियर, Hooli जून 2021 से", "hi"],
     ["इंजीनियर, Hooli जून 2021 - अभी तक", "hi"],
   ])("reads %j as current", (line, language) => {
@@ -429,11 +430,71 @@ describe("date spellings that dropped the role", () => {
     expect(rows("Jane Doe\nExperience\nShipped 3/12 - 5/12 sprint goals")).toEqual([]);
   });
 
-  // An open end written straight after a date ends its clause: in a sentence it is a word.
+  // A span of two such dates with words after it is a rating, a sprint or an event, not a role.
+  it.each([
+    "Ran hackathon 09/15 - 09/17 at MIT",
+    "Rated 08/10 - 10/10 by users",
+    "results 06/21 - 08/21 sprint",
+    "Cut ticket backlog from 10/12 - 11/12 of the year",
+  ])("does not read %j in a role's bullets as a role", (bullet) => {
+    const { roles } = check(
+      `Jane Doe\nExperience\nEngineer, Hooli\nJan 2016 - Dec 2018\nBuilt Java services used by 40 teams\n${bullet}`,
+    );
+    expect(roles).toHaveLength(1);
+  });
+
+  // A "since" date still to come dates no role: it says when the candidate is free to start.
+  it.each([
+    "Verfügbar ab 11/2026",
+    "Kündigungsfrist 3 Monate, verfügbar ab 01/2027",
+    "Verfügbar ab 2027",
+  ])("does not read %j as a current role", (line) => {
+    const { roles, monthsOfExperience } = check(
+      `Jane Doe\nBerufserfahrung\nIngenieur, Hooli\n03/2017 – 02/2021\n${line}`,
+      { languages: ["de"] },
+    );
+    expect(roles).toHaveLength(1);
+    expect(monthsOfExperience).toBe(48);
+  });
+
+  it("reads a role begun this month as current", () => {
+    const { roles } = check("Jane Doe\nBerufserfahrung\nIngenieur, Hooli ab 08/2026", {
+      languages: ["de"],
+    });
+    expect(roles).toMatchObject([{ start: { year: 2026, month: 8 }, current: true }]);
+  });
+
+  it.each([
+    "Analyst, Initech\n01/15 - 05/21",
+    "Analyst, Initech 01/15 - 05/21  Berlin",
+    "Analyst, Initech 01/15 - 05/21 | Berlin",
+  ])("still reads %j as a role", (lines) => {
+    expect(check(`Jane Doe\nExperience\n${lines}`).roles).toMatchObject([
+      { start: { year: 2015, month: 1 }, end: { year: 2021, month: 5 } },
+    ]);
+  });
+
+  // "AB" is a Swedish company's suffix ("Volvo AB"), not German "ab" ("from").
+  it.each([
+    ["Ingenieur, Volvo AB 2018 – 2021", "Volvo AB", { year: 2018, month: null }],
+    ["Ingenieur, Spotify AB 01/2018 – 12/2021", "Spotify AB", { year: 2018, month: 1 }],
+  ])("reads %j as an ended role at the company", (line, employer, start) => {
+    const { roles } = check(`Jane Doe\nBerufserfahrung\n${line}`, { languages: ["de"] });
+    expect(roles).toMatchObject([{ employer, start, current: false }]);
+  });
+
+  // An everyday word that dates a role ("continuing", "onwards", "से") counts only where its date
+  // ends the line or a column: in a sentence it is a word.
   it.each([
     ["Jan 2017 continuing support for 3 legacy apps", "en"],
     ["Mar 2019 Continuing professional development: AWS course", "en"],
     ["2017 से टीम का नेतृत्व किया", "hi"],
+    ["2020 onwards, growth of 30% each year", "en"],
+    ["From 2017 onwards: 40% growth", "en"],
+    ["2017 – continuing education credits (40 hrs)", "en"],
+    ["Umsatz ab 2017 um 30 % gesteigert", "de"],
+    ["मार्च 2017 से 5 नए ग्राहक जोड़े", "hi"],
+    ["जनवरी 2017 से, टीम का नेतृत्व", "hi"],
   ])("does not read %j in a role's bullets as a role", (bullet, language) => {
     const { roles } = check(
       `Jane Doe\nExperience\nEngineer, Hooli\nJan 2016 - Dec 2018\nBuilt Java services used by 40 teams\n${bullet}`,
@@ -442,13 +503,24 @@ describe("date spellings that dropped the role", () => {
     expect(roles).toHaveLength(1);
   });
 
-  // A PDF often loses the dash: a place after the open end is no sentence.
+  // A PDF often loses the dash: whatever follows "Present" or "heute", a place or a team, in any
+  // case or script, the role is current.
   it.each([
     ["Engineer, Hooli\nJun 2021 Present San Francisco, CA", "en"],
     ["Engineer, Hooli\nJun 2021 Present\tRemote", "en"],
     ["Engineer, Hooli\nJun 2021 Current Remote", "en"],
     ["Senior Engineer Jun 2021 Present Austin, TX", "en"],
     ["Ingenieur, Hooli\n03/2020 heute Berlin", "de"],
+    ["Engineer, Hooli\nJun 2021 Present remote", "en"],
+    ["Engineer, Hooli\nJun 2021 present      remote, us", "en"],
+    ["Engineer  Jun 2021 Present  eBay", "en"],
+    ["Engineer, Hooli  Jun 2021 Present  iOS team", "en"],
+    ["Engineer, Hooli\nJun 2021 Now  eBay Inc.", "en"],
+    ["Ingenieur\n03/2020 heute bei Siemens", "de"],
+    ["इंजीनियर, Hooli\nजून 2021 वर्तमान बेंगलुरु", "hi"],
+    ["इंजीनियर, Hooli\nजून 2021 जारी मुंबई", "hi"],
+    ["Engineer, Hooli\nJun 2021 onwards | Remote", "en"],
+    ["Engineer, Hooli\nJun 2021 - Continuing\tRemote", "en"],
   ])("still reads %j as a current role", (lines, language) => {
     const { roles } = check(`Jane Doe\nExperience\n${lines}`, { languages: [language] });
     expect(roles).toMatchObject([{ current: true }]);

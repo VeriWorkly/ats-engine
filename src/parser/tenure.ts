@@ -1,18 +1,16 @@
-import type { AtsParsedDate, AtsParsedRole } from "../types.js";
+import type { AtsParsedRole } from "../types.js";
+import { monthIndex, nowMonth } from "../util/months.js";
 
 /** Calendar months covered by at least one role, so concurrent jobs are not counted twice. */
 export function monthsOfExperience(roles: AtsParsedRole[], now: Date) {
-  // A missing month is read generously: January for a start, December for an end.
-  const toIndex = (date: AtsParsedDate, fallbackMonth: number) =>
-    date.year * 12 + (date.month ?? fallbackMonth) - 1;
-  const nowIndex = now.getUTCFullYear() * 12 + now.getUTCMonth();
+  const nowIndex = nowMonth(now);
 
   const spans = roles
     .flatMap((role) => {
       if (!role.start) return [];
-      const start = toIndex(role.start, 1);
+      const start = monthIndex(role.start);
       if (start > nowIndex) return []; // not started yet
-      const end = role.current ? nowIndex : role.end ? toIndex(role.end, 12) : start;
+      const end = role.current ? nowIndex : role.end ? monthIndex(role.end, 12) : start;
       return [{ start, end: Math.max(start, Math.min(end, nowIndex)) }];
     })
     .sort((a, b) => a.start - b.start);

@@ -1,6 +1,7 @@
 import { escapeRegex, normalizeText, wordListRegex } from "../text/text.js";
-import { EMAIL } from "../parser/contact.js";
 import { educationLevel } from "../parser/education.js";
+import { organisationWordsOf, titleWordsOf } from "../parser/experience.js";
+import { isSectionHeading } from "../parser/sections.js";
 import { findDateRange, isPlausibleDate } from "../parser/dates.js";
 import { parseQuality } from "../parser/index.js";
 import { finalizeParsed, type ParsedCore } from "../parser/record.js";
@@ -87,20 +88,43 @@ export function writtenYears(text: string): Set<number> {
  * count. Read in the document's own language.
  */
 export function ongoingIn(source: string, policy: AtsEnginePolicy) {
-  const localized = inLanguagesOf(policy, source);
-  const words = (list: readonly string[]) => list.map((word) => escapeRegex(normalizeText(word)));
-  const openEnded = wordListRegex(words(localized.resumeParse.openEnded));
-  // An open end after a dash or range word ("– present", "bis heute"), or a start ("since 2019").
-  const rangeWords = wordListRegex(words(localized.resumeParse.rangeWords)).source;
-  const sinceWords = wordListRegex(words(localized.resumeParse.sinceWords)).source;
-  // An open-ended word ending the line counts too ("Jan 2019 Present").
+  const rp = inLanguagesOf(policy, source).resumeParse;
+  const folded = (word: string) => normalizeText(word).toLowerCase();
+  const everyday = new Set(rp.lineEndDateWords.map(folded));
+  /** The words as one pattern; no word matches nothing. */
+  const alternatives = (list: readonly string[]) =>
+    list.length
+      ? wordListRegex(list.map((word) => escapeRegex(normalizeText(word)))).source
+      : "(?!)";
+  /** The words of `list` that are (or are not) everyday words. */
+  const pattern = (list: readonly string[], isEveryday: boolean) =>
+    alternatives(list.filter((word) => everyday.has(folded(word)) === isEveryday));
+  const openEnded = pattern(rp.openEnded, false);
+  const everydayOpenEnded = pattern(rp.openEnded, true);
+  const dash = `(?:[-–—]|${alternatives(rp.rangeWords)})`;
+  // An open end after a dash or range word ("– present", "bis heute") or ending the line ("Jan
+  // 2019 Present"), or a start ("since 2019"). An everyday word ("onwards", "ab", "से") counts
+  // only as the parser reads it: after a date ("Jun 2021 onwards", not "दिल्ली से") or before one
+  // ("ab 03/2020", not "Volvo AB 2018 – 2021"), ending the line.
   const range = new RegExp(
-    `(?:[-–—]|${rangeWords})\\s*(?:${openEnded.source})|(?:${openEnded.source})\\s*$|${sinceWords}`,
+    [
+      `${dash}\\s*(?:${openEnded})`,
+      `(?:${openEnded})\\s*$`,
+      pattern(rp.sinceWords, false),
+      String.raw`\d\s*(?:${dash}\s*)?(?:${everydayOpenEnded})[\s.)\]]*$`,
+      String.raw`(?:${pattern(rp.sinceWords, true)})\s+(?:\p{L}+\.?\s*)?\d[\d./-]*[\s.)\]]*$`,
+    ].join("|"),
     "iu",
   );
-  /** A line that is only the open end: "Present", "- to date". */
+  const anyOpenEnd = new RegExp(openEnded, "iu");
+  const onlyEveryday = new RegExp(
+    String.raw`^\s*(?:${dash}\s*)?(?:${everydayOpenEnded})\s*$`,
+    "iu",
+  );
+  /** A line that is only the open end: "Present", "- to date", "- continuing". */
   const bare = (line: string | undefined) =>
-    line !== undefined && openEnded.test(line) && line.trim().split(/\s+/).length <= 3;
+    line !== undefined &&
+    ((anyOpenEnd.test(line) && line.trim().split(/\s+/).length <= 3) || onlyEveryday.test(line));
   const lines = normalizeText(source).toLowerCase().split("\n");
   const near = (holds: (line: string) => boolean, datesBeside: boolean) =>
     lines.some(
@@ -131,13 +155,72 @@ export function ongoingIn(source: string, policy: AtsEnginePolicy) {
   };
 }
 
-/** An email address and nothing else, as the parser reads one. */
-const WHOLE_EMAIL = new RegExp(`^(?:${EMAIL.source})$`, EMAIL.flags);
 /**
- * Only what a phone number is written with: digits, "+", spaces, brackets ("(+44)"), dots,
- * dashes of any width, slashes; then an extension ("ext. 12", "x12") apart.
+ * An email address and nothing else: a local part, then a domain of up to nine labels in any
+ * script (`jane@bücher.de`, `张伟@example.cn`), which the parser's ASCII pattern leaves out.
  */
-const PHONE_SHAPE = /^([+\d\s().\-/–—]+?)(?:\s*(?:ext\.?|x)\s*\d{1,6})?$/i;
+const WHOLE_EMAIL =
+  /^[^\s@]{1,64}@(?:[\p{L}\p{M}\p{N}-]{1,63}\.){1,8}[\p{L}\p{M}][\p{L}\p{M}\p{N}-]{1,23}$/u;
+/**
+ * Only what a phone number is written with, once normalised (digits of every script as ASCII,
+ * every dash as "-"): digits, "+", spaces, brackets ("(+44)"), dots, dashes, slashes; then an
+ * extension ("ext. 12", ", x12") apart.
+ */
+const PHONE_SHAPE = /^([+\d\s().\-/]+?)(?:[\s,]*(?:ext\.?|x)\s*\d{1,6})?$/i;
+const MAX_PHONE_CHARS = 64;
+/** A label before a phone number ("Mobile:", "Tel.:") and a note after it ("(US)", "(mobile)"). */
+const PHONE_LABELS = /^\p{L}[\p{L}\s.]{0,20}:\s*|\s*\(\p{L}[\p{L}\s.]{0,20}\)$/gu;
+/** Junk with a phone's characters: an IP address, years alone ("2019 2020 2021"). */
+const NOT_A_PHONE = /^\d{1,3}(?:\.\d{1,3}){3}$|^\+?(?:(?:19|20)\d{2}[\s.\-/]*)+$/;
+/** A generation after a name ("3rd"), the one place a name holds a digit. */
+const ORDINAL = /\s\d{1,2}\p{L}{1,3}\.?$/u;
+
+/**
+ * Whether a value reads as a person's name: up to twelve words, a bracket after it ("(she/her)")
+ * and a generation ("3rd") aside; capitalised words, lowercase only for a name particle or a
+ * word of one or two letters ("da", "e"), or a name of two to four words all in lowercase. Not
+ * two phrases joined by a comma ("Senior Engineer, Acme Corporation"; "Doe, Jane" and "Jane Doe,
+ * PhD" are names), a heading, the document's title, a job title or an organisation (`roles`
+ * names the document's roles' titles and employers).
+ */
+function isNameShaped(value: string, policy: AtsEnginePolicy, roles: readonly string[]) {
+  if (value.length > 200) return false;
+  const name = normalizeText(value)
+    .trim()
+    .replace(/\([^()]*\)$/u, "")
+    .trimEnd()
+    .replace(ORDINAL, "");
+  if (!name || /[\d@/()]/u.test(name)) return false;
+  const words = name.split(/\s+/);
+  const phrases = name.split(",").filter((part) => part.trim().split(/\s+/).length > 1);
+  if (words.length > 12 || phrases.length > 1) return false;
+  const rp = policy.resumeParse;
+  const particle = new RegExp(`^(?:${rp.nameParticles.join("|")})$`, "u");
+  const lower = (word: string) => /^\p{Ll}/u.test(word);
+  const cased = words.every((word) => !lower(word) || particle.test(word) || word.length <= 2);
+  const lowercase =
+    words.every(lower) && words.length >= 2 && words.length <= 4 && !/[.!?]$/u.test(name);
+  if (!cased && !lowercase) return false;
+  if (
+    isSectionHeading(name, policy) ||
+    new RegExp(`^(?:${rp.documentTitles.join("|")})$`, "iu").test(name)
+  )
+    return false;
+  // A title or organisation word is a surname too ("Maria Head", "Anna Bank"). A part reads as a
+  // title or an employer when one leads it or two are in it ("Head Chef", "Jane Doe, Engineer"),
+  // or when the document's roles give it as a title or employer.
+  const titled = (text: string) =>
+    titleWordsOf(policy).test(text) || organisationWordsOf(policy).test(text);
+  if (!titled(name)) return true;
+  const folded = name.toLowerCase();
+  if (roles.some((role) => normalizeText(role).trim().toLowerCase() === folded)) return false;
+  return name.split(",").every((part) => {
+    const partWords = part.trim().split(/\s+/);
+    const count = partWords.filter(titled).length;
+    // A phrase the policy lists whole ("Pty Ltd") counts as two.
+    return !titled(part) || (count === 1 && !titled(partWords[0]!));
+  });
+}
 
 /**
  * Fills gaps in the deterministic parse with grounded AI values. A value the parser found is
@@ -171,24 +254,35 @@ export function mergeGrounded(
   const filled = new Set<AtsParsedField>();
 
   // Grounded words are not enough: each contact field must also be the kind of value it holds.
+  const roleNames = [...deterministic.roles, ...candidate.roles].flatMap((role) => [
+    role.title,
+    role.employer,
+  ]);
   const shaped = {
-    name: (value: string) => !/[\d@/]/.test(value) && value.trim().split(/\s+/).length <= 8,
+    name: (value: string) => isNameShaped(value, policy, roleNames),
     email: (value: string) => WHOLE_EMAIL.test(value.trim()),
-    // A phone's characters and 7 to 15 digits (E.164) besides an extension; without a country
-    // code, not a date range ("2017 - 2019"). libphonenumber's check would put its metadata in the
-    // `/ai` bundle.
+    // A phone's characters and 7 to 15 digits (E.164) besides an extension, ending in a group of
+    // two or more ("978-3-16-148410-0" is an ISBN), and not a date range alone ("2017 - 2019";
+    // "(11) 2019-2020" has more). libphonenumber's check would put its metadata in the `/ai` bundle.
     phone: (value: string) => {
-      const number = PHONE_SHAPE.exec(value.trim())?.[1];
-      return (
-        number !== undefined &&
-        /^(?:\D*\d){7,15}\D*$/.test(number) &&
-        (number.includes("+") || !findDateRange(number, policy.resumeParse, now))
-      );
+      const number = PHONE_SHAPE.exec(
+        normalizeText(value)
+          .replace(/[\p{Pd}−]/gu, "-")
+          .trim(),
+      )?.[1];
+      if (number === undefined || NOT_A_PHONE.test(number.trim())) return false;
+      if (!/^(?:\D*\d){7,15}\D*$/.test(number) || !/\d{2}\D*$/.test(number)) return false;
+      const range = findDateRange(number, policy.resumeParse, now)?.matched;
+      return !range || /\d/.test(number.replace(range, ""));
     },
   };
+  // A phone is kept without its label and note: "+1 415 555 0134", not "Mobile: … (US)". Longer
+  // is no phone number, and the lazy shape would rescan it.
+  const phone = candidate.phone.length > MAX_PHONE_CHARS ? "" : candidate.phone;
+  const values = { ...candidate, phone: phone.replace(PHONE_LABELS, "").trim() };
   for (const field of ["name", "email", "phone"] as const)
-    if (!core[field] && ok(field, candidate[field]) && shaped[field](candidate[field])) {
-      core[field] = candidate[field];
+    if (!core[field] && ok(field, values[field]) && shaped[field](values[field])) {
+      core[field] = values[field];
       filled.add(field);
     }
 

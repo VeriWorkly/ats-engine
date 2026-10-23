@@ -485,6 +485,33 @@ describe("a huge paste", () => {
     expect(text.length).toBeLessThanOrEqual(50_000);
     expect(text.startsWith("Jane Doe\nCut costs by 40% in 2019 and 2021.")).toBe(true);
   });
+
+  // Cut at 100,000 characters before normalising, invisible characters filled the cut: the
+  // resume after them was lost (0 characters kept, then 1,000 of 50,000).
+  const RESUME = "Jane Doe\nSenior Engineer, Acme Corporation\nJan 2020 - Present\n";
+  const ZWSP = String.fromCodePoint(0x200b);
+  it.each([
+    ["the resume after 100,000 invisible characters", ZWSP.repeat(100_000), 1, RESUME.trim()],
+    [
+      "50,000 characters after 99,000 invisible ones",
+      ZWSP.repeat(99_000),
+      1_000,
+      RESUME.repeat(1_000).slice(0, 50_000),
+    ],
+  ])("keeps %s", (_label, invisible, copies, kept) => {
+    const { text, hidden } = prepareResume(`${invisible}${RESUME.repeat(copies)}`);
+    expect(text).toBe(kept);
+    expect(hidden.count).toBe(invisible.length);
+  });
+
+  it("reads a paste of invisible characters in bounded time", () => {
+    const { text, hidden } = expectFast(
+      () => prepareResume(`${`${ZWSP}\n`.repeat(20_000_000)}${RESUME}`),
+      1_500,
+    );
+    expect(text).toBe("");
+    expect(hidden.count).toBeGreaterThan(0);
+  });
 });
 
 describe("line breaks of every kind", () => {
