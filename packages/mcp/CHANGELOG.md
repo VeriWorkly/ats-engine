@@ -1,5 +1,24 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.14.0
+
+### Minor Changes
+
+- c3a0d31: A resume in a language the engine has no pack for now says so.
+
+  - **Breaking:** `check_resume`'s `locale` gains `unsupported` (`"it"`, `"Cyrillic"`, or `null`), and its text answer a "Language:" line: "This resume looks Italian, which the engine does not read yet: …". Scores do not change.
+
+- c3a0d31: German, French and Hindi resumes read nearly as well as English ones, and Spanish and Portuguese are read too (engine 0.20.0).
+
+  - **Breaking:** answers for the same file change where the engine now reads it better. On resumes written in each language, fields read right went from 80.0% to 99.2% in German, 89.8% to 97.6% in French, 88.4% to 99.2% in Hindi, 24.3% to 98.0% in Spanish and 23.3% to 99.3% in Portuguese; a city after the employer is left out of it; English answers change only where a field is read better.
+  - `language` accepts `es` and `pt`, and `region` accepts `ES`, `BR` and `PT`.
+
+### Patch Changes
+
+- Updated dependencies [c3a0d31]
+- Updated dependencies [c3a0d31]
+  - @veriworkly/ats-engine@0.20.0
+
 ## 0.13.0
 
 ### Minor Changes
