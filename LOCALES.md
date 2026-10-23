@@ -21,7 +21,10 @@ report.locale; // { languages: ["de"], region: "DE" }
   a `script` applies when that script covers a fair share of the letters. A Latin-script pack
   applies when at least three _different_ `detectionWords` appear and make up 3% of the words,
   so a German company name in an English resume doesn't make the resume German, and neither
-  does a surname like "Das". Words inside email addresses and URLs don't count. A blind union
+  does a surname like "Das". Words inside email addresses and URLs don't count, and neither
+  does a word in capitals among lower-case words, which is an acronym: "MIT" in "BSc, MIT, 2016"
+  is not German "mit", nor "AB" in "Volvo AB". A line all in capitals is a heading, and its
+  words count ("AUSBILDUNG UND STUDIUM", "EXPÉRIENCE PROFESSIONNELLE"). A blind union
   of every pack would let German stopwords like "die" and "am" eat English keywords.
 - **A language without a pack is read in none, not as English.** The policy names its own
   language's common words (`text.detectionWords`) and those of languages it has no vocabulary
@@ -60,7 +63,10 @@ report.locale; // { languages: ["de"], region: "DE" }
 - Pass `languages` or `region` to `check` to override detection, in any case (`"DE"`, `"fr"`).
   An id no attached pack has throws `AtsPolicyError` naming the attached ones; `[]`, or the
   policy's own language (`"en"`), reads with the base only. A host that knows the user's
-  country should pass it.
+  country should pass it. The CLI's `--lang`, the MCP tools' `language` and the GitHub Action's
+  `language` do the same for one language (`en` reads English only). Like `languages`, they set
+  the language of the posting too: an English resume with a German posting is read best with
+  no language given.
 
 ## Built-in packs
 
@@ -232,6 +238,12 @@ then holds the set to:
 - the expected locale;
 - every section heading found;
 - field accuracy of at least 0.95.
+
+The same file holds every English resume, and 100 generated ones, to one more rule: with every
+built-in pack attached, each reads exactly as it does with none, with and without an English
+posting that uses other languages' words ("AB testing", "die-cut", "MIT-licensed"). A new pack
+whose detection words or vocabulary reach into English fails there. Add your language's
+lookalikes (a place, a company form, a surname) to that test's English resume.
 
 Cover the layouts real resumes in that language use (stacked headers, dates on their own line,
 letter-spaced headings), not just one tidy example.

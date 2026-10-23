@@ -102,6 +102,7 @@ Advice (not scored):
 | `--policy <file>` | Use your own scoring policy JSON instead of the bundled one                                               |
 | `--json`          | Print the full report as JSON, `advice` included                                                          |
 | `--min-score <n>` | Exit with code 2 when the readiness score is below `n`, for CI checks                                     |
+| `--lang <code>`   | Read the resume and posting in `de`, `fr`, `hi`, or `en` for English only, instead of detecting it        |
 | `--region <code>` | Read the resume as from `US`, `GB`, `DE`, `FR` or `IN` instead of guessing                                |
 | `--text`          | Also print the text in the order an ATS reads it (with `--json`, as the report's `lines`)                 |
 | `--ats <name>`    | Add the documented notes on one ATS (`greenhouse`, `lever`, `taleo`), each with its source                |
@@ -168,6 +169,7 @@ Keep your resume in a repository and check it on every push. The step fails when
 | `resume`    | Path to the resume (required)                                                                                                         |
 | `job`       | Path to a job posting to match against                                                                                                |
 | `min-score` | Fail the step below this readiness score (0–100)                                                                                      |
+| `language`  | Read the resume in this language (`en`, `de`, `fr`, `hi`) instead of detecting it; needs `version` 0.19.0 or later                    |
 | `region`    | Read the resume as from this country (`US`, `GB`, `DE`, `FR`, `IN`)                                                                   |
 | `version`   | Engine version to run. Defaults to the release the action ships with, so your score only moves when you change it                     |
 | `ats`       | Add the documented notes for the ATS you apply through (`greenhouse`, `lever`, `taleo`) to the advice; needs `version` 0.3.0 or later |
