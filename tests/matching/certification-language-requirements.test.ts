@@ -123,6 +123,7 @@ describe("a certification not held", () => {
     ["CISSP (expired 2021)", "CISSP required", "CISSP: expired 2021"],
     ["CISSP (expired 2021)", "Must hold a current CISSP", "CISSP: expired 2021"],
     ["CISSP (in progress)", "CISSP required", "CISSP: not yet held"],
+    ["CISSP (in progress)", "CISSP preferred", "CISSP: not yet held"],
   ])("is partial, and says why: %s for %s", (row, ask, detail) => {
     const found = judge(listing(row), ask);
     expect(found).toMatchObject({ status: "partial", detail });
@@ -145,6 +146,9 @@ describe("a certification not held", () => {
   it.each([
     "CISSP, ISC2, 2015, expired 2021\nCISSP, ISC2, 2023, expires 2029",
     "CISSP (ISC2), 2019, expired 2021, renewed 2023",
+    "CISSP, ISC2, expired 2021\nCISSP, ISC2, 2024",
+    "CISSP, ISC2, 2015, expired 2021\nCISSP, ISC2, renewed 2024",
+    "CISSP (ISC2), 2019, renewed 2023 after lapse in 2021",
   ])("is met by a renewal: %s", (rows) => {
     const found = judge(listing(rows), "CISSP certification required");
     expect(found.status).toBe("met");
@@ -451,6 +455,7 @@ describe("a language asked for", () => {
     // writes for a structured document.
     it.each([
       `María García\nmaria@example.es\nSummary\nIngeniera de software con cinco años en sistemas de pagos.\nWork Experience\nIngeniera de Software, BBVA\nEne 2019 - Present\n- Diseñé el sistema de pagos en tiempo real\n- Dirigí la migración de la plataforma de datos a la nube\nEducation\nGrado en Ingeniería Informática, Universidad Politécnica de Madrid, 2016\nSkills\nJava, Python, Kafka`,
+      `João Silva\njoao@example.com.br\nSummary\nEngenheiro de software com experiência em sistemas de pagamentos.\nExperience\nEngenheiro de Software, Nubank\nJan 2019 - Present\n- Projetei o sistema de pagamentos em tempo real\n- Liderei a migração da plataforma de dados para a nuvem\nEducation\nBacharelado em Ciência da Computação, Universidade de São Paulo, 2016\nSkills\nJava, Python, Kafka`,
       `Sanne de Vries\nsanne@example.nl\nSummary\nSoftware engineer met ervaring in betalingssystemen.\nWork Experience\nSoftware Engineer, Adyen\nJan 2019 - Present\n- Ontwikkelde het betalingssysteem\n- Leidde de migratie van het dataplatform naar de cloud\nEducation\nMSc Informatica, TU Delft, 2016\nSkills\nJava, Python`,
     ])("is not English for English headings over other prose: %#", (resume) => {
       expect(ask(resume, "Fluent English")?.status).toBe("unverifiable");

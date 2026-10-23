@@ -180,6 +180,8 @@ describe("reasoning-model replies", () => {
     ],
     ["with nothing in it", JSON.stringify({ explanation: " ", priorityOrder: [] })],
     ["with only blank items", JSON.stringify({ priorityOrder: [" "], missingEvidence: [null] })],
+    ["with only blank evidence", JSON.stringify({ missingEvidence: [null] })],
+    ["with only a blank keyword suggestion", JSON.stringify({ keywordOpportunities: [""] })],
     // Without a posting, keyword suggestions are dropped: nothing would be left.
     ["with only keyword suggestions and no posting", '{"keywordOpportunities": ["Kubernetes"]}'],
   ])("refuses a reply %s", async (_label, text) => {

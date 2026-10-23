@@ -217,10 +217,21 @@ describe("a verb is not the named skill its stem spells", () => {
   it("meets an abbreviation joined by & by the same abbreviation", () => {
     expect(
       judged(
-        ["Owned the P&L for a $40M business unit", "Led M&A due diligence on 6 acquisitions"],
-        ["P&L responsibility", "P&L ownership", "Full P&L accountability", "M&A experience", "Q&A"],
+        [
+          "Owned the P&L for a $40M business unit",
+          "Led M&A due diligence on 6 acquisitions",
+          "Worked in R&D",
+        ],
+        [
+          "P&L responsibility",
+          "P&L ownership",
+          "Full P&L accountability",
+          "M&A experience",
+          "Q&A",
+          "R&D",
+        ],
       ),
-    ).toEqual(["met", "met", "met", "met", "missing"]);
+    ).toEqual(["met", "met", "met", "met", "missing", "met"]);
   });
 
   it("still meets a skill by its plural, and a plain word by its other forms", () => {

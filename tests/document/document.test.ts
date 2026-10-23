@@ -369,16 +369,38 @@ describe("JSON Resume through the engine's front door", () => {
     ["Heute nicht", ["de"]],
     ["jetzt nicht mehr", ["de"]],
     ["से", ["hi"]],
+    ["present-ish", []],
+    ["Today: left in 2022", []],
+    ["Now-defunct startup", []],
+    ["Present, 2022", []],
+    ["से 2022 तक", ["hi"]],
   ])("still reads an end of %j as no end, not as current", (endDate, languages) => {
+    const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
+    const options = { now: NOW, languages: languages as string[] };
     const resume = {
       basics: { name: "Jane Doe" },
       work: [{ name: "Acme", position: "Engineer", startDate: "2019-01", endDate }],
     };
-    const report = score(resume, withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), {
-      now: NOW,
-      languages: languages as string[],
+    expect(score(resume, policy, options).parsed.roles[0]).toMatchObject({
+      current: false,
+      end: null,
     });
-    expect(report.parsed.roles[0]).toMatchObject({ current: false, end: null });
+    // The engine's own format reads its end the same way.
+    const document: AtsResumeDocument = {
+      format: ATS_DOCUMENT_FORMAT,
+      basics: { name: "Jane Doe" },
+      sections: [
+        {
+          kind: "experience",
+          title: "Experience",
+          items: [{ title: "Engineer", employer: "Acme", start: "2019-01", end: endDate }],
+        },
+      ],
+    };
+    expect(score(document, policy, options).parsed.roles[0]).toMatchObject({
+      current: false,
+      end: null,
+    });
   });
 
   it("reads only a bounded slice of a huge array", () => {

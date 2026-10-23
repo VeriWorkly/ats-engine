@@ -218,6 +218,7 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     ["phone", "192.168.100.200 (server)"],
     ["phone", "ISBN: 978-3-16-148410-0"],
     ["phone", "Mobile: (US)"],
+    ["phone", "1.2.3.4.5.6.7"],
     ["name", "EXPERIENCE"],
     ["name", "Senior Engineer, Acme Corporation"],
     ["name", "Built the thing."],
@@ -249,6 +250,11 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     ["phone", "+١ ٤١٥ ٥٥٥ ٠١٣٤"],
     ["phone", "＋１ ４１５ ５５５ ０１３４"],
     ["phone", "(11) 2019-2020"],
+    ["phone", "(212) 2019-2020"],
+    ["phone", "212-2019-2020"],
+    ["phone", "+٩٧١ ٥٠ ١٢٣ ٤٥٦٧"],
+    ["phone", "٠٥٠ ١٢٣ ٤٥٦٧"],
+    ["phone", "０９０-１２３４-５６７８"],
     ["phone", "+1 415 555 0134, ext. 12"],
     ["name", "Jane Doe (she/her)"],
     ["name", "John Smith 3rd"],
@@ -263,6 +269,10 @@ describe("merge: AI values only fill gaps, and only when grounded", () => {
     ["name", "Anna Bank"],
     ["name", "Lena Officer"],
     ["name", "Kim Co"],
+    ["name", "Tom Engineer"],
+    ["name", "Sam Lead"],
+    ["name", "Ana Manager"],
+    ["name", "Leo Director"],
   ] as const)("fills %s with %j", (field, value) => {
     const { merged } = merge(emptyParsed, candidate({ [field]: value }), `${SOURCE}\n${value}`);
     expect(merged[field]).toBe(value);
