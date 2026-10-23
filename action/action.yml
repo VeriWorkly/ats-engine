@@ -18,11 +18,11 @@ inputs:
     required: false
     default: ""
   language:
-    description: Read the resume in this language (en, de, fr or hi; en means English only). Empty means detected from the resume. Needs version 0.19.0 or later.
+    description: Read the resume in this language (en, de, fr, hi, es or pt; en means English only). Empty means detected from the resume. Needs version 0.19.0 or later.
     required: false
     default: ""
   region:
-    description: Read the resume as from this country (US, GB, DE, FR or IN). Empty means inferred.
+    description: Read the resume as from this country (US, GB, DE, FR, IN, ES, BR or PT). Empty means inferred.
     required: false
     default: ""
   version:

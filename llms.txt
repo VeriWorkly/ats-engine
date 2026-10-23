@@ -17,7 +17,7 @@ The engine is for candidates checking their own resume, not for ranking or filte
 - [README](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/README.md): what it does, install, CLI, GitHub Action, MCP server, use in an app, AI features
 - [Scoring rubric](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/RUBRIC.md): every rule with its category, weight, what it reads, when it passes and the fix
 - [Architecture](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/ARCHITECTURE.md): the check() pipeline, modules, invariants and design decisions
-- [Locales](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/LOCALES.md): German, French and Hindi language packs, US/GB/DE/FR/IN regions, how a language without a pack is read, how to add a language
+- [Locales](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/LOCALES.md): German, French, Hindi, Spanish and Portuguese language packs, US/GB/DE/FR/IN/ES/BR/PT regions, how a language without a pack is read, how to add a language
 - [Security](https://raw.githubusercontent.com/VeriWorkly/ats-engine/main/SECURITY.md): input limits, hostile input, prompt injection, what leaves the machine
 
 ## Tools

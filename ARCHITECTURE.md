@@ -93,7 +93,9 @@ per module, each file named for what it covers. `tests/action/` runs the GitHub 
 `tests/fixtures/` builds PDFs, DOCX files and the labelled corpus. `generatedResumes.ts` writes a
 seeded set of invented resumes (varied separators, date forms, city placement, headings and section
 order) and renders each as text, a one-column PDF, a two-column PDF and a DOCX, labelled from its
-inputs and never from what the engine reads. `npm run bench` (`bench/run.ts`) scores both that set
+inputs and never from what the engine reads. With a language (`"de"`, `"fr"`, `"hi"`, `"es"`, `"pt"`) it writes the
+same layouts in that language, as its speakers write them (headings, months, date forms, titles,
+degrees, phone numbers), so the bench measures each pack; English draws exactly as without one. `npm run bench` (`bench/run.ts`) scores both that set
 and the hand-written one per field and fails on any miss `bench/baseline.json` does not list; the
 ≥0.95 per-locale gate in `tests/locales/` runs on the hand-written set. `timing.ts` has
 `expectFast`, which every time budget uses so a busy machine cannot fail a test. Work bounded by a
