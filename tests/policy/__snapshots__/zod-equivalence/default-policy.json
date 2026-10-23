@@ -2042,6 +2042,7 @@
         "valid\\s+(?:until|through|thru|till|to)",
         "renew(?:s|al)?(?:\\s+due)?"
       ],
+      "expiresAfter": [],
       "issuer": [
         "issued\\s+by",
         "by",
@@ -2131,6 +2132,10 @@
       "name",
       "full name"
     ],
+    "rangeOpeners": [
+      "from"
+    ],
+    "monthYearJoiners": [],
     "rangeWords": [
       "to",
       "until",
@@ -2613,6 +2618,7 @@
       "wales",
       "northern ireland"
     ],
+    "cityNames": [],
     "workplaceWords": [
       "remote",
       "hybrid",
@@ -2801,6 +2807,7 @@
     ],
     "otherLanguages": [
       {
+        "id": "es",
         "detectionWords": [
           "con",
           "para",
@@ -2817,6 +2824,7 @@
         ]
       },
       {
+        "id": "pt",
         "detectionWords": [
           "em",
           "uma",
@@ -2833,6 +2841,7 @@
         ]
       },
       {
+        "id": "it",
         "detectionWords": [
           "di",
           "della",
@@ -2849,6 +2858,7 @@
         ]
       },
       {
+        "id": "fr",
         "detectionWords": [
           "une",
           "pour",
@@ -2865,6 +2875,7 @@
         ]
       },
       {
+        "id": "de",
         "detectionWords": [
           "und",
           "der",
@@ -2881,6 +2892,7 @@
         ]
       },
       {
+        "id": "nl",
         "detectionWords": [
           "het",
           "een",
@@ -2895,6 +2907,7 @@
         ]
       },
       {
+        "id": "pl",
         "detectionWords": [
           "oraz",
           "dla",
@@ -2909,6 +2922,7 @@
         ]
       },
       {
+        "id": "sv",
         "detectionWords": [
           "och",
           "för",
@@ -2927,6 +2941,7 @@
         "detectionWords": []
       },
       {
+        "id": "el",
         "script": "Greek",
         "detectionWords": []
       },
@@ -2935,7 +2950,18 @@
         "detectionWords": []
       },
       {
+        "id": "he",
         "script": "Hebrew",
+        "detectionWords": []
+      },
+      {
+        "id": "ja",
+        "script": "Hiragana",
+        "detectionWords": []
+      },
+      {
+        "id": "ja",
+        "script": "Katakana",
         "detectionWords": []
       },
       {
@@ -2943,18 +2969,12 @@
         "detectionWords": []
       },
       {
+        "id": "ko",
         "script": "Hangul",
         "detectionWords": []
       },
       {
-        "script": "Hiragana",
-        "detectionWords": []
-      },
-      {
-        "script": "Katakana",
-        "detectionWords": []
-      },
-      {
+        "id": "th",
         "script": "Thai",
         "detectionWords": []
       },
@@ -2967,10 +2987,12 @@
         "detectionWords": []
       },
       {
+        "id": "ta",
         "script": "Tamil",
         "detectionWords": []
       },
       {
+        "id": "te",
         "script": "Telugu",
         "detectionWords": []
       }

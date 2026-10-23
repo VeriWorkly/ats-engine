@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_POLICY, parseResume } from "../../src/index.js";
+import { DEFAULT_POLICY, check, parseResume } from "../../src/index.js";
+import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 
 /** Role headers with their location, in the forms resume templates print them. */
 
@@ -426,5 +427,96 @@ describe("an employer written before the title", () => {
       title: "Bank Manager",
       employer: "Globex",
     });
+  });
+});
+
+// A dotted abbreviation keeps its last dot (found with the Spanish and Portuguese fixtures).
+describe("an employer ending in a dotted abbreviation", () => {
+  it.each([
+    ["Muestra Sistemas S.A.", "Muestra Sistemas S.A."],
+    ["Banco Ejemplo S.A. de C.V.", "Banco Ejemplo S.A. de C.V."],
+    ["Bank of the U.S.", "Bank of the U.S."],
+    // An abbreviation of one word loses its dot, as before.
+    ["Acme Inc.", "Acme Inc"],
+    ["Globex Co.", "Globex Co"],
+  ])("reads %j as %j", (written, employer) => {
+    const text = `Jane Doe\njane@example.com\nExperience\nEngineer, ${written}    Jan 2020 – Present\n- Built the billing service`;
+    expect(check(text, DEFAULT_POLICY).parsed.roles[0]?.employer).toBe(employer);
+  });
+});
+
+describe("an employer ending in a dotted abbreviation, before a comma", () => {
+  it("keeps the dot with the dates after a comma", () => {
+    const text =
+      "Jane Doe\njane@example.com\nExperience\nDesigner, Pedra Branca Energia S.A., 2024 – Present\n- Built the billing service";
+    expect(check(text, DEFAULT_POLICY).parsed.roles[0]?.employer).toBe("Pedra Branca Energia S.A.");
+  });
+});
+
+// Review finding (2026-10-24): dates first, then the title, then the employer on its own line.
+describe("dates first, title and employer below on lines of their own", () => {
+  const LOCALIZED = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
+  const roles = (lines: string[], languages: string[] = []) =>
+    check(["Julian Lee", "julian@example.com", ...lines].join("\n"), LOCALIZED, {
+      now,
+      languages,
+    }).parsed.roles.map((role) => [role.title, role.employer, role.start?.year, role.current]);
+
+  it("reads both halves in English, with and without bullets", () => {
+    const lines = [
+      "Experience",
+      "Sep 2018 – Aug 2021",
+      "Software Engineer",
+      "Capgemini, Toulouse",
+      "• Built simulation tools in Python",
+      "Jan 2021 – Present",
+      "Embedded Engineer",
+      "Thales Alenia Space, Cannes",
+      "• Designed flight software in C",
+    ];
+    const want = [
+      ["Software Engineer", "Capgemini", 2018, false],
+      ["Embedded Engineer", "Thales Alenia Space", 2021, true],
+    ];
+    expect(roles(lines)).toEqual(want);
+    expect(roles(lines.filter((line) => !line.startsWith("•")))).toEqual(want);
+  });
+
+  it("reads both halves in French", () => {
+    expect(
+      roles(
+        [
+          "Expérience professionnelle",
+          "sept. 2018 – août 2021",
+          "Ingénieur d'études",
+          "Capgemini, Toulouse",
+          "• Développement d'outils de simulation en Python pour Airbus",
+          "janv. 2021 – aujourd'hui",
+          "Ingénieur logiciel",
+          "Thales Alenia Space, Cannes",
+          "• Conception de logiciels embarqués en C pour satellites",
+        ],
+        ["fr"],
+      ),
+    ).toEqual([
+      ["Ingénieur d'études", "Capgemini", 2018, false],
+      ["Ingénieur logiciel", "Thales Alenia Space", 2021, true],
+    ]);
+  });
+
+  it("does not take a bullet-less description or a second title for the employer", () => {
+    expect(
+      roles([
+        "Experience",
+        "2019 – 2021",
+        "Software Engineer",
+        "Senior Software Engineer",
+        "2016 – 2019",
+        "Analyst",
+      ]),
+    ).toEqual([
+      ["Software Engineer", "", 2019, false],
+      ["Analyst", "", 2016, false],
+    ]);
   });
 });

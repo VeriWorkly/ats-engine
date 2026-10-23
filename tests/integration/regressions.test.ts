@@ -84,7 +84,11 @@ describe("adversarial input", () => {
         1_500, // see `expectFastOn`
         label,
       );
-      expect(report.locale, label).toEqual({ languages: ["de", "fr", "hi"], region: "DE" });
+      expect(report.locale, label).toEqual({
+        languages: ["de", "fr", "hi"],
+        region: "DE",
+        unsupported: null,
+      });
     }
   });
 

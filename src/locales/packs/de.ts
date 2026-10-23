@@ -68,6 +68,13 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "im",
     "dem",
     "des",
+    // A CV's own words, as a LinkedIn export with hardly a sentence holds them.
+    "berufserfahrung",
+    "ausbildung",
+    "kenntnisse",
+    "heute",
+    "jahre",
+    "monate",
     "wir",
     "ihre",
     "unsere",
@@ -78,11 +85,11 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   sections: {
     experience: String.raw`^(?:berufserfahrung|berufspraxis|beruflicher\s+werdegang|berufliche\s+erfahrung|berufst[äa]tigkeit|praxiserfahrung|arbeitserfahrung|werdegang|erfahrung)`,
     education: String.raw`^(?:ausbildung|bildungsweg|bildung|schulbildung|schulische\s+ausbildung|studium|akademische\s+ausbildung|hochschulbildung)`,
-    skills: String.raw`^(?:kenntnisse|f[äa]higkeiten|kompetenzen|fachkenntnisse|it[\s-]kenntnisse|edv[\s-]kenntnisse|technische\s+(?:kenntnisse|f[äa]higkeiten))`,
+    skills: String.raw`^(?:top-?kenntnisse|kenntnisse|f[äa]higkeiten|kompetenzen|fachkenntnisse|it[\s-]kenntnisse|edv[\s-]kenntnisse|technische\s+(?:kenntnisse|f[äa]higkeiten))`,
     projects: String.raw`^(?:projekte|projekterfahrung|ausgew[äa]hlte\s+projekte)`,
-    certifications: String.raw`^(?:zertifikate|zertifizierungen|lizenzen)`,
+    certifications: String.raw`^(?:zertifikate|zertifizierungen|lizenzen|(?:fort-?\s*und\s+)?weiterbildung(?:en)?)`,
     languages: String.raw`^(?:sprachen|sprachkenntnisse|fremdsprachen|fremdsprachenkenntnisse)`,
-    other: String.raw`^(?:profil|kurzprofil|zusammenfassung|[üu]ber\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\s+engagement|referenzen|pers[öo]nliche\s+(?:daten|angaben))`,
+    other: String.raw`^(?:kontakt|profil|kurzprofil|zusammenfassung|[üu]ber\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\s+engagement|referenzen|pers[öo]nliche\s+(?:daten|angaben))`,
   },
   // "Verhandlungssicher" is C1, as "fließend" is; "sehr gute Kenntnisse" B2, "gute Kenntnisse" B1.
   languageLevels: {
@@ -134,6 +141,8 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "bis dato",
   ],
   rangeWords: ["bis"],
+  // "von 2019 bis 2021".
+  rangeOpeners: ["von"],
   sinceWords: ["seit", "ab"],
   // "ab 03/2020" ends the line; "Umsatz ab 2017 um 30 % gesteigert" is a sentence.
   lineEndDateWords: ["ab"],
@@ -160,8 +169,8 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "geschäftsführer(?:in)?",
     "praktikant(?:in)?",
     "werkstudent(?:in)?",
-    "managerin",
-    "designerin",
+    compound("manager(?:in)?"),
+    compound("designer(?:in)?"),
   ],
   schoolWords: [
     "universität",
@@ -183,6 +192,10 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "mecklenburg-vorpommern|niedersachsen|nordrhein-westfalen|rheinland-pfalz|saarland|sachsen|" +
     "sachsen-anhalt|schleswig-holstein|thüringen"
   ).split("|"),
+  cityNames:
+    "Berlin|Hamburg|München|Köln|Frankfurt am Main|Frankfurt|Stuttgart|Düsseldorf|Leipzig|Dortmund|Bremen|Dresden|Hannover|Nürnberg|Duisburg|Bochum|Wuppertal|Bielefeld|Bonn|Münster|Karlsruhe|Mannheim|Augsburg|Wiesbaden|Mainz|Kiel|Aachen|Freiburg|Freiburg im Breisgau|Heidelberg|Regensburg|Darmstadt|Potsdam|Erlangen|Ingolstadt|Wolfsburg|Walldorf|Braunschweig|Chemnitz|Magdeburg|Rostock|Saarbrücken|Erfurt|Jena|Wien|Graz|Linz|Salzburg|Innsbruck|Zürich|Basel|Bern|Luzern|Lausanne|Genf|St\\.? Gallen|Zug".split(
+      "|",
+    ),
   contentLineVerbs: [
     "entwickelte",
     "leitete",

@@ -72,6 +72,14 @@
             "minLength": 1
           }
         },
+        "expiresAfter": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "issuer": {
           "minItems": 1,
           "type": "array",
@@ -160,6 +168,30 @@
       }
     },
     "placeNames": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "rangeOpeners": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "monthYearJoiners": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "cityNames": {
       "minItems": 1,
       "type": "array",
       "items": {

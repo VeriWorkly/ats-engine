@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_POLICY, policyRubric, type AtsReport, check as score } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import type { AtsEnginePolicy } from "../../src/policy/schema.js";
-import { LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
+import { ITALIAN_RESUME, LOCALE_FIXTURES } from "../fixtures/locale-resumes.js";
 
 /**
  * The writing rules, in their own category so the categories that say whether a resume survives
@@ -306,29 +306,14 @@ describe("when the writing rules stand down", () => {
     expect(writingRules(report)).toHaveLength(IDS.length);
   });
 
-  // A language no pack reads is judged by English rules: every bullet "opens with no action verb".
-  const SPANISH = `Lucía Fernández Ruiz
-lucia.fernandez@example.es | +34 612 345 678 | Madrid
-Perfil
-Ingeniera de software con siete años de experiencia en sistemas de pago y en la nube.
-Experiencia profesional
-Ingeniera de software sénior, Ejemplo Tecnología S.L.    enero 2021 – actualidad
-• Diseño de una plataforma de pagos para dos millones de clientes en España
-• Responsable de un equipo de seis personas y de la integración continua
-• Reducción del tiempo de despliegue de dos horas a diez minutos
-Ingeniera de software, Muestra Sistemas S.A.    03/2017 – 12/2020
-• Desarrollo de servicios REST en Java para la gestión de pedidos
-• Migración de la base de datos a PostgreSQL sin pérdida de servicio
-Formación
-Grado en Ingeniería Informática, Universidad de Ejemplo, 2017
-Habilidades
-Go, Java, Kubernetes, PostgreSQL`;
-
+  // A language no pack reads would be judged by English rules: every bullet "opens with no action
+  // verb". Its writing rules are dropped instead.
   it.each([
     ["the base policy", DEFAULT_POLICY],
     ["the packs attached", LOCALIZED],
   ])("drops every writing rule for a language nothing reads, with %s", (_, policy) => {
-    const report = check(SPANISH, policy);
+    // Italian: no pack reads it (Spanish has one).
+    const report = check(ITALIAN_RESUME, policy);
     expect(report.locale.languages).toEqual([]);
     expect(writingRules(report)).toEqual([]);
     // Only the rules that read English words: the rest still judge it.
@@ -455,6 +440,18 @@ const BEFORE_WRITING: Record<string, string> = {
   "fr-plain":
     "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:100/0/29/5/5 integrity:100/0/60/4/4",
   "hi-certified":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+  "es-backend":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:55/13/29/3/5 integrity:100/0/60/4/4",
+  "es-analista":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:66/10/29/4/5 integrity:100/0/60/4/4",
+  "es-practicas":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
+  "pt-backend":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:55/13/29/3/5 integrity:100/0/60/4/4",
+  "pt-analista":
+    "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:66/10/29/4/5 integrity:100/0/60/4/4",
+  "pt-estagio":
     "parse:100/0/53/4/4 contact:100/0/18/2/2 structure:100/0/28/3/3 format:44/10/18/1/2 content:90/3/29/4/5 integrity:100/0/60/4/4",
 };
 

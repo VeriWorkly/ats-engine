@@ -301,16 +301,17 @@ describe("a range of years joined by a word asks for its lower end", () => {
 
 describe("an unknown region is an error, not silently ignored", () => {
   it("throws naming the region and the attached ones", () => {
-    expect(() => localizePolicy(P, "x", { region: "ES" })).toThrow(AtsPolicyError);
+    expect(() => localizePolicy(P, "x", { region: "MX" })).toThrow(AtsPolicyError);
     const message = (() => {
       try {
-        localizePolicy(P, "x", { region: "ES" });
+        localizePolicy(P, "x", { region: "MX" });
       } catch (error) {
         return (error as Error).message;
       }
     })();
-    for (const id of ["ES", "DE", "FR", "GB", "IN", "US"]) expect(message).toContain(id);
-    expect(() => check(resume({ roles: TEN_YEARS }), P, { region: "ES", now: NOW })).toThrow(
+    for (const id of ["MX", "DE", "FR", "GB", "IN", "US", "ES", "BR", "PT"])
+      expect(message).toContain(id);
+    expect(() => check(resume({ roles: TEN_YEARS }), P, { region: "MX", now: NOW })).toThrow(
       AtsPolicyError,
     );
   });
@@ -324,11 +325,11 @@ describe("an unknown region is an error, not silently ignored", () => {
     const original = console.error;
     console.error = (line: string) => void errors.push(line);
     try {
-      expect(await main(["check", "resume.txt", "--region", "ES"])).toBe(1);
+      expect(await main(["check", "resume.txt", "--region", "MX"])).toBe(1);
     } finally {
       console.error = original;
     }
-    expect(errors.join("\n")).toMatch(/region.*ES/i);
+    expect(errors.join("\n")).toMatch(/region.*MX/i);
   });
 });
 

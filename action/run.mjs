@@ -152,6 +152,11 @@ if (groups) {
     lines.push(`**Missing soft skills (weigh less):** ${cell(groups.soft.join(", "))}`, "");
 } else if (report.missingKeywords?.length)
   lines.push(`**Missing keywords:** ${cell(report.missingKeywords.join(", "))}`, "");
+// A resume in a language the engine has no pack for (0.19.0 and later).
+const languageNote =
+  report.locale?.unsupported &&
+  (report.parsingWarnings ?? []).find((warning) => warning.includes("does not read yet"));
+if (languageNote) lines.push(`**Language:** ${cell(languageNote)}`, "");
 if (report.advice?.length) {
   lines.push("### Advice (not scored)", "");
   for (const item of report.advice)

@@ -1964,6 +1964,14 @@
                   "minLength": 1
                 }
               },
+              "expiresAfter": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
               "issuer": {
                 "default": [
                   "issued\\s+by",
@@ -2124,6 +2132,25 @@
               "full name"
             ],
             "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "rangeOpeners": {
+            "default": [
+              "from"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "monthYearJoiners": {
+            "default": [],
             "type": "array",
             "items": {
               "type": "string",
@@ -2700,6 +2727,14 @@
               "minLength": 1
             }
           },
+          "cityNames": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "workplaceWords": {
             "default": [
               "remote",
@@ -2946,6 +2981,7 @@
           "otherLanguages": {
             "default": [
               {
+                "id": "es",
                 "detectionWords": [
                   "con",
                   "para",
@@ -2962,6 +2998,7 @@
                 ]
               },
               {
+                "id": "pt",
                 "detectionWords": [
                   "em",
                   "uma",
@@ -2978,6 +3015,7 @@
                 ]
               },
               {
+                "id": "it",
                 "detectionWords": [
                   "di",
                   "della",
@@ -2994,6 +3032,7 @@
                 ]
               },
               {
+                "id": "fr",
                 "detectionWords": [
                   "une",
                   "pour",
@@ -3010,6 +3049,7 @@
                 ]
               },
               {
+                "id": "de",
                 "detectionWords": [
                   "und",
                   "der",
@@ -3026,6 +3066,7 @@
                 ]
               },
               {
+                "id": "nl",
                 "detectionWords": [
                   "het",
                   "een",
@@ -3040,6 +3081,7 @@
                 ]
               },
               {
+                "id": "pl",
                 "detectionWords": [
                   "oraz",
                   "dla",
@@ -3054,6 +3096,7 @@
                 ]
               },
               {
+                "id": "sv",
                 "detectionWords": [
                   "och",
                   "för",
@@ -3072,6 +3115,7 @@
                 "detectionWords": []
               },
               {
+                "id": "el",
                 "script": "Greek",
                 "detectionWords": []
               },
@@ -3080,7 +3124,18 @@
                 "detectionWords": []
               },
               {
+                "id": "he",
                 "script": "Hebrew",
+                "detectionWords": []
+              },
+              {
+                "id": "ja",
+                "script": "Hiragana",
+                "detectionWords": []
+              },
+              {
+                "id": "ja",
+                "script": "Katakana",
                 "detectionWords": []
               },
               {
@@ -3088,18 +3143,12 @@
                 "detectionWords": []
               },
               {
+                "id": "ko",
                 "script": "Hangul",
                 "detectionWords": []
               },
               {
-                "script": "Hiragana",
-                "detectionWords": []
-              },
-              {
-                "script": "Katakana",
-                "detectionWords": []
-              },
-              {
+                "id": "th",
                 "script": "Thai",
                 "detectionWords": []
               },
@@ -3112,10 +3161,12 @@
                 "detectionWords": []
               },
               {
+                "id": "ta",
                 "script": "Tamil",
                 "detectionWords": []
               },
               {
+                "id": "te",
                 "script": "Telugu",
                 "detectionWords": []
               }
@@ -3124,6 +3175,10 @@
             "items": {
               "type": "object",
               "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,3}$"
+                },
                 "script": {
                   "type": "string"
                 },
@@ -4340,6 +4395,14 @@
                         "minLength": 1
                       }
                     },
+                    "expiresAfter": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "issuer": {
                       "minItems": 1,
                       "type": "array",
@@ -4428,6 +4491,30 @@
                   }
                 },
                 "placeNames": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "rangeOpeners": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "monthYearJoiners": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "cityNames": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -4861,6 +4948,14 @@
                         "minLength": 1
                       }
                     },
+                    "expiresAfter": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "issuer": {
                       "minItems": 1,
                       "type": "array",
@@ -4949,6 +5044,30 @@
                   }
                 },
                 "placeNames": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "rangeOpeners": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "monthYearJoiners": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "cityNames": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -7593,6 +7712,14 @@
                   "minLength": 1
                 }
               },
+              "expiresAfter": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
               "issuer": {
                 "default": [
                   "issued\\s+by",
@@ -7624,6 +7751,7 @@
             "required": [
               "issued",
               "expires",
+              "expiresAfter",
               "issuer",
               "id"
             ],
@@ -7760,6 +7888,25 @@
               "full name"
             ],
             "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "rangeOpeners": {
+            "default": [
+              "from"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "monthYearJoiners": {
+            "default": [],
             "type": "array",
             "items": {
               "type": "string",
@@ -8336,6 +8483,14 @@
               "minLength": 1
             }
           },
+          "cityNames": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "workplaceWords": {
             "default": [
               "remote",
@@ -8517,6 +8672,8 @@
           "openEnded",
           "durationUnits",
           "nameLabels",
+          "rangeOpeners",
+          "monthYearJoiners",
           "rangeWords",
           "sinceWords",
           "lineEndDateWords",
@@ -8528,6 +8685,7 @@
           "postNominals",
           "regionCodes",
           "placeNames",
+          "cityNames",
           "workplaceWords",
           "organisationWords",
           "departmentWords",
@@ -8608,6 +8766,7 @@
           "otherLanguages": {
             "default": [
               {
+                "id": "es",
                 "detectionWords": [
                   "con",
                   "para",
@@ -8624,6 +8783,7 @@
                 ]
               },
               {
+                "id": "pt",
                 "detectionWords": [
                   "em",
                   "uma",
@@ -8640,6 +8800,7 @@
                 ]
               },
               {
+                "id": "it",
                 "detectionWords": [
                   "di",
                   "della",
@@ -8656,6 +8817,7 @@
                 ]
               },
               {
+                "id": "fr",
                 "detectionWords": [
                   "une",
                   "pour",
@@ -8672,6 +8834,7 @@
                 ]
               },
               {
+                "id": "de",
                 "detectionWords": [
                   "und",
                   "der",
@@ -8688,6 +8851,7 @@
                 ]
               },
               {
+                "id": "nl",
                 "detectionWords": [
                   "het",
                   "een",
@@ -8702,6 +8866,7 @@
                 ]
               },
               {
+                "id": "pl",
                 "detectionWords": [
                   "oraz",
                   "dla",
@@ -8716,6 +8881,7 @@
                 ]
               },
               {
+                "id": "sv",
                 "detectionWords": [
                   "och",
                   "för",
@@ -8734,6 +8900,7 @@
                 "detectionWords": []
               },
               {
+                "id": "el",
                 "script": "Greek",
                 "detectionWords": []
               },
@@ -8742,7 +8909,18 @@
                 "detectionWords": []
               },
               {
+                "id": "he",
                 "script": "Hebrew",
+                "detectionWords": []
+              },
+              {
+                "id": "ja",
+                "script": "Hiragana",
+                "detectionWords": []
+              },
+              {
+                "id": "ja",
+                "script": "Katakana",
                 "detectionWords": []
               },
               {
@@ -8750,18 +8928,12 @@
                 "detectionWords": []
               },
               {
+                "id": "ko",
                 "script": "Hangul",
                 "detectionWords": []
               },
               {
-                "script": "Hiragana",
-                "detectionWords": []
-              },
-              {
-                "script": "Katakana",
-                "detectionWords": []
-              },
-              {
+                "id": "th",
                 "script": "Thai",
                 "detectionWords": []
               },
@@ -8774,10 +8946,12 @@
                 "detectionWords": []
               },
               {
+                "id": "ta",
                 "script": "Tamil",
                 "detectionWords": []
               },
               {
+                "id": "te",
                 "script": "Telugu",
                 "detectionWords": []
               }
@@ -8786,6 +8960,10 @@
             "items": {
               "type": "object",
               "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z]{2,3}$"
+                },
                 "script": {
                   "type": "string"
                 },
@@ -10072,6 +10250,14 @@
                         "minLength": 1
                       }
                     },
+                    "expiresAfter": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "issuer": {
                       "minItems": 1,
                       "type": "array",
@@ -10161,6 +10347,30 @@
                   }
                 },
                 "placeNames": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "rangeOpeners": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "monthYearJoiners": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "cityNames": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -10593,6 +10803,14 @@
                         "minLength": 1
                       }
                     },
+                    "expiresAfter": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "issuer": {
                       "minItems": 1,
                       "type": "array",
@@ -10682,6 +10900,30 @@
                   }
                 },
                 "placeNames": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "rangeOpeners": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "monthYearJoiners": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "cityNames": {
                   "minItems": 1,
                   "type": "array",
                   "items": {

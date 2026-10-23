@@ -88,6 +88,14 @@ export const wordList = (label: string) =>
     z.superRefine((words, ctx) => checkAssembles(label, words, ctx)),
   );
 
+/** A word list that may be empty, as one a pack fills: the base names no city. */
+export const wordListOrNone = (label: string) =>
+  z.array(z.string().check(z.minLength(1))).check(
+    z.superRefine((words, ctx) => {
+      if (words.length) checkAssembles(label, words, ctx);
+    }),
+  );
+
 /** A Unicode script name, as `\p{Script=…}` reads it: "Devanagari", "Cyrillic". */
 export const scriptName = z.string().check(
   z.superRefine((script, ctx) => {
@@ -165,6 +173,11 @@ export const credentialWords = z.object({
     String.raw`valid\s+(?:until|through|thru|till|to)`,
     String.raw`renew(?:s|al)?(?:\s+due)?`,
   ]),
+  /**
+   * Expiry words written after the date, in a language that puts them there: Hindi "2027 तक
+   * वैध" (valid until 2027). English has none.
+   */
+  expiresAfter: z._default(wordListOrNone("credentialWords.expiresAfter"), []),
   issuer: z._default(wordList("credentialWords.issuer"), [String.raw`issued\s+by`, "by", "from"]),
   id: z._default(wordList("credentialWords.id"), [
     String.raw`credential(?:\s+id)?`,

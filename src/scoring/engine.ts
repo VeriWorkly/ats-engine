@@ -1,6 +1,7 @@
 import { adviceFor, targetOf } from "../advice/index.js";
 import { prepareResume, type AtsResumeInput, type PreparedResume } from "../input.js";
 import { MAX_JOB_TEXT_CHARS } from "../job/index.js";
+import { unsupportedLanguageNote } from "../locales/languages.js";
 import { localizePolicy, type AtsLocaleOptions } from "../locales/resolve.js";
 import { computeJobMatch } from "../matching/jobMatch.js";
 import {
@@ -513,6 +514,7 @@ export function check(
           (rule.category === "format" && EXTRACTION_METRICS.has(metricOf.get(rule.id) ?? "")),
       )
       .map((rule) => rule.evidence)
+      .concat(locale.unsupported ? unsupportedLanguageNote(locale.unsupported) : [])
       .concat(
         posting && posting.length > MAX_JOB_TEXT_CHARS
           ? `The job posting is ${posting.length.toLocaleString("en")} characters; only its first ${MAX_JOB_TEXT_CHARS.toLocaleString("en")} were read.`

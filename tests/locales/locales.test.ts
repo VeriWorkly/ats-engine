@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { AtsPolicyError, DEFAULT_POLICY, type AtsReport, check as score } from "../../src/index.js";
+import {
+  AtsPolicyError,
+  DEFAULT_POLICY,
+  parseAtsPolicy,
+  type AtsReport,
+  check as score,
+} from "../../src/index.js";
 import {
   BUILT_IN_LOCALES,
   atsLanguagePackJsonSchema,
@@ -10,7 +16,13 @@ import {
 } from "../../src/locales/index.js";
 import { fieldChecks } from "../fixtures/accuracy.js";
 import { generateResumes, renderResume } from "../fixtures/generatedResumes.js";
-import { LOCALE_FIXTURES, type LocaleFixture } from "../fixtures/locale-resumes.js";
+import {
+  LOCALE_FIXTURES,
+  ITALIAN_RESUME,
+  RUSSIAN_RESUME,
+  SPANISH_RESUME,
+  type LocaleFixture,
+} from "../fixtures/locale-resumes.js";
 
 const NOW = new Date("2026-10-01T00:00:00Z");
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -25,7 +37,10 @@ const fieldAccuracy = (report: AtsReport, fixture: LocaleFixture) => {
 describe.each(Object.entries(LOCALE_FIXTURES))("the %s fixture set", (_, fixtures) => {
   it("is read with the expected locale", () => {
     for (const fixture of fixtures)
-      expect(check(fixture.text).locale, fixture.id).toEqual(fixture.locale);
+      expect(check(fixture.text).locale, fixture.id).toEqual({
+        ...fixture.locale,
+        unsupported: null,
+      });
   });
 
   it("meets the field-accuracy target of 0.95", () => {
@@ -54,12 +69,108 @@ describe.each(Object.entries(LOCALE_FIXTURES))("the %s fixture set", (_, fixture
   });
 });
 
+// A resume in a language the policy recognises but has no vocabulary for is read with English
+// rules; the report says so, in words, instead of a lower score with no reason.
+describe("a language the engine does not read yet", () => {
+  it.each([
+    [ITALIAN_RESUME, "it", "This resume looks Italian"],
+    [RUSSIAN_RESUME, "Cyrillic", "This resume is written in Cyrillic script"],
+  ])("is named, with what that means for the reading", (text, unsupported, opening) => {
+    const report = check(text);
+    expect(report.locale).toEqual({ languages: [], region: report.locale.region, unsupported });
+    const note = report.parsingWarnings.filter((warning) => warning.startsWith(opening));
+    expect(note).toEqual([
+      `${opening}, which the engine does not read yet: section names, dates and degrees were read as English, and the English writing checks were skipped.`,
+    ]);
+  });
+
+  it("is not named for English, or for a language a pack reads", () => {
+    for (const text of [LOCALE_FIXTURES.en[0]!.text, LOCALE_FIXTURES.de[0]!.text]) {
+      const report = check(text);
+      expect(report.locale.unsupported).toBeNull();
+      expect(report.parsingWarnings.join(" ")).not.toContain("does not read yet");
+    }
+  });
+
+  it("names German when no German pack is attached", () => {
+    const report = score(LOCALE_FIXTURES.de[0]!.text, DEFAULT_POLICY, { now: NOW });
+    expect(report.locale.unsupported).toBe("de");
+    expect(report.parsingWarnings.join(" ")).toContain("This resume looks German, which");
+  });
+
+  // Review findings, 2026-10-23. A German summary and headings over English bullets: the German
+  // pack's words are read, so German is not "not read".
+  it("is not named for a language a pack reads, whatever its bullets", () => {
+    const report = check(
+      [
+        "Lukas Weber",
+        "lukas.weber@example.com | +49 30 12345678 | Berlin",
+        "Profil",
+        "Softwareentwickler mit acht Jahren Erfahrung in der Entwicklung von Zahlungssystemen für Banken und Versicherungen. Ich arbeite gern mit verteilten Teams und bin verantwortlich für die Architektur der Plattform sowie für die Betreuung von Junior-Entwicklern durch das ganze Jahr.",
+        "Berufserfahrung",
+        "Senior Engineer, Beispiel Bank AG — Berlin    03/2019 – heute",
+        "- Built Kafka pipelines processing 2 million events a day",
+        "- Led 6 engineers through a Kubernetes migration",
+        "- Cut cloud costs 30%",
+        "Ausbildung",
+        "B.Sc. Informatik, TU Berlin, 2015",
+      ].join("\n"),
+    );
+    expect(report.locale).toMatchObject({ languages: ["de"], unsupported: null });
+    expect(report.parsingWarnings.join(" ")).not.toContain("does not read yet");
+  });
+
+  it("is still read in none for a policy's language with words but no id, and says so", () => {
+    const [spanish] = DEFAULT_POLICY.text.otherLanguages;
+    const policy = parseAtsPolicy({
+      ...DEFAULT_POLICY,
+      text: {
+        ...DEFAULT_POLICY.text,
+        otherLanguages: [{ detectionWords: spanish!.detectionWords }],
+      },
+    });
+    const report = score(SPANISH_RESUME, policy, { now: NOW });
+    expect(report.locale.unsupported).toBe("und");
+    expect(report.rules.some((rule) => rule.category === "writing")).toBe(false);
+    expect(report.parsingWarnings).toContain(
+      "This resume is in a language the engine does not read yet: section names, dates and degrees were read as English, and the English writing checks were skipped.",
+    );
+  });
+
+  it("names Japanese by its kana, not the Han script it shares with Chinese", () => {
+    const japanese = [
+      "山田 太郎",
+      "taro@example.com | +81 90-1234-5678 | 東京",
+      "職務経歴",
+      "シニアソフトウェアエンジニア、サンプル銀行 — 東京    2019 – 現在",
+      "- 二百万人の顧客のための決済プラットフォームを開発",
+      "- 六人のチームを率いてクラウドへの移行を完了",
+      "学歴",
+      "情報工学 学士、東京大学、2015",
+    ].join("\n");
+    expect(check(japanese).locale.unsupported).toBe("ja");
+  });
+
+  // A German policy that keeps the default list must not call German "not read".
+  it("ignores an entry that names the policy's own language or undetermined", () => {
+    for (const id of ["en", "und"]) {
+      const policy = parseAtsPolicy({
+        ...DEFAULT_POLICY,
+        text: { ...DEFAULT_POLICY.text, otherLanguages: [{ id, script: "Greek" }] },
+      });
+      const greek =
+        "Νίκος Παπαδόπουλος\nΕμπειρία\nΜηχανικός λογισμικού στην εταιρεία Παράδειγμα από το 2019 έως σήμερα";
+      expect(score(greek, policy, { now: NOW }).locale.unsupported, id).toBeNull();
+    }
+  });
+});
+
 describe("detection", () => {
   it("leaves an English resume to the base vocabulary", () => {
     const report = check(
       "Jane Doe\njane@example.com | (415) 555-0199\nExperience\nEngineer, Acme 2020 - 2022",
     );
-    expect(report.locale).toEqual({ languages: [], region: null });
+    expect(report.locale).toEqual({ languages: [], region: null, unsupported: null });
   });
 
   it("does not read an English resume as German for a German company name", () => {
@@ -143,7 +254,7 @@ describe("detection", () => {
         "Java, TypeScript, React, AWS",
       ].join("\n"),
     );
-    expect(report.locale).toEqual({ languages: ["fr"], region: null });
+    expect(report.locale).toEqual({ languages: ["fr"], region: null, unsupported: null });
     expect(report.parsed.roles[0].start).toEqual({ year: 2019, month: 4 });
     expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
   });
@@ -178,7 +289,7 @@ describe("detection", () => {
     ],
   ])("keeps a German CV with %s German", (_, text, roles) => {
     const report = check(text);
-    expect(report.locale).toEqual({ languages: ["de"], region: "DE" });
+    expect(report.locale).toEqual({ languages: ["de"], region: "DE", unsupported: null });
     expect(report.parsed.roles).toHaveLength(roles);
     expect(report.parsed.roles[0].start).toEqual({ year: 2019, month: 3 });
     expect(report.rules.map((rule) => rule.id)).not.toContain("ats-v2.writing.firstPerson");
@@ -200,7 +311,7 @@ describe("detection", () => {
         "B.Tech Computer Science, दिल्ली विश्वविद्यालय, 2017",
       ].join("\n"),
     );
-    expect(report.locale).toEqual({ languages: ["hi"], region: "IN" });
+    expect(report.locale).toEqual({ languages: ["hi"], region: "IN", unsupported: null });
     expect(report.parsed.roles[0].start).toEqual({ year: 2020, month: 3 });
   });
 
@@ -210,12 +321,13 @@ describe("detection", () => {
     ).toEqual({
       languages: ["de"],
       region: "IN",
+      unsupported: null,
     });
   });
 
   it("reads with exactly the locale a host asks for", () => {
     const report = check(LOCALE_FIXTURES["en-IN"][1].text, { region: "IN" });
-    expect(report.locale).toEqual({ languages: [], region: "IN" });
+    expect(report.locale).toEqual({ languages: [], region: "IN", unsupported: null });
     // The region's credentials and date order apply.
     expect(report.parsed.education[1]).toMatchObject({ isced: 6 });
     expect(report.parsed.roles[0].start).toEqual({ year: 2018, month: 4 });
@@ -229,7 +341,7 @@ describe("detection", () => {
     // The policy's own language names no pack: the base alone, as `[]` does.
     expect(check(german, { languages: ["en"] }).locale.languages).toEqual([]);
     expect(() => check(german, { languages: ["deu"] })).toThrow(
-      /Language "deu" is not attached to the policy \(attached: de, fr, hi\)/,
+      /Language "deu" is not attached to the policy \(attached: de, fr, hi, es, pt\)/,
     );
   });
 
@@ -272,7 +384,7 @@ describe("region conventions", () => {
       "Date of birth: 04/05/1990",
     ].join("\n");
     const report = check(text);
-    expect(report.locale).toEqual({ languages: [], region: "GB" });
+    expect(report.locale).toEqual({ languages: [], region: "GB", unsupported: null });
     expect(report.rules.find((rule) => rule.id === "ats-v2.privacy.dateOfBirth")).toMatchObject({
       passed: false,
       severity: "warning",
@@ -325,6 +437,41 @@ describe("the language packs and English resumes", () => {
     "Skills",
     "TypeScript, SQL",
   ].join("\n");
+  // English resumes from Spanish- and Portuguese-speaking communities: names and a phrase or two
+  // in those languages (the Spanish pack read the first as Spanish before its prepositions went).
+  const COMMUNITIES = [
+    [
+      "Ana Ruiz",
+      "ana@example.com | (915) 555-0100 | El Paso, TX",
+      "Employment",
+      "Teacher Aide, Para Los Niños — El Paso, TX",
+      "2019 – Present",
+      "- Bilingual tutoring, grades 1-3",
+      "- Parent outreach en español",
+      "Cashier, Supermercado El Rey y Más — El Paso, TX",
+      "2017 – 2019",
+      "- Cash handling, inventory",
+      "Volunteer, Iglesia San José — El Paso, TX",
+      "- Food drive con familias",
+      "Education",
+      "High School Diploma, Colegio Por Un Mundo Mejor, 2017",
+      "Skills",
+      "Spanish, Customer Service, Microsoft Office, CPR",
+    ].join("\n"),
+    [
+      "Lucas Pereira",
+      "lucas@example.com | (617) 555-0100 | Boston, MA",
+      "Experience",
+      "Data Analyst, Banco Itaú Unibanco — São Paulo, SP",
+      "2018 – 2021",
+      "- Built credit dashboards for the São Paulo branch network",
+      "- Worked with the equipe de dados on monthly reporting",
+      "Education",
+      "BSc Economics, Universidade de São Paulo, 2018",
+      "Skills",
+      "SQL, Python, Tableau, Portuguese",
+    ].join("\n"),
+  ];
 
   it("leave every English resume as it reads with none attached", async () => {
     const english = [
@@ -332,6 +479,7 @@ describe("the language packs and English resumes", () => {
         (fixture) => fixture.text,
       ),
       LOOKALIKES,
+      ...COMMUNITIES,
       ...(await Promise.all(
         generateResumes(100).map(async (resume) => (await renderResume(resume, "text")).text),
       )),
@@ -444,7 +592,7 @@ describe("packs", () => {
 
   it("replace an attached pack with the same id", () => {
     const twice = withLocales(withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), { languages: [de] });
-    expect(twice.locales.languages.map((pack) => pack.id)).toEqual(["de", "fr", "hi"]);
+    expect(twice.locales.languages.map((pack) => pack.id)).toEqual(["de", "fr", "hi", "es", "pt"]);
   });
 
   it("publish a JSON Schema for contributors", () => {
@@ -455,6 +603,6 @@ describe("packs", () => {
     const report = score("Jane Doe\nExperience\nEngineer, Acme 2020 - 2022", DEFAULT_POLICY, {
       now: NOW,
     });
-    expect(report.locale).toEqual({ languages: [], region: null });
+    expect(report.locale).toEqual({ languages: [], region: null, unsupported: null });
   });
 });

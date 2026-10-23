@@ -8,6 +8,7 @@ import {
   regexString,
   seasonRanges,
   wordList,
+  wordListOrNone,
 } from "../primitives.js";
 
 /** Vocabulary the resume parser needs. */
@@ -152,6 +153,16 @@ export const resumeParseSchema = z.object({
   /** Labels a resume writes its owner's name under: "Name: Jane Doe". */
   nameLabels: z._default(wordList("nameLabels"), ["name", "full name"]),
   /** Words between the two ends of a date range besides a dash: "2019 to 2022", "2019 bis 2022". */
+  /**
+   * Words that open a date range, read with it, so they leave the employer: "from Jan 2020 to
+   * Present", "de marzo de 2020 a la actualidad". Matched whole, ignoring case.
+   */
+  rangeOpeners: z._default(wordList("rangeOpeners"), ["from"]),
+  /**
+   * Words between a month's name and its year: Spanish and Portuguese "marzo de 2020". None in
+   * English.
+   */
+  monthYearJoiners: z._default(wordListOrNone("monthYearJoiners"), []),
   rangeWords: z._default(wordList("rangeWords"), ["to", "until", "through", "thru"]),
   /** Words before a lone start date that make it a current role: "since 2019", "seit 03/2019". */
   sinceWords: z._default(wordList("sinceWords"), ["since"]),
@@ -270,7 +281,7 @@ export const resumeParseSchema = z.object({
   /**
    * Countries and short forms, and the states, provinces and territories of the United States,
    * Canada, India and Australia and the nations of the United Kingdom, in full: what a city is
-   * written with ("Berlin, Germany"). No cities. Matched whole, ignoring case. Each entry is a
+   * written with ("Berlin, Germany"). Cities are `cityNames`. Matched whole, ignoring case. Each entry is a
    * pattern for one name and its spellings ("u[.]?k[.]?"), written as one string cut at its bars.
    */
   placeNames: z._default(
@@ -330,6 +341,13 @@ export const resumeParseSchema = z.object({
       "england|scotland|wales|northern ireland"
     ).split("|"),
   ),
+  /**
+   * Cities, each a pattern matched whole ignoring case: a part after the employer that names one
+   * is where the role is worked ("Acme GmbH, Berlin" is Acme GmbH), and so is a line of its own.
+   * Empty in the base policy; the language and region packs list their larger cities, leaving out
+   * names that are also words or employers ("Nice", "Reading", "Phoenix").
+   */
+  cityNames: z._default(wordListOrNone("cityNames"), []),
   /** Words that say how or where a role is worked rather than for whom: "Remote", "Hybrid". */
   workplaceWords: z._default(wordList("workplaceWords"), [
     "remote",

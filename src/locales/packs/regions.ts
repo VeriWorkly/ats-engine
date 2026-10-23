@@ -29,6 +29,10 @@ export const US: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   maintainers: [],
   phoneCountry: "US",
   dateOrder: "MDY",
+  cityNames:
+    "New York|New York City|NYC|Los Angeles|Chicago|Houston|San Francisco|Seattle|Boston|Austin|Denver|Atlanta|Dallas|Philadelphia|San Diego|San Jose|Miami|Minneapolis|Detroit|Pittsburgh|Nashville|Raleigh|Salt Lake City|Las Vegas|Baltimore|St\\.? Louis|Kansas City|Indianapolis|Sacramento|Orlando|Tampa|Cincinnati|Cleveland|Milwaukee|New Orleans|Brooklyn|Manhattan|Palo Alto|Mountain View|Sunnyvale|Cupertino|Menlo Park|Redmond|Bellevue|Silicon Valley|Bay Area".split(
+      "|",
+    ),
   rules: {
     "ats-v2.privacy.dateOfBirth": { weight: 6, severity: "warning" },
     "ats-v2.format.photo": { weight: 6, severity: "warning" },
@@ -45,6 +49,10 @@ export const DE: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   maintainers: [],
   phoneCountry: "DE",
   dateOrder: "DMY",
+  cityNames:
+    "Berlin|Hamburg|München|Köln|Frankfurt am Main|Frankfurt|Stuttgart|Düsseldorf|Leipzig|Dortmund|Bremen|Dresden|Hannover|Nürnberg|Duisburg|Bochum|Wuppertal|Bielefeld|Bonn|Münster|Karlsruhe|Mannheim|Augsburg|Wiesbaden|Mainz|Kiel|Aachen|Freiburg|Freiburg im Breisgau|Heidelberg|Regensburg|Darmstadt|Potsdam|Erlangen|Ingolstadt|Wolfsburg|Walldorf|Braunschweig|Chemnitz|Magdeburg|Rostock|Saarbrücken|Erfurt|Jena|Munich|Cologne|Nuremberg|Hanover|Dusseldorf".split(
+      "|",
+    ),
   rules: {
     "ats-v2.privacy.dateOfBirth": { weight: 0 },
     "ats-v2.format.photo": { weight: 0 },
@@ -80,6 +88,10 @@ export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   maintainers: [],
   phoneCountry: "IN",
   dateOrder: "DMY",
+  cityNames:
+    "Mumbai|Bombay|Delhi|New Delhi|Bengaluru|Bangalore|Hyderabad|Chennai|Madras|Kolkata|Calcutta|Pune|Ahmedabad|Jaipur|Lucknow|Noida|Greater Noida|Gurugram|Gurgaon|Chandigarh|Kochi|Cochin|Coimbatore|Indore|Bhopal|Nagpur|Thiruvananthapuram|Trivandrum|Visakhapatnam|Mysuru|Mysore|Bhubaneswar|Vadodara|Surat|Patna|Mangaluru|Mangalore|Navi Mumbai|Thane|नई दिल्ली|दिल्ली|मुंबई|बेंगलुरु|बैंगलोर|हैदराबाद|चेन्नई|कोलकाता|पुणे|अहमदाबाद|जयपुर|लखनऊ|नोएडा|गुरुग्राम|गुड़गांव|चंडीगढ़|भोपाल|इंदौर|नागपुर|पटना|कानपुर|वाराणसी|सूरत|वडोदरा".split(
+      "|",
+    ),
   // State and union territory codes written after a city ("Pune, MH"): a place, never a name.
   regionCodes: [
     "AP",
@@ -150,6 +162,10 @@ export const FR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   maintainers: [],
   phoneCountry: "FR",
   dateOrder: "DMY",
+  cityNames:
+    "Paris|Lyon|Marseille|Toulouse|Nantes|Strasbourg|Montpellier|Bordeaux|Lille|Rennes|Reims|Grenoble|Dijon|Angers|Nîmes|Clermont-Ferrand|Le Mans|Aix-en-Provence|Brest|Amiens|Limoges|Metz|Rouen|Caen|Orléans|Saint-Étienne|Sophia Antipolis|La Défense|Boulogne-Billancourt|Nanterre|Issy-les-Moulineaux|Versailles|Toulon|Mulhouse|Perpignan|Besançon|Poitiers".split(
+      "|",
+    ),
   rules: {
     "ats-v2.privacy.dateOfBirth": { weight: 0 },
     "ats-v2.format.photo": { weight: 0 },
@@ -185,6 +201,10 @@ export const GB: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   maintainers: [],
   phoneCountry: "GB",
   dateOrder: "DMY",
+  cityNames:
+    "London|Manchester|Birmingham|Leeds|Glasgow|Edinburgh|Liverpool|Bristol|Sheffield|Newcastle|Newcastle upon Tyne|Nottingham|Leicester|Cardiff|Belfast|Southampton|Cambridge|Oxford|Brighton|Aberdeen|Coventry|Milton Keynes|Swansea|Dundee|Canary Wharf".split(
+      "|",
+    ),
   rules: {
     "ats-v2.privacy.dateOfBirth": { weight: 6, severity: "warning" },
     "ats-v2.format.photo": { weight: 6, severity: "warning" },
@@ -196,5 +216,94 @@ export const GB: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "3": word(String.raw`as[\s-]levels?|(?:advanced\s+)?highers`),
     "5": word(String.raw`hnd|hnc|higher\s+national\s+(?:diploma|certificate)|foundation\s+degree`),
     "7": word(String.raw`pgce|pg\s?dip|postgraduate\s+(?:diploma|certificate)`),
+  },
+});
+
+/**
+ * Spain: day-first dates, Spanish credentials; a date of birth or a photo is customary and not
+ * judged. Bachillerato is upper secondary here (in Peru a "bachiller" is a university degree, so
+ * it is not the `es` pack's), and a higher vocational cycle is short-cycle tertiary.
+ */
+export const ES: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "ES",
+  name: "España",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "ES",
+  dateOrder: "DMY",
+  cityNames: (
+    "Madrid|Barcelona|Valencia|Sevilla|Zaragoza|Málaga|Malaga|Bilbao|Alicante|Valladolid|Vigo|" +
+    "Gijón|A Coruña|La Coruña|Palma de Mallorca|Las Palmas de Gran Canaria|Granada|San Sebastián|" +
+    "Donostia|Pamplona|Salamanca|Santander"
+  ).split("|"),
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 0 },
+    "ats-v2.format.photo": { weight: 0 },
+  },
+  degrees: {
+    "2": word(String.raw`eso|graduado\s+en\s+(?:educaci[óo]n\s+)?secundaria`),
+    "3": word(
+      String.raw`bachillerato|ciclo\s+(?:formativo\s+de\s+)?grado\s+medio|fp\s+(?:de\s+)?grado\s+medio`,
+    ),
+    "5": word(
+      String.raw`ciclo\s+(?:formativo\s+de\s+)?grado\s+superior|fp\s+(?:de\s+)?grado\s+superior|t[ée]cnico\s+superior`,
+    ),
+  },
+});
+
+/**
+ * Brazil: day-first dates, Brazilian credentials and state codes ("São Paulo, SP"); a date of
+ * birth or a photo is not judged. Ensino médio is upper secondary.
+ */
+export const BR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "BR",
+  name: "Brasil",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "BR",
+  dateOrder: "DMY",
+  regionCodes:
+    "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" "),
+  cityNames: (
+    "São Paulo|Sao Paulo|Rio de Janeiro|Belo Horizonte|Brasília|Brasilia|Salvador|Fortaleza|" +
+    "Curitiba|Recife|Porto Alegre|Manaus|Belém|Belem|Goiânia|Goiania|Campinas|Florianópolis|" +
+    "Florianopolis|Vitória|Vitoria|São José dos Campos|Santos|Ribeirão Preto|Joinville|Niterói|" +
+    "Uberlândia|Londrina"
+  ).split("|"),
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 0 },
+    "ats-v2.format.photo": { weight: 0 },
+  },
+  degrees: {
+    "2": word(String.raw`ensino\s+fundamental`),
+    "3": word(String.raw`ensino\s+m[ée]dio(?:\s+t[ée]cnico)?|curso\s+t[ée]cnico`),
+  },
+});
+
+/**
+ * Portugal: day-first dates, Portuguese schooling; a date of birth or a photo is not judged. The
+ * `pt` pack defaults to Brazil; a +351 number, or this region asked for, reads Portugal.
+ */
+export const PT: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "PT",
+  name: "Portugal",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "PT",
+  dateOrder: "DMY",
+  cityNames: (
+    "Lisboa|Porto|Braga|Coimbra|Aveiro|Faro|Setúbal|Funchal|Évora|Guimarães|Leiria|Viseu|Oeiras|" +
+    "Matosinhos|Amadora|Cascais|Sintra"
+  ).split("|"),
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 0 },
+    "ats-v2.format.photo": { weight: 0 },
+  },
+  // "Lda." is Portugal's limited company.
+  organisationWords: [String.raw`lda\.?`],
+  degrees: {
+    "2": word(String.raw`ensino\s+b[áa]sico|9\.?\s*[ºo]\s+ano`),
+    "3": word(String.raw`ensino\s+secund[áa]rio|12\.?\s*[ºo]\s+ano`),
+    "5": word(String.raw`ctesp|curso\s+t[ée]cnico\s+superior\s+profissional`),
   },
 });

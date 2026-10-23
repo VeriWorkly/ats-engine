@@ -44,7 +44,10 @@ export function classifyHeading<K>(
 
   for (const { kind, re } of matchers.kinds) {
     const match = re.exec(head);
-    const tail = match && head.slice(match.index + match[0].length);
+    let tail = match && head.slice(match.index + match[0].length);
+    // A later alternative may cover the whole heading: a pack's Spanish "Contactar" after the
+    // policy's English "contact", which matched first and ended mid-word.
+    if (tail && /^[\p{L}\p{M}\p{N}]/u.test(tail) && wholeOf(re).test(head)) tail = "";
     if (tail === null || !isTitleTail(tail, head, matchers.connector)) continue;
     if (matchers.titleWords?.test(tail)) continue;
     return { kind, rest: colon === -1 ? "" : line.slice(colon + 1).trim(), tail: tail.trim() };
@@ -135,9 +138,15 @@ export function isBareSectionHeading(line: string, policy: AtsEnginePolicy) {
   const head = (colon === -1 ? line : line.slice(0, colon)).trim();
   return (
     isSectionHeading(line, policy) &&
-    sectionMatchers(policy).kinds.some(({ re }) => re.exec(head)?.[0].length === head.length)
+    sectionMatchers(policy).kinds.some(({ re }) => wholeOf(re).test(head))
   );
 }
+
+/**
+ * The pattern matching a whole heading. Its first match would not do: a pack's alternative comes
+ * after the policy's own, so English "contact" matches the start of Spanish "Contactar".
+ */
+const wholeOf = memo((re: RegExp) => new RegExp(`(?:${re.source})$`, re.flags.replace("g", "")));
 
 /** The kinds of section a resume has a heading for: exactly the ones `segmentResume` opened. */
 export function headedKinds(sections: readonly ResumeSection[]) {

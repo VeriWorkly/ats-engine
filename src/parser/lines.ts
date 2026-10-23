@@ -1,4 +1,5 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
+import { findDateRange } from "./dates.js";
 import { despaceLines, isBareSectionHeading } from "./sections.js";
 
 /** The first word of a wrapped line's continuation: entirely lowercase ("iOS", "eBay" start lines). */
@@ -23,12 +24,19 @@ function joinWrapped(lines: string[], policy: AtsEnginePolicy): string[] {
       previous.length >= fullWidth &&
       !/[.!?]$/.test(previous) &&
       CONTINUATION.test(line) &&
-      !isBareSectionHeading(line, policy)
+      !isBareSectionHeading(line, policy) &&
+      !isDateLine(line, policy)
     )
       joined[last] = previous.endsWith("-") ? previous + line : `${previous} ${line}`;
     else joined.push(line);
   }
   return joined;
+}
+
+/** A line that is a date range and nothing else ("janv. 2021 – aujourd'hui"): a role's dates. */
+function isDateLine(line: string, policy: AtsEnginePolicy) {
+  const found = findDateRange(line, policy.resumeParse);
+  return found !== null && !/\p{L}/u.test(line.replace(found.matched, ""));
 }
 
 /** The opening of an ATX heading ("## Experience"): one to six marks, then a space. */

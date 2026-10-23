@@ -65,7 +65,7 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   sections: {
     experience: String.raw`^(?:exp${e}riences?(?:\s+(?:professionnelles?|pertinentes?))?|parcours\s+professionnel|historique\s+professionnel|emplois?\s+occup${e}s|stages?(?:\s+et\s+alternances?)?|alternances?)`,
     education: String.raw`^(?:formations?(?:\s+(?:acad${e}miques?|universitaires?|initiales?|et\s+dipl[ôo]mes))?|${e}tudes(?:\s+sup${e}rieures)?|cursus(?:\s+(?:universitaire|scolaire|acad${e}mique))?|dipl[ôo]mes(?:\s+et\s+formations?)?|parcours\s+(?:acad${e}mique|scolaire|universitaire))`,
-    skills: String.raw`^(?:comp${e}tences(?!\s+linguistiques)(?:\s+(?:techniques|informatiques|cl${e}s|professionnelles))?|savoir[\s-]faire|outils(?:\s+et\s+technologies)?|connaissances\s+(?:techniques|informatiques)|informatique)`,
+    skills: String.raw`^(?:principales\s+comp${e}tences|comp${e}tences(?!\s+linguistiques)(?:\s+(?:techniques|informatiques|cl${e}s|professionnelles))?|savoir[\s-]faire|outils(?:\s+et\s+technologies)?|connaissances\s+(?:techniques|informatiques)|informatique)`,
     projects: String.raw`^(?:projets(?:\s+(?:personnels|professionnels|acad${e}miques|r${e}alis${e}s))?|r${e}alisations)`,
     certifications: String.raw`^(?:certifications?|certificats?|habilitations)`,
     languages: String.raw`^(?:langues(?:\s+${e}trang[eè]res)?|comp${e}tences\s+linguistiques)`,
@@ -83,7 +83,11 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   },
   credentialWords: {
     issued: [String.raw`d${e}livr${e}e?(?:\s+le)?`, String.raw`obtenue?(?:\s+(?:le|en))?`],
-    expires: [String.raw`valable\s+jusqu['’]au?`, String.raw`expire\s+(?:le|en)`, "expiration"],
+    expires: [
+      String.raw`valable\s+jusqu['’](?:au?|en)`,
+      String.raw`expire\s+(?:le|en)`,
+      "expiration",
+    ],
     issuer: [String.raw`d${e}livr${e}e?\s+par`, "par"],
     id: [String.raw`n°`, String.raw`num${e}ro(?:\s+de\s+(?:certificat|licence))?`],
   },
@@ -129,6 +133,8 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   ],
   // "Mars 2019 à juin 2021", "du 03/2019 au 06/2021", "jusqu'à 2021".
   rangeWords: ["à", "au", String.raw`jusqu['’]\s?(?:à|au|en)`],
+  // "de 2019 à 2021", "du 03/2019 au 06/2021".
+  rangeOpeners: ["de", "du", "depuis"],
   sinceWords: ["depuis"],
   leaveWords: [
     String.raw`cong${e}\s+(?:parental|(?:de\s+)?(?:maternit${e}|paternit${e})|sabbatique)`,
@@ -172,6 +178,8 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     String.raw`expert(?:e)?`,
   ],
   schoolWords: [
+    // Québec's colleges, between secondary school and university.
+    String.raw`c${e}gep`,
     String.raw`universit${e}`,
     String.raw`${e}cole`,
     "lycée",
@@ -186,13 +194,17 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   documentTitles: [String.raw`curriculum\s+vit[aæ]e`],
   dateOfBirthLabels: [String.raw`date\s+de\s+naissance`, String.raw`n${e}e?\s+le`],
   headingConnectors: ["et", "de", "des", "du", String.raw`d['’]\p{L}+`],
-  // France's regions and the French-speaking countries. No cities.
+  // France's regions and the French-speaking countries; cities are `cityNames`.
   placeNames: (
     "france|belgique|suisse|luxembourg|québec|canada|maroc|tunisie|algérie|sénégal|" +
     "île-de-france|auvergne-rhône-alpes|bourgogne-franche-comté|bretagne|centre-val de loire|" +
     "corse|grand est|hauts-de-france|normandie|nouvelle-aquitaine|occitanie|pays de la loire|" +
     "provence-alpes-côte d'azur"
   ).split("|"),
+  cityNames:
+    "Paris|Lyon|Marseille|Toulouse|Nantes|Strasbourg|Montpellier|Bordeaux|Lille|Rennes|Reims|Grenoble|Dijon|Angers|Nîmes|Clermont-Ferrand|Le Mans|Aix-en-Provence|Brest|Amiens|Limoges|Metz|Rouen|Caen|Orléans|Saint-Étienne|Sophia Antipolis|La Défense|Boulogne-Billancourt|Nanterre|Issy-les-Moulineaux|Versailles|Toulon|Mulhouse|Perpignan|Besançon|Poitiers|Bruxelles|Liège|Namur|Genève|Lausanne|Montréal|Québec|Luxembourg".split(
+      "|",
+    ),
   workplaceWords: [String.raw`t${e}l${e}travail`, "hybride", String.raw`[àa]\s+distance`],
   organisationWords: ["sas", "sasu", "sarl", "eurl", String.raw`s\.a\.`, "sca", "snc"],
   contentLineVerbs: [
@@ -303,7 +315,10 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   // "Bac+N" is the `FR` region's too, and here for a French posting read under another region.
   // A baccalauréat named for its field is Québec's bachelor's; France names it for a stream.
   degrees: {
-    "5": word(String.raw`bac\s*\+\s*2`),
+    // Québec's DEC, from a CEGEP; only before its field, since "Dec" is also December.
+    "5": word(
+      String.raw`bac\s*\+\s*2|d\.?\s?e\.?\s?c\.?(?=\s+(?:en|\())|dipl[ôo]me\s+d['’]${e}tudes\s+coll${e}giales`,
+    ),
     "6": word(
       String.raw`licence(?:\s+professionnelle)?|bac(?:calaur[ée]at)?\s+en\s+\p{L}+|bac\s*\+\s*3`,
     ),

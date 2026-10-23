@@ -70,6 +70,22 @@ for (const resume of generateResumes(GENERATED_COUNT))
     record(`generated, ${rendering}`, "generated", `${resume.id}/${rendering}`, checks);
   }
 
+// The same generator in German, French and Hindi, read with detection as a host reads them. Text
+// and DOCX only: the test PDF writer's Helvetica has no encoding for umlauts or Devanagari.
+const OTHER_LANGUAGES = ["de", "fr", "hi", "es", "pt"] as const;
+for (const language of OTHER_LANGUAGES)
+  for (const resume of generateResumes(GENERATED_COUNT, undefined, language))
+    for (const rendering of ["text", "docx"] as const) {
+      const { text, layout } = await renderResume(resume, rendering);
+      const checks = fieldChecks(checkTimed(text, layout), resume);
+      record(
+        `generated ${language}, ${rendering}`,
+        `generated-${language}`,
+        `${resume.id}/${rendering}`,
+        checks,
+      );
+    }
+
 const percent = (ratio: number) => `${(100 * ratio).toFixed(1).padStart(5)}%`;
 for (const [set, tally] of tallies) {
   const all = [...tally.values()].reduce(
@@ -93,8 +109,9 @@ const list = (title: string, corpus: string) => {
   if (rows.length) console.log(["", `${title}:`, ...rows].join("\n"));
 };
 list("missed in hand-written", "hand-written");
-if (verbose) list("missed in generated", "generated");
-else console.log(`\n${misses.get("generated")?.size ?? 0} generated misses (--verbose lists them)`);
+for (const corpus of ["generated", ...OTHER_LANGUAGES.map((language) => `generated-${language}`)])
+  if (verbose) list(`missed in ${corpus}`, corpus);
+  else console.log(`\n${misses.get(corpus)?.size ?? 0} ${corpus} misses (--verbose lists them)`);
 
 const current = Object.fromEntries([...misses].map(([corpus, keys]) => [corpus, [...keys.keys()]]));
 if (update) {

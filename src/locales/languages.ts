@@ -40,6 +40,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       credentialWords: {
         issued: union(rp.credentialWords.issued, v.credentialWords?.issued),
         expires: union(rp.credentialWords.expires, v.credentialWords?.expires),
+        expiresAfter: union(rp.credentialWords.expiresAfter, v.credentialWords?.expiresAfter),
         issuer: union(rp.credentialWords.issuer, v.credentialWords?.issuer),
         id: union(rp.credentialWords.id, v.credentialWords?.id),
       },
@@ -50,10 +51,13 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       postNominals: union(rp.postNominals, v.postNominals),
       regionCodes: union(rp.regionCodes, v.regionCodes),
       placeNames: union(rp.placeNames, v.placeNames),
+      cityNames: union(rp.cityNames, v.cityNames),
       workplaceWords: union(rp.workplaceWords, v.workplaceWords),
       organisationWords: union(rp.organisationWords, v.organisationWords),
       openEnded: union(rp.openEnded, v.openEnded),
       rangeWords: union(rp.rangeWords, v.rangeWords),
+      rangeOpeners: union(rp.rangeOpeners, v.rangeOpeners),
+      monthYearJoiners: union(rp.monthYearJoiners, v.monthYearJoiners),
       sinceWords: union(rp.sinceWords, v.sinceWords),
       lineEndDateWords: union(rp.lineEndDateWords, v.lineEndDateWords),
       leaveWords: union(rp.leaveWords, v.leaveWords),
@@ -202,18 +206,46 @@ export function outweighs({ words }: Sample, pack: Detection, base: Detection) {
 export const UNDETERMINED = "und";
 
 /**
- * The language a resume no attached pack recognises is read in: the policy's own, unless it is
- * recognised as written in one of `text.otherLanguages`, with more of its words than the policy's
- * own has, and not in the policy's own as well. Only what a text has decides, never what it
- * lacks: a short English resume, or one of terse bullets, holds few English function words, and
- * fewer still of another language's, even naming "El Paso" or "Banque Nationale du Canada".
+ * The language of `text.otherLanguages` a resume no pack reads is written in, by its ISO 639
+ * code ("es"), or by its script ("Cyrillic") when the policy names none; undefined when it is
+ * the policy's own. Only what a text has decides, never what it lacks: a short English resume, or
+ * one of terse bullets, holds few English function words, and fewer still of another language's,
+ * even naming "El Paso" or "Banque Nationale du Canada". Such a resume is read in "und".
  */
-export function baseLanguageOf(policy: AtsEnginePolicy, sample: Sample) {
+export function otherLanguageOf(policy: AtsEnginePolicy, sample: Sample): string | undefined {
   const { text } = policy;
-  return !isWrittenIn(sample, text) &&
-    text.otherLanguages.some((other) => isWrittenIn(sample, other, text))
-    ? UNDETERMINED
-    : text.language;
+  if (isWrittenIn(sample, text)) return undefined;
+  // An entry naming the policy's own language (a German policy keeping the default list) is it.
+  const other = text.otherLanguages.find(
+    (candidate) =>
+      candidate.id !== text.language &&
+      candidate.id !== UNDETERMINED &&
+      isWrittenIn(sample, candidate, text),
+  );
+  return other && (other.id ?? other.script ?? UNDETERMINED);
+}
+
+/** A language's English name from its ISO 639 code ("es" → "Spanish"), where the runtime knows it. */
+export function englishName(id: string) {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "language" }).of(id);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * What the report says about a resume in a language the engine has no vocabulary for: `label`
+ * is an ISO 639 code ("es") or a script ("Cyrillic"), as `locale.unsupported` holds it.
+ */
+export function unsupportedLanguageNote(label: string) {
+  const opening =
+    label === UNDETERMINED
+      ? "This resume is in a language the engine"
+      : label === label.toLowerCase()
+        ? `This resume looks ${englishName(label) ?? label}, which the engine`
+        : `This resume is written in ${label} script, which the engine`;
+  return `${opening} does not read yet: section names, dates and degrees were read as English, and the English writing checks were skipped.`;
 }
 
 const inLanguagesCache = memo<AtsEnginePolicy, Map<string, AtsEnginePolicy>>(() => new Map());
