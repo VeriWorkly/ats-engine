@@ -527,6 +527,166 @@ describe("date spellings that dropped the role", () => {
   });
 });
 
+describe("a leave or career break in the work history", () => {
+  // A dated leave is time off, not a job: no role, no months, no title to judge seniority by.
+  it.each([
+    ["Parental leave, 03/2024 – Present", "en"],
+    ["Maternity leave 03/2024 – Present", "en"],
+    ["Elternzeit ab 03/2024", "de"],
+    ["Mutterschutz seit 03/2024", "de"],
+    ["Congé parental 03/2024 – aujourd'hui", "fr"],
+  ])("does not read %j after the last role as a current role", (leave, language) => {
+    const { roles, monthsOfExperience } = check(
+      `Jane Doe\nExperience\nSenior Engineer, Acme GmbH\n01/2018 – 02/2024\n- Built the payments platform\n${leave}`,
+      { languages: [language] },
+    );
+    expect(roles).toMatchObject([{ title: "Senior Engineer", employer: "Acme GmbH" }]);
+    expect(monthsOfExperience).toBe(74);
+  });
+
+  it.each([
+    ["Career break 2019 – 2020", "en"],
+    ["Sabbatical, Jan 2022 – Jun 2022", "en"],
+    ["Maternity leave\tJan 2022 – Jun 2022", "en"],
+    ["Career break – travel and volunteering, Jan 2022 – Jun 2022", "en"],
+    ["Auszeit 01/2022 – 06/2022", "de"],
+    ["Mutterschutz 01/2022 – 06/2022", "de"],
+    ["Congé parental 01/2022 – 06/2022", "fr"],
+    ["Année sabbatique 01/2022 – 06/2022", "fr"],
+  ])("does not read %j between two roles as a role", (leave, language) => {
+    const { roles } = check(
+      `Jane Doe\nExperience\nEngineer, Acme\nJan 2015 – Dec 2018\n${leave}\nEngineer, Globex\nJul 2022 – Present`,
+      { languages: [language] },
+    );
+    expect(roles.map(({ employer }) => employer)).toEqual(["Acme", "Globex"]);
+  });
+
+  it("counts the months of the roles either side of a sabbatical, not the sabbatical", () => {
+    const { monthsOfExperience } = check(
+      "Jane Doe\nExperience\nEngineer, Acme\nJan 2018 – Dec 2021\nSabbatical, Jan 2022 – Jun 2022\nEngineer, Globex\nJul 2022 – Present",
+    );
+    expect(monthsOfExperience).toBe(48 + 50);
+  });
+
+  it.each([
+    "Engineer, Acme\nJan 2018 – Present\n- Built a parental leave tracker used by 400 staff",
+    "Engineer, Acme\nJan 2018 – Present\nCovered the team lead's parental leave for six months",
+    "HR Manager, Parental Leave Programs, Acme\nJan 2018 – Present",
+    "Visiting Professor (sabbatical), State University\nJan 2018 – Present",
+  ])("still reads a role naming a leave in %j", (lines) => {
+    const { roles, monthsOfExperience } = check(`Jane Doe\nExperience\n${lines}`);
+    expect(roles).toHaveLength(1);
+    expect(roles[0]!.title).not.toBe("");
+    expect(monthsOfExperience).toBe(104);
+  });
+
+  // A bracket or an employer naming a title or an organisation is work done in the leave.
+  it.each([
+    ["Sabbatical (Visiting Researcher, Stanford) 2019 – 2020", "en"],
+    ["Sabbatical, Stanford University 2019 – 2020", "en"],
+    ["Elternzeit (Teilzeit als Entwickler bei Beispiel AG) 03/2019 – 02/2020", "de"],
+  ])("still reads %j as a role", (line, language) => {
+    const { roles } = check(`Jane Doe\nExperience\n${line}`, { languages: [language] });
+    expect(roles).toMatchObject([{ start: { year: 2019 } }]);
+  });
+});
+
+describe("a dated sentence in the work history", () => {
+  // A line that opens with a past-tense action verb, with only lowercase words and numbers up to
+  // its dates, is a description: its dates are what it is about, not a role's tenure.
+  it.each([
+    "Analysed 2017 thru 2018 data",
+    "Analysed 2017 through 2018 data for the board.",
+    "- Analysed 2017 thru 2018 data",
+    "Maintained a legacy system originally built 2008 - 2011 by another team.",
+    "Mentored two junior engineers since 2012.",
+    // Nothing after the dates, but an everyday open end after words of its own.
+    "Mentored 5 interns 2017 – continuing",
+  ])("does not read %j as a role", (line) => {
+    const { roles, monthsOfExperience } = check(
+      `Jane Doe\nExperience\nEngineer, Hooli\nJan 2016 - Dec 2018\nBuilt Java services used by 40 teams\n${line}`,
+    );
+    expect(roles).toMatchObject([{ title: "Engineer", employer: "Hooli" }]);
+    expect(monthsOfExperience).toBe(36);
+  });
+
+  // A title that opens with a word spelled like a verb is still a header.
+  it.each([
+    ["Engineer, Acme Jan 2017 through Mar 2018", "Engineer", "Acme"],
+    ["Jan 2017 thru Mar 2018  Acme\nEngineer", "Engineer", "Acme"],
+    ["Lead Engineer, Acme Jan 2017 - Mar 2018 | Remote", "Lead Engineer", "Acme"],
+    [
+      "Managed Services Engineer, Acme Jan 2017 - Mar 2018  Remote",
+      "Managed Services Engineer",
+      "Acme",
+    ],
+    [
+      "Integrated marketing manager, Acme Jan 2017 - Mar 2018",
+      "Integrated marketing manager",
+      "Acme",
+    ],
+    ["Support Engineer at Acme, Jan 2017 - Mar 2018", "Support Engineer", "Acme"],
+    // An employer named like a verb, its words capitalised.
+    [
+      "Integrated Device Technology Jan 2017 - Mar 2018\nEngineer",
+      "Engineer",
+      "Integrated Device Technology",
+    ],
+  ])("still reads %j as a role", (lines, title, employer) => {
+    expect(check(`Jane Doe\nExperience\n${lines}`).roles).toMatchObject([
+      { title, employer, start: { year: 2017, month: 1 }, end: { year: 2018, month: 3 } },
+    ]);
+  });
+
+  // An employer line with an everyday open end, a long one, or one in a script without case
+  // (where every word reads as lowercase) is a header, as 0.17.0 read it.
+  it.each([
+    ["सॉफ्टवेयर इंजीनियर\nइन्फोसिस लिमिटेड, बेंगलुरु 2019 से 2022 तक", "hi", 2019],
+    ["सॉफ्टवेयर इंजीनियर\nइन्फोसिस लिमिटेड, बेंगलुरु मार्च 2020 से", "hi", 2020],
+    ["प्रबंधन विभाग, टाटा स्टील 2019 – 2021", "hi", 2019],
+    ["विकसित भारत फाउंडेशन, दिल्ली 2019 – 2021\nकार्यक्रम सहायक", "hi", 2019],
+    ["Software Engineer\nBank of America 2019 onwards", "en", 2019],
+    ["Software Engineer\nGovernment of India 2019 onwards", "en", 2019],
+    ["Software Engineer\nAcme Corp, remote 2019 – continuing", "en", 2019],
+    ["Software Engineer\nUniversity of the West of England 2019 – continuing", "en", 2019],
+    ["Teamleiter Entwicklung\nbei der Beispiel GmbH in Berlin ab 03/2020", "de", 2020],
+    [
+      "Software Engineer\nAcme Corp, a fintech startup in London, 2017 – 2019 (acquired by Globex in 2020).",
+      "en",
+      2017,
+    ],
+    ["Software Engineer\nJan 2019 – Present (4 years and 9 months).", "en", 2019],
+    ["Product Designer\ndesigned for acme 2019 – 2021", "en", 2019],
+    // A verb-shaped line its dates end is a header: self-employment, or an employer named like a
+    // verb on the date line under the title.
+    ["Owned and operated a bakery 2015 – 2019", "en", 2015],
+    ["Founded and ran a design studio 2015 – 2019", "en", 2015],
+    ["Founded startup 2017 – 2019", "en", 2017],
+    ["Founded and run a design studio since 2015", "en", 2015],
+    ["Software Engineer\nHired 2017 – 2019", "en", 2017],
+    ["Product Manager\nShipped 2015 – 2019", "en", 2015],
+    ["SOFTWARE ENGINEER\nHIRED 2015 – 2019", "en", 2015],
+  ])("still reads %j as a role", (lines, language, year) => {
+    const { roles } = check(`Jane Doe\nExperience\n${lines}`, { languages: [language] });
+    expect(roles).toMatchObject([{ start: { year } }]);
+    expect(roles[0]!.title).not.toBe("");
+  });
+
+  it.each([
+    "Senior Engineer 2017 – continuing",
+    "Engineer, Acme from 2017 onward",
+    "Engineer\nAcme from 2017 onward",
+    "Engineer, Acme\n2017 onwards",
+    // A verb-shaped header ended by "Present" is a role: sentences end in "since" or "onwards".
+    "Founded startup 2017 – Present",
+    "Consulted independently 2017 - Present",
+  ])("still reads %j as a current role", (lines) => {
+    expect(check(`Jane Doe\nExperience\n${lines}`).roles).toMatchObject([
+      { start: { year: 2017 }, current: true },
+    ]);
+  });
+});
+
 describe("the education fallback", () => {
   it("does not read bullets in the work history as degrees or schools", () => {
     const parsed = parse(
@@ -767,6 +927,9 @@ describe("new shapes stay linear", () => {
     ["dev hosts", "a.".repeat(N / 2)],
     ["contact spaces", `Jane Doe${" ".repeat(N)}x 1`],
     ["capital words", "VOLUNTEER WORK\n".repeat(N / 15)],
+    ["dated sentences", "Analysed 2017 - 2018 data for the board.\n".repeat(N / 41)],
+    ["a dated sentence of one line", `Analysed 2017 - 2018 ${"data . ".repeat(N / 7)}`],
+    ["leave brackets", `Career break ${"( ".repeat(N / 2)}2019 - 2020`],
   ])("%s", (_, text) => {
     expectFast(
       () =>

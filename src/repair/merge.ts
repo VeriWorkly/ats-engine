@@ -1,6 +1,6 @@
 import { escapeRegex, normalizeText, wordListRegex } from "../text/text.js";
 import { educationLevel } from "../parser/education.js";
-import { organisationWordsOf, titleWordsOf } from "../parser/experience.js";
+import { isLeave, organisationWordsOf, titleWordsOf } from "../parser/experience.js";
 import { isSectionHeading } from "../parser/sections.js";
 import { findDateRange, isPlausibleDate } from "../parser/dates.js";
 import { parseQuality } from "../parser/index.js";
@@ -164,9 +164,17 @@ const WHOLE_EMAIL =
 /**
  * Only what a phone number is written with, once normalised (digits of every script as ASCII,
  * every dash as "-"): digits, "+", spaces, brackets ("(+44)"), dots, dashes, slashes; then an
- * extension ("ext. 12", ", x12") apart.
+ * extension ("ext. 12", ", x12", "extension 12", "#12") apart.
  */
-const PHONE_SHAPE = /^([+\d\s().\-/]+?)(?:[\s,]*(?:ext\.?|x)\s*\d{1,6})?$/i;
+const PHONE_SHAPE = /^([+\d\s().\-/]+?)(?:[\s,]*(?:ext(?:ension)?\.?|x|#)\s*\d{1,6})?$/i;
+/**
+ * A toll-free number (800, 833, 844 … 888) short of its digits, the one place capitals stand for
+ * them: "1-800-FLOWERS", "1-800-GOT-JUNK". Not "(555) 010-2020 CELL", "2019-2021 AB", or a full
+ * number's extension or note ("1-800-555-0199 EXT 12", "1-800-555-0199 CELL").
+ */
+const VANITY = /^(?:\+?1[\s.-]?)?\(?8([03-8])\1\)?[\s.-]?[\dA-Z]+(?:[\s.-][\dA-Z]+)*$/;
+const isVanity = (text: string) =>
+  VANITY.test(text) && (/^[^A-Z]*/.exec(text)![0].match(/\d/g)?.length ?? 0) < 10;
 const MAX_PHONE_CHARS = 64;
 /** A label before a phone number ("Mobile:", "Tel.:") and a note after it ("(US)", "(mobile)"). */
 const PHONE_LABELS = /^\p{L}[\p{L}\s.]{0,20}:\s*|\s*\(\p{L}[\p{L}\s.]{0,20}\)$/gu;
@@ -265,11 +273,10 @@ export function mergeGrounded(
     // two or more ("978-3-16-148410-0" is an ISBN), and not a date range alone ("2017 - 2019";
     // "(11) 2019-2020" has more). libphonenumber's check would put its metadata in the `/ai` bundle.
     phone: (value: string) => {
-      const number = PHONE_SHAPE.exec(
-        normalizeText(value)
-          .replace(/[\p{Pd}−]/gu, "-")
-          .trim(),
-      )?.[1];
+      const text = normalizeText(value)
+        .replace(/[\p{Pd}−]/gu, "-")
+        .trim();
+      const number = PHONE_SHAPE.exec(isVanity(text) ? text.replace(/[A-Z]/g, "2") : text)?.[1];
       if (number === undefined || NOT_A_PHONE.test(number.trim())) return false;
       if (!/^(?:\D*\d){7,15}\D*$/.test(number) || !/\d{2}\D*$/.test(number)) return false;
       const range = findDateRange(number, policy.resumeParse, now)?.matched;
@@ -290,7 +297,8 @@ export function mergeGrounded(
     const roles = candidate.roles.flatMap((role, index) => {
       const title = ok(`roles[${index}].title`, role.title) ? role.title : "";
       const employer = ok(`roles[${index}].employer`, role.employer) ? role.employer : "";
-      if (!title && !employer) return [];
+      // Time off the parser dropped is no role either: "Parental leave", "Elternzeit".
+      if ((!title && !employer) || isLeave(title, employer, policy)) return [];
       const start = date(role.start);
       const current = isCurrent(role, start);
       return [{ title, employer, start, end: current ? null : date(role.end), current }];

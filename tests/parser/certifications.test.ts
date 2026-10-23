@@ -188,6 +188,10 @@ describe("a certification line becomes a row", () => {
     expect(
       certs("AWS Certified Developer – Associate (2019, renewed 2022; expires 2028)")[0],
     ).toMatchObject({ name: "AWS Certified Developer – Associate", issuer: "" });
+    expect(certs("CKA (2021; renewed 2024)")[0]).toMatchObject({
+      name: "CKA",
+      date: { year: 2024, month: null },
+    });
     expect(certs("AWS Certified Data Analytics – Specialty (2022, expires 2025)")[0]?.name).toBe(
       "AWS Certified Data Analytics – Specialty",
     );

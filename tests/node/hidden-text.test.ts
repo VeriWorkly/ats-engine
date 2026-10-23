@@ -23,15 +23,15 @@ const IMAGE = (x: number, y: number, w: number, h: number) =>
 const BORDER = "40 690 400 30 re 41 691 398 28 re f*";
 /**
  * `GS1` paints nothing, `GS2` paints at 8% opacity, `GS4` at 30%, `GS5` 50%, `GS7` 70%, `GS8` 80%,
- * `GS85` 85%, `GS9` 95%, `GS3` 99%; `GS40` fills and strokes at 40%. `Multiply`, `Screen`, `Darken`
- * and `Lighten` set that blend mode.
+ * `GS85` 85%, `GS9` 95%, `GS3` 99%; `GS40` fills and strokes at 40%. `Multiply`, `Screen`, `Darken`,
+ * `Lighten`, `HardLight`, `Luminosity` and `Overlay` set that blend mode.
  */
 const GSTATES =
   "/ExtGState<</GS1<</ca 0>>/GS2<</ca 0.08>>/GS3<</ca 0.99>>/GS4<</ca 0.3>>/GS5<</ca 0.5>>" +
   "/GS40<</ca 0.4/CA 0.4>>" +
   "/GS7<</ca 0.7>>/GS8<</ca 0.8>>/GS85<</ca 0.85>>/GS9<</ca 0.95>>" +
   "/Multiply<</BM/Multiply>>/Screen<</BM/Screen>>/Darken<</BM/Darken>>/Lighten<</BM/Lighten>>" +
-  "/HardLight<</BM/HardLight>>/Luminosity<</BM/Luminosity>>>>";
+  "/HardLight<</BM/HardLight>>/Luminosity<</BM/Luminosity>>/Overlay<</BM/Overlay>>>>";
 /** A 1×1 image of one grey (a byte) stretched over a box: it shows no words. */
 const BLANK = (x: number, y: number, w: number, h: number, grey = "\xFF") =>
   `q ${w} 0 0 ${h} ${x} ${y} cm BI /W 1 /H 1 /CS /G /BPC 8 ID ${grey} EI Q`;
@@ -186,6 +186,14 @@ describe("hidden text", () => {
     [
       "covered by a white box drawn by luminosity after it",
       `0 g ${line(700)} q /Luminosity gs 1 1 1 rg 40 690 400 30 re f Q`,
+    ],
+    [
+      "covered by a white box overlaid after it",
+      `0 g ${line(700)} q /Overlay gs 1 1 1 rg 40 690 400 30 re f Q`,
+    ],
+    [
+      "black on a black box hard-lit after it",
+      `0 g ${line(700)} q /HardLight gs 0 0 0 rg 40 690 400 30 re f Q`,
     ],
     // A blank image shows no words: invisible text over it is no scan's OCR layer.
     [

@@ -165,6 +165,13 @@ describe("a degree or years offered as alternatives is met by either", () => {
       "B.A. Hotel Restaurant Management, Cornell University, 2014",
     ],
     ["Bachelor's degree in ML", "B.A. History, Machine Learning Institute, 2014"],
+    // "CE" is civil engineering as often as computer engineering: it stands for neither.
+    ["Bachelor's degree in CE", "B.S. Computer Engineering, Boston University, 2014"],
+    ["Bachelor's degree in CE or EE", "B.S. Computer Engineering, Boston University, 2014"],
+    [
+      "Bachelor's degree in CE or EE",
+      "B.S. Electrical and Computer Engineering, Georgia Institute of Technology, 2014",
+    ],
   ])("does not read initials or a school's name as %j", (line, education) => {
     expect(one(line, resume({ roles: TEN_YEARS, education })).status).toBe("partial");
   });

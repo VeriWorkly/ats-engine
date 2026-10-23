@@ -2,7 +2,7 @@ import { isDatedLine, readsAsSentence } from "../checks/bullets.js";
 import { formatCertification, formatSpokenLanguage, ISCED_LABELS } from "../format/index.js";
 import { statesExpiry } from "../parser/certifications.js";
 import { degreeLevels } from "../parser/education.js";
-import { namesPlace } from "../parser/experience.js";
+import { namesPlace, roleDates } from "../parser/experience.js";
 import { isWrittenIn, sampleOf, showsAny } from "../locales/languages.js";
 import { canonicalLanguage, cefrLevel, compareCefr } from "../parser/languages.js";
 import { monthsOfExperience } from "../parser/tenure.js";
@@ -25,6 +25,7 @@ import {
   buildVocabulary,
   canonicalize,
   extractVocabulary,
+  isSkillItem,
   properNounTokens,
   resumeCapabilities,
 } from "./vocabulary.js";
@@ -721,6 +722,21 @@ function listsLanguages(line: string, matchers: Matchers, names: Record<string, 
   return named.size >= 2 || patternLanguages(body, matchers).length > 0;
 }
 
+/**
+ * Whether the rows of a "Languages" heading list a spoken language: an item that is no skill
+ * (`isSkillItem`). "Python, Go" or "C++, TypeScript" lists programming languages; "Klingon
+ * (fluent)" is a language the policy does not know.
+ */
+function listsSpoken(lines: readonly string[], km: AtsEnginePolicy["keywordMatch"]) {
+  return lines.some((line) =>
+    line
+      .replace(BULLET_PREFIX, "")
+      .replace(/\([^()]*\)|\[[^[\]]*\]/gu, " ")
+      .split(/[,;|/•·]/u)
+      .some((item) => !isSkillItem(item, km)),
+  );
+}
+
 /** Where one clause of a requirement ends: a comma, a semicolon, or the policy's "and" words. */
 const clauseBreak = memo(
   (rp: AtsEnginePolicy["resumeParse"]) =>
@@ -958,6 +974,12 @@ export function judgeRequirements(
       resumeLines.some((entry) =>
         listsLanguages(entry.line, matchers, km.requirements.languageNames),
       ));
+  // A "Languages" heading over programming languages or other skills lists no spoken language.
+  let spokenList: boolean | undefined;
+  const listsSpokenAny = () =>
+    (spokenList ??= sections.some(
+      (section) => section.kind === "languages" && listsSpoken(section.lines, km),
+    ));
   // The certification rows, each with what it names: a credential asked for is met by one held.
   // Expired, dated after today or in progress (`inProgress`), a row is not held, and says why.
   // Schema-defaulted; a hand-built policy may lack it.
@@ -1056,7 +1078,8 @@ export function judgeRequirements(
         Boolean((title && line.includes(title)) || (employer && line.includes(employer)))
       );
     };
-    const dated = work.flatMap((entry, at) => (isDatedLine(entry.line, policy, now) ? [at] : []));
+    // Only the lines the parser reads as roles: a leave or a dated sentence is none.
+    const dated = work.flatMap((entry, at) => (roleDates(entry.line, policy, now) ? [at] : []));
     const owner = new Array<number>(work.length).fill(-1);
     if (dated.length === parsed.roles.length) {
       // Each dated line in order, raised to the header lines above it that name the role.
@@ -1185,7 +1208,8 @@ export function judgeRequirements(
         // A spoken-language row decides, at the level asked; without one, a line naming it does;
         // failing both, the language the resume's sentences are written in, at `WRITTEN_LEVEL`:
         // only when no line names the language ("English: basic") and the resume lists no
-        // languages, which would have named it.
+        // spoken languages, which would have named it; a list of skills ("Languages: Python, Go")
+        // under any heading lists none.
         const row = parsed.spokenLanguages.find(
           (spoken) => canonicalLanguage(spoken.language, policy) === english,
         );
@@ -1194,7 +1218,7 @@ export function judgeRequirements(
           !row &&
           writtenIn.includes(english) &&
           !listsAny() &&
-          !sections.some((section) => section.kind === "languages") &&
+          !listsSpokenAny() &&
           !resumeLines.some((entry) => named.test(entry.line));
         const have = row?.cefr ?? (written ? WRITTEN_LEVEL : null);
         const level = asked.get(name) ?? null;

@@ -431,7 +431,14 @@ describe("the right to work, read for what the statement says", () => {
     ["US citizen, UK", "Must have the right to work in the UK"],
     ["Authorized to work in the US (Texas)", "Must have the right to work in the UK"],
     ["Right to work in Germany and France", "Must be authorized to work in the United States"],
-  ])("does not take a statement about another country as evidence: %s", (statement, ask) => {
+    // A place one moves to is not one worked in, and the US is not every country.
+    [
+      "Authorized to work in Canada; open to relocating to the US",
+      "Must be authorized to work in the United States",
+    ],
+    ["Authorized to work in the US", "Must have the right to work in Germany"],
+    ["Authorized to work in the US", "Must have the right to work in Ireland"],
+  ])("does not take a statement about another country as evidence: %s for %s", (statement, ask) => {
     expect(authorized(statement, ask)).toMatchObject({
       kind: "authorization",
       status: "unverifiable",
@@ -517,6 +524,13 @@ describe("the right to work, read for what the statement says", () => {
     ["Indian citizen; authorized to work in the US", "Must be a U.S. citizen"],
     ["British citizen, previously worked in the US", "US citizenship required"],
     ["Canadian citizen living in the US", "Must be a U.S. citizen"],
+    ["Irish citizen", "US citizen or green card holder"],
+    ["Latin American citizen", "Must be authorized to work in the United States"],
+    ["Indian citizen; open to relocating to the US", "Must be a U.S. citizen"],
+    [
+      "British citizen, previously worked in the US",
+      "Must be authorized to work in the United States",
+    ],
   ])(
     "meets a citizenship ask only with that country's citizenship: %s for %s",
     (statement, ask) => {
@@ -723,6 +737,9 @@ describe("a clearance, compared by its level", () => {
     ["Top Secret clearance, active; polygraph: no", "Top Secret clearance required"],
     ["Active TS/SCI clearance; no longer with Lockheed Martin", "TS/SCI clearance required"],
     ["Active Top Secret clearance; not active duty military", "Top Secret clearance required"],
+    ["Active Secret clearance; sponsorship needed: no", "Active Secret clearance required"],
+    ["Active TS/SCI clearance; no longer requires sponsorship", "TS/SCI clearance required"],
+    ["Active Secret clearance; not in use since 2024 but valid", "Secret clearance required"],
   ])("keeps a clearance beside a negation about something else: %s", (statement, ask) => {
     expect(cleared(statement, ask).status).toBe("met");
   });

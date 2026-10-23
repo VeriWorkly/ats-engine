@@ -1,8 +1,10 @@
 import { addCertifications, parseCertifications } from "../parser/certifications.js";
 import { educationLevel } from "../parser/education.js";
+import { isSkillItem } from "../matching/vocabulary.js";
 import { canonicalLanguage, cefrLevel, parseSpokenLanguages } from "../parser/languages.js";
 import { findPhone } from "../parser/phone.js";
 import { parseDocumentDate, saysOngoing } from "../parser/dates.js";
+import { isLeave } from "../parser/experience.js";
 import { finalizeParsed } from "../parser/record.js";
 import { sectionKind } from "../parser/sections.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
@@ -39,7 +41,8 @@ export function parseResumeDocument(
       for (const item of section.items) {
         const title = item.title.trim();
         const employer = item.employer.trim();
-        if (!title && !employer) continue;
+        // Time off is no role, as in printed text: "Parental leave", "Elternzeit".
+        if ((!title && !employer) || isLeave(title, employer, policy)) continue;
         const start = parseDocumentDate(item.start, rp, now);
         const end = parseDocumentDate(item.end, rp, now);
         // An end that is no date but an open end in any language read ("heute", "Current role").
@@ -86,9 +89,11 @@ export function parseResumeDocument(
       for (const item of section.items) {
         const language = item.language.trim();
         const key = canonicalLanguage(language, policy);
+        // A programming language or other skill ("Python", "C++") is no spoken language, as in text.
         if (
           !language ||
-          spokenLanguages.some((row) => canonicalLanguage(row.language, policy) === key)
+          spokenLanguages.some((row) => canonicalLanguage(row.language, policy) === key) ||
+          isSkillItem(language, policy.keywordMatch)
         )
           continue;
         const level = item.level?.trim() ?? "";
