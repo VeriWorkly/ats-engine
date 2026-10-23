@@ -28,7 +28,12 @@ jobs:
       # action: with nothing pending it returns early and sets no `hasChangesets` output.
       publish: ${{ steps.pending.outputs.publish }}
     steps:
+      # No token left in .git/config while `npm ci` runs dependency scripts: changesets/action
+      # pushes the Version Packages branch through the GitHub API with its own token
+      # (`push-with-git-cli` is off), so no step needs the checkout's.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - id: pending
         run: |
           if ls .changeset/*.md | grep -qv 'README.md$'; then publish=false; else publish=true; fi
@@ -54,7 +59,12 @@ jobs:
       id-token: write # npm trusted publishing and provenance, and the MCP Registry login
       actions: write # starts the GitHub Packages workflow
     steps:
+      # Tags and releases go through the GitHub API (changesets/action's own token; the 0.17.0
+      # run created both that way), the Packages run through `gh` with GH_TOKEN: no step needs a
+      # token in .git/config.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
