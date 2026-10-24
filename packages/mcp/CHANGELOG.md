@@ -1,5 +1,27 @@
 # @veriworkly/ats-engine-mcp
 
+## 0.15.0
+
+### Minor Changes
+
+- 4888dab: The audit's findings are fixed in the server and the engine it runs (engine 0.21.0).
+
+  - A saved job posting page (`job_path` to an HTML file) is read in the reader's child process, under the same 60 s limit as a resume, so a 19 MB page no longer blocks the server.
+  - A file the reader cannot open reports the reader's own reason ("InvalidPDFException: …"), and a malformed request to the child is answered instead of crashing it.
+  - **Breaking:** answers for the same file change where the engine now reads better: hidden text in Word styles, PDF layers and HTML style sheets is flagged and kept out of the match, the contact line and link paths add no keywords, bulleted role headers and LinkedIn certification rows are read, and a report says when a resume or a posting's requirements were cut.
+
+- a75165a: Mexico, Argentina, Colombia and Chile are read as their own regions (engine 0.21.0).
+
+  - `region` accepts `MX`, `AR`, `CO` and `CL`. Without it, a Spanish or Portuguese resume's region also comes from its header (an email's country domain, the country's name or one of its cities) when its phone has no country code.
+  - **Breaking:** answers for the same file change where the engine now reads it better: an honorific is left out of the name ("Dr. Miriam Hoffmann" reads "Miriam Hoffmann"), every Spanish role is read "Cargo en Empresa" once one role shows it, a city beside the dates under a stacked header is where, and a PDF's flush-right city over its dates is no longer a second column. On the reviewer's resumes, German, Hindi, Spanish and Portuguese go from 99.2–99.3% of fields right to 100%, and every pack is corrected by a linguist's review.
+
+### Patch Changes
+
+- Updated dependencies [4888dab]
+- Updated dependencies [a75165a]
+- Updated dependencies [a75165a]
+  - @veriworkly/ats-engine@0.21.0
+
 ## 0.14.0
 
 ### Minor Changes
