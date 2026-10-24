@@ -372,10 +372,40 @@ export function parseRoles(
   now: Date = new Date(),
 ): AtsParsedRole[] {
   const roles: AtsParsedRole[] = [];
+  // A resume repeats one layout: one role joined "en" before a legal form joins every role so.
+  const layout = byLayout(policy);
+  const shown =
+    layout !== null &&
+    given.some(
+      (line) =>
+        !BULLET.test(line) &&
+        [...line.matchAll(layout.shown)].some((match) => layout.word.test(match[0].trim())),
+    );
 
   const rp = policy.resumeParse;
-  const lines = joinWrappedDates(given, rp, now);
   const { verbOpener: opensWithVerb, titleWords, duration } = matchersOf(policy);
+  // The last such word in a line's first part, after a title word, then parts title from employer:
+  // "Especialista en Marketing en Cielo Azul Software, 2023" reads "… | Cielo Azul Software, 2023".
+  // Never when the rest of the line names the employer ("Ingeniera en Sistemas, Grupo Bimbo"), nor
+  // after a title that takes a field ("Ingeniero en Sistemas", `fieldTitleWords`).
+  const parted = (line: string) => {
+    if (BULLET.test(line)) return line;
+    const head = line.split(/[,|\t]|\s{2,}/u)[0]!;
+    const last = [...head.matchAll(layout!.loose)].at(-1);
+    if (last === undefined) return line;
+    const before = head.slice(0, last.index);
+    if (!titleWords.test(before) || layout!.fieldTitle.test(before)) return line;
+    const rest = line.slice(head.length);
+    const dates = findDateRange(rest, rp, now)?.matched ?? "";
+    const named = rest
+      .replace(dates, " ")
+      .split(/[,|\t]|\s{2,}/u)
+      .map((part) => part.trim())
+      .some((part) => /\p{L}{2}/u.test(part) && !isPlace(part, policy));
+    if (named) return line;
+    return `${line.slice(0, last.index)} | ${line.slice(last.index + last[0].length)}`;
+  };
+  const lines = joinWrappedDates(shown ? given.map(parted) : given, rp, now);
   // The employer the last employer line named, for the roles under it that name none.
   let group = "";
   // A header is a short, unbulleted line with no dates; a trailing full stop is allowed. A header in
@@ -410,13 +440,32 @@ export function parseRoles(
   const lettersIn = (text: string) => text.match(/\p{L}/gu)?.length ?? 0;
 
   // Every dated line, with the header text it carries itself (a place beside the dates is none).
+  const titled = (at: number) => titleWords.test(lines[at] ?? "");
   const anchors = lines.flatMap((line, index) => {
     const found = roleDates(line, policy, now);
     if (!found) return [];
     const remainder = line.replace(found.matched, " ").replace(duration, " ").trim();
-    // A country or state names where only after the dates; before them "Infosys, India" is the employer.
+    // A country or state names where only after the dates; before them "Infosys, India" is the
+    // employer. A city alone before them is where when the lines above hold the header, a whole
+    // one or a title and an employer stacked ("Paris    04/2024 – today"); with no header above it
+    // may be the employer ("Santander"). A description line above is no header ("Worked on …").
     const after = lettersIn(line.slice(0, line.indexOf(found.matched))) === 0;
-    const own = lettersIn(remainder) >= 3 && !isPlace(remainder, policy, after) ? remainder : "";
+    // A sentence's full stop, not a legal form's ("Piedra Blanca Energía S.A.").
+    const header = (at: number) =>
+      isHeader(lines[at]) &&
+      !lines[at]!.includes(":") &&
+      !/;\s*$/u.test(lines[at]!) &&
+      (!/\.\s*$/u.test(lines[at]!) || placesOf(rp).company.test(lines[at]!.trim()));
+    const headed =
+      header(index - 1) &&
+      (titled(index - 1)
+        ? !isSingle(lines[index - 1]!) || (header(index - 2) && !titled(index - 2))
+        : header(index - 2) && titled(index - 2));
+    const cityAlone = placesOf(rp).city.test(remainder);
+    const own =
+      lettersIn(remainder) >= 3 && !isPlace(remainder, policy, after) && !(headed && cityAlone)
+        ? remainder
+        : "";
     return [{ index, found, own }];
   });
   const ownAt = new Map(anchors.map((anchor) => [anchor.index, anchor.own]));
@@ -446,7 +495,6 @@ export function parseRoles(
   const belowVotes = halves.filter((a) => halfAt(a.index + 1, a.index)).length;
   const sides = belowVotes > aboveVotes ? [1, -1] : [-1, 1];
 
-  const titled = (at: number) => titleWords.test(lines[at] ?? "");
   // Dates first ("2020 - Present" over "Senior Engineer, Acme"): every bare date line then reads
   // the line below before the one above, which ends the previous role.
   const [first] = anchors;
@@ -578,6 +626,26 @@ export function parseRoles(
 
   return roles;
 }
+
+/**
+ * `layoutEmployerWords`, and what shows a resume uses them: one of them joining a title to its
+ * employer through `employerWords` ("Diseñadora UX en Acme S.L.").
+ */
+const byLayout = memo((policy: AtsEnginePolicy) => {
+  const rp = policy.resumeParse;
+  if (!rp.layoutEmployerWords.length) return null;
+  const loose = rp.layoutEmployerWords.join("|");
+  return {
+    shown: new RegExp(String.raw`\s(?:${rp.employerWords.join("|")})\s`, "giu"),
+    word: new RegExp(`^(?:${loose})$`, "iu"),
+    loose: new RegExp(String.raw`\s(?:${loose})\s`, "giu"),
+    /** A title that takes a field after the word ends the text before it: "Ingeniero". */
+    fieldTitle: new RegExp(
+      String.raw`(?<![\p{L}\p{M}])(?:${rp.fieldTitleWords.join("|") || "(?!)"})\s*$`,
+      "iu",
+    ),
+  };
+});
 
 /** A line that can name an employer above a role: no label (":"), not a lowercase sentence opening. */
 const employerLine = (line: string) => !line.includes(":") && /^[\p{Lu}\p{N}]/u.test(line);

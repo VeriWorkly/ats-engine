@@ -1,72 +1,9 @@
 {
-  "hand-written": [
-    "de/de-letterspaced: education.credential[0]",
-    "en-IN/en-in-national-phone: education.credential[1]"
-  ],
-  "generated": ["gen-28/pdf-2col: cert.expires[0]"],
+  "hand-written": [],
+  "generated": [],
   "generated-de": [],
-  "generated-fr": [
-    "gen-fr-01/text: education.credential[1]",
-    "gen-fr-01/docx: education.credential[1]",
-    "gen-fr-06/text: education.credential[0]",
-    "gen-fr-06/docx: education.credential[0]",
-    "gen-fr-09/text: education.credential[1]",
-    "gen-fr-09/docx: education.credential[1]",
-    "gen-fr-10/text: role.employer[0]",
-    "gen-fr-10/text: role.employer[1]",
-    "gen-fr-10/docx: role.employer[0]",
-    "gen-fr-10/docx: role.employer[1]",
-    "gen-fr-25/text: education.credential[0]",
-    "gen-fr-25/docx: education.credential[0]",
-    "gen-fr-26/text: role.title[0]",
-    "gen-fr-26/text: role.title[1]",
-    "gen-fr-26/text: role.title[2]",
-    "gen-fr-26/docx: role.title[0]",
-    "gen-fr-26/docx: role.title[1]",
-    "gen-fr-26/docx: role.title[2]",
-    "gen-fr-28/text: education.credential[0]",
-    "gen-fr-28/docx: education.credential[0]",
-    "gen-fr-30/text: education.credential[0]",
-    "gen-fr-30/docx: education.credential[0]"
-  ],
-  "generated-hi": [
-    "gen-hi-10/text: role.employer[0]",
-    "gen-hi-10/text: role.employer[1]",
-    "gen-hi-10/docx: role.employer[0]",
-    "gen-hi-10/docx: role.employer[1]",
-    "gen-hi-26/text: role.title[0]",
-    "gen-hi-26/text: role.title[1]",
-    "gen-hi-26/text: role.title[2]",
-    "gen-hi-26/docx: role.title[0]",
-    "gen-hi-26/docx: role.title[1]",
-    "gen-hi-26/docx: role.title[2]"
-  ],
-  "generated-es": [
-    "gen-es-01/text: role.title[1]",
-    "gen-es-01/text: role.employer[1]",
-    "gen-es-01/docx: role.title[1]",
-    "gen-es-01/docx: role.employer[1]",
-    "gen-es-05/text: role.title[0]",
-    "gen-es-05/text: role.employer[0]",
-    "gen-es-05/docx: role.title[0]",
-    "gen-es-05/docx: role.employer[0]",
-    "gen-es-19/text: role.title[1]",
-    "gen-es-19/text: role.employer[1]",
-    "gen-es-19/docx: role.title[1]",
-    "gen-es-19/docx: role.employer[1]",
-    "gen-es-22/text: role.title[0]",
-    "gen-es-22/text: role.employer[0]",
-    "gen-es-22/docx: role.title[0]",
-    "gen-es-22/docx: role.employer[0]",
-    "gen-es-24/text: role.title[0]",
-    "gen-es-24/text: role.title[1]",
-    "gen-es-24/docx: role.title[0]",
-    "gen-es-24/docx: role.title[1]"
-  ],
-  "generated-pt": [
-    "gen-pt-15/text: role.title[0]",
-    "gen-pt-15/text: role.employer[0]",
-    "gen-pt-15/docx: role.title[0]",
-    "gen-pt-15/docx: role.employer[0]"
-  ]
+  "generated-fr": [],
+  "generated-hi": [],
+  "generated-es": [],
+  "generated-pt": []
 }

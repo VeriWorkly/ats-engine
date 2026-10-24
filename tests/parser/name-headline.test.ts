@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_POLICY, check } from "../../src/index.js";
+import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 const name = (text: string) => check(text, DEFAULT_POLICY).parsed.name;
@@ -532,5 +533,43 @@ describe("a surname that is also a job title", () => {
         `${person}\nalex@example.com | (555) 123-4567\nExperience\nSoftware Engineer, Acme Corp\nJan 2020 - Present`,
       ),
     ).toBe(person);
+  });
+});
+
+// Review finding (2026-10-24): "Dr. Miriam Hoffmann" and "डॉ. अंजलि मिश्रा" kept the honorific.
+describe("an honorific before the name", () => {
+  it.each([
+    ["Dr. Jane Doe", "Jane Doe"],
+    ["Dr Jane Doe, PhD", "Jane Doe"],
+    ["Ms Mira Kestrel", "Mira Kestrel"],
+    ["DR. JANE DOE", "JANE DOE"],
+    ["Prof. Mira Kestrel", "Mira Kestrel"],
+  ])("reads %s as %s", (line, want) => {
+    expect(name(`${line}\njane.doe@example.com`)).toBe(want);
+  });
+
+  it.each([
+    // Initials, not an honorific, before mixed case.
+    ["MS Dhoni", "MS Dhoni"],
+    // One word would be left: the honorific stays.
+    ["Mr Kestrel", "Mr Kestrel"],
+    ["Drew Barrymore", "Drew Barrymore"],
+  ])("keeps %s", (line, want) => {
+    expect(name(`${line}\nms.dhoni@example.com`)).toBe(want);
+  });
+
+  it.each([
+    ["de", "Prof. Dr. med. Anna Schmidt", "Anna Schmidt"],
+    ["de", "Dipl.-Ing. Hans Müller", "Hans Müller"],
+    ["es", "Lic. Ana Sofía Ramírez", "Ana Sofía Ramírez"],
+    ["pt", "Dra. Inês Sousa", "Inês Sousa"],
+    ["fr", "Mme Claire Martin", "Claire Martin"],
+    ["fr", "M. Kestrel Dupont", "M. Kestrel Dupont"],
+    ["hi", "डॉ. अंजलि मिश्रा", "अंजलि मिश्रा"],
+  ])("reads a %s honorific: %s", (language, line, want) => {
+    const policy = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
+    expect(
+      check(`${line}\nperson@example.org`, policy, { languages: [language] }).parsed.name,
+    ).toBe(want);
   });
 });

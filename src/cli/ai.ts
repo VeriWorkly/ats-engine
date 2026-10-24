@@ -11,7 +11,9 @@ import {
   type AnalyzeInput,
   type AtsAiInsights,
   type AtsAiResult,
+  type AtsConvertedResume,
 } from "../ai/index.js";
+import type { AtsEnginePolicy } from "../policy/schema.js";
 import { openAiCompatible } from "../ai/openai-compatible.js";
 import type { FetchLike } from "../ai/http.js";
 import type { LlmProvider } from "../ai/provider.js";
@@ -195,11 +197,29 @@ export async function analyzeReport(
   return ai.analyze(input, { signal: AbortSignal.timeout(config.timeoutMs) });
 }
 
+/**
+ * A resume in a language no pack reads, read by the model into fields: every name, employer,
+ * title, school, skill, email and link it returns is checked against the file, and the rest blanked.
+ */
+export async function readWithAi(
+  config: AiConfig,
+  resumeText: string,
+  policy: AtsEnginePolicy,
+  fetch?: FetchLike,
+): Promise<AtsAiResult<AtsConvertedResume>> {
+  const ai = createAtsAi({
+    provider: createProvider(config, fetch),
+    routes: { convertResume: { model: config.model, maxTokens: config.maxTokens, retries: 1 } },
+    enginePolicy: policy,
+  });
+  return ai.convertResume({ resumeText }, { signal: AbortSignal.timeout(config.timeoutMs) });
+}
+
 /** What went wrong, and what to change. */
 export function describeAiError(error: unknown, config: AiConfig): string {
   const where = `${config.provider} (${config.model})`;
   if (!(error instanceof AtsAiError))
-    return `AI analysis failed: ${error instanceof Error ? error.message : String(error)}`;
+    return `The AI request failed: ${error instanceof Error ? error.message : String(error)}`;
   switch (error.code) {
     case "truncated":
       return `${where} ran out of output tokens. Raise --max-tokens (now ${config.maxTokens}).`;
@@ -209,9 +229,9 @@ export function describeAiError(error: unknown, config: AiConfig): string {
         "Raise --timeout, or try a faster model."
       );
     case "refused":
-      return `${where} declined to analyse this resume.`;
+      return `${where} declined this resume.`;
     case "invalid_output":
-      return `${where} did not return a usable analysis (${error.message}). Try another model.`;
+      return `${where} did not return a usable answer (${error.message}). Try another model.`;
     case "provider":
       if (error.status === 401 || error.status === 403)
         return `${where} rejected the API key (HTTP ${error.status}). Check the key for ${config.provider}.`;
@@ -219,7 +239,7 @@ export function describeAiError(error: unknown, config: AiConfig): string {
         return `${where} returned HTTP 404. Check the model id${config.baseUrl ? ` and --base-url` : ""}.`;
       return `${where} failed: ${error.message}`;
     default:
-      return `AI analysis failed: ${error.message}`;
+      return `The AI request failed: ${error.message}`;
   }
 }
 

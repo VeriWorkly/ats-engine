@@ -60,22 +60,22 @@ export const DE: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   degrees: {
     "2": word(String.raw`mittlere\s+reife|realschulabschluss|hauptschulabschluss`),
     "3": word(
-      String.raw`abitur|fachabitur|(?:allgemeine\s+|fachgebundene\s+)?hochschulreife|fachhochschulreife|(?:abgeschlossene\s+)?berufsausbildung|ausbildung\s+(?:zum|zur|als)|gesellen(?:brief|prüfung)`,
+      String.raw`abitur|fachabitur|matura|(?:berufs)?maturit[äa]t|berufsmatura|reifepr[üu]fung|efz|eidg(?:en[öo]ssisches|\.)\s+f[äa]higkeitszeugnis|(?:allgemeine\s+|fachgebundene\s+)?hochschulreife|fachhochschulreife|(?:abgeschlossene\s+)?berufsausbildung|ausbildung\s+(?:zum|zur|als)(?:\s+\p{L}[\p{L}-]{0,40})?|gesellen(?:brief|prüfung)`,
     ),
     // Diplom (FH) and Diplom (BA) are bachelor's equivalents, as at DQR level 6 are a master
     // craftsman (Meister, alone or compounded) and a state-certified technician or business
     // economist. The compound prefix is bounded to stay linear, and skips the Meister who hold no
     // credential: caretaker, mayor, champion.
     "6": word(
-      String.raw`dipl(?:om|\.)(?:-\p{L}+)?\.?\s*\((?:fh|ba)\)|\p{L}{0,30}(?<!haus|bürger|welt|europa|bundes|landes|kreis|stadt|vereins|kapell|konzert|ballett|schach)meister(?:in|prüfung|brief|titel)?|staatl(?:ich|\.)\s*gepr(?:üfte[nr]?|\.)\s+\p{L}+`,
+      String.raw`dipl(?:om|\.)(?:-\p{L}+)?\.?\s*\(?(?:fh|ba|hf)\)?(?!\p{L})|dipl(?:om|\.)[^\n,;|]{0,60}?\s\(?hf(?!\p{L})|eidg\.\s?dipl\.|eidg(?:en[öo]ssischer|\.)\s+fachausweis|\p{L}{0,30}(?<!haus|bürger|welt|europa|bundes|landes|kreis|stadt|vereins|kapell|konzert|ballett|schach)meister(?:in|prüfung|brief|titel)?|staatl(?:ich|\.)\s*gepr(?:üfte[nr]?|\.)\s+\p{L}+`,
     ),
     // The lookahead pair stops "Diplom-Informatiker (FH)" backtracking into a match here; the
     // optional dot stops "Dipl.-Ing. (FH)" matching as "Dipl.-Ing" before the dot.
     "7": word(
-      String.raw`dipl(?:om|\.)(?:-\p{L}+)?\.?(?![\p{L}-])(?!\.?\s*\((?:fh|ba)\))|magister|staatsexamen`,
+      String.raw`(?<!eidg\.\s?)dipl(?:om|\.)(?:-\p{L}+)?\.?(?![\p{L}-])(?!\.?\s*\(?(?:fh|ba|hf)(?!\p{L}))(?![^\n,;|]{0,60}?\s\(?hf(?!\p{L}))|magister|staatsexamen`,
     ),
     "8": word(
-      String.raw`promotion\s+(?:zum|zur|in)|promoviert|doktorarbeit|doktorgrad|dr\.[\s-]?(?:rer|phil|ing|med)\.`,
+      String.raw`promotion\s+(?:zum|zur|in|im|an\s+der)|promoviert|doktorarbeit|doktorgrad|dr\.[\s-]?(?:rer|phil|ing|med|jur|iur|oec|sc)\.`,
     ),
   },
 });
@@ -89,7 +89,7 @@ export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   phoneCountry: "IN",
   dateOrder: "DMY",
   cityNames:
-    "Mumbai|Bombay|Delhi|New Delhi|Bengaluru|Bangalore|Hyderabad|Chennai|Madras|Kolkata|Calcutta|Pune|Ahmedabad|Jaipur|Lucknow|Noida|Greater Noida|Gurugram|Gurgaon|Chandigarh|Kochi|Cochin|Coimbatore|Indore|Bhopal|Nagpur|Thiruvananthapuram|Trivandrum|Visakhapatnam|Mysuru|Mysore|Bhubaneswar|Vadodara|Surat|Patna|Mangaluru|Mangalore|Navi Mumbai|Thane|नई दिल्ली|दिल्ली|मुंबई|बेंगलुरु|बैंगलोर|हैदराबाद|चेन्नई|कोलकाता|पुणे|अहमदाबाद|जयपुर|लखनऊ|नोएडा|गुरुग्राम|गुड़गांव|चंडीगढ़|भोपाल|इंदौर|नागपुर|पटना|कानपुर|वाराणसी|सूरत|वडोदरा".split(
+    "Mumbai|Bombay|Delhi|New Delhi|Bengaluru|Bangalore|Hyderabad|Chennai|Madras|Kolkata|Calcutta|Pune|Ahmedabad|Jaipur|Lucknow|Noida|Greater Noida|Gurugram|Gurgaon|Chandigarh|Kochi|Cochin|Coimbatore|Indore|Bhopal|Nagpur|Thiruvananthapuram|Trivandrum|Visakhapatnam|Mysuru|Mysore|Bhubaneswar|Vadodara|Surat|Patna|Mangaluru|Mangalore|Navi Mumbai|Thane|Kanpur|Varanasi|Ghaziabad|Faridabad|Ludhiana|Guwahati|Dehradun|Ranchi|Raipur|Agra|नई दिल्ली|दिल्ली|मुंबई|बेंगलुरु|बैंगलोर|हैदराबाद|चेन्नई|कोलकाता|पुणे|अहमदाबाद|जयपुर|लखनऊ|नोएडा|गुरुग्राम|गुड़गांव|चंडीगढ़|भोपाल|इंदौर|नागपुर|पटना|कानपुर|वाराणसी|सूरत|वडोदरा".split(
       "|",
     ),
   // State and union territory codes written after a city ("Pune, MH"): a place, never a name.
@@ -122,6 +122,7 @@ export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "SK",
     "TN",
     "TR",
+    "TG",
     "TS",
     "UK",
     "UP",
@@ -140,16 +141,16 @@ export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     // unless a branch of engineering or a bracket follows; "LLM" undotted is a language model
     // unless it stands where a degree does beside a law school (see `LLM` above).
     "2": word(
-      String.raw`class\s+(?:x|10)(?:th)?|10th(?:\s+(?:standard|grade|class))?|matriculation|s\.?s\.?l\.?c\.?|s\.?s\.?c\.?|secondary\s+school\s+certificate`,
+      String.raw`class\s+(?:x|10)(?:th)?|10th(?!\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|rank|position|place))(?:\s+(?:standard|grade|class))?|xth|(?:std\.?|standard)\s+(?:x|10)(?:th)?|matric(?:ulation)?|s\.?s\.?l\.?c\.?|s\.?s\.?c\.?|secondary\s+school\s+certificate`,
     ),
     "3": word(
-      String.raw`class\s+(?:xii|12)(?:th)?|12th(?:\s+(?:standard|grade|class))?|h\.?s\.?c\.?|intermediate\s+(?:\(|board|education|exam)|higher\s+secondary|senior\s+secondary|pre[\s-]university|(?:ii\s+|2nd\s+)?p\.?u\.?c\.?`,
+      String.raw`class\s+(?:xii|12)(?:th)?|12th(?!\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|rank|position|place))(?:\s+(?:standard|grade|class))?|xiith|10\s*\+\s*2|(?:std\.?|standard)\s+(?:xii|12)(?:th)?|h\.?s\.?c\.?|intermediate\s+(?:\(|board|education|exam|from|in\s+(?:science|commerce|arts|mpc|bipc))|higher\s+secondary|senior\s+secondary|pre[\s-]university|(?:ii\s+|2nd\s+)?p\.?u\.?c\.?`,
     ),
     "6": word(
-      String.raw`b\.?\s?com\.?|b\.?c\.?a\.?|b\.?b\.?a\.?|b\.\s?e\.?|be(?=\s*\(|\s+(?:in\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\p{L}\p{M}]))|b\.?\s?pharm\.?|ll\.?b\.?`,
+      String.raw`b\.?\s?com\.?|b\.?c\.?a\.?|b\.?b\.?a\.?|b\.\s?e\.?|be(?=\s*\(|\s+(?:in\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\p{L}\p{M}]))|b\.?\s?pharm(?:a|acy)?\.?|ll\.?b\.?`,
     ),
     "7": word(
-      String.raw`m\.?\s?com\.?|m\.?c\.?a\.?|m\.\s?e\.?|pgdm|pgdba|post[\s-]?graduate\s+diploma|m\.?b\.?b\.?s\.?|ll\.m\.?|${LLM}`,
+      String.raw`m\.?\s?com\.?|m\.?c\.?a\.?|m\.\s?e\.?|pgdm|pgdba|post[\s-]?graduate\s+diploma|m\.?b\.?b\.?s\.?|m\.?\s?pharm(?:a)?\.?|m\.?\s?phil\.?|ll\.m\.?|${LLM}`,
     ),
   },
 });
@@ -174,15 +175,18 @@ export const FR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
   // "Bac+3" (licence, BUT) bachelor's, "Bac+5" (master, diplôme d'ingénieur) master's, "Bac+8"
   // doctorate. Tried highest first, so "Bac+5" is never read as the baccalauréat. "Bac+N" is in
   // the `fr` pack too. A baccalauréat named for its field is Québec's bachelor's (`fr` pack).
-  // "BUT" only with its speciality, since "but" is a French and an English word.
+  // "BUT" only before its speciality, since "but" is a French and an English word; the speciality
+  // is the field, not the credential.
   degrees: {
-    "2": word(String.raw`brevet(?:\s+des\s+coll[èe]ges)?|dnb`),
+    "2": word(
+      String.raw`brevet(?:\s+des\s+coll[èe]ges)?(?!\s+(?:de\s+technicien|d['’]|professionnel))|dnb`,
+    ),
     "3": word(
       String.raw`baccalaur[ée]at(?!\s+en\s+\p{L})(?:\s+(?:g[ée]n[ée]ral|technologique|professionnel|s|es|l|stmg|sti2d))?|bac(?!\s*\+|\s+en\s+\p{L})(?:\s+(?:g[ée]n[ée]ral|technologique|pro(?:fessionnel)?|s|es|l|stmg|sti2d))?|cap|bep`,
     ),
-    "5": word(String.raw`bts|dut|deug|bac\s*\+\s*2`),
+    "5": word(String.raw`bts|dut|deug|bac\s*\+\s*2|brevet\s+de\s+technicien\s+sup[ée]rieur`),
     "6": word(
-      String.raw`b\.u\.t\.|but\s+(?:informatique|gea|tc|mmi|geii|gmp|r&t|rt|qlio|chimie|g[ée]nie\s+\p{L}+|techniques\s+de\s+commercialisation|gestion\s+des\s+entreprises)|bac\s*\+\s*3`,
+      String.raw`b\.u\.t\.|but(?=\s+(?:informatique|gea|tc|mmi|geii|gmp|r&t|rt|qlio|chimie|g[ée]nie\s+\p{L}+|techniques\s+de\s+commercialisation|gestion\s+des\s+entreprises)(?![\p{L}\p{M}]))|bac\s*\+\s*3`,
     ),
     "7": word(String.raw`bac\s*\+\s*5|dea|dess|grande\s+[ée]cole`),
     "8": word(String.raw`bac\s*\+\s*8`),
@@ -248,6 +252,11 @@ export const ES: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "5": word(
       String.raw`ciclo\s+(?:formativo\s+de\s+)?grado\s+superior|fp\s+(?:de\s+)?grado\s+superior|t[ée]cnico\s+superior`,
     ),
+    "6": word(
+      // Not "Diplomado en": a Latin American resume with no country signal is read in Spain, and
+      // there a diplomado is a course.
+      String.raw`graduad[oa]\s+en(?!\s+(?:educaci[óo]n\s+)?secundaria)|diplomatura`,
+    ),
   },
 });
 
@@ -275,8 +284,156 @@ export const BR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "ats-v2.format.photo": { weight: 0 },
   },
   degrees: {
-    "2": word(String.raw`ensino\s+fundamental`),
-    "3": word(String.raw`ensino\s+m[ée]dio(?:\s+t[ée]cnico)?|curso\s+t[ée]cnico`),
+    "2": word(String.raw`ensino\s+fundamental|(?:1\s?[º°o]|primeiro)\s+grau`),
+    "3": word(
+      String.raw`ensino\s+m[ée]dio(?:\s+t[ée]cnico)?|curso\s+t[ée]cnico|(?:2\s?[º°o]|segundo)\s+grau`,
+    ),
+  },
+});
+
+/**
+ * Mexico: day-first dates, state codes after a city ("Monterrey, N.L."), Mexican schooling
+ * (secundaria is lower secondary, preparatoria upper); a date of birth or a photo is customary and
+ * not judged.
+ */
+export const MX: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "MX",
+  name: "México",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "MX",
+  dateOrder: "DMY",
+  // CDMX is the city itself, so it is in `cityNames`.
+  regionCodes: [
+    String.raw`N\.\s?L\.`,
+    String.raw`D\.\s?F\.`,
+    String.raw`Edo\.\s?(?:de\s)?M[ée]x\.`,
+    String.raw`(?:Jal|Qro|Gto|Pue|Yuc|Chih|Coah|Son|Ver|Mich|Oax|Tamps|Sin|Ags|Hgo|Tab|Dgo|Zac|Mor|Gro|Chis|Nay|Camp|Tlax)\.`,
+    String.raw`B\.\s?C\.(?:\s?S\.)?`,
+    String.raw`Q\.\s?Roo\.?`,
+    String.raw`S\.\s?L\.\s?P\.`,
+  ],
+  cityNames: (
+    "Ciudad de México|CDMX|Guadalajara|Monterrey|Puebla|Querétaro|Tijuana|Zapopan|Mérida|" +
+    "Aguascalientes|San Luis Potosí|Toluca|Chihuahua|Hermosillo|Saltillo|Mexicali|Culiacán|Cancún|" +
+    "Morelia|Ciudad Juárez|San Pedro Garza García|Naucalpan|Oaxaca|Veracruz"
+  ).split("|"),
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 0 },
+    "ats-v2.format.photo": { weight: 0 },
+  },
+  organisationWords: [
+    String.raw`s\.\s?a\.\s?b\.\s+de\s+c\.\s?v\.`,
+    String.raw`s\.?\s?a\.?\s+de\s+c\.?\s?v\.?`,
+    String.raw`s\.\s?de\s+r\.\s?l\.(?:\s+de\s+c\.\s?v\.)?`,
+    String.raw`s\.\s?a\.\s?p\.\s?i\.\s+de\s+c\.\s?v\.`,
+  ],
+  degrees: {
+    "2": word(String.raw`secundaria`),
+    "3": word(
+      String.raw`preparatoria|prepa|bachillerato(?:\s+(?:general|tecnol[óo]gico))?|profesional\s+t[ée]cnico(?:\s+bachiller)?`,
+    ),
+    "5": word(String.raw`t[ée]cnico\s+superior\s+universitario|tsu`),
+  },
+});
+
+/**
+ * Argentina: day-first dates, Argentine schooling (secundario and polimodal are upper secondary, a
+ * tecnicatura short-cycle tertiary); a date of birth or a photo is customary and not judged. CABA
+ * and "Bs. As." are Buenos Aires itself ("Arcor, CABA"), so they are cities; PBA is its province.
+ */
+export const AR: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "AR",
+  name: "Argentina",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "AR",
+  dateOrder: "DMY",
+  regionCodes: ["PBA"],
+  cityNames: [
+    ..."Buenos Aires|Córdoba|Rosario|Mendoza|La Plata|Mar del Plata|San Miguel de Tucumán|Tucumán|Salta|Neuquén|Bahía Blanca|Vicente López|Santa Fe|Corrientes|Posadas|San Isidro|Capital Federal|CABA".split(
+      "|",
+    ),
+    String.raw`C\.A\.B\.A\.`,
+    String.raw`Bs\.\s?As\.`,
+  ],
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 0 },
+    "ats-v2.format.photo": { weight: 0 },
+  },
+  degrees: {
+    "3": word(
+      String.raw`secundari[oa](?:\s+completo)?|polimodal|bachiller(?:ato)?(?:\s+con\s+orientaci[óo]n)?`,
+    ),
+    "5": word(String.raw`tecnicatura|t[ée]cnic[oa]\s+superior`),
+    // A four-year teacher training is a first tertiary degree.
+    "6": word(String.raw`profesorado(?=\s+(?:de|en|para)\s)`),
+  },
+});
+
+/**
+ * Colombia: day-first dates, "D.C." after Bogotá, Colombian schooling (a bachiller has finished
+ * upper secondary; técnico profesional and tecnólogo are short-cycle tertiary, often from the
+ * SENA); a date of birth or a photo is customary and not judged.
+ */
+export const CO: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "CO",
+  name: "Colombia",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "CO",
+  dateOrder: "DMY",
+  regionCodes: [String.raw`D\.\s?C\.`],
+  cityNames: [
+    // "Bogotá D.C." without its comma.
+    String.raw`Bogot[áa](?:\s+D\.\s?C\.)?`,
+    ..."Medellín|Medellin|Cali|Barranquilla|Cartagena|Bucaramanga|Manizales|Cúcuta|Ibagué|Santa Marta|Villavicencio|Montería|Neiva|Envigado|Itagüí|Chía".split(
+      "|",
+    ),
+  ],
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 0 },
+    "ats-v2.format.photo": { weight: 0 },
+  },
+  schoolWords: ["sena"],
+  degrees: {
+    "3": word(String.raw`bachiller(?:\s+(?:acad[ée]mico|t[ée]cnico|comercial))?|bachillerato`),
+    "5": word(
+      String.raw`t[ée]cnic[oa]\s+profesional|tecn[óo]log[oa](?=\s+en\s)|tecnolog[íi]a\s+en`,
+    ),
+  },
+});
+
+/**
+ * Chile: day-first dates, Chilean schooling (enseñanza media is upper secondary, a técnico de
+ * nivel superior short-cycle tertiary, from INACAP or Duoc UC); a date of birth or a photo is
+ * not judged.
+ */
+export const CL: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
+  id: "CL",
+  name: "Chile",
+  status: "community",
+  maintainers: [],
+  phoneCountry: "CL",
+  dateOrder: "DMY",
+  regionCodes: ["RM"],
+  cityNames: (
+    "Santiago|Santiago de Chile|Valparaíso|Viña del Mar|Concepción|Antofagasta|La Serena|Temuco|" +
+    "Puerto Montt|Rancagua|Talca|Arica|Iquique|Calama|Chillán|Osorno|Las Condes|Vitacura"
+  ).split("|"),
+  rules: {
+    "ats-v2.privacy.dateOfBirth": { weight: 0 },
+    "ats-v2.format.photo": { weight: 0 },
+  },
+  schoolWords: ["liceo", "inacap", String.raw`duoc(?:\s+uc)?`],
+  // "SpA" is Chile's most common company form.
+  organisationWords: ["spa", String.raw`e\.\s?i\.\s?r\.\s?l\.`],
+  degrees: {
+    "2": word(String.raw`ense[ñn]anza\s+b[áa]sica`),
+    "3": word(
+      String.raw`(?:licencia\s+de\s+)?ense[ñn]anza\s+media|(?:cuarto|4(?:\s?[°º]|to)?)\s+(?:a[ñn]o\s+)?medio`,
+    ),
+    "5": word(String.raw`t[ée]cnico\s+(?:de\s+nivel\s+superior|universitario)`),
   },
 });
 

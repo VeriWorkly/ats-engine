@@ -67,8 +67,8 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "em",
   ],
   sections: {
-    experience: String.raw`^(?:experi${e}ncias?(?:\s+(?:profissionais?|relevantes?))?|hist${o}rico\s+profissional|trajet${o}ria\s+profissional|atua${c}${a}o\s+profissional|est${a}gios?)`,
-    education: String.raw`^(?:forma${c}${a}o(?:\s+(?:acad${e}mica|profissional|complementar))?|educa${c}${a}o|escolaridade|estudos)`,
+    experience: String.raw`^(?:experi${e}ncias?(?:\s+(?:profissionais?|relevantes?))?|hist${o}rico\s+profissional|trajet${o}ria\s+profissional|atua${c}${a}o\s+profissional|est${a}gios?|percurso\s+profissional)`,
+    education: String.raw`^(?:forma${c}${a}o(?:\s+(?:acad${e}mica|profissional|complementar))?|educa${c}${a}o|escolaridade|estudos|habilita${c}${o}es(?:\s+(?:liter${a}rias|acad${e}micas))?|percurso\s+(?:acad${e}mico|escolar|formativo))`,
     skills: String.raw`^(?:principais\s+compet${e}ncias|habilidades(?:\s+(?:t${e}cnicas|profissionais))?|compet${e}ncias(?!\s+lingu${i}sticas)(?:\s+(?:t${e}cnicas|profissionais))?|conhecimentos(?:\s+(?:t${e}cnicos|em\s+inform${a}tica))?|ferramentas|tecnologias|inform${a}tica)`,
     projects: String.raw`^(?:projetos(?:\s+(?:pessoais|profissionais|acad${e}micos|relevantes))?)`,
     certifications: String.raw`^(?:certifica${c}${o}es|certificados|cursos(?:\s+(?:e\s+certifica${c}${o}es|complementares|extracurriculares))?)`,
@@ -77,11 +77,14 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   },
   // "Nativo" and "língua materna" are C2; "fluente" and "avançado" C1.
   languageLevels: {
+    [String.raw`profici${e}ncia\s+profissional\s+completa`]: "C2",
+    [String.raw`profici${e}ncia\s+profissional\s+limitada`]: "B1",
+    [String.raw`profici${e}ncia\s+profissional`]: "C1",
     [String.raw`(?:l${i}ngua\s+)?materna|nativ[oa]`]: "C2",
     [String.raw`fluente|avan${c}ad[oa]|biling[uü]e`]: "C1",
-    [String.raw`intermedi${a}ri[oa][\s-]avan${c}ad[oa]`]: "B2",
-    [String.raw`intermedi${a}ri[oa]`]: "B1",
-    [String.raw`b${a}sic[oa]`]: "A2",
+    [String.raw`(?:intermedi${a}ri[oa]|interm${e}di[oa])[\s-]avan${c}ad[oa]`]: "B2",
+    [String.raw`intermedi${a}ri[oa]|interm${e}di[oa]`]: "B1",
+    [String.raw`b${a}sic[oa]|elementar`]: "A2",
     [String.raw`iniciante`]: "A1",
   },
   credentialWords: {
@@ -131,6 +134,13 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "até hoje",
     "hoje",
     "em andamento",
+    "o presente",
+    "a presente data",
+    "à data",
+    "actual",
+    "actualmente",
+    "em curso",
+    "cursando",
   ],
   // "Março 2019 a junho 2021", "de 2019 até 2021".
   rangeWords: ["a", "até"],
@@ -145,10 +155,43 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   ],
   durationUnits: ["ano", "anos", "mês", "mes", "meses"],
   nameLabels: ["nome", String.raw`nome\s+completo`],
+  namePrefixes: [
+    String.raw`dra\.?`,
+    String.raw`profa?\.`,
+    String.raw`eng\.?[ºª]?`,
+    String.raw`sr[a]?\.`,
+  ],
   // "Analista na Exemplo Ltda.": "na", "no" and "em" part a title from its employer only where a
   // legal form ends the company within six words and before a comma.
   employerWords: [
-    String.raw`(?:na|no|em)(?=\s+(?:[^\s,|]+\s+){0,6}?(?:ltda\.?|lda\.?|s\.\s?a\.|eireli)(?=[\s,|]|$))`,
+    String.raw`(?:na|no|em)(?=\s+(?:[^\s,|]+\s+){0,6}?(?:ltda\.?|lda\.?|s\.\s?a\.|s\/a|eireli)(?=[\s,|]|$))`,
+  ],
+  layoutEmployerWords: ["na", "no", "em"],
+  // "Engenheiro em Computação", "Bacharel em Direito": a field follows these, never an employer.
+  fieldTitleWords: [
+    "engenheir[oa]",
+    "bacharel",
+    "t[ée]cnic[oa]",
+    "tecn[óo]log[oa]",
+    "especialista",
+    "mestre",
+    "doutor(?:a)?",
+    "graduad[oa]",
+    "licenciad[oa]",
+    "formad[oa]",
+    "p[óo]s-graduad[oa]",
+  ],
+  // "Engenharia Química, Universidade Federal do Rio de Janeiro": a bacharelado; postgraduate and
+  // technologist programs name themselves (mestrado, MBA, tecnólogo).
+  universityWords: ["universidade"],
+  courseWords: [
+    "curso",
+    String.raw`interc${a}mbio`,
+    "semestre",
+    String.raw`extens${a}o`,
+    "workshop",
+    "certificado",
+    String.raw`semin${a}rio`,
   ],
   // Each with its feminine: "engenheira", "desenvolvedora", "gerente".
   titleWords: [
@@ -158,6 +201,14 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "analista",
     "gerente",
     "coordenador(?:a)?",
+    "administrador(?:a)?",
+    "gestor(?:a)?",
+    "executiv[oa]",
+    "operador(?:a)?",
+    "representante",
+    String.raw`secret${a}ri[oa]`,
+    String.raw`m${e}dic[oa]`,
+    "advogad[oa]",
     "diretor(?:a)?",
     "supervisor(?:a)?",
     "arquitet[oa]",
@@ -178,6 +229,11 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "trainee",
     "aprendiz",
     "cientista",
+    "pesquisador(?:a)?",
+    "investigador(?:a)?",
+    "atendente",
+    "contabilista",
+    "encarregad[oa]",
   ],
   schoolWords: [
     "universidade",
@@ -186,6 +242,8 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "escola",
     String.raw`col${e}gio`,
     String.raw`centro\s+universit${a}rio`,
+    // Foundations that grant degrees: Fundação Getulio Vargas, Fundação Dom Cabral, FAAP.
+    String.raw`funda${c}${a}o`,
     "fatec",
     "etec",
     "senai",
@@ -213,7 +271,13 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     String.raw`h${i}brido`,
     String.raw`trabalho\s+remoto`,
   ],
-  organisationWords: [String.raw`ltda\.?`, String.raw`s\.\s?a\.`, "eireli", "epp"],
+  organisationWords: [
+    String.raw`ltda\.?`,
+    String.raw`s\.\s?a\.`,
+    String.raw`s\/a`,
+    "eireli",
+    "epp",
+  ],
   contentLineVerbs: [
     "desenvolvi",
     "liderei",
@@ -317,10 +381,10 @@ export const pt: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   // Brazil's degrees by name, read in Portugal as well; schooling below them is the BR region's.
   degrees: {
     "6": word(
-      String.raw`bacharel(?:ado)?|licenciatura|gradua${c}${a}o(?=\s+(?:em|de)\s)|tecn${o}logo(?=\s+(?:em|de)\s)`,
+      String.raw`bacharel(?:ado|ato)?|licenciatura|gradua${c}${a}o(?=\s+(?:em|de)\s)|tecn${o}logo(?=\s+(?:em|de)\s)`,
     ),
     "7": word(String.raw`mestrado|p${o}s[\s-]gradua${c}${a}o|especializa${c}${a}o|mba`),
-    "8": word(String.raw`doutorado|ph\.?\s?d\.?`),
+    "8": word(String.raw`doutorado|doutoramento|ph\.?\s?d\.?`),
   },
   alternationWords: ["ou"],
   stopwords: [

@@ -29,6 +29,13 @@ const LLM_DEGREE = String.raw`llm(?=${DEGREE_POSITION}|\s+in\s)(?:(?=[^\n]{0,80}
 const JD_DEGREE = String.raw`j\.\s?d\.?(?=${DEGREE_POSITION})|j\.d\.?(?:(?=[^\n]{0,80}?${LAW_CONTEXT})|(?<=${LAW_CONTEXT}[^\n]{0,80}j\.d\.?))`;
 
 /** The community policy's parsing vocabulary. Month names and "still here" words are the schema's defaults. */
+/**
+ * Degrees in the languages no built-in pack reads (Italian, Polish, Russian, Swedish, Dutch), so a
+ * resume read with AI help, or a degree an English resume carries from abroad, has its level.
+ * Edged by letters, not `\b`, which does not see Cyrillic as a word.
+ */
+const other = (words: string) => String.raw`(?<![\p{L}\p{M}])(?:${words})(?![\p{L}\p{M}])`;
+
 export const DEFAULT_RESUME_PARSE = {
   // Experience headings of every field (a nurse's "Clinical Experience", a fresher's
   // "Internships"). A heading the policy does not know is read as part of the section above it,
@@ -115,16 +122,17 @@ export const DEFAULT_RESUME_PARSE = {
   // forms stay unconditional. "Associate" and "certificate" alone are not degrees; "Master Data
   // Management" is a discipline. "Secondary School Certificate" is India's Class X (level 2, the
   // IN region's), so neither it nor "High School (Class X)" is claimed at level 3.
+  // B.Com and M.Com are read with no region: Australia, South Africa and Ireland write them too.
   // J.D. and M.D. are level 7 in ISCED 2011, matched dotted only ("MD" is Maryland, "JD" a job
   // description); "MFA" undotted is multi-factor authentication.
   // Keyed by ISCED 2011 level. Level 4 is any diploma or certificate that is not a school one,
   // so its pattern steps around level 3's.
   degrees: {
-    "3": String.raw`(?:\b|^)((?:high\s+school(?!\s*\(\s*class\s+(?:x|10)(?:th)?(?![a-z]))|secondary\s+school(?!\s+certificate))(?:\s+(?:diploma|certificate))?|g\.?e\.?d\.?|a[\s-]levels?)(?![\p{L}\p{M}])`,
+    "3": String.raw`(?:\b|^)((?:high\s+school(?!\s*\(\s*class\s+(?:x|10)(?:th)?(?![a-z]))|secondary\s+school(?!\s+certificate))(?:\s+(?:diploma|certificate))?|g\.?e\.?d\.?|a[\s-]levels?)(?![\p{L}\p{M}])|${other(String.raw`diploma\s+di\s+maturit[àa]|maturit[àa]|аттестат|świadectwo\s+dojrzałości|matura|gymnasieexamen|havo|vwo`)}`,
     "4": String.raw`(?:\b|^)((?<!(?:high|secondary)\s+school\s+)diploma|(?:graduate\s+)?certificate\s+(?:in|of)\b)(?![\p{L}\p{M}])`,
     "5": String.raw`(?:\b|^)(associate(?:'?s)?\s+(?:degree|of\s+[a-z]+)|a\.a\.s?\.?|(?<!,\s*)aas?(?=\s+(?:in|of)\b))(?![\p{L}\p{M}])`,
-    "6": String.raw`(?:\b|^)(bachelor(?:'?s)?(?:\s+of\s+[a-z]+)?|b\.s\.c?\.?|b\.?sc\.?|b\.a\.|b\.?eng\.?|b\.?tech\.?|b\.?b\.?a\.?|b\.?f\.?a\.?|b\.\s?ed\.?|ll\.?b\.?|b[as])(?![\p{L}\p{M}])`,
-    "7": String.raw`(?:\b|^)(${JD_DEGREE}|juris\s+doctor|m\.\s?d\.|m\.\s?ed\.?|m\.f\.a\.|ll\.m\.?|${LLM_DEGREE}|(?<!scrum\s)master(?!\s+data(?![a-z]))(?:'?s)?(?:\s+of\s+[a-z]+)?|m\.s\.c?\.?|m\.?sc\.?|m\.a\.|m\.?eng\.?|m\.?b\.?a\.?|m\.?tech\.?|(?<=,\s*)m[as](?=${SUBJECT_AFTER})(?!${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER})|(?<!,\s*|\d\s?)m[as](?!-|\.\s+\p{L}|${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER}))(?![\p{L}\p{M}])`,
-    "8": String.raw`(?:\b|^)(doctorate|ph\.?d\.?|d\.?phil\.?)(?![\p{L}\p{M}])`,
+    "6": String.raw`(?:\b|^)(bachelor(?:'?s)?(?:\s+of\s+[a-z]+)?|b\.s\.c?\.?|b\.?sc\.?|b\.a\.|b\.?eng\.?|b\.?tech\.?|b\.?b\.?a\.?|b\.?f\.?a\.?|b\.\s?ed\.?|b\.\s?com\.?|bcom|ll\.?b\.?|b[as])(?![\p{L}\p{M}])|${other(String.raw`laurea(?:\s+triennale)?|licencjat|бакалавр|kandidatexamen|hbo[\s-]bachelor`)}`,
+    "7": String.raw`(?:\b|^)(${JD_DEGREE}|juris\s+doctor|m\.\s?d\.|m\.\s?ed\.?|m\.f\.a\.|ll\.m\.?|${LLM_DEGREE}|(?<!scrum\s)master(?!\s+data(?![a-z]))(?:'?s)?(?:\s+of\s+[a-z]+)?|m\.s\.c?\.?|m\.?sc\.?|m\.a\.|m\.?eng\.?|m\.?b\.?a\.?|m\.?tech\.?|m\.\s?com\.?|mcom|(?<=,\s*)m[as](?=${SUBJECT_AFTER})(?!${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER})|(?<!,\s*|\d\s?)m[as](?!-|\.\s+\p{L}|${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER}))(?![\p{L}\p{M}])|${other(String.raw`laurea\s+magistrale|laurea\s+specialistica|магистр|magisterexamen|masterexamen|doctoraal`)}`,
+    "8": String.raw`(?:\b|^)(doctorate|ph\.?d\.?|d\.?phil\.?)(?![\p{L}\p{M}])|${other(String.raw`dottorato(?:\s+di\s+ricerca)?|кандидат\s+наук|доктор\s+наук|doktorat|doktorsexamen|doctoraat`)}`,
   },
 };

@@ -11,19 +11,24 @@ const { exports, version } = JSON.parse(readFileSync("package.json", "utf8"));
 const BUDGETS = {
   // Core: policy data (word lists, place names, clearance levels) grows with each reading fix.
   // 111: the 0.17.0 audit fixes took it to 109.1, and 0.18.0's leave words, dated-sentence and
-  // tagline-name reading to 110.1.
-  ".": 111,
+  // tagline-name reading to 110.1. 112: 0.21.0's honorifics, region from the header, the
+  // "Cargo en Empresa" layout and cities beside dates took it to 111.6. 113: the other languages'
+  // words for a current role (reading with AI help) and `universityWords` took it to 112.3.
+  ".": 113,
   "./document": 3,
   "./format": 1.5,
   // Entity decoding, page-furniture skipping, JSON-LD requirements, hidden-element rules.
   "./job": 3.8,
   // Policy data and every built-in pack. 87: the Spanish and Portuguese packs, the Spain, Brazil
-  // and Portugal regions, the city lists (decision D1) and LinkedIn headings added 9 KB; each
-  // new pack raises it again.
-  "./locales": 87,
+  // and Portugal regions, the city lists (decision D1) and LinkedIn headings added 9 KB. 89: the
+  // Mexico, Argentina, Colombia and Chile regions and the honorifics added 1.5 KB. 92: a linguist's
+  // review of every pack added 3 KB of headings, titles, degrees and levels; each new pack raises
+  // it again.
+  "./locales": 92,
   // Core policy data plus redaction; room for the next policy fixes. 79: the 0.17.0 audit fixes'
-  // policy data took it to 75.1, and 0.18.0's leave words and phone shapes to 78.0.
-  "./ai": 79,
+  // policy data took it to 75.1, and 0.18.0's leave words and phone shapes to 78.0. 80: 0.21.0's
+  // policy data and `convertedToDocument` took it to 79.4.
+  "./ai": 80,
   // Streamed, size-capped response reading. 2.7: errors sent with HTTP 200, `retry-after`, and a
   // timeout that holds when a host's fetch ignores the signal took them to 2.6.
   "./ai/openai-compatible": 2.7,
@@ -40,7 +45,8 @@ const BUDGETS = {
  * `@__PURE__`; without the marks a bundler keeps them and zod's JSON Schema writer with them.
  */
 const NAMED = [
-  ["./locales", ["withLocales"], 50.5],
+  // 51: 0.21.0's new policy and pack fields.
+  ["./locales", ["withLocales"], 51],
   [
     "./ai",
     ["AtsAiError", "DEFAULT_ANALYZE_PROMPT", "DEFAULT_CONVERT_PROMPT", "DEFAULT_REPAIR_PROMPT"],

@@ -209,6 +209,39 @@ describe("an employer named like a city", () => {
     const text = ["Jordan Blake", "jordan.blake@example.com", "Experience", ...lines].join("\n");
     expect(check(text, policy, { now: NOW }).parsed.roles[0]?.employer).toBe(employer);
   });
+
+  // With the employer and title stacked above, a city beside the dates is where (review,
+  // 2026-10-24: "Paris    04/2024 à aujourd'hui" was read as the employer).
+  it.each([
+    [
+      "fr",
+      [
+        "Ciel Bleu Logiciels SARL",
+        "Analyste métier",
+        "Paris    04/2024 à aujourd'hui",
+        "• Réduction de la clôture mensuelle",
+      ],
+      "Ciel Bleu Logiciels SARL",
+    ],
+    [
+      "hi",
+      [
+        "Sahyadri Systems Ltd",
+        "व्यवसाय विश्लेषक",
+        "नई दिल्ली    04/2024 से वर्तमान",
+        "• मासिक क्लोज़ को दस दिन से घटाकर चार दिन किया",
+      ],
+      "Sahyadri Systems Ltd",
+    ],
+  ])(
+    "reads a %s city beside the dates as where under a stacked header",
+    (language, lines, employer) => {
+      const text = ["Jordan Blake", "jordan.blake@example.com", "Experience", ...lines].join("\n");
+      expect(
+        check(text, policy, { now: NOW, languages: [language] }).parsed.roles[0]?.employer,
+      ).toBe(employer);
+    },
+  );
 });
 
 // LinkedIn's PDF export, in the member's language (review finding, 2026-10-24): its contact and
@@ -310,6 +343,76 @@ describe("Spanish and Portuguese employer after en, na, em", () => {
   ])("reads %j", (line, language, title, employer) => {
     expect(first(line, language)).toMatchObject({ title, employer });
   });
+
+  // A resume repeats one layout (review, 2026-10-24): one role joined "en" before a legal form
+  // shows how every role is joined, so a city on the next line is no longer taken as the employer.
+  it.each([
+    [
+      "es",
+      [
+        "Diseñadora UX en Puente Viejo Estudios, enero 2023 - enero 2025",
+        "Barcelona",
+        "– Reducción del cierre mensual de diez a cuatro días",
+        "Responsable de operaciones en Montaña Clara Salud S.L., marzo 2019 - diciembre 2022",
+        "Barcelona",
+        "– Planificación semanal con diseño, ventas y operaciones",
+      ],
+      ["Puente Viejo Estudios", "Montaña Clara Salud S.L."],
+      ["Diseñadora UX", "Responsable de operaciones"],
+    ],
+    [
+      "es",
+      [
+        "Especialista en Marketing en Cielo Azul Software, 2023 - actual",
+        "Consultor en Acme Consultores S.A., 2019 - 2022",
+      ],
+      ["Cielo Azul Software", "Acme Consultores S.A."],
+      ["Especialista en Marketing", "Consultor"],
+    ],
+    [
+      "pt",
+      [
+        "Analista de dados na Exemplo Pagamentos, 2022 - atual",
+        "Analista na Estrela Sul Tecnologia Ltda, 2019 - 2022",
+      ],
+      ["Exemplo Pagamentos", "Estrela Sul Tecnologia Ltda"],
+      ["Analista de dados", "Analista"],
+    ],
+  ])("reads every %s role the way one shows", (language, lines, employers, titles) => {
+    const roles = check(
+      ["Ana Lima", "ana@example.com", "Experiencia", ...lines].join("\n"),
+      policy,
+      {
+        now: NOW,
+        languages: [language],
+      },
+    ).parsed.roles;
+    expect(roles.map((role) => role.employer)).toEqual(employers);
+    expect(roles.map((role) => role.title)).toEqual(titles);
+  });
+
+  it("keeps a title's own en where no role shows the layout", () => {
+    expect(first("Especialista en Marketing Digital, 2019 – 2021", "es")).toMatchObject({
+      title: "Especialista en Marketing Digital",
+    });
+  });
+});
+
+// Review findings (2026-10-24): foundations that grant degrees are schools.
+describe("schools named as foundations", () => {
+  it.each([
+    ["pt", "MBA em Gestão de Projetos, Fundação Getulio Vargas, 2020", "Fundação Getulio Vargas"],
+    [
+      "es",
+      "Profesional en Mercadeo, Fundación Universitaria Los Libertadores, 2016",
+      "Fundación Universitaria Los Libertadores",
+    ],
+  ])("reads the %s school in %s", (language, line, school) => {
+    const text = ["Ana Lima", "ana@example.com", "Formación", line].join("\n");
+    expect(
+      check(text, policy, { now: NOW, languages: [language] }).parsed.education[0]?.school,
+    ).toBe(school);
+  });
 });
 
 // A German LinkedIn export holds German headings, months and durations but hardly a function
@@ -380,5 +483,97 @@ describe("Chile and Québec", () => {
       ["Université Laval", 6],
       ["Cégep du Vieux Montréal", 5],
     ]);
+  });
+});
+
+// The independent review of the branch (2026-10-24).
+describe("what the branch review found", () => {
+  it.each([
+    [
+      [
+        "Software Engineer",
+        "Deloitte, Canada    Jan 2020 – Present",
+        "Worked on payments.",
+        "Data Analyst",
+        "Deloitte, Canada    Jan 2018 – Dec 2019",
+      ],
+      ["Deloitte", "Deloitte"],
+    ],
+    [
+      [
+        "Software Engineer",
+        "Deloitte, Canada    Jan 2020 – Present",
+        "Payments platform for retail banks",
+        "Data Analyst",
+        "Deloitte, Canada    Jan 2018 – Dec 2019",
+      ],
+      ["Deloitte", "Deloitte"],
+    ],
+    [
+      [
+        "Engineer",
+        "Acme Corp    Jan 2020 – Present",
+        "- Built the billing service",
+        "Tech: Java, Spring",
+        "Analyst",
+        "Infosys, India    Jan 2018 – Dec 2019",
+      ],
+      ["Acme Corp", "Infosys"],
+    ],
+  ])("keeps the English employer beside the dates: %j", (lines, employers) => {
+    const text = ["Jordan Blake", "jordan.blake@example.com", "Experience", ...lines].join("\n");
+    expect(check(text, policy, { now: NOW }).parsed.roles.map((role) => role.employer)).toEqual(
+      employers,
+    );
+  });
+
+  it.each([
+    [
+      "Ingeniera en Sistemas Computacionales, Grupo Bimbo    2020 – 2023",
+      "Ingeniera en Sistemas Computacionales",
+      "Grupo Bimbo",
+    ],
+    ["Ingeniero en Sistemas    2020 – 2023", "Ingeniero en Sistemas", ""],
+  ])(
+    "keeps a Spanish title's field once a role shows Cargo en Empresa: %s",
+    (line, title, employer) => {
+      const text = [
+        "Ana Lima",
+        "ana@example.com",
+        "Experiencia",
+        "Diseñadora UX en Piedra Blanca Energía S.A.    2024 – presente",
+        line,
+      ].join("\n");
+      const roles = check(text, policy, { now: NOW, languages: ["es"] }).parsed.roles;
+      expect(roles[1]).toMatchObject({ title, employer });
+    },
+  );
+
+  it.each(["Córdoba, España", "Cartagena, Murcia, España", "Guadalajara, España"])(
+    "reads a header naming Spain as Spain: %s",
+    (place) => {
+      const text = [
+        "Ana López",
+        place,
+        "ana.lopez@gmail.com",
+        "Experiencia profesional",
+        "Analista de datos, Ejemplo S.A., 2019 – actualidad",
+        "• Elaboración de informes de gestión y análisis de ventas",
+      ].join("\n");
+      expect(check(text, policy, { now: NOW }).locale.region).toBe("ES");
+    },
+  );
+
+  it.each([
+    "Semestre de intercambio, Universidad de Salamanca, 2016",
+    "Curso de Inglés, Universidad de Chile, 2019",
+    "Diplomado en Finanzas, Universidad de los Andes, 2019",
+    "Marzo 2010 – Diciembre 2015, Universidad de Chile",
+    "Medellín, Universidad de Antioquia, 2015",
+  ])("reads no degree from a course, a date or a place before a university: %s", (line) => {
+    const text = ["Ana Lima", "ana@example.com", "Formación", line].join("\n");
+    expect(
+      check(text, policy, { now: NOW, languages: ["es"] }).parsed.education[0]?.isced,
+    ).toBeNull();
   });
 });

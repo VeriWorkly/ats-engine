@@ -399,3 +399,33 @@ ${line}`),
     );
   });
 });
+
+// Bench misses kept until 2026-10-24, read now.
+describe("credentials the bench kept as known misses", () => {
+  it("reads B.Com and M.Com with no region", () => {
+    expect(degreeLevel("B.Com, Sample College 2010 - 2013", DEFAULT_POLICY)?.isced).toBe(6);
+    expect(degreeLevel("M.Com, Sample University, 2015", DEFAULT_POLICY)?.isced).toBe(7);
+    expect(degreeLevel("Visit b2b commerce.com for details", DEFAULT_POLICY)).toBeNull();
+  });
+
+  it("names a German apprenticeship by its occupation", () => {
+    const text = `${HEAD}Ausbildung\nAusbildung zum Fachinformatiker, IHK München 2012 - 2015\n`;
+    expect(check(text, { languages: ["de"], region: "DE" }).parsed.education[0]).toMatchObject({
+      credential: "Ausbildung zum Fachinformatiker",
+      isced: 3,
+    });
+  });
+
+  it("rejoins a piped line the page wrapped before its separator", () => {
+    const text = `${HEAD}Licenses & Certifications\nProject Management Professional (PMP) | PMI | Issued Jan 2024\n| Expires Jan 2027\n${JOB}`;
+    expect(check(text).parsed.certifications[0]).toMatchObject({
+      name: "Project Management Professional (PMP)",
+      expires: { year: 2027, month: 1 },
+    });
+  });
+
+  it("keeps the rows of a Markdown table apart", () => {
+    const text = `${HEAD}Skills\n| Skill | Level |\n| Go | Expert |\n${JOB}`;
+    expect(parse(text.replace(/\n$/, "")).skills).not.toContain("Skill | Level | | Go | Expert |");
+  });
+});

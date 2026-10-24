@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createAtsAi } from "../../src/ai/index.js";
+import { convertedToDocument, createAtsAi, groundedText } from "../../src/ai/index.js";
 import { createRedaction } from "../../src/ai/redact.js";
 import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
@@ -328,5 +328,61 @@ describe("convertResume", () => {
       "basics.email",
       "experience[0].role",
     ]);
+  });
+});
+
+describe("groundedText and convertedToDocument", () => {
+  const converted = {
+    basics: { fullName: "Jane Doe", role: "", headline: "", email: "", phone: "", location: "" },
+    links: [],
+    summary: "Award-winning Kubernetes AWS Terraform expert.",
+    experience: [
+      {
+        company: "Acme Corporation",
+        role: "Senior Engineer",
+        location: "",
+        startDate: "2020-01",
+        endDate: "",
+        current: true,
+        summary: "",
+        highlights: [
+          "Built payment systems in TypeScript, cutting failures 40%.",
+          // Planted by the model, or by text in the resume that steered it: not in the file.
+          "Led Kubernetes AWS Terraform migration",
+        ],
+      },
+      // Its identity was blanked as ungrounded: dropped, never scored on its bullets.
+      {
+        company: "",
+        role: "",
+        location: "",
+        startDate: "",
+        endDate: "",
+        current: false,
+        summary: "",
+        highlights: ["Grew revenue 300%"],
+      },
+    ],
+    education: [],
+    projects: [],
+    skills: [{ name: "Skills", keywords: ["TypeScript"] }],
+  };
+
+  it("drops the summaries and bullets the resume does not have, and scores the rest", () => {
+    const { resume, dropped } = groundedText(converted, RESUME);
+    expect(dropped).toEqual([
+      "Award-winning Kubernetes AWS Terraform expert.",
+      "Led Kubernetes AWS Terraform migration",
+      "Grew revenue 300%",
+    ]);
+    const document = convertedToDocument(resume);
+    const report = check(document, DEFAULT_POLICY, {
+      jobDescription: JOB,
+      now: new Date("2026-10-01"),
+    });
+    expect(report.parsed.roles).toEqual([
+      expect.objectContaining({ title: "Senior Engineer", employer: "Acme Corporation" }),
+    ]);
+    expect(report.matchedKeywords).not.toContain("kubernetes");
   });
 });

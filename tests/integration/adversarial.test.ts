@@ -160,6 +160,12 @@ const SHAPES: Record<string, string> = {
   "date line run": rep("Jan 2020 - Present\n"),
   "expiry after date run": rep("2027 तक "),
   "linkedin heading run": rep("Top-Kenntnisse "),
+  // Honorifics before a name, a role layout shown once, a header's country domain and city.
+  "honorific run": rep("Dr. "),
+  "layout en run": rep("Analista en Acme S.L. en "),
+  "country domain run": rep("a.com.ar."),
+  "header city run": rep("Bogotá D.C. | "),
+  "foundation run": rep("Fundação "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -172,7 +178,7 @@ describe("50 KB adversarial input", () => {
     const html = `<p>${input}</p>`;
     expectFast(() => jobTextFromHtml(html), 1_500);
     // Every region's credential patterns, compiled only under its region.
-    for (const region of ["DE", "FR", "GB", "IN", "ES", "BR", "PT"])
+    for (const region of ["DE", "FR", "GB", "IN", "ES", "BR", "PT", "MX", "AR", "CO", "CL"])
       expectFast(
         () =>
           check(resume, POLICY, {

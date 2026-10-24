@@ -60,6 +60,24 @@ function withoutPostNominals(line: string) {
     : { text: line, tail: [] };
 }
 
+/**
+ * The name without the honorifics before it ("Dr. Jane Doe", "Prof. Dr. Hans Müller"), cut only
+ * while two words remain. Undotted capitals are initials ("MS Dhoni").
+ */
+function withoutPrefixes(text: string, prefix: RegExp) {
+  let rest = text.trimStart();
+  for (let cut = 0; cut < 4; cut += 1) {
+    const match = prefix.exec(rest)?.[0];
+    if (!match) break;
+    const after = rest.slice(match.length).trimStart();
+    // Undotted capitals are initials as often as an honorific: "MS Dhoni", "MS DHONI SINGH".
+    if (!match.includes(".") && /\p{Lu}/u.test(match) && match === match.toUpperCase()) break;
+    if (after.split(/\s+/).length < 2) break;
+    rest = after;
+  }
+  return rest;
+}
+
 const birthPattern = memo(
   (rp: AtsEnginePolicy["resumeParse"]) =>
     new RegExp(
@@ -78,8 +96,15 @@ export function statesDateOfBirth(lines: string[], policy: AtsEnginePolicy) {
 }
 
 const nameVocabulary = memo(
-  ({ nameParticles, documentTitles, nameLabels, notNames }: AtsEnginePolicy["resumeParse"]) => ({
+  ({
+    nameParticles,
+    documentTitles,
+    nameLabels,
+    notNames,
+    namePrefixes,
+  }: AtsEnginePolicy["resumeParse"]) => ({
     particles: new RegExp(`^(?:${nameParticles.join("|")})$`, "u"),
+    prefix: new RegExp(String.raw`^(?:${namePrefixes.join("|") || "(?!)"})(?=\s)`, "iu"),
     titles: new RegExp(`^(?:${documentTitles.join("|")})$`, "iu"),
     notNames: new RegExp(`^(?:${(notNames ?? ["(?!)"]).join("|")})$`, "iu"),
     label: new RegExp(String.raw`^${wordListPattern(nameLabels)}\s*[:：]\s*`, "iu"),
@@ -146,7 +171,7 @@ export function findName(
   lines: string[],
   policy: AtsEnginePolicy,
 ): { name: string; headlined: boolean } {
-  const { particles, titles, label } = nameVocabulary(policy.resumeParse);
+  const { particles, titles, label, prefix } = nameVocabulary(policy.resumeParse);
   const trimmed = lines.map((line) => line.trim()).filter(Boolean);
   const titleWords = titleWordsOf(policy);
   const organisation = organisationWordsOf(policy);
@@ -209,8 +234,9 @@ export function findName(
 
   /** The name a line holds, or null. */
   const nameIn = (line: string, index: number, firstLine: boolean) => {
-    const candidate = nameCandidate(line, label, titleWords, spelled);
-    if (candidate === null || titles.test(candidate.text)) return null;
+    const found = nameCandidate(line, label, titleWords, spelled);
+    if (found === null || titles.test(found.text)) return null;
+    const candidate = { ...found, text: withoutPrefixes(found.text, prefix) };
 
     // "Kestrel, Mira" at the very top: a one-word surname first, read in the order the name is
     // spoken. Two skills or a place have the same shape ("Java, Spring", "Austin, TX"), so it is

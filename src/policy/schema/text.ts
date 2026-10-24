@@ -2,6 +2,22 @@ import * as z from "zod/mini";
 
 import { scriptName, wordList } from "../primitives.js";
 
+/** Words for a role still held, in languages no built-in pack reads, by language id or script. */
+const OPEN_ENDED: Record<string, string[]> = {
+  it: ["oggi", "attuale", "in corso", "presente"],
+  nl: ["heden", "huidig"],
+  pl: ["obecnie", "nadal", "teraz"],
+  sv: ["nuvarande", "pågående", "idag"],
+  Cyrillic: ["настоящее время", "наст. время", "н.в.", "сейчас", "теперішній час"],
+  el: ["σήμερα"],
+  Arabic: ["حتى الآن", "الحاضر"],
+  he: ["היום", "הווה"],
+  ja: ["現在", "至今"],
+  Han: ["至今", "现在", "現在", "目前"],
+  ko: ["현재"],
+  th: ["ปัจจุบัน"],
+};
+
 /** Text-shape vocabulary the scorer itself reads, as opposed to the parser or the matcher. */
 export const engineTextSchema = z.prefault(
   z.object({
@@ -83,6 +99,11 @@ export const engineTextSchema = z.prefault(
             id: z.optional(z.string().check(z.regex(/^[a-z]{2,3}$/, "an ISO 639 language code"))),
             script: z.optional(scriptName),
             detectionWords: z._default(z.array(z.string().check(z.minLength(1))), []),
+            /**
+             * Its words for a role still held ("oggi", "obecnie"), by which a model's reading of
+             * such a resume is checked when it says a role is current.
+             */
+            openEnded: z._default(z.array(z.string().check(z.minLength(1))), []),
           })
           .check(
             z.refine((other) => other.script !== undefined || other.detectionWords.length >= 10, {
@@ -102,17 +123,26 @@ export const engineTextSchema = z.prefault(
         "pl oraz dla jest się doświadczenie pracy przez jako lat zespołu",
         "sv och för att som inom samt erfarenhet utveckling arbetat ansvarig",
       ]
-        .map((words): { id?: string; script?: string; detectionWords: string[] } => {
-          const [id, ...detectionWords] = words.split(" ");
-          return { id, detectionWords };
-        })
+        .map(
+          (
+            words,
+          ): { id?: string; script?: string; detectionWords: string[]; openEnded: string[] } => {
+            const [id, ...detectionWords] = words.split(" ");
+            return { id, detectionWords, openEnded: OPEN_ENDED[id!] ?? [] };
+          },
+        )
         .concat(
           // A script one language writes names it; kana before Han, so Japanese is not named Chinese.
           "Cyrillic Greek:el Arabic Hebrew:he Hiragana:ja Katakana:ja Han Hangul:ko Thai:th Devanagari Bengali Tamil:ta Telugu:te"
             .split(" ")
             .map((entry) => {
               const [script, id] = entry.split(":");
-              return { ...(id && { id }), script, detectionWords: [] };
+              return {
+                ...(id && { id }),
+                script,
+                detectionWords: [],
+                openEnded: OPEN_ENDED[id ?? script!] ?? [],
+              };
             }),
         ),
     ),

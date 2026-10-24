@@ -102,6 +102,8 @@ export { DEFAULT_ANALYZE_PROMPT, type AnalyzeInput, type AtsAiInsights } from ".
 export { DEFAULT_REPAIR_PROMPT, type RepairParseInput } from "./tasks/repairParse.js";
 export {
   CONVERT_GROUNDING_SKIP,
+  convertedToDocument,
+  groundedText,
   DEFAULT_CONVERT_PROMPT,
   type AtsConvertedResume,
   type ConvertResumeInput,

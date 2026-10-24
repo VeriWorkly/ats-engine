@@ -16,7 +16,7 @@
  */
 import { extractResume } from "../../src/node/extract.js";
 import { buildDocx } from "./buildDocx.js";
-import { buildPdfPages, text } from "./buildPdf.js";
+import { buildPdfPages, text, unicodeFont } from "./buildPdf.js";
 import type { LocaleFixture } from "./locale-resumes.js";
 
 export type Rendering = "text" | "pdf" | "pdf-2col" | "docx";
@@ -1299,8 +1299,20 @@ const width = (value: string, size = 10) =>
 /** Where a run starts so its right edge is exactly `edge`, as a right tab or justify-between does. */
 const flushRight = (right: string, edge: number) => Math.round((edge - width(right)) * 100) / 100;
 
+/** How a PDF shows, measures and writes its text: Helvetica, or `unicodeFont` for other scripts. */
+type PdfFont = {
+  show: (x: number, y: number, value: string) => string;
+  width: (value: string) => number;
+  pages: (contentStreams: string[]) => Buffer;
+};
+const HELVETICA: PdfFont = {
+  show: (x, y, value) => text(x, y, pdfSafe(value)),
+  width: (value) => width(pdfSafe(value)),
+  pages: buildPdfPages,
+};
+
 /** One column, dates flush right, a new page when a page is full. */
-function pdfOneColumn(resume: GeneratedResume): Buffer {
+function pdfOneColumn(resume: GeneratedResume, font: PdfFont = HELVETICA): Buffer {
   const pages: string[][] = [[]];
   let y = 750;
   const put = (x: number, value: string, step = 13) => {
@@ -1308,7 +1320,7 @@ function pdfOneColumn(resume: GeneratedResume): Buffer {
       pages.push([]);
       y = 750;
     }
-    pages[pages.length - 1]!.push(text(x, y, pdfSafe(value)));
+    pages[pages.length - 1]!.push(font.show(x, y, value));
     y -= step;
   };
   const row = (line: Line) => {
@@ -1316,7 +1328,7 @@ function pdfOneColumn(resume: GeneratedResume): Buffer {
     const at = y;
     put(50, line.left, 0);
     y = at;
-    put(flushRight(pdfSafe(line.right), 562), line.right);
+    put(Math.round((562 - font.width(line.right)) * 100) / 100, line.right);
   };
   resume.header.forEach((line, i) => put(50, line.left, i === 0 ? 20 : 13));
   for (const block of resume.blocks) {
@@ -1324,7 +1336,7 @@ function pdfOneColumn(resume: GeneratedResume): Buffer {
     put(50, block.heading, 16);
     block.lines.forEach(row);
   }
-  return buildPdfPages(pages.map((ops) => ops.join("\n")));
+  return font.pages(pages.map((ops) => ops.join("\n")));
 }
 
 /**
@@ -1386,7 +1398,8 @@ export async function renderResume(
   if (rendering === "text") return { text: lines(resume).join("\n") };
   const file =
     rendering === "pdf"
-      ? pdfOneColumn(resume)
+      ? // Helvetica has no Devanagari and no encoding for most accents: a Unicode font for the others.
+        pdfOneColumn(resume, resume.locale.languages.length ? unicodeFont() : HELVETICA)
       : rendering === "pdf-2col"
         ? pdfTwoColumn(resume)
         : // In Word, the gap before a flush-right city or date is a tab, not a run of spaces.

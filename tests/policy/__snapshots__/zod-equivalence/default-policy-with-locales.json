@@ -2159,6 +2159,8 @@
     "employerWords": [
       "at"
     ],
+    "layoutEmployerWords": [],
+    "fieldTitleWords": [],
     "documentTitles": [
       "resume",
       "résumé",
@@ -2228,6 +2230,13 @@
       "lcsw",
       "frcs",
       "mrcp"
+    ],
+    "namePrefixes": [
+      "dr\\.?",
+      "prof\\.?",
+      "mrs?\\.?",
+      "ms\\.?",
+      "mx\\.?"
     ],
     "regionCodes": [
       "AL",
@@ -2745,13 +2754,15 @@
       "polytechnic",
       "seminary"
     ],
+    "universityWords": [],
+    "courseWords": [],
     "degrees": {
-      "3": "(?:\\b|^)((?:high\\s+school(?!\\s*\\(\\s*class\\s+(?:x|10)(?:th)?(?![a-z]))|secondary\\s+school(?!\\s+certificate))(?:\\s+(?:diploma|certificate))?|g\\.?e\\.?d\\.?|a[\\s-]levels?)(?![\\p{L}\\p{M}])",
+      "3": "(?:\\b|^)((?:high\\s+school(?!\\s*\\(\\s*class\\s+(?:x|10)(?:th)?(?![a-z]))|secondary\\s+school(?!\\s+certificate))(?:\\s+(?:diploma|certificate))?|g\\.?e\\.?d\\.?|a[\\s-]levels?)(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:diploma\\s+di\\s+maturit[àa]|maturit[àa]|аттестат|świadectwo\\s+dojrzałości|matura|gymnasieexamen|havo|vwo)(?![\\p{L}\\p{M}])",
       "4": "(?:\\b|^)((?<!(?:high|secondary)\\s+school\\s+)diploma|(?:graduate\\s+)?certificate\\s+(?:in|of)\\b)(?![\\p{L}\\p{M}])",
       "5": "(?:\\b|^)(associate(?:'?s)?\\s+(?:degree|of\\s+[a-z]+)|a\\.a\\.s?\\.?|(?<!,\\s*)aas?(?=\\s+(?:in|of)\\b))(?![\\p{L}\\p{M}])",
-      "6": "(?:\\b|^)(bachelor(?:'?s)?(?:\\s+of\\s+[a-z]+)?|b\\.s\\.c?\\.?|b\\.?sc\\.?|b\\.a\\.|b\\.?eng\\.?|b\\.?tech\\.?|b\\.?b\\.?a\\.?|b\\.?f\\.?a\\.?|b\\.\\s?ed\\.?|ll\\.?b\\.?|b[as])(?![\\p{L}\\p{M}])",
-      "7": "(?:\\b|^)(j\\.\\s?d\\.?(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)|j\\.d\\.?(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}j\\.d\\.?))|juris\\s+doctor|m\\.\\s?d\\.|m\\.\\s?ed\\.?|m\\.f\\.a\\.|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$|\\s+in\\s)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm))|(?<!scrum\\s)master(?!\\s+data(?![a-z]))(?:'?s)?(?:\\s+of\\s+[a-z]+)?|m\\.s\\.c?\\.?|m\\.?sc\\.?|m\\.a\\.|m\\.?eng\\.?|m\\.?b\\.?a\\.?|m\\.?tech\\.?|(?<=,\\s*)m[as](?=\\s+(?!(?:or|and|usa?)(?![a-z]))\\p{L}|\\s*\\()(?!\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b)|(?<!,\\s*|\\d\\s?)m[as](?!-|\\.\\s+\\p{L}|\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b))(?![\\p{L}\\p{M}])",
-      "8": "(?:\\b|^)(doctorate|ph\\.?d\\.?|d\\.?phil\\.?)(?![\\p{L}\\p{M}])"
+      "6": "(?:\\b|^)(bachelor(?:'?s)?(?:\\s+of\\s+[a-z]+)?|b\\.s\\.c?\\.?|b\\.?sc\\.?|b\\.a\\.|b\\.?eng\\.?|b\\.?tech\\.?|b\\.?b\\.?a\\.?|b\\.?f\\.?a\\.?|b\\.\\s?ed\\.?|b\\.\\s?com\\.?|bcom|ll\\.?b\\.?|b[as])(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:laurea(?:\\s+triennale)?|licencjat|бакалавр|kandidatexamen|hbo[\\s-]bachelor)(?![\\p{L}\\p{M}])",
+      "7": "(?:\\b|^)(j\\.\\s?d\\.?(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)|j\\.d\\.?(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}j\\.d\\.?))|juris\\s+doctor|m\\.\\s?d\\.|m\\.\\s?ed\\.?|m\\.f\\.a\\.|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$|\\s+in\\s)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm))|(?<!scrum\\s)master(?!\\s+data(?![a-z]))(?:'?s)?(?:\\s+of\\s+[a-z]+)?|m\\.s\\.c?\\.?|m\\.?sc\\.?|m\\.a\\.|m\\.?eng\\.?|m\\.?b\\.?a\\.?|m\\.?tech\\.?|m\\.\\s?com\\.?|mcom|(?<=,\\s*)m[as](?=\\s+(?!(?:or|and|usa?)(?![a-z]))\\p{L}|\\s*\\()(?!\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b)|(?<!,\\s*|\\d\\s?)m[as](?!-|\\.\\s+\\p{L}|\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b))(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:laurea\\s+magistrale|laurea\\s+specialistica|магистр|magisterexamen|masterexamen|doctoraal)(?![\\p{L}\\p{M}])",
+      "8": "(?:\\b|^)(doctorate|ph\\.?d\\.?|d\\.?phil\\.?)(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:dottorato(?:\\s+di\\s+ricerca)?|кандидат\\s+наук|доктор\\s+наук|doktorat|doktorsexamen|doctoraat)(?![\\p{L}\\p{M}])"
     }
   },
   "text": {
@@ -2821,7 +2832,8 @@
           "también",
           "años",
           "experiencia"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "pt",
@@ -2838,7 +2850,8 @@
           "ao",
           "para",
           "como"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "it",
@@ -2855,6 +2868,12 @@
           "degli",
           "alla",
           "anni"
+        ],
+        "openEnded": [
+          "oggi",
+          "attuale",
+          "in corso",
+          "presente"
         ]
       },
       {
@@ -2872,7 +2891,8 @@
           "aux",
           "les",
           "nous"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "de",
@@ -2889,7 +2909,8 @@
           "zur",
           "zum",
           "auf"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "nl",
@@ -2904,6 +2925,10 @@
           "werkervaring",
           "jaar",
           "ervaring"
+        ],
+        "openEnded": [
+          "heden",
+          "huidig"
         ]
       },
       {
@@ -2919,6 +2944,11 @@
           "jako",
           "lat",
           "zespołu"
+        ],
+        "openEnded": [
+          "obecnie",
+          "nadal",
+          "teraz"
         ]
       },
       {
@@ -2934,67 +2964,114 @@
           "utveckling",
           "arbetat",
           "ansvarig"
+        ],
+        "openEnded": [
+          "nuvarande",
+          "pågående",
+          "idag"
         ]
       },
       {
         "script": "Cyrillic",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "настоящее время",
+          "наст. время",
+          "н.в.",
+          "сейчас",
+          "теперішній час"
+        ]
       },
       {
         "id": "el",
         "script": "Greek",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "σήμερα"
+        ]
       },
       {
         "script": "Arabic",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "حتى الآن",
+          "الحاضر"
+        ]
       },
       {
         "id": "he",
         "script": "Hebrew",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "היום",
+          "הווה"
+        ]
       },
       {
         "id": "ja",
         "script": "Hiragana",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "現在",
+          "至今"
+        ]
       },
       {
         "id": "ja",
         "script": "Katakana",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "現在",
+          "至今"
+        ]
       },
       {
         "script": "Han",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "至今",
+          "现在",
+          "現在",
+          "目前"
+        ]
       },
       {
         "id": "ko",
         "script": "Hangul",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "현재"
+        ]
       },
       {
         "id": "th",
         "script": "Thai",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "ปัจจุบัน"
+        ]
       },
       {
         "script": "Devanagari",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "script": "Bengali",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "id": "ta",
         "script": "Tamil",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "id": "te",
         "script": "Telugu",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       }
     ],
     "contentLineVerbs": [
@@ -3696,19 +3773,19 @@
     "languages": [
       {
         "sections": {
-          "experience": "^(?:berufserfahrung|berufspraxis|beruflicher\\s+werdegang|berufliche\\s+erfahrung|berufst[äa]tigkeit|praxiserfahrung|arbeitserfahrung|werdegang|erfahrung)",
-          "education": "^(?:ausbildung|bildungsweg|bildung|schulbildung|schulische\\s+ausbildung|studium|akademische\\s+ausbildung|hochschulbildung)",
-          "skills": "^(?:top-?kenntnisse|kenntnisse|f[äa]higkeiten|kompetenzen|fachkenntnisse|it[\\s-]kenntnisse|edv[\\s-]kenntnisse|technische\\s+(?:kenntnisse|f[äa]higkeiten))",
+          "experience": "^(?:berufserfahrung(?:en)?|berufspraxis|beruflicher\\s+werdegang|berufliche\\s+erfahrung(?:en)?|berufliche\\s+stationen|praktische\\s+erfahrung(?:en)?|berufst[äa]tigkeit|praxiserfahrung|arbeitserfahrung|werdegang|praktik(?:a|um)|erfahrung(?:en)?)",
+          "education": "^(?:ausbildung|berufsausbildung|schul-\\s*und\\s+(?:berufs)?ausbildung|bildungsweg|bildung|schulbildung|schulische\\s+ausbildung|studium|akademische\\s+ausbildung|akademischer\\s+werdegang|hochschulbildung)",
+          "skills": "^(?:top-?kenntnisse|kenntnisse|f[äa]higkeiten|kompetenzen|fachkenntnisse|it[\\s-]kenntnisse|edv[\\s-]kenntnisse|technische\\s+(?:kenntnisse|f[äa]higkeiten)|(?:besondere|sonstige|weitere|fachliche)\\s+(?:kenntnisse|kompetenzen|f[äa]higkeiten)|(?:pc|computer|software)-?kenntnisse|fachkompetenzen)",
           "projects": "^(?:projekte|projekterfahrung|ausgew[äa]hlte\\s+projekte)",
-          "certifications": "^(?:zertifikate|zertifizierungen|lizenzen|(?:fort-?\\s*und\\s+)?weiterbildung(?:en)?)",
+          "certifications": "^(?:zertifikate|zertifizierungen|lizenzen|(?:fort-?\\s*und\\s+)?weiterbildung(?:en)?|zusatzqualifikationen|bescheinigungen|schulungen)",
           "languages": "^(?:sprachen|sprachkenntnisse|fremdsprachen|fremdsprachenkenntnisse)",
-          "other": "^(?:kontakt|profil|kurzprofil|zusammenfassung|[üu]ber\\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\\s+engagement|referenzen|pers[öo]nliche\\s+(?:daten|angaben))"
+          "other": "^(?:kontakt|profil|kurzprofil|zusammenfassung|[üu]ber\\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\\s+engagement|referenzen|pers[öo]nliche\\s+(?:daten|angaben)|sonstiges|ehrenamtliche\\s+t[äa]tigkeit(?:en)?|mitgliedschaften)"
         },
         "languageLevels": {
           "muttersprache|muttersprachniveau|muttersprachlich(?:e[mnrs]?)?|muttersprachler(?:in)?": "C2",
           "zweisprachig(?:e[mnrs]?)?": "C1",
           "verhandlungssicher(?:e[mnrs]?)?": "C1",
-          "fließend(?:e[mnrs]?)?": "C1",
+          "flie(?:ß|ss)end(?:e[mnrs]?)?": "C1",
           "sehr\\s+gute?[mnrs]?(?:\\s+(?:(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)-\\s+(?:und|oder)\\s+)?(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)?kenntnissen?)?": "B2",
           "gute?[mnrs]?\\s+(?:(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)-\\s+(?:und|oder)\\s+)?(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)?kenntnissen?": "B1",
           "(?:deutsch|englisch|französisch|spanisch|italienisch|niederländisch|polnisch|türkisch|russisch|chinesisch|japanisch|arabisch|portugiesisch|sprach|fremdsprachen)?(?:grund|basis|schul)kenntnissen?": "A2",
@@ -3737,6 +3814,7 @@
         },
         "months": {
           "januar": 1,
+          "maerz": 3,
           "jän": 1,
           "jänner": 1,
           "februar": 2,
@@ -3781,6 +3859,16 @@
         "nameLabels": [
           "name",
           "vor- und nachname"
+        ],
+        "namePrefixes": [
+          "dr\\.-ing\\.",
+          "(?:med|rer\\.\\s?nat|rer\\.\\s?pol|phil|jur|habil)\\.",
+          "dipl\\.-\\p{L}{2,6}\\.",
+          "mag\\.(?:a\\.?)?",
+          "ing\\.",
+          "dkfm\\.",
+          "herr",
+          "frau"
         ],
         "placeNames": [
           "deutschland",
@@ -3862,6 +3950,14 @@
           "St\\.? Gallen",
           "Zug"
         ],
+        "organisationWords": [
+          "ag",
+          "kg",
+          "ug",
+          "gbr",
+          "ohg",
+          "e\\.\\s?v\\."
+        ],
         "openEnded": [
           "heute",
           "aktuell",
@@ -3889,7 +3985,8 @@
           "mutterschutz",
           "auszeit",
           "sabbatjahr",
-          "karenz"
+          "karenz",
+          "berufliche\\s+neuorientierung"
         ],
         "employerWords": [
           "bei"
@@ -3913,17 +4010,23 @@
           "praktikant(?:in)?",
           "werkstudent(?:in)?",
           "\\p{L}{0,30}manager(?:in)?",
-          "\\p{L}{0,30}designer(?:in)?"
+          "\\p{L}{0,30}designer(?:in)?",
+          "\\p{L}{0,30}mitarbeiter(?:in)?",
+          "\\p{L}{0,30}(?:fach|hilfs)kraft",
+          "\\p{L}{0,30}informatiker(?:in)?",
+          "\\p{L}{0,30}(?:mechatron|elektron|mechan)iker(?:in)?",
+          "\\p{L}{2,30}kaufmann|\\p{L}{0,30}kauffrau",
+          "auszubildende[rn]?"
         ],
         "schoolWords": [
           "universität",
           "\\p{L}{0,30}hochschule",
           "fachhochschule",
-          "gymnasium",
+          "\\p{L}{0,30}gymnasium",
           "\\p{L}{0,30}schule",
-          "akademie",
+          "\\p{L}{0,30}akademie",
           "institut",
-          "kolleg"
+          "\\p{L}{0,30}kolleg"
         ],
         "documentTitles": [
           "lebenslauf",
@@ -4012,8 +4115,8 @@
             "sicherheitsfreigabe"
           ],
           "languagePatterns": [
-            "(?:fließende?[mnrs]?|verhandlungssichere?[mnrs]?|sehr\\s+gute?[mnrs]?)\\s+(\\p{L}+?)(?:kenntnisse|-)",
-            "(?:fließend|verhandlungssicher)(?:e[mnrs]?)?\\s+(?:in\\s+)?(\\p{L}+)"
+            "(?:flie(?:ß|ss)ende?[mnrs]?|verhandlungssichere?[mnrs]?|sehr\\s+gute?[mnrs]?)\\s+(\\p{L}+?)(?:kenntnisse|-)",
+            "(?:flie(?:ß|ss)end|verhandlungssicher)(?:e[mnrs]?)?\\s+(?:in\\s+)?(\\p{L}+)"
           ],
           "languageNames": {
             "deutsch": "german",
@@ -4167,6 +4270,9 @@
           "fließend",
           "fließende",
           "fließendes",
+          "fliessend",
+          "fliessende",
+          "fliessendes",
           "fundierte",
           "fundiertes",
           "fundierten",
@@ -4277,14 +4383,19 @@
       {
         "sections": {
           "experience": "^(?:exp[eéèê]riences?(?:\\s+(?:professionnelles?|pertinentes?))?|parcours\\s+professionnel|historique\\s+professionnel|emplois?\\s+occup[eéèê]s|stages?(?:\\s+et\\s+alternances?)?|alternances?)",
-          "education": "^(?:formations?(?:\\s+(?:acad[eéèê]miques?|universitaires?|initiales?|et\\s+dipl[ôo]mes))?|[eéèê]tudes(?:\\s+sup[eéèê]rieures)?|cursus(?:\\s+(?:universitaire|scolaire|acad[eéèê]mique))?|dipl[ôo]mes(?:\\s+et\\s+formations?)?|parcours\\s+(?:acad[eéèê]mique|scolaire|universitaire))",
-          "skills": "^(?:principales\\s+comp[eéèê]tences|comp[eéèê]tences(?!\\s+linguistiques)(?:\\s+(?:techniques|informatiques|cl[eéèê]s|professionnelles))?|savoir[\\s-]faire|outils(?:\\s+et\\s+technologies)?|connaissances\\s+(?:techniques|informatiques)|informatique)",
+          "education": "^(?:formations?(?:\\s+(?:acad[eéèê]miques?|universitaires?|initiales?|et\\s+dipl[ôo]mes))?|[eéèê]tudes(?:\\s+sup[eéèê]rieures)?|cursus(?:\\s+(?:universitaire|scolaire|acad[eéèê]mique))?|scolarit[eéèê]|dipl[ôo]mes(?:\\s+et\\s+formations?)?|parcours\\s+(?:acad[eéèê]mique|scolaire|universitaire))",
+          "skills": "^(?:principales\\s+comp[eéèê]tences|comp[eéèê]tences(?!\\s+linguistiques)(?:\\s+(?:techniques|informatiques|cl[eéèê]s|professionnelles))?|savoir[\\s-]faire|outils(?:\\s+et\\s+technologies)?|connaissances(?:\\s+(?:techniques|informatiques))?|aptitudes|savoir[\\s-][eéèê]tre|informatique)",
           "projects": "^(?:projets(?:\\s+(?:personnels|professionnels|acad[eéèê]miques|r[eéèê]alis[eéèê]s))?|r[eéèê]alisations)",
-          "certifications": "^(?:certifications?|certificats?|habilitations)",
+          "certifications": "^(?:(?:licences\\s+et\\s+)?certifications?|certificats?|habilitations|licences)",
           "languages": "^(?:langues(?:\\s+[eéèê]trang[eè]res)?|comp[eéèê]tences\\s+linguistiques)",
-          "other": "^(?:profil(?:\\s+professionnel)?|r[eéèê]sum[eéèê](?:\\s+professionnel)?|[àa]\\s+propos(?:\\s+de\\s+moi)?|objectif(?:\\s+professionnel)?|centres?\\s+d['’]int[eéèê]r[eê]ts?|loisirs|int[eéèê]r[eê]ts|activit[eéèê]s(?:\\s+extra[\\s-]?professionnelles)?|b[eéèê]n[eéèê]volat|engagements?(?:\\s+associatifs)?|publications|r[eéèê]f[eéèê]rences|distinctions|prix(?:\\s+et\\s+distinctions)?|informations\\s+personnelles|coordonn[eéèê]es|divers)"
+          "other": "^(?:profil(?:\\s+professionnel)?|r[eéèê]sum[eéèê](?:\\s+professionnel)?|[àa]\\s+propos(?:\\s+de\\s+moi)?|objectif(?:\\s+professionnel)?|centres?\\s+d['’]int[eéèê]r[eê]ts?|loisirs|int[eéèê]r[eê]ts|activit[eéèê]s(?:\\s+extra[\\s-]?professionnelles)?|b[eéèê]n[eéèê]volat|engagements?(?:\\s+associatifs)?|publications|r[eéèê]f[eéèê]rences|distinctions|prix(?:\\s+et\\s+distinctions)?|informations\\s+personnelles|coordonn[eéèê]es|divers|vie\\s+associative|informations\\s+compl[eéèê]mentaires|qualit[eéèê]s(?:\\s+personnelles)?)"
         },
         "languageLevels": {
+          "bilingue\\s+ou\\s+langue\\s+natale|langue\\s+natale|natif|native": "C2",
+          "capacit[eéèê]\\s+professionnelle\\s+compl[eè]te": "C2",
+          "capacit[eéèê]\\s+professionnelle": "C1",
+          "comp[eéèê]tence\\s+professionnelle\\s+limit[eéèê]e": "B1",
+          "avanc[eéèê]e?": "C1",
           "langue\\s+maternelle|maternelle": "C2",
           "bilingue": "C1",
           "courant(?:e)?|lu,?\\s+[eéèê]crit,?\\s+parl[eéèê]": "C1",
@@ -4366,6 +4477,11 @@
           "nom",
           "nom\\s+et\\s+pr[eéèê]nom",
           "pr[eéèê]nom\\s+et\\s+nom"
+        ],
+        "namePrefixes": [
+          "mme\\.?",
+          "mlle\\.?",
+          "pr\\.?"
         ],
         "placeNames": [
           "france",
@@ -4456,7 +4572,11 @@
           "eurl",
           "s\\.a\\.",
           "sca",
-          "snc"
+          "snc",
+          "sprl",
+          "srl",
+          "asbl",
+          "s[àa]rl"
         ],
         "openEnded": [
           "aujourd'hui",
@@ -4469,7 +4589,8 @@
           "actuellement",
           "actuel",
           "en cours",
-          "maintenant"
+          "maintenant",
+          "ce jour"
         ],
         "rangeWords": [
           "à",
@@ -4481,7 +4602,8 @@
         ],
         "leaveWords": [
           "cong[eéèê]\\s+(?:parental|(?:de\\s+)?(?:maternit[eéèê]|paternit[eéèê])|sabbatique)",
-          "ann[eéèê]e\\s+sabbatique"
+          "ann[eéèê]e\\s+sabbatique",
+          "ann[eéèê]e\\s+de\\s+c[eéèê]sure"
         ],
         "employerWords": [
           "chez"
@@ -4490,7 +4612,14 @@
           "ing[eéèê]nieure?",
           "d[eéèê]veloppeu(?:r|se)",
           "programmeu(?:r|se)",
-          "chef(?:fe)?\\s+de\\s+(?:projet|produit|[eéèê]quipe|service|rayon)",
+          "chef(?:fe)?\\s+(?:de\\s+(?:projet|produit|service|rayon|chantier|cuisine)|d['’][eéèê]quipe)",
+          "professeure?",
+          "chercheu(?:r|se)",
+          "doctorante?",
+          "pr[eéèê]sidente?",
+          "vendeu(?:r|se)",
+          "serveu(?:r|se)",
+          "caissi(?:er|ère)",
           "charg[eéèê]e?\\s+(?:de|d['’])\\s*(?:client[eéèê]le|mission|affaires|recrutement|communication|projet)",
           "responsable",
           "directeur",
@@ -4546,8 +4675,9 @@
           "d['’]\\p{L}+"
         ],
         "degrees": {
+          "3": "(?<![\\p{L}\\p{M}])(?:dipl[ôo]me\\s+d['’][eéèê]tudes\\s+(?:secondaires|professionnelles)|maturit[eéèê]\\s+(?:gymnasiale|professionnelle|f[eéèê]d[eéèê]rale)|cfc|cess)(?![\\p{L}\\p{M}])",
           "5": "(?<![\\p{L}\\p{M}])(?:bac\\s*\\+\\s*2|d\\.?\\s?e\\.?\\s?c\\.?(?=\\s+(?:en|\\())|dipl[ôo]me\\s+d['’][eéèê]tudes\\s+coll[eéèê]giales)(?![\\p{L}\\p{M}])",
-          "6": "(?<![\\p{L}\\p{M}])(?:licence(?:\\s+professionnelle)?|bac(?:calaur[ée]at)?\\s+en\\s+\\p{L}+|bac\\s*\\+\\s*3)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:licence(?:\\s+professionnelle)?|bac(?:calaur[ée]at)?\\s+en\\s+\\p{L}+|bac\\s*\\+\\s*3|bacheli(?:er|[eè]re)\\s+en)(?![\\p{L}\\p{M}])",
           "7": "(?<![\\p{L}\\p{M}])(?:dipl[ôo]me\\s+d['’]ing[eéèê]nieur|ing[eéèê]nieur\\s+dipl[ôo]m[eéèê]|mast[eè]re(?:\\s+sp[eéèê]cialis[eéèê])?|bac\\s*\\+\\s*5)(?![\\p{L}\\p{M}])",
           "8": "(?<![\\p{L}\\p{M}])(?:doctorat|th[eè]se\\s+de\\s+doctorat|bac\\s*\\+\\s*8)(?![\\p{L}\\p{M}])"
         },
@@ -4853,13 +4983,13 @@
       },
       {
         "sections": {
-          "experience": "^(?:कार्य\\s*अनुभव|व्यावसायिक\\s+अनुभव|पेशेवर\\s+अनुभव|प्रोफेशनल\\s+अनुभव|कार्यानुभव|रोज़गार\\s+इतिहास|अनुभव)",
-          "education": "^(?:शैक्षिक\\s+योग्यता|शैक्षणिक\\s+योग्यता|शिक्षा|योग्यता)",
-          "skills": "^(?:तकनीकी\\s+कौशल|कौशल|दक्षताएँ|दक्षता|विशेषज्ञता)",
+          "experience": "^(?:कार्य\\s*अनुभव|व्यावसायिक\\s+अनुभव|पेशेवर\\s+अनुभव|प्रोफेशनल\\s+अनुभव|कार्यानुभव|रोज़?गार\\s+इतिहास|अनुभव)",
+          "education": "^(?:(?:शैक्षिक|शैक्षणिक)\\s+(?:योग्यता(?:ए[ँं])?|विवरण)|(?:व्यावसायिक|तकनीकी)\\s+योग्यता(?:ए[ँं])?|शिक्षा|योग्यता(?:ए[ँं])?)",
+          "skills": "^(?:(?:तकनीकी|प्रमुख|मुख्य)\\s+कौशल|कौशल|दक्षताए[ँं]|दक्षता|विशेषज्ञता|(?:कंप्यूटर|कम्प्यूटर|तकनीकी)\\s+ज्ञान)",
           "projects": "^(?:परियोजनाएँ|परियोजनाएं|परियोजना|प्रोजेक्ट्स|प्रोजेक्ट)",
-          "certifications": "^(?:प्रमाणपत्र|प्रमाणन)",
+          "certifications": "^(?:प्रमाण\\s*पत्र|प्रमाणन|सर्टिफिकेट|सर्टिफिकेशन)",
           "languages": "^(?:भाषाएँ|भाषाएं|भाषा\\s+ज्ञान|भाषाई\\s+दक्षता)",
-          "other": "^(?:सारांश|उद्देश्य|परिचय|प्रोफ़ाइल|पुरस्कार|उपलब्धियाँ|उपलब्धियां|रुचियाँ|रुचियां|शौक|संदर्भ|व्यक्तिगत\\s+विवरण)"
+          "other": "^(?:सारांश|(?:करियर|कैरियर)\\s+उद्देश्य|उद्देश्य|परिचय|प्रोफ़?ाइल|पुरस्कार|(?:प्रमुख\\s+)?उपलब्धिया[ँं]|रुचिया[ँं]|शौक|संदर्भ|व्यक्तिगत\\s+(?:विवरण|जानकारी)|संपर्क|सम्पर्क|घोषणा|प्रशिक्षण)"
         },
         "languageLevels": {
           "मातृभाषा": "C2",
@@ -4884,7 +5014,7 @@
             "तक\\s+वैध"
           ],
           "id": [
-            "प्रमाणपत्र\\s+संख्या",
+            "प्रमाण\\s*पत्र\\s+संख्या",
             "क्रमांक"
           ]
         },
@@ -4907,6 +5037,42 @@
           "दिसंबर": 12,
           "दिसम्बर": 12
         },
+        "nameLabels": [
+          "नाम",
+          "पूरा\\s+नाम",
+          "आवेदक\\s+का\\s+नाम"
+        ],
+        "namePrefixes": [
+          "डॉ\\.?",
+          "डा\\.",
+          "प्रो\\.",
+          "कु\\.",
+          "श्री",
+          "श्रीमती",
+          "सुश्री",
+          "कुमारी"
+        ],
+        "placeNames": [
+          "भारत",
+          "उत्तर प्रदेश",
+          "मध्य प्रदेश",
+          "उ\\.\\s?प्र\\.",
+          "म\\.\\s?प्र\\.",
+          "महाराष्ट्र",
+          "बिहार",
+          "राजस्थान",
+          "गुजरात",
+          "हरियाणा",
+          "पंजाब",
+          "उत्तराखंड",
+          "झारखंड",
+          "छत्तीसगढ़",
+          "कर्नाटक",
+          "तमिलनाडु",
+          "तेलंगाना",
+          "पश्चिम बंगाल",
+          "ओडिशा"
+        ],
         "cityNames": [
           "नई दिल्ली",
           "दिल्ली",
@@ -4931,7 +5097,24 @@
           "कानपुर",
           "वाराणसी",
           "सूरत",
-          "वडोदरा"
+          "वडोदरा",
+          "ग्रेटर नोएडा",
+          "गाज़ियाबाद",
+          "गाजियाबाद",
+          "फ़रीदाबाद",
+          "फरीदाबाद",
+          "देहरादून",
+          "रांची",
+          "रायपुर",
+          "आगरा",
+          "मेरठ",
+          "प्रयागराज",
+          "इलाहाबाद",
+          "गोरखपुर",
+          "ग्वालियर",
+          "जबलपुर",
+          "जोधपुर",
+          "बंगलौर"
         ],
         "openEnded": [
           "वर्तमान",
@@ -4970,7 +5153,19 @@
           "आर्किटेक्ट",
           "डिज़ाइनर",
           "डिजाइनर",
-          "प्रशासक"
+          "प्रशासक",
+          "अभियंता",
+          "ऑपरेटर",
+          "लेखाकार",
+          "अकाउंटेंट",
+          "लिपिक",
+          "क्लर्क",
+          "अध्यापक",
+          "प्रवक्ता",
+          "प्राध्यापक",
+          "सुपरवाइज़र",
+          "सुपरवाइजर",
+          "एग्जीक्यूटिव"
         ],
         "schoolWords": [
           "विश्वविद्यालय",
@@ -4979,12 +5174,21 @@
           "संस्थान",
           "कॉलेज",
           "स्कूल",
-          "यूनिवर्सिटी"
+          "यूनिवर्सिटी",
+          "विद्यापीठ",
+          "पॉलिटेक्निक",
+          "पॉलीटेक्निक",
+          "इंस्टीट्यूट",
+          "कालेज"
         ],
         "documentTitles": [
           "बायोडाटा",
+          "बायोडेटा",
+          "बायो-डाटा",
           "रिज़्यूमे",
           "रिज्यूमे",
+          "रेज़्यूमे",
+          "रेज्यूमे",
           "जीवनवृत्त",
           "सीवी"
         ],
@@ -4994,11 +5198,12 @@
           "जन्मदिन"
         ],
         "degrees": {
-          "2": "(?<![\\p{L}\\p{M}])(?:दसवीं|हाई\\s*स्कूल|मैट्रिक)(?![\\p{L}\\p{M}])",
-          "3": "(?<![\\p{L}\\p{M}])(?:बारहवीं|इंटरमीडिएट|उच्चतर\\s+माध्यमिक)(?![\\p{L}\\p{M}])",
-          "6": "(?<![\\p{L}\\p{M}])(?:स्नातक(?!ोत्तर)|बी\\.?\\s*ए\\.?|बी\\.?\\s*टेक|बी\\.?\\s*एससी\\.?|बी\\.?\\s*कॉम)(?![\\p{L}\\p{M}])",
-          "7": "(?<![\\p{L}\\p{M}])(?:स्नातकोत्तर|परास्नातक|एम\\.?\\s*ए\\.?|एम\\.?\\s*बी\\.?\\s*ए\\.?|एम\\.?\\s*टेक|एम\\.?\\s*एससी\\.?|एम\\.?\\s*कॉम)(?![\\p{L}\\p{M}])",
-          "8": "(?<![\\p{L}\\p{M}])(?:पीएच\\.?\\s*डी\\.?|डॉक्टरेट)(?![\\p{L}\\p{M}])"
+          "2": "(?<![\\p{L}\\p{M}])(?:दसवीं|10\\s*वीं|हाई\\s*स्कूल|मैट्रिक(?:ुलेशन)?)(?![\\p{L}\\p{M}])",
+          "3": "(?<![\\p{L}\\p{M}])(?:बारहवीं|12\\s*वीं|इंटरमीडिएट|इण्टरमीडिएट|उच्च(?:तर)?\\s+माध्यमिक|हायर\\s+सेके(?:ं|ण्)डरी)(?![\\p{L}\\p{M}])",
+          "4": "(?<![\\p{L}\\p{M}])(?:डिप्लोमा|आई\\.?\\s*टी\\.?\\s*आई\\.?)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:स्नातक(?!ोत्तर)|बी\\.?\\s*ए\\.?|बी\\.?\\s*टेक|बी\\.?\\s*एस\\.?\\s*सी\\.?|बी\\.?\\s*कॉम|बी\\.?\\s*एड\\.?|बी\\.?\\s*सी\\.?\\s*ए\\.?|बी\\.?\\s*बी\\.?\\s*ए\\.?|एल\\.?\\s*एल\\.?\\s*बी\\.?)(?![\\p{L}\\p{M}])",
+          "7": "(?<![\\p{L}\\p{M}])(?:स्नातकोत्तर|परास्नातक|एम\\.?\\s*ए\\.?|एम\\.?\\s*बी\\.?\\s*ए\\.?|एम\\.?\\s*टेक|एम\\.?\\s*एस\\.?\\s*सी\\.?|एम\\.?\\s*कॉम|एम\\.?\\s*एड\\.?|एम\\.?\\s*सी\\.?\\s*ए\\.?|एम\\.?\\s*फिल\\.?)(?![\\p{L}\\p{M}])",
+          "8": "(?<![\\p{L}\\p{M}])(?:पी\\.?\\s*एच\\.?\\s*डी\\.?|डॉक्टरेट)(?![\\p{L}\\p{M}])"
         },
         "contentLineVerbs": [
           "किया",
@@ -5016,6 +5221,7 @@
           "प्रबंधित",
           "प्रबंधन",
           "डिज़ाइन",
+          "डिजाइन",
           "लागू",
           "कार्यान्वित",
           "सुधारा",
@@ -5034,7 +5240,7 @@
         ],
         "requirements": {
           "yearsPatterns": [
-            "(?<!\\d)(\\d{1,2})\\s*(?:\\+\\s*)?(?:वर्ष|साल)(?![\\p{L}\\p{M}])"
+            "(?<!\\d)(\\d{1,2})\\s*(?:\\+\\s*)?(?:वर्ष(?:ों)?|साल(?:ों)?)(?![\\p{L}\\p{M}])"
           ],
           "languagePatterns": [
             "(?<![\\p{L}\\p{M}])(\\p{L}[\\p{L}\\p{M}]*)\\s+(?:में\\s+)?(?:धाराप्रवाह|प्रवीणता)"
@@ -5049,14 +5255,18 @@
             "बंगाली": "bengali",
             "मराठी": "marathi",
             "जर्मन": "german",
-            "फ्रेंच": "french"
+            "फ्रेंच": "french",
+            "इंग्लिश": "english",
+            "उर्दू": "urdu",
+            "पंजाबी": "punjabi",
+            "गुजराती": "gujarati"
           }
         },
         "jobSections": {
-          "required": "^(?:आवश्यकताएँ|आवश्यकताएं|योग्यता|अपेक्षित\\s+योग्यता)",
+          "required": "^(?:आवश्यकताएँ|आवश्यकताएं|योग्यता|अपेक्षित\\s+योग्यता|पात्रता|आवश्यक\\s+योग्यता|शैक्षणिक\\s+योग्यता)",
           "preferred": "^(?:वांछनीय|अतिरिक्त\\s+योग्यता)",
-          "responsibilities": "^(?:ज़िम्मेदारियाँ|जिम्मेदारियां|कार्य\\s+विवरण|दायित्व)",
-          "excluded": "^(?:हमारे\\s+बारे\\s+में|लाभ|सुविधाएँ)"
+          "responsibilities": "^(?:ज़?िम्मेदारिया[ँं]|कार्य\\s+विवरण|दायित्व|उत्तरदायित्व|भूमिका)",
+          "excluded": "^(?:हमारे\\s+बारे\\s+में|लाभ|सुविधाए[ँं])"
         },
         "alternationWords": [
           "या",
@@ -5126,21 +5336,25 @@
       },
       {
         "sections": {
-          "experience": "^(?:experiencia(?:\\s+(?:laboral|profesional|relevante))?|trayectoria\\s+(?:profesional|laboral)|historial\\s+(?:laboral|profesional)|empleos?\\s+anteriores|pr[aá]cticas(?:\\s+profesionales)?)",
-          "education": "^(?:formaci[oó]n(?:\\s+(?:acad[eé]mica|profesional|complementaria|universitaria))?|educaci[oó]n|estudios(?:\\s+(?:realizados|universitarios|acad[eé]micos))?|t[ií]tulos?(?:\\s+acad[eé]micos?)?)",
+          "experience": "^(?:experiencia(?:\\s+(?:laboral|profesional|relevante))?|trayectoria\\s+(?:profesional|laboral)|historial\\s+(?:laboral|profesional)|empleos?\\s+anteriores|pr[aá]cticas(?:\\s+profesionales)?|antecedentes\\s+(?:laborales|profesionales))",
+          "education": "^(?:formaci[oó]n(?:\\s+(?:acad[eé]mica|profesional|complementaria|universitaria))?|educaci[oó]n|estudios(?:\\s+(?:realizados|universitarios|acad[eé]micos))?|t[ií]tulos?(?:\\s+acad[eé]micos?)?|antecedentes\\s+(?:acad[eé]micos|educacionales)|escolaridad|preparaci[oó]n\\s+acad[eé]mica|titulaci[oó]n(?:\\s+acad[eé]mica)?)",
           "skills": "^(?:habilidades(?:\\s+(?:t[eé]cnicas|profesionales|clave))?|competencias(?!\\s+ling[uú][ií]sticas)(?:\\s+(?:t[eé]cnicas|profesionales|clave|digitales))?|conocimientos(?:\\s+(?:t[eé]cnicos|inform[aá]ticos))?|herramientas(?:\\s+y\\s+tecnolog[ií]as)?|aptitudes|tecnolog[ií]as|inform[aá]tica)",
           "projects": "^(?:proyectos(?:\\s+(?:personales|profesionales|destacados|acad[eé]micos))?)",
           "certifications": "^(?:certificaciones|certificados|licencias|cursos(?:\\s+y\\s+certificaciones|\\s+complementarios)?)",
           "languages": "^(?:idiomas|lenguas|competencias\\s+ling[uú][ií]sticas)",
-          "other": "^(?:contactar|contacto|extracto|perfil(?:\\s+profesional)?|resumen(?:\\s+profesional)?|sobre\\s+m[ií]|acerca\\s+de\\s+m[ií]|objetivo(?:\\s+profesional)?|intereses|aficiones|voluntariado|publicaciones|referencias|premios(?:\\s+y\\s+reconocimientos)?|reconocimientos|datos\\s+personales|informaci[oó]n\\s+(?:personal|adicional)|otros(?:\\s+datos)?)"
+          "other": "^(?:contactar|contacto|extracto|perfil(?:\\s+profesional)?|resumen(?:\\s+profesional)?|sobre\\s+m[ií]|acerca\\s+de\\s+m[ií]|objetivo(?:\\s+profesional)?|intereses|aficiones|voluntariado|publicaciones|referencias|premios(?:\\s+y\\s+reconocimientos)?|reconocimientos|datos\\s+personales|informaci[oó]n\\s+(?:personal|adicional)|otros(?:\\s+datos)?|antecedentes\\s+personales|logros)"
         },
         "languageLevels": {
+          "competencia\\s+biling[uü]e\\s+o\\s+nativa": "C2",
+          "competencia\\s+profesional\\s+completa": "C2",
+          "competencia\\s+b[aá]sica\\s+profesional": "C1",
+          "competencia\\s+b[aá]sica\\s+limitada": "B1",
           "(?:lengua\\s+)?materna|nativ[oa]": "C2",
           "biling[uü]e": "C1",
           "fluid[oa]|avanzad[oa]|dominio": "C1",
-          "intermedio[\\s-]alto|alto": "B2",
-          "intermedio": "B1",
-          "b[aá]sico|elemental": "A2",
+          "(?:intermedio|medio)[\\s-]alto|alto": "B2",
+          "intermedio|medio": "B1",
+          "b[aá]sic[oa]|elemental": "A2",
           "principiante": "A1"
         },
         "credentialWords": {
@@ -5194,6 +5408,16 @@
         "nameLabels": [
           "nombre",
           "nombre\\s+(?:y\\s+apellidos|completo)"
+        ],
+        "namePrefixes": [
+          "dra\\.?",
+          "lic(?:d[oa])?\\.",
+          "lcd[oa]\\.",
+          "ing\\.",
+          "arq\\.",
+          "mtr[oa]\\.",
+          "sr[a]?\\.",
+          "srta\\."
         ],
         "placeNames": [
           "españa",
@@ -5323,7 +5547,8 @@
         "organisationWords": [
           "s\\.\\s?l\\.(?:\\s?u\\.)?",
           "slu?",
-          "s\\.\\s?a\\.(?:\\s+de\\s+c\\.\\s?v\\.)?",
+          "s\\.\\s?a\\.(?:\\s?u\\.|\\s+de\\s+c\\.\\s?v\\.)?",
+          "s\\.?\\s?a\\.?\\s+de\\s+c\\.?\\s?v\\.?",
           "s\\.\\s?a\\.\\s?s\\.",
           "ltda\\.?",
           "s\\.\\s?r\\.\\s?l\\.",
@@ -5355,13 +5580,44 @@
           "permiso\\s+parental"
         ],
         "employerWords": [
-          "en(?=\\s+(?:[^\\s,|]+\\s+){0,6}?(?:s\\.\\s?l\\.(?:\\s?u\\.)?|s\\.\\s?a\\.(?:\\s+de\\s+c\\.\\s?v\\.)?|s\\.\\s?a\\.\\s?s\\.|s\\.\\s?r\\.\\s?l\\.|ltda\\.?)(?=[\\s,|]|$))"
+          "en(?=\\s+(?:[^\\s,|]+\\s+){0,6}?(?:s\\.\\s?l\\.(?:\\s?u\\.)?|s\\.\\s?a\\.(?:\\s?u\\.|\\s+de\\s+c\\.\\s?v\\.)?|s\\.?\\s?a\\.?\\s+de\\s+c\\.?\\s?v\\.?|s\\.\\s?a\\.\\s?s\\.|s\\.\\s?r\\.\\s?l\\.|ltda\\.?)(?=[\\s,|]|$))"
+        ],
+        "layoutEmployerWords": [
+          "en"
+        ],
+        "fieldTitleWords": [
+          "ingenier[oa]",
+          "licenciad[oa]",
+          "t[ée]cnic[oa]",
+          "tecn[óo]log[oa]",
+          "especialista",
+          "egresad[oa]",
+          "graduad[oa]",
+          "diplomad[oa]",
+          "doctor(?:a)?",
+          "mag[ií]ster",
+          "maestr[oa]",
+          "bachiller",
+          "profesional"
+        ],
+        "universityWords": [
+          "universidad"
+        ],
+        "courseWords": [
+          "curso",
+          "intercambio",
+          "semestre",
+          "diplomado",
+          "seminario",
+          "taller",
+          "extensi[oó]n",
+          "certificado"
         ],
         "titleWords": [
           "ingenier[oa]",
           "desarrollador(?:a)?",
           "programador(?:a)?",
-          "jef[ea]\\s+de\\s+(?:proyecto|producto|equipo|ventas|[aá]rea|departamento)",
+          "jef[ea]\\s+(?:de|del)",
           "director(?:a)?",
           "gerente",
           "responsable",
@@ -5388,7 +5644,17 @@
           "disenador(?:a)?",
           "l[ií]der",
           "supervisor(?:a)?",
-          "científic[oa]"
+          "cient[ií]fic[oa]",
+          "pasante",
+          "ejecutiv[oa]",
+          "vendedor(?:a)?",
+          "abogad[oa]",
+          "m[eé]dic[oa]",
+          "secretari[oa]",
+          "gestor(?:a)?",
+          "investigador(?:a)?",
+          "encargad[oa]",
+          "representante"
         ],
         "schoolWords": [
           "universidad",
@@ -5398,7 +5664,8 @@
           "facultad",
           "tecnol[oó]gico",
           "polit[eé]cnic[oa]",
-          "conservatorio"
+          "conservatorio",
+          "(?:fundaci[oó]n|corporaci[oó]n)\\s+universitaria"
         ],
         "documentTitles": [
           "curr[ií]culum(?:\\s+vitae)?",
@@ -5415,7 +5682,8 @@
           "del"
         ],
         "degrees": {
-          "6": "(?<![\\p{L}\\p{M}])(?:grado(?=\\s+(?:en|de)\\s)|licenciatura|licenciad[oa]|ingenier[ií]a(?=\\s+(?:en|de|civil|industrial|comercial|el[eé]ctrica|mec[aá]nica|qu[ií]mica|inform[aá]tica|electr[oó]nica|ambiental)\\s)|diplomatura)(?![\\p{L}\\p{M}])",
+          "5": "(?<![\\p{L}\\p{M}])(?:tecnolog[ií]a\\s+en(?=\\s)|t[eé]cnic[oa]\\s+(?:superior|profesional|universitario))(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:grado(?=\\s+(?:en|de)\\s)|licenciatura|licenciad[oa]|ingenier[ií]a(?=\\s+(?:en|de|t[eé]cnica|superior|civil|industrial|comercial|el[eé]ctrica|mec[aá]nica|qu[ií]mica|inform[aá]tica|electr[oó]nica|ambiental)\\s))(?![\\p{L}\\p{M}])",
           "7": "(?<![\\p{L}\\p{M}])(?:m[aá]ster(?:\\s+universitario)?|maestr[ií]a|mag[ií]ster|especializaci[oó]n)(?![\\p{L}\\p{M}])",
           "8": "(?<![\\p{L}\\p{M}])(?:doctorado|doctor(?:a)?\\s+en)(?![\\p{L}\\p{M}])"
         },
@@ -5526,12 +5794,15 @@
             "galician": "galician",
             "euskera": "basque",
             "vasco": "basque",
-            "basque": "basque"
+            "basque": "basque",
+            "coreano": "korean"
           },
           "seniorityLevels": {
             "entry": [
               "becari[oa]",
               "practicante",
+              "pasante",
+              "trainee",
               "reci[eé]n\\s+(?:titulad[oa]|egresad[oa])"
             ],
             "senior": [
@@ -5670,12 +5941,10 @@
         "maintainers": [],
         "detectionWords": [
           "una",
-          "desde",
           "sus",
           "también",
           "años",
           "experiencia",
-          "mediante",
           "nuestro",
           "nuestra",
           "equipo",
@@ -5685,7 +5954,6 @@
           "través",
           "ventas",
           "formación",
-          "académica",
           "conocimientos",
           "datos",
           "trabajo",
@@ -5694,14 +5962,22 @@
           "desarrollé",
           "educación",
           "herramientas",
-          "planificación"
+          "planificación",
+          "tambien",
+          "educacion",
+          "formacion",
+          "profesional",
+          "elaboración",
+          "informes",
+          "análisis",
+          "logros"
         ],
         "defaultRegion": "ES"
       },
       {
         "sections": {
-          "experience": "^(?:experi[eéê]ncias?(?:\\s+(?:profissionais?|relevantes?))?|hist[oóôõ]rico\\s+profissional|trajet[oóôõ]ria\\s+profissional|atua[cç][aáàâã]o\\s+profissional|est[aáàâã]gios?)",
-          "education": "^(?:forma[cç][aáàâã]o(?:\\s+(?:acad[eéê]mica|profissional|complementar))?|educa[cç][aáàâã]o|escolaridade|estudos)",
+          "experience": "^(?:experi[eéê]ncias?(?:\\s+(?:profissionais?|relevantes?))?|hist[oóôõ]rico\\s+profissional|trajet[oóôõ]ria\\s+profissional|atua[cç][aáàâã]o\\s+profissional|est[aáàâã]gios?|percurso\\s+profissional)",
+          "education": "^(?:forma[cç][aáàâã]o(?:\\s+(?:acad[eéê]mica|profissional|complementar))?|educa[cç][aáàâã]o|escolaridade|estudos|habilita[cç][oóôõ]es(?:\\s+(?:liter[aáàâã]rias|acad[eéê]micas))?|percurso\\s+(?:acad[eéê]mico|escolar|formativo))",
           "skills": "^(?:principais\\s+compet[eéê]ncias|habilidades(?:\\s+(?:t[eéê]cnicas|profissionais))?|compet[eéê]ncias(?!\\s+lingu[ií]sticas)(?:\\s+(?:t[eéê]cnicas|profissionais))?|conhecimentos(?:\\s+(?:t[eéê]cnicos|em\\s+inform[aáàâã]tica))?|ferramentas|tecnologias|inform[aáàâã]tica)",
           "projects": "^(?:projetos(?:\\s+(?:pessoais|profissionais|acad[eéê]micos|relevantes))?)",
           "certifications": "^(?:certifica[cç][oóôõ]es|certificados|cursos(?:\\s+(?:e\\s+certifica[cç][oóôõ]es|complementares|extracurriculares))?)",
@@ -5709,11 +5985,14 @@
           "other": "^(?:contato|contacto|perfil(?:\\s+profissional)?|resumo(?:\\s+profissional)?|sobre\\s+mim|objetivos?(?:\\s+profissional)?|interesses|atividades\\s+(?:extracurriculares|complementares)|voluntariado|publica[cç][oóôõ]es|refer[eéê]ncias|pr[eéê]mios|informa[cç][oóôõ]es\\s+(?:pessoais|adicionais)|dados\\s+pessoais)"
         },
         "languageLevels": {
+          "profici[eéê]ncia\\s+profissional\\s+completa": "C2",
+          "profici[eéê]ncia\\s+profissional\\s+limitada": "B1",
+          "profici[eéê]ncia\\s+profissional": "C1",
           "(?:l[ií]ngua\\s+)?materna|nativ[oa]": "C2",
           "fluente|avan[cç]ad[oa]|biling[uü]e": "C1",
-          "intermedi[aáàâã]ri[oa][\\s-]avan[cç]ad[oa]": "B2",
-          "intermedi[aáàâã]ri[oa]": "B1",
-          "b[aáàâã]sic[oa]": "A2",
+          "(?:intermedi[aáàâã]ri[oa]|interm[eéê]di[oa])[\\s-]avan[cç]ad[oa]": "B2",
+          "intermedi[aáàâã]ri[oa]|interm[eéê]di[oa]": "B1",
+          "b[aáàâã]sic[oa]|elementar": "A2",
           "iniciante": "A1"
         },
         "credentialWords": {
@@ -5771,6 +6050,12 @@
         "nameLabels": [
           "nome",
           "nome\\s+completo"
+        ],
+        "namePrefixes": [
+          "dra\\.?",
+          "profa?\\.",
+          "eng\\.?[oa]?",
+          "sr[a]?\\."
         ],
         "placeNames": [
           "brasil",
@@ -5869,6 +6154,7 @@
         "organisationWords": [
           "ltda\\.?",
           "s\\.\\s?a\\.",
+          "s\\/a",
           "eireli",
           "epp"
         ],
@@ -5880,7 +6166,14 @@
           "até o momento",
           "até hoje",
           "hoje",
-          "em andamento"
+          "em andamento",
+          "o presente",
+          "a presente data",
+          "à data",
+          "actual",
+          "actualmente",
+          "em curso",
+          "cursando"
         ],
         "rangeWords": [
           "a",
@@ -5895,7 +6188,37 @@
           "ano\\s+sab[aáàâã]tico"
         ],
         "employerWords": [
-          "(?:na|no|em)(?=\\s+(?:[^\\s,|]+\\s+){0,6}?(?:ltda\\.?|lda\\.?|s\\.\\s?a\\.|eireli)(?=[\\s,|]|$))"
+          "(?:na|no|em)(?=\\s+(?:[^\\s,|]+\\s+){0,6}?(?:ltda\\.?|lda\\.?|s\\.\\s?a\\.|s\\/a|eireli)(?=[\\s,|]|$))"
+        ],
+        "layoutEmployerWords": [
+          "na",
+          "no",
+          "em"
+        ],
+        "fieldTitleWords": [
+          "engenheir[oa]",
+          "bacharel",
+          "t[ée]cnic[oa]",
+          "tecn[óo]log[oa]",
+          "especialista",
+          "mestre",
+          "doutor(?:a)?",
+          "graduad[oa]",
+          "licenciad[oa]",
+          "formad[oa]",
+          "p[óo]s-graduad[oa]"
+        ],
+        "universityWords": [
+          "universidade"
+        ],
+        "courseWords": [
+          "curso",
+          "interc[aáàâã]mbio",
+          "semestre",
+          "extens[aáàâã]o",
+          "workshop",
+          "certificado",
+          "semin[aáàâã]rio"
         ],
         "titleWords": [
           "engenheir[oa]",
@@ -5904,6 +6227,14 @@
           "analista",
           "gerente",
           "coordenador(?:a)?",
+          "administrador(?:a)?",
+          "gestor(?:a)?",
+          "executiv[oa]",
+          "operador(?:a)?",
+          "representante",
+          "secret[aáàâã]ri[oa]",
+          "m[eéê]dic[oa]",
+          "advogad[oa]",
           "diretor(?:a)?",
           "supervisor(?:a)?",
           "arquitet[oa]",
@@ -5923,7 +6254,12 @@
           "chefe\\s+de",
           "trainee",
           "aprendiz",
-          "cientista"
+          "cientista",
+          "pesquisador(?:a)?",
+          "investigador(?:a)?",
+          "atendente",
+          "contabilista",
+          "encarregad[oa]"
         ],
         "schoolWords": [
           "universidade",
@@ -5932,6 +6268,7 @@
           "escola",
           "col[eéê]gio",
           "centro\\s+universit[aáàâã]rio",
+          "funda[cç][aáàâã]o",
           "fatec",
           "etec",
           "senai"
@@ -5952,9 +6289,9 @@
           "dos"
         ],
         "degrees": {
-          "6": "(?<![\\p{L}\\p{M}])(?:bacharel(?:ado)?|licenciatura|gradua[cç][aáàâã]o(?=\\s+(?:em|de)\\s)|tecn[oóôõ]logo(?=\\s+(?:em|de)\\s))(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:bacharel(?:ado|ato)?|licenciatura|gradua[cç][aáàâã]o(?=\\s+(?:em|de)\\s)|tecn[oóôõ]logo(?=\\s+(?:em|de)\\s))(?![\\p{L}\\p{M}])",
           "7": "(?<![\\p{L}\\p{M}])(?:mestrado|p[oóôõ]s[\\s-]gradua[cç][aáàâã]o|especializa[cç][aáàâã]o|mba)(?![\\p{L}\\p{M}])",
-          "8": "(?<![\\p{L}\\p{M}])(?:doutorado|ph\\.?\\s?d\\.?)(?![\\p{L}\\p{M}])"
+          "8": "(?<![\\p{L}\\p{M}])(?:doutorado|doutoramento|ph\\.?\\s?d\\.?)(?![\\p{L}\\p{M}])"
         },
         "contentLineVerbs": [
           "desenvolvi",
@@ -6341,10 +6678,10 @@
         ],
         "degrees": {
           "2": "(?<![\\p{L}\\p{M}])(?:mittlere\\s+reife|realschulabschluss|hauptschulabschluss)(?![\\p{L}\\p{M}])",
-          "3": "(?<![\\p{L}\\p{M}])(?:abitur|fachabitur|(?:allgemeine\\s+|fachgebundene\\s+)?hochschulreife|fachhochschulreife|(?:abgeschlossene\\s+)?berufsausbildung|ausbildung\\s+(?:zum|zur|als)|gesellen(?:brief|prüfung))(?![\\p{L}\\p{M}])",
-          "6": "(?<![\\p{L}\\p{M}])(?:dipl(?:om|\\.)(?:-\\p{L}+)?\\.?\\s*\\((?:fh|ba)\\)|\\p{L}{0,30}(?<!haus|bürger|welt|europa|bundes|landes|kreis|stadt|vereins|kapell|konzert|ballett|schach)meister(?:in|prüfung|brief|titel)?|staatl(?:ich|\\.)\\s*gepr(?:üfte[nr]?|\\.)\\s+\\p{L}+)(?![\\p{L}\\p{M}])",
-          "7": "(?<![\\p{L}\\p{M}])(?:dipl(?:om|\\.)(?:-\\p{L}+)?\\.?(?![\\p{L}-])(?!\\.?\\s*\\((?:fh|ba)\\))|magister|staatsexamen)(?![\\p{L}\\p{M}])",
-          "8": "(?<![\\p{L}\\p{M}])(?:promotion\\s+(?:zum|zur|in)|promoviert|doktorarbeit|doktorgrad|dr\\.[\\s-]?(?:rer|phil|ing|med)\\.)(?![\\p{L}\\p{M}])"
+          "3": "(?<![\\p{L}\\p{M}])(?:abitur|fachabitur|matura|(?:berufs)?maturit[äa]t|berufsmatura|reifepr[üu]fung|efz|eidg(?:en[öo]ssisches|\\.)\\s+f[äa]higkeitszeugnis|(?:allgemeine\\s+|fachgebundene\\s+)?hochschulreife|fachhochschulreife|(?:abgeschlossene\\s+)?berufsausbildung|ausbildung\\s+(?:zum|zur|als)(?:\\s+\\p{L}[\\p{L}-]{0,40})?|gesellen(?:brief|prüfung))(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:dipl(?:om|\\.)(?:-\\p{L}+)?\\.?\\s*\\(?(?:fh|ba|hf)\\)?(?!\\p{L})|dipl(?:om|\\.)[^\\n,;|]{0,60}?\\s\\(?hf(?!\\p{L})|eidg\\.\\s?dipl\\.|eidg(?:en[öo]ssischer|\\.)\\s+fachausweis|\\p{L}{0,30}(?<!haus|bürger|welt|europa|bundes|landes|kreis|stadt|vereins|kapell|konzert|ballett|schach)meister(?:in|prüfung|brief|titel)?|staatl(?:ich|\\.)\\s*gepr(?:üfte[nr]?|\\.)\\s+\\p{L}+)(?![\\p{L}\\p{M}])",
+          "7": "(?<![\\p{L}\\p{M}])(?:(?<!eidg\\.\\s?)dipl(?:om|\\.)(?:-\\p{L}+)?\\.?(?![\\p{L}-])(?!\\.?\\s*\\(?(?:fh|ba|hf)(?!\\p{L}))(?![^\\n,;|]{0,60}?\\s\\(?hf(?!\\p{L}))|magister|staatsexamen)(?![\\p{L}\\p{M}])",
+          "8": "(?<![\\p{L}\\p{M}])(?:promotion\\s+(?:zum|zur|in|im|an\\s+der)|promoviert|doktorarbeit|doktorgrad|dr\\.[\\s-]?(?:rer|phil|ing|med|jur|iur|oec|sc)\\.)(?![\\p{L}\\p{M}])"
         },
         "id": "DE",
         "name": "Deutschland",
@@ -6402,10 +6739,10 @@
           "Poitiers"
         ],
         "degrees": {
-          "2": "(?<![\\p{L}\\p{M}])(?:brevet(?:\\s+des\\s+coll[èe]ges)?|dnb)(?![\\p{L}\\p{M}])",
+          "2": "(?<![\\p{L}\\p{M}])(?:brevet(?:\\s+des\\s+coll[èe]ges)?(?!\\s+(?:de\\s+technicien|d['’]|professionnel))|dnb)(?![\\p{L}\\p{M}])",
           "3": "(?<![\\p{L}\\p{M}])(?:baccalaur[ée]at(?!\\s+en\\s+\\p{L})(?:\\s+(?:g[ée]n[ée]ral|technologique|professionnel|s|es|l|stmg|sti2d))?|bac(?!\\s*\\+|\\s+en\\s+\\p{L})(?:\\s+(?:g[ée]n[ée]ral|technologique|pro(?:fessionnel)?|s|es|l|stmg|sti2d))?|cap|bep)(?![\\p{L}\\p{M}])",
-          "5": "(?<![\\p{L}\\p{M}])(?:bts|dut|deug|bac\\s*\\+\\s*2)(?![\\p{L}\\p{M}])",
-          "6": "(?<![\\p{L}\\p{M}])(?:b\\.u\\.t\\.|but\\s+(?:informatique|gea|tc|mmi|geii|gmp|r&t|rt|qlio|chimie|g[ée]nie\\s+\\p{L}+|techniques\\s+de\\s+commercialisation|gestion\\s+des\\s+entreprises)|bac\\s*\\+\\s*3)(?![\\p{L}\\p{M}])",
+          "5": "(?<![\\p{L}\\p{M}])(?:bts|dut|deug|bac\\s*\\+\\s*2|brevet\\s+de\\s+technicien\\s+sup[ée]rieur)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:b\\.u\\.t\\.|but(?=\\s+(?:informatique|gea|tc|mmi|geii|gmp|r&t|rt|qlio|chimie|g[ée]nie\\s+\\p{L}+|techniques\\s+de\\s+commercialisation|gestion\\s+des\\s+entreprises)(?![\\p{L}\\p{M}]))|bac\\s*\\+\\s*3)(?![\\p{L}\\p{M}])",
           "7": "(?<![\\p{L}\\p{M}])(?:bac\\s*\\+\\s*5|dea|dess|grande\\s+[ée]cole)(?![\\p{L}\\p{M}])",
           "8": "(?<![\\p{L}\\p{M}])(?:bac\\s*\\+\\s*8)(?![\\p{L}\\p{M}])"
         },
@@ -6508,6 +6845,7 @@
           "SK",
           "TN",
           "TR",
+          "TG",
           "TS",
           "UK",
           "UP",
@@ -6553,6 +6891,16 @@
           "Mangalore",
           "Navi Mumbai",
           "Thane",
+          "Kanpur",
+          "Varanasi",
+          "Ghaziabad",
+          "Faridabad",
+          "Ludhiana",
+          "Guwahati",
+          "Dehradun",
+          "Ranchi",
+          "Raipur",
+          "Agra",
           "नई दिल्ली",
           "दिल्ली",
           "मुंबई",
@@ -6586,10 +6934,10 @@
           "vidyapith"
         ],
         "degrees": {
-          "2": "(?<![\\p{L}\\p{M}])(?:class\\s+(?:x|10)(?:th)?|10th(?:\\s+(?:standard|grade|class))?|matriculation|s\\.?s\\.?l\\.?c\\.?|s\\.?s\\.?c\\.?|secondary\\s+school\\s+certificate)(?![\\p{L}\\p{M}])",
-          "3": "(?<![\\p{L}\\p{M}])(?:class\\s+(?:xii|12)(?:th)?|12th(?:\\s+(?:standard|grade|class))?|h\\.?s\\.?c\\.?|intermediate\\s+(?:\\(|board|education|exam)|higher\\s+secondary|senior\\s+secondary|pre[\\s-]university|(?:ii\\s+|2nd\\s+)?p\\.?u\\.?c\\.?)(?![\\p{L}\\p{M}])",
-          "6": "(?<![\\p{L}\\p{M}])(?:b\\.?\\s?com\\.?|b\\.?c\\.?a\\.?|b\\.?b\\.?a\\.?|b\\.\\s?e\\.?|be(?=\\s*\\(|\\s+(?:in\\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\\p{L}\\p{M}]))|b\\.?\\s?pharm\\.?|ll\\.?b\\.?)(?![\\p{L}\\p{M}])",
-          "7": "(?<![\\p{L}\\p{M}])(?:m\\.?\\s?com\\.?|m\\.?c\\.?a\\.?|m\\.\\s?e\\.?|pgdm|pgdba|post[\\s-]?graduate\\s+diploma|m\\.?b\\.?b\\.?s\\.?|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+in\\s|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm)))(?![\\p{L}\\p{M}])"
+          "2": "(?<![\\p{L}\\p{M}])(?:class\\s+(?:x|10)(?:th)?|10th(?!\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|rank|position|place))(?:\\s+(?:standard|grade|class))?|xth|(?:std\\.?|standard)\\s+(?:x|10)(?:th)?|matric(?:ulation)?|s\\.?s\\.?l\\.?c\\.?|s\\.?s\\.?c\\.?|secondary\\s+school\\s+certificate)(?![\\p{L}\\p{M}])",
+          "3": "(?<![\\p{L}\\p{M}])(?:class\\s+(?:xii|12)(?:th)?|12th(?!\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|rank|position|place))(?:\\s+(?:standard|grade|class))?|xiith|10\\s*\\+\\s*2|(?:std\\.?|standard)\\s+(?:xii|12)(?:th)?|h\\.?s\\.?c\\.?|intermediate\\s+(?:\\(|board|education|exam|from|in\\s+(?:science|commerce|arts|mpc|bipc))|higher\\s+secondary|senior\\s+secondary|pre[\\s-]university|(?:ii\\s+|2nd\\s+)?p\\.?u\\.?c\\.?)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:b\\.?\\s?com\\.?|b\\.?c\\.?a\\.?|b\\.?b\\.?a\\.?|b\\.\\s?e\\.?|be(?=\\s*\\(|\\s+(?:in\\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\\p{L}\\p{M}]))|b\\.?\\s?pharm(?:a|acy)?\\.?|ll\\.?b\\.?)(?![\\p{L}\\p{M}])",
+          "7": "(?<![\\p{L}\\p{M}])(?:m\\.?\\s?com\\.?|m\\.?c\\.?a\\.?|m\\.\\s?e\\.?|pgdm|pgdba|post[\\s-]?graduate\\s+diploma|m\\.?b\\.?b\\.?s\\.?|m\\.?\\s?pharm(?:a)?\\.?|m\\.?\\s?phil\\.?|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+in\\s|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm)))(?![\\p{L}\\p{M}])"
         },
         "id": "IN",
         "name": "India",
@@ -6634,7 +6982,8 @@
         "degrees": {
           "2": "(?<![\\p{L}\\p{M}])(?:eso|graduado\\s+en\\s+(?:educaci[óo]n\\s+)?secundaria)(?![\\p{L}\\p{M}])",
           "3": "(?<![\\p{L}\\p{M}])(?:bachillerato|ciclo\\s+(?:formativo\\s+de\\s+)?grado\\s+medio|fp\\s+(?:de\\s+)?grado\\s+medio)(?![\\p{L}\\p{M}])",
-          "5": "(?<![\\p{L}\\p{M}])(?:ciclo\\s+(?:formativo\\s+de\\s+)?grado\\s+superior|fp\\s+(?:de\\s+)?grado\\s+superior|t[ée]cnico\\s+superior)(?![\\p{L}\\p{M}])"
+          "5": "(?<![\\p{L}\\p{M}])(?:ciclo\\s+(?:formativo\\s+de\\s+)?grado\\s+superior|fp\\s+(?:de\\s+)?grado\\s+superior|t[ée]cnico\\s+superior)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:graduad[oa]\\s+en(?!\\s+(?:educaci[óo]n\\s+)?secundaria)|diplomatura)(?![\\p{L}\\p{M}])"
         },
         "id": "ES",
         "name": "España",
@@ -6712,8 +7061,8 @@
           "Londrina"
         ],
         "degrees": {
-          "2": "(?<![\\p{L}\\p{M}])(?:ensino\\s+fundamental)(?![\\p{L}\\p{M}])",
-          "3": "(?<![\\p{L}\\p{M}])(?:ensino\\s+m[ée]dio(?:\\s+t[ée]cnico)?|curso\\s+t[ée]cnico)(?![\\p{L}\\p{M}])"
+          "2": "(?<![\\p{L}\\p{M}])(?:ensino\\s+fundamental|(?:1\\s?[o°o]|primeiro)\\s+grau)(?![\\p{L}\\p{M}])",
+          "3": "(?<![\\p{L}\\p{M}])(?:ensino\\s+m[ée]dio(?:\\s+t[ée]cnico)?|curso\\s+t[ée]cnico|(?:2\\s?[o°o]|segundo)\\s+grau)(?![\\p{L}\\p{M}])"
         },
         "id": "BR",
         "name": "Brasil",
@@ -6763,6 +7112,212 @@
         "status": "community",
         "maintainers": [],
         "phoneCountry": "PT",
+        "dateOrder": "DMY",
+        "rules": {
+          "ats-v2.privacy.dateOfBirth": {
+            "weight": 0
+          },
+          "ats-v2.format.photo": {
+            "weight": 0
+          }
+        }
+      },
+      {
+        "regionCodes": [
+          "N\\.\\s?L\\.",
+          "D\\.\\s?F\\.",
+          "Edo\\.\\s?(?:de\\s)?M[ée]x\\.",
+          "(?:Jal|Qro|Gto|Pue|Yuc|Chih|Coah|Son|Ver|Mich|Oax|Tamps|Sin|Ags|Hgo|Tab|Dgo|Zac|Mor|Gro|Chis|Nay|Camp|Tlax)\\.",
+          "B\\.\\s?C\\.(?:\\s?S\\.)?",
+          "Q\\.\\s?Roo\\.?",
+          "S\\.\\s?L\\.\\s?P\\."
+        ],
+        "cityNames": [
+          "Ciudad de México",
+          "CDMX",
+          "Guadalajara",
+          "Monterrey",
+          "Puebla",
+          "Querétaro",
+          "Tijuana",
+          "Zapopan",
+          "Mérida",
+          "Aguascalientes",
+          "San Luis Potosí",
+          "Toluca",
+          "Chihuahua",
+          "Hermosillo",
+          "Saltillo",
+          "Mexicali",
+          "Culiacán",
+          "Cancún",
+          "Morelia",
+          "Ciudad Juárez",
+          "San Pedro Garza García",
+          "Naucalpan",
+          "Oaxaca",
+          "Veracruz"
+        ],
+        "organisationWords": [
+          "s\\.\\s?a\\.\\s?b\\.\\s+de\\s+c\\.\\s?v\\.",
+          "s\\.?\\s?a\\.?\\s+de\\s+c\\.?\\s?v\\.?",
+          "s\\.\\s?de\\s+r\\.\\s?l\\.(?:\\s+de\\s+c\\.\\s?v\\.)?",
+          "s\\.\\s?a\\.\\s?p\\.\\s?i\\.\\s+de\\s+c\\.\\s?v\\."
+        ],
+        "degrees": {
+          "2": "(?<![\\p{L}\\p{M}])(?:secundaria)(?![\\p{L}\\p{M}])",
+          "3": "(?<![\\p{L}\\p{M}])(?:preparatoria|prepa|bachillerato(?:\\s+(?:general|tecnol[óo]gico))?|profesional\\s+t[ée]cnico(?:\\s+bachiller)?)(?![\\p{L}\\p{M}])",
+          "5": "(?<![\\p{L}\\p{M}])(?:t[ée]cnico\\s+superior\\s+universitario|tsu)(?![\\p{L}\\p{M}])"
+        },
+        "id": "MX",
+        "name": "México",
+        "status": "community",
+        "maintainers": [],
+        "phoneCountry": "MX",
+        "dateOrder": "DMY",
+        "rules": {
+          "ats-v2.privacy.dateOfBirth": {
+            "weight": 0
+          },
+          "ats-v2.format.photo": {
+            "weight": 0
+          }
+        }
+      },
+      {
+        "regionCodes": [
+          "PBA"
+        ],
+        "cityNames": [
+          "Buenos Aires",
+          "Córdoba",
+          "Rosario",
+          "Mendoza",
+          "La Plata",
+          "Mar del Plata",
+          "San Miguel de Tucumán",
+          "Tucumán",
+          "Salta",
+          "Neuquén",
+          "Bahía Blanca",
+          "Vicente López",
+          "Santa Fe",
+          "Corrientes",
+          "Posadas",
+          "San Isidro",
+          "Capital Federal",
+          "CABA",
+          "C\\.A\\.B\\.A\\.",
+          "Bs\\.\\s?As\\."
+        ],
+        "degrees": {
+          "3": "(?<![\\p{L}\\p{M}])(?:secundari[oa](?:\\s+completo)?|polimodal|bachiller(?:ato)?(?:\\s+con\\s+orientaci[óo]n)?)(?![\\p{L}\\p{M}])",
+          "5": "(?<![\\p{L}\\p{M}])(?:tecnicatura|t[ée]cnic[oa]\\s+superior)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:profesorado(?=\\s+(?:de|en|para)\\s))(?![\\p{L}\\p{M}])"
+        },
+        "id": "AR",
+        "name": "Argentina",
+        "status": "community",
+        "maintainers": [],
+        "phoneCountry": "AR",
+        "dateOrder": "DMY",
+        "rules": {
+          "ats-v2.privacy.dateOfBirth": {
+            "weight": 0
+          },
+          "ats-v2.format.photo": {
+            "weight": 0
+          }
+        }
+      },
+      {
+        "regionCodes": [
+          "D\\.\\s?C\\."
+        ],
+        "cityNames": [
+          "Bogot[áa](?:\\s+D\\.\\s?C\\.)?",
+          "Medellín",
+          "Medellin",
+          "Cali",
+          "Barranquilla",
+          "Cartagena",
+          "Bucaramanga",
+          "Manizales",
+          "Cúcuta",
+          "Ibagué",
+          "Santa Marta",
+          "Villavicencio",
+          "Montería",
+          "Neiva",
+          "Envigado",
+          "Itagüí",
+          "Chía"
+        ],
+        "schoolWords": [
+          "sena"
+        ],
+        "degrees": {
+          "3": "(?<![\\p{L}\\p{M}])(?:bachiller(?:\\s+(?:acad[ée]mico|t[ée]cnico|comercial))?|bachillerato)(?![\\p{L}\\p{M}])",
+          "5": "(?<![\\p{L}\\p{M}])(?:t[ée]cnic[oa]\\s+profesional|tecn[óo]log[oa](?=\\s+en\\s)|tecnolog[íi]a\\s+en)(?![\\p{L}\\p{M}])"
+        },
+        "id": "CO",
+        "name": "Colombia",
+        "status": "community",
+        "maintainers": [],
+        "phoneCountry": "CO",
+        "dateOrder": "DMY",
+        "rules": {
+          "ats-v2.privacy.dateOfBirth": {
+            "weight": 0
+          },
+          "ats-v2.format.photo": {
+            "weight": 0
+          }
+        }
+      },
+      {
+        "regionCodes": [
+          "RM"
+        ],
+        "cityNames": [
+          "Santiago",
+          "Santiago de Chile",
+          "Valparaíso",
+          "Viña del Mar",
+          "Concepción",
+          "Antofagasta",
+          "La Serena",
+          "Temuco",
+          "Puerto Montt",
+          "Rancagua",
+          "Talca",
+          "Arica",
+          "Iquique",
+          "Calama",
+          "Chillán",
+          "Osorno",
+          "Las Condes",
+          "Vitacura"
+        ],
+        "organisationWords": [
+          "spa",
+          "e\\.\\s?i\\.\\s?r\\.\\s?l\\."
+        ],
+        "schoolWords": [
+          "liceo",
+          "inacap",
+          "duoc(?:\\s+uc)?"
+        ],
+        "degrees": {
+          "2": "(?<![\\p{L}\\p{M}])(?:ense[ñn]anza\\s+b[áa]sica)(?![\\p{L}\\p{M}])",
+          "3": "(?<![\\p{L}\\p{M}])(?:(?:licencia\\s+de\\s+)?ense[ñn]anza\\s+media|(?:cuarto|4(?:\\s?[°o]|to)?)\\s+(?:a[ñn]o\\s+)?medio)(?![\\p{L}\\p{M}])",
+          "5": "(?<![\\p{L}\\p{M}])(?:t[ée]cnico\\s+(?:de\\s+nivel\\s+superior|universitario))(?![\\p{L}\\p{M}])"
+        },
+        "id": "CL",
+        "name": "Chile",
+        "status": "community",
+        "maintainers": [],
+        "phoneCountry": "CL",
         "dateOrder": "DMY",
         "rules": {
           "ats-v2.privacy.dateOfBirth": {

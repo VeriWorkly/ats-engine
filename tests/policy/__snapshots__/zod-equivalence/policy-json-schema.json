@@ -2220,6 +2220,22 @@
               "minLength": 1
             }
           },
+          "layoutEmployerWords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "fieldTitleWords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "documentTitles": {
             "default": [
               "resume",
@@ -2314,6 +2330,21 @@
               "lcsw",
               "frcs",
               "mrcp"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "namePrefixes": {
+            "default": [
+              "dr\\.?",
+              "prof\\.?",
+              "mrs?\\.?",
+              "ms\\.?",
+              "mx\\.?"
             ],
             "minItems": 1,
             "type": "array",
@@ -2872,6 +2903,22 @@
               "minLength": 1
             }
           },
+          "universityWords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "courseWords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "degrees": {
             "type": "object",
             "properties": {
@@ -2995,7 +3042,8 @@
                   "también",
                   "años",
                   "experiencia"
-                ]
+                ],
+                "openEnded": []
               },
               {
                 "id": "pt",
@@ -3012,7 +3060,8 @@
                   "ao",
                   "para",
                   "como"
-                ]
+                ],
+                "openEnded": []
               },
               {
                 "id": "it",
@@ -3029,6 +3078,12 @@
                   "degli",
                   "alla",
                   "anni"
+                ],
+                "openEnded": [
+                  "oggi",
+                  "attuale",
+                  "in corso",
+                  "presente"
                 ]
               },
               {
@@ -3046,7 +3101,8 @@
                   "aux",
                   "les",
                   "nous"
-                ]
+                ],
+                "openEnded": []
               },
               {
                 "id": "de",
@@ -3063,7 +3119,8 @@
                   "zur",
                   "zum",
                   "auf"
-                ]
+                ],
+                "openEnded": []
               },
               {
                 "id": "nl",
@@ -3078,6 +3135,10 @@
                   "werkervaring",
                   "jaar",
                   "ervaring"
+                ],
+                "openEnded": [
+                  "heden",
+                  "huidig"
                 ]
               },
               {
@@ -3093,6 +3154,11 @@
                   "jako",
                   "lat",
                   "zespołu"
+                ],
+                "openEnded": [
+                  "obecnie",
+                  "nadal",
+                  "teraz"
                 ]
               },
               {
@@ -3108,67 +3174,114 @@
                   "utveckling",
                   "arbetat",
                   "ansvarig"
+                ],
+                "openEnded": [
+                  "nuvarande",
+                  "pågående",
+                  "idag"
                 ]
               },
               {
                 "script": "Cyrillic",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "настоящее время",
+                  "наст. время",
+                  "н.в.",
+                  "сейчас",
+                  "теперішній час"
+                ]
               },
               {
                 "id": "el",
                 "script": "Greek",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "σήμερα"
+                ]
               },
               {
                 "script": "Arabic",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "حتى الآن",
+                  "الحاضر"
+                ]
               },
               {
                 "id": "he",
                 "script": "Hebrew",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "היום",
+                  "הווה"
+                ]
               },
               {
                 "id": "ja",
                 "script": "Hiragana",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "現在",
+                  "至今"
+                ]
               },
               {
                 "id": "ja",
                 "script": "Katakana",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "現在",
+                  "至今"
+                ]
               },
               {
                 "script": "Han",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "至今",
+                  "现在",
+                  "現在",
+                  "目前"
+                ]
               },
               {
                 "id": "ko",
                 "script": "Hangul",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "현재"
+                ]
               },
               {
                 "id": "th",
                 "script": "Thai",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "ปัจจุบัน"
+                ]
               },
               {
                 "script": "Devanagari",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": []
               },
               {
                 "script": "Bengali",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": []
               },
               {
                 "id": "ta",
                 "script": "Tamil",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": []
               },
               {
                 "id": "te",
                 "script": "Telugu",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": []
               }
             ],
             "type": "array",
@@ -3183,6 +3296,14 @@
                   "type": "string"
                 },
                 "detectionWords": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "openEnded": {
                   "default": [],
                   "type": "array",
                   "items": {
@@ -4482,6 +4603,14 @@
                     "minLength": 1
                   }
                 },
+                "namePrefixes": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "regionCodes": {
                   "minItems": 1,
                   "type": "array",
@@ -4579,6 +4708,38 @@
                   }
                 },
                 "employerWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "layoutEmployerWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "fieldTitleWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "universityWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "courseWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -5035,6 +5196,14 @@
                     "minLength": 1
                   }
                 },
+                "namePrefixes": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "regionCodes": {
                   "minItems": 1,
                   "type": "array",
@@ -5132,6 +5301,38 @@
                   }
                 },
                 "employerWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "layoutEmployerWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "fieldTitleWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "universityWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "courseWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -7976,6 +8177,22 @@
               "minLength": 1
             }
           },
+          "layoutEmployerWords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "fieldTitleWords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "documentTitles": {
             "default": [
               "resume",
@@ -8070,6 +8287,21 @@
               "lcsw",
               "frcs",
               "mrcp"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "namePrefixes": {
+            "default": [
+              "dr\\.?",
+              "prof\\.?",
+              "mrs?\\.?",
+              "ms\\.?",
+              "mx\\.?"
             ],
             "minItems": 1,
             "type": "array",
@@ -8628,6 +8860,22 @@
               "minLength": 1
             }
           },
+          "universityWords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "courseWords": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "degrees": {
             "type": "object",
             "properties": {
@@ -8679,10 +8927,13 @@
           "lineEndDateWords",
           "leaveWords",
           "employerWords",
+          "layoutEmployerWords",
+          "fieldTitleWords",
           "documentTitles",
           "notNames",
           "nameParticles",
           "postNominals",
+          "namePrefixes",
           "regionCodes",
           "placeNames",
           "cityNames",
@@ -8695,6 +8946,8 @@
           "phoneRegions",
           "titleWords",
           "schoolWords",
+          "universityWords",
+          "courseWords",
           "degrees"
         ],
         "additionalProperties": false
@@ -8780,7 +9033,8 @@
                   "también",
                   "años",
                   "experiencia"
-                ]
+                ],
+                "openEnded": []
               },
               {
                 "id": "pt",
@@ -8797,7 +9051,8 @@
                   "ao",
                   "para",
                   "como"
-                ]
+                ],
+                "openEnded": []
               },
               {
                 "id": "it",
@@ -8814,6 +9069,12 @@
                   "degli",
                   "alla",
                   "anni"
+                ],
+                "openEnded": [
+                  "oggi",
+                  "attuale",
+                  "in corso",
+                  "presente"
                 ]
               },
               {
@@ -8831,7 +9092,8 @@
                   "aux",
                   "les",
                   "nous"
-                ]
+                ],
+                "openEnded": []
               },
               {
                 "id": "de",
@@ -8848,7 +9110,8 @@
                   "zur",
                   "zum",
                   "auf"
-                ]
+                ],
+                "openEnded": []
               },
               {
                 "id": "nl",
@@ -8863,6 +9126,10 @@
                   "werkervaring",
                   "jaar",
                   "ervaring"
+                ],
+                "openEnded": [
+                  "heden",
+                  "huidig"
                 ]
               },
               {
@@ -8878,6 +9145,11 @@
                   "jako",
                   "lat",
                   "zespołu"
+                ],
+                "openEnded": [
+                  "obecnie",
+                  "nadal",
+                  "teraz"
                 ]
               },
               {
@@ -8893,67 +9165,114 @@
                   "utveckling",
                   "arbetat",
                   "ansvarig"
+                ],
+                "openEnded": [
+                  "nuvarande",
+                  "pågående",
+                  "idag"
                 ]
               },
               {
                 "script": "Cyrillic",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "настоящее время",
+                  "наст. время",
+                  "н.в.",
+                  "сейчас",
+                  "теперішній час"
+                ]
               },
               {
                 "id": "el",
                 "script": "Greek",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "σήμερα"
+                ]
               },
               {
                 "script": "Arabic",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "حتى الآن",
+                  "الحاضر"
+                ]
               },
               {
                 "id": "he",
                 "script": "Hebrew",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "היום",
+                  "הווה"
+                ]
               },
               {
                 "id": "ja",
                 "script": "Hiragana",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "現在",
+                  "至今"
+                ]
               },
               {
                 "id": "ja",
                 "script": "Katakana",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "現在",
+                  "至今"
+                ]
               },
               {
                 "script": "Han",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "至今",
+                  "现在",
+                  "現在",
+                  "目前"
+                ]
               },
               {
                 "id": "ko",
                 "script": "Hangul",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "현재"
+                ]
               },
               {
                 "id": "th",
                 "script": "Thai",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": [
+                  "ปัจจุบัน"
+                ]
               },
               {
                 "script": "Devanagari",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": []
               },
               {
                 "script": "Bengali",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": []
               },
               {
                 "id": "ta",
                 "script": "Tamil",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": []
               },
               {
                 "id": "te",
                 "script": "Telugu",
-                "detectionWords": []
+                "detectionWords": [],
+                "openEnded": []
               }
             ],
             "type": "array",
@@ -8974,10 +9293,19 @@
                     "type": "string",
                     "minLength": 1
                   }
+                },
+                "openEnded": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 }
               },
               "required": [
-                "detectionWords"
+                "detectionWords",
+                "openEnded"
               ],
               "additionalProperties": false
             }
@@ -10338,6 +10666,14 @@
                     "minLength": 1
                   }
                 },
+                "namePrefixes": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "regionCodes": {
                   "minItems": 1,
                   "type": "array",
@@ -10435,6 +10771,38 @@
                   }
                 },
                 "employerWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "layoutEmployerWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "fieldTitleWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "universityWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "courseWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {
@@ -10891,6 +11259,14 @@
                     "minLength": 1
                   }
                 },
+                "namePrefixes": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "regionCodes": {
                   "minItems": 1,
                   "type": "array",
@@ -10988,6 +11364,38 @@
                   }
                 },
                 "employerWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "layoutEmployerWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "fieldTitleWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "universityWords": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "courseWords": {
                   "minItems": 1,
                   "type": "array",
                   "items": {

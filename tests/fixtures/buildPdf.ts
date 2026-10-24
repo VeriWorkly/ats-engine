@@ -109,6 +109,66 @@ export function buildPdfPages(contentStreams: string[]): Buffer {
   return assemble(objects, "");
 }
 
+/**
+ * A font for any script, as a word processor writes one: a Type0 font with one code per character
+ * and a ToUnicode map, so umlauts and Devanagari extract as written. The glyph shapes are not
+ * embedded (a reader extracts text from the map); every character is half an em wide. Text is
+ * shown with `show`, measured with `width`, and the file built with `pages` once all is shown.
+ */
+export function unicodeFont() {
+  const codes = new Map<string, number>();
+  const hex = (unit: number) => unit.toString(16).padStart(4, "0").toUpperCase();
+  const codeOf = (char: string) => {
+    if (!codes.has(char)) codes.set(char, codes.size + 1);
+    return hex(codes.get(char)!);
+  };
+  // A tab is no glyph: a word processor writes the gap as space.
+  const show = (x: number, y: number, value: string) =>
+    `BT /F1 10 Tf ${x} ${y} Td <${[...value.replace(/\t/g, "    ")].map(codeOf).join("")}> Tj ET`;
+  // A non-spacing mark (a virama, a nukta) sits on the letter before it, as in any real font.
+  const width = (value: string, size = 10) =>
+    ([...value.replace(/\t/g, "    ")].filter((char) => !/\p{Mn}/u.test(char)).length * size) / 2;
+  const pages = (contentStreams: string[]) => {
+    const entries = [...codes].map(([char, code]) => {
+      const units = [...Array(char.length).keys()].map((at) => hex(char.charCodeAt(at)));
+      return `<${hex(code)}> <${units.join("")}>`;
+    });
+    const blocks: string[] = [];
+    for (let at = 0; at < entries.length; at += 100) {
+      const block = entries.slice(at, at + 100);
+      blocks.push(`${block.length} beginbfchar\n${block.join("\n")}\nendbfchar`);
+    }
+    const cmap = [
+      "/CIDInit /ProcSet findresource begin 12 dict begin begincmap",
+      "/CIDSystemInfo <</Registry (Adobe) /Ordering (UCS) /Supplement 0>> def",
+      "/CMapName /Adobe-Identity-UCS def /CMapType 2 def",
+      "1 begincodespacerange <0000> <FFFF> endcodespacerange",
+      ...blocks,
+      "endcmap CMapName currentdict /CMap defineresource pop end end",
+    ].join("\n");
+    const marks = [...codes]
+      .filter(([char]) => /\p{Mn}/u.test(char))
+      .map(([, code]) => `${code}[0]`);
+    const pageAt = contentStreams.map((_, index) => 7 + index * 2);
+    return assemble(
+      [
+        "<</Type/Catalog/Pages 2 0 R>>",
+        `<</Type/Pages/Kids[${pageAt.map((page) => `${page} 0 R`).join(" ")}]/Count ${pageAt.length}>>`,
+        "<</Type/Font/Subtype/Type0/BaseFont/NotoSans/Encoding/Identity-H/DescendantFonts[4 0 R]/ToUnicode 6 0 R>>",
+        `<</Type/Font/Subtype/CIDFontType2/BaseFont/NotoSans/CIDSystemInfo<</Registry(Adobe)/Ordering(Identity)/Supplement 0>>/FontDescriptor 5 0 R/DW 500/W[${marks.join(" ")}]/CIDToGIDMap/Identity>>`,
+        "<</Type/FontDescriptor/FontName/NotoSans/Flags 32/FontBBox[0 -250 1000 900]/ItalicAngle 0/Ascent 900/Descent -250/CapHeight 700/StemV 80>>",
+        stream("", cmap),
+        ...contentStreams.flatMap((content, index) => [
+          `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R>>>>/Contents ${pageAt[index]! + 1} 0 R>>`,
+          stream("", content),
+        ]),
+      ],
+      "",
+    );
+  };
+  return { show, width, pages };
+}
+
 /** A stream object for `buildPdf`'s `extra`: `dictionary` without its `<<>>` or `/Length`. */
 export function stream(dictionary: string, content: string) {
   return `<<${dictionary}/Length ${Buffer.byteLength(content, "latin1")}>>\nstream\n${content}\nendstream`;

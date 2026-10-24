@@ -156,13 +156,65 @@ function dateOrderIn(text: string): "DMY" | "MDY" | undefined {
   return dayFirst === monthFirst ? undefined : dayFirst ? "DMY" : "MDY";
 }
 
+/** Without accents: "Bogotá" and "Bogota" alike. */
+const plain = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "");
+/** A region's name and cities, matched whole, ignoring case and accents. */
+const placesOfRegion = memo(
+  (region: AtsRegionPack) =>
+    new RegExp(`^(?:${[region.name, ...(region.cityNames ?? [])].map(plain).join("|")})$`, "iu"),
+);
+/** The country domain of an email or a site: "ar" in "@empresa.com.ar"; ".co" alone is a startup's. */
+const COUNTRY_DOMAIN =
+  /[@.][a-z0-9-]{1,63}\.(?:(?:com|org|edu|gob|gov|net)\.)?([a-z]{2})(?![\w.-])/giu;
+/** An email address or a run of seven digits or more: a contact line. */
+const CONTACT = /@|\d(?:[\s().-]*\d){6}/u;
+
+/**
+ * The region a resume's header names: its email's or site's country domain (".com.ar", ".cl"),
+ * else a part of a header line that is the country's name or one of its cities ("Buenos Aires,
+ * Argentina", "Lisboa"). The header runs to the line after the last contact line of the first
+ * six, so a role's city further down never names it.
+ */
+function headerRegion(resumeText: string, regions: readonly AtsRegionPack[]) {
+  const top = resumeText
+    .slice(0, DETECTION_SAMPLE)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+  let contact = -1;
+  for (const [at, line] of top.entries()) if (CONTACT.test(line)) contact = at;
+  const header = top.slice(0, contact + 2);
+  for (const [, domain] of header.join("\n").matchAll(COUNTRY_DOMAIN)) {
+    const found = regions.find((region) => region.id === domain!.toUpperCase());
+    if (found && !(domain === "co" && !/\.com\.co(?![\w.-])/iu.test(header.join("\n"))))
+      return found;
+  }
+  // Split, then trim: a separator pattern with spaces on both sides rescans a run of spaces.
+  const parts = header.flatMap((line) =>
+    line
+      .split(/[|,·•\t]|\s[–—-]\s/u)
+      .map((part) => plain(part.trim()))
+      .filter(Boolean),
+  );
+  // The country named beats a city: "Córdoba, España" is Spain, though Argentina has a Córdoba.
+  return (
+    regions.find((region) => parts.some((part) => countryOf(region).test(part))) ??
+    parts.map((part) => regions.find((region) => placesOfRegion(region).test(part))).find(Boolean)
+  );
+}
+
+/** A region's own name, whole, ignoring case and accents: "España", "Mexico". */
+const countryOf = memo((region: AtsRegionPack) => new RegExp(`^${plain(region.name)}$`, "iu"));
+
 /**
  * The policy a given resume (and posting) is scored with: the base, plus the attached language
  * packs it is written in, plus one region, plus the date order the resume's own dates show.
  *
  * The region is the one asked for, else the country of the first phone number with a country
- * code, else the default region of a language the resume is written in (or asked for). Memoised
- * per combination.
+ * code, else, for a resume a language pack reads, the region its header names (`headerRegion`),
+ * else the default region of a language the resume is written in (or asked for). An English
+ * resume is left to its phone number. Memoised per combination.
  */
 export function localizePolicy(
   policy: AtsEnginePolicy,
@@ -187,17 +239,33 @@ export function localizePolicy(
     ? regions.find((pack) => pack.id === options.region!.toUpperCase())
     : undefined;
   if (options.region && !asked) throw notAttached("region", options.region, regions);
-  // The policy's own language names no pack and is accepted.
+  // The policy's own language names no pack and is accepted. So is a language it recognises and no
+  // pack reads (`text.otherLanguages`, by id or script: "it", "Cyrillic"): the resume is read as
+  // detection would read it, with no pack and without the English writing rules.
   const askedLanguages = options.languages?.map((id) => id.toLowerCase());
+  const recognised = (id: string) =>
+    policy.text.otherLanguages.find(
+      (other) => other.id === id || other.script?.toLowerCase() === id,
+    );
   const unknown = askedLanguages?.find(
-    (id) => id !== policy.text.language && !packs.some((pack) => pack.id === id),
+    (id) => id !== policy.text.language && !packs.some((pack) => pack.id === id) && !recognised(id),
   );
   if (unknown !== undefined) throw notAttached("language", unknown, packs);
+  const askedOther = askedLanguages
+    ?.filter((id) => !packs.some((pack) => pack.id === id))
+    .map(recognised)
+    .find(Boolean);
   const dateOrder = dateOrderIn(resumeText.slice(0, DETECTION_SAMPLE));
   const resumeSample = sampleOf(resumeText);
   // No pack's language: the base's, or "und" when the resume is not the base's either.
   const unsupportedIn = (ids: string[]) =>
-    ids.length || options.languages ? null : (otherLanguageOf(policy, resumeSample) ?? null);
+    ids.length
+      ? null
+      : options.languages
+        ? askedOther
+          ? (askedOther.id ?? askedOther.script ?? UNDETERMINED)
+          : null
+        : (otherLanguageOf(policy, resumeSample) ?? null);
   if (packs.length === 0 && regions.length === 0 && dateOrder === undefined) {
     const unsupported = unsupportedIn([]);
     return {
@@ -237,6 +305,7 @@ export function localizePolicy(
   const region =
     asked ??
     regions.find((pack) => pack.phoneCountry === country) ??
+    (leading.length ? headerRegion(resumeText, regions) : undefined) ??
     leading
       .map((pack) => regions.find((candidate) => candidate.id === pack.defaultRegion))
       .find(Boolean);

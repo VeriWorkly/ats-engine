@@ -3,6 +3,7 @@
 import { parseArgs } from "node:util";
 
 import type { FetchLike } from "../ai/http.js";
+import { convertedToDocument, groundedText } from "../ai/tasks/convertResume.js";
 import {
   adviceLabel,
   categoryLabel,
@@ -23,7 +24,7 @@ import {
   type AtsSeverity,
 } from "../index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../locales/index.js";
-import { unsupportedLanguageNote } from "../locales/languages.js";
+import { unsupportedLanguageNote, unsupportedLanguageOpening } from "../locales/languages.js";
 import {
   AtsFileError,
   parseJsonFile,
@@ -39,6 +40,7 @@ import {
   DEFAULT_TIMEOUT_SECONDS,
   describeAiError,
   PROVIDERS,
+  readWithAi,
   renderInsights,
   resolveAiConfig,
 } from "./ai.js";
@@ -90,7 +92,11 @@ The report ends with advice that is never scored: the file's name and size, an e
 tracked changes or comments in a Word file, and details that can invite age bias (US resumes).
 
 AI analysis (optional, with your own API key):
-  --ai                Ask a model to explain the report and suggest improvements
+  --ai                Ask a model to explain the report and suggest improvements. A resume
+                      in a language no pack reads (Italian, Dutch, Russian…) is first read
+                      by the model, contact details included; each name, employer, title,
+                      school, skill, link and bullet must appear in the file, and what
+                      does is scored ("Read with AI help")
   --provider <name>   ${Object.keys(PROVIDERS).slice(0, -1).join(", ")},
                       or openai-compatible with --base-url
   --model <id>        A model id your provider lists
@@ -326,7 +332,7 @@ async function runCheck(argv: string[], context: CliContext): Promise<number> {
       : undefined;
   const jobDescription = job?.text;
   const resume = prepareResume(input);
-  const report = check(resume, policy, {
+  const options = {
     jobDescription,
     jobCompany: job?.company,
     layout,
@@ -335,15 +341,53 @@ async function runCheck(argv: string[], context: CliContext): Promise<number> {
     region: values.region,
     languages: values.lang === undefined ? undefined : [values.lang],
     includeLines: values.text,
-  });
+  };
+  let report = check(resume, policy, options);
+
+  // A language no pack reads, with --ai: the model reads the fields, every one checked against the
+  // file, and the engine scores them as a structured document ("read with AI help").
+  let aiFailed = false;
+  let reading: { language: string; rejected: number } | undefined;
+  const unsupported = report.locale.unsupported;
+  if (aiConfig && unsupported && !resume.document) {
+    console.error(
+      `\n${unsupportedLanguageOpening(unsupported)} the engine does not read yet. Sending the ` +
+        `whole resume, contact details included, to ${aiConfig.provider} at ` +
+        `${aiConfig.host} (${aiConfig.model}) to read its fields; each name, employer, title, school ` +
+        "and skill it returns must appear in the file.",
+    );
+    try {
+      const run = await readWithAi(aiConfig, resume.text, policy, context.fetch);
+      // Bullets and summaries must occur in the file too before they are scored; read as the
+      // language detected, so the English writing rules stay off them.
+      const grounded = groundedText(run.result, resume.text);
+      report = check(convertedToDocument(grounded.resume), policy, {
+        ...options,
+        layout: undefined,
+        languages: [unsupported],
+      });
+      reading = { language: unsupported, rejected: run.rejected.length + grounded.dropped.length };
+    } catch (error) {
+      console.error(`ats-engine: ${printable(describeAiError(error, aiConfig))}`);
+      aiFailed = true;
+    }
+  }
   const belowMinimum = minScore !== null && report.readinessScore < minScore;
 
   // Resume and posting text can carry control characters; none reach the terminal.
-  if (!values.json) console.log(render(printable(report), style));
+  if (!values.json) {
+    if (reading)
+      console.log(
+        style.dim(
+          `Read with AI help (${aiConfig!.model}): the fields below come from the model, checked ` +
+            `against the file${reading.rejected ? `; ${reading.rejected} value(s) not found in it were dropped` : ""}.`,
+        ),
+      );
+    console.log(render(printable(report), style));
+  }
 
-  let aiFailed = false;
   let ai: ReturnType<typeof aiJson> | undefined;
-  if (aiConfig) {
+  if (aiConfig && !aiFailed) {
     // Printed before anything leaves the machine; `analyze` redacts these (ai/redact.ts).
     console.error(
       `\nSending the resume to ${aiConfig.provider} at ${aiConfig.host} (${aiConfig.model}) for ` +
@@ -364,8 +408,15 @@ async function runCheck(argv: string[], context: CliContext): Promise<number> {
   }
 
   // JSON escapes C0 but not C1 controls (U+0080–U+009F), which a terminal can act on.
-  if (values.json) console.log(JSON.stringify(printable(ai ? { ...report, ai } : report), null, 2));
-  else if (values.text)
+  if (values.json) {
+    const readWithAi = reading && {
+      provider: aiConfig!.provider,
+      model: aiConfig!.model,
+      ...reading,
+    };
+    const out = { ...report, ...(readWithAi && { readWithAi }), ...(ai && { ai }) };
+    console.log(JSON.stringify(printable(out), null, 2));
+  } else if (values.text)
     console.log(["", style.bold("Text as read:"), ...printable(report.lines ?? [])].join("\n"));
 
   if (belowMinimum)

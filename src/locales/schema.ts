@@ -58,6 +58,8 @@ const vocabularyShape = {
   nameLabels: optionalList("nameLabels"),
   /** Letters after a name ("Dipl.-Ing.", "CA"), and codes that name a region, not a credential ("MH", "KA"). */
   postNominals: optionalList("postNominals"),
+  /** Honorifics before a name: "Dra.", "Frau", "डॉ.". */
+  namePrefixes: optionalList("namePrefixes"),
   regionCodes: optionalList("regionCodes"),
   /** Countries and states in the pack's language: "Deutschland", "Bayern". */
   placeNames: optionalList("placeNames"),
@@ -77,6 +79,14 @@ const vocabularyShape = {
   /** Time off dated like a role, which counts as none: "Elternzeit", "congé parental". */
   leaveWords: optionalList("leaveWords"),
   employerWords: optionalList("employerWords"),
+  /** Words joining title and employer once a role shows it: Spanish "en", Portuguese "na". */
+  layoutEmployerWords: optionalList("layoutEmployerWords"),
+  /** Titles that take a field after that word: "Ingeniero en Sistemas". */
+  fieldTitleWords: optionalList("fieldTitleWords"),
+  /** Universities where a program named by its field alone is the first degree: "universidad". */
+  universityWords: optionalList("universityWords"),
+  /** A course or a term abroad, never a degree: "curso", "intercambio". */
+  courseWords: optionalList("courseWords"),
   titleWords: optionalList("titleWords"),
   schoolWords: optionalList("schoolWords"),
   documentTitles: optionalList("documentTitles"),

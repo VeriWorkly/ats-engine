@@ -186,6 +186,18 @@ export const resumeParseSchema = z.object({
   ]),
   /** Words joining a job title to its employer on one line: "Engineer at Acme". */
   employerWords: z._default(wordList("employerWords"), ["at"]),
+  /**
+   * Words that join a title to its employer only once the resume shows it: one role joined by
+   * the same word in `employerWords` (Spanish "en" before a legal form: "Diseñadora UX en Acme
+   * S.L.") makes every role's last such word part title from employer ("Ingeniero en Cielo Azul
+   * Software"). Without such a role, "Especialista en Marketing" stays a title.
+   */
+  layoutEmployerWords: z._default(wordListOrNone("layoutEmployerWords"), []),
+  /**
+   * Titles that take a field after a `layoutEmployerWords` word, never an employer: "Ingeniero en
+   * Sistemas", "Licenciada en Derecho". Matched whole, ignoring case.
+   */
+  fieldTitleWords: z._default(wordListOrNone("fieldTitleWords"), []),
   /** What the top of a resume says in place of a name; never taken as the candidate's name. */
   documentTitles: z._default(wordList("documentTitles"), [
     "resume",
@@ -264,6 +276,18 @@ export const resumeParseSchema = z.object({
     "lcsw",
     "frcs",
     "mrcp",
+  ]),
+  /**
+   * Honorifics written before a name ("Dr. Jane Doe", "Ms Mira Kestrel"); the name is read without
+   * them. Matched whole at the start of the name, ignoring case, only before two more name words;
+   * undotted capitals are initials ("MS Dhoni"), not an honorific.
+   */
+  namePrefixes: z._default(wordList("namePrefixes"), [
+    String.raw`dr\.?`,
+    String.raw`prof\.?`,
+    String.raw`mrs?\.?`,
+    String.raw`ms\.?`,
+    String.raw`mx\.?`,
   ]),
   /**
    * Two-letter state and province codes written in capitals after a city ("New York, NY"). A
@@ -424,6 +448,18 @@ export const resumeParseSchema = z.object({
   titleWords: wordList("titleWords"),
   /** Words that mark a fragment as an institution. */
   schoolWords: wordList("schoolWords"),
+  /**
+   * Words naming a university where a program named by its field alone is the first degree
+   * (ISCED 6), because postgraduate programs always name themselves: "Administración de
+   * Empresas, Universidad de Antioquia". None in English, where "Computer Science, Stanford
+   * University" may be either.
+   */
+  universityWords: z._default(wordListOrNone("universityWords"), []),
+  /**
+   * Words naming a course, a term abroad or a certificate, never a degree, so a line they open at a
+   * university reads no level: "Curso de Inglés", "Semestre de intercambio", Mexico's "Diplomado".
+   */
+  courseWords: z._default(wordListOrNone("courseWords"), []),
   /**
    * One pattern per ISCED 2011 level (see `AtsIscedLevel`), naming the credentials at it. Levels
    * are tried highest first, so a level's pattern must not match a lower level's credential

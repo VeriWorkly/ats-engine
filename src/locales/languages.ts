@@ -49,6 +49,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       durationUnits: union(rp.durationUnits, v.durationUnits),
       nameLabels: union(rp.nameLabels, v.nameLabels),
       postNominals: union(rp.postNominals, v.postNominals),
+      namePrefixes: union(rp.namePrefixes, v.namePrefixes),
       regionCodes: union(rp.regionCodes, v.regionCodes),
       placeNames: union(rp.placeNames, v.placeNames),
       cityNames: union(rp.cityNames, v.cityNames),
@@ -62,6 +63,10 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
       lineEndDateWords: union(rp.lineEndDateWords, v.lineEndDateWords),
       leaveWords: union(rp.leaveWords, v.leaveWords),
       employerWords: union(rp.employerWords, v.employerWords),
+      layoutEmployerWords: union(rp.layoutEmployerWords, v.layoutEmployerWords),
+      fieldTitleWords: union(rp.fieldTitleWords, v.fieldTitleWords),
+      universityWords: union(rp.universityWords, v.universityWords),
+      courseWords: union(rp.courseWords, v.courseWords),
       titleWords: union(rp.titleWords, v.titleWords),
       schoolWords: union(rp.schoolWords, v.schoolWords),
       documentTitles: union(rp.documentTitles, v.documentTitles),
@@ -239,13 +244,16 @@ export function englishName(id: string) {
  * is an ISO 639 code ("es") or a script ("Cyrillic"), as `locale.unsupported` holds it.
  */
 export function unsupportedLanguageNote(label: string) {
-  const opening =
-    label === UNDETERMINED
-      ? "This resume is in a language the engine"
-      : label === label.toLowerCase()
-        ? `This resume looks ${englishName(label) ?? label}, which the engine`
-        : `This resume is written in ${label} script, which the engine`;
-  return `${opening} does not read yet: section names, dates and degrees were read as English, and the English writing checks were skipped.`;
+  return `${unsupportedLanguageOpening(label)} the engine does not read yet: section names, dates and degrees were read as English, and the English writing checks were skipped.`;
+}
+
+/** "This resume looks Italian, which", "This resume is written in Cyrillic script, which". */
+export function unsupportedLanguageOpening(label: string) {
+  return label === UNDETERMINED
+    ? "This resume is in a language"
+    : label === label.toLowerCase()
+      ? `This resume looks ${englishName(label) ?? label}, which`
+      : `This resume is written in ${label} script, which`;
 }
 
 const inLanguagesCache = memo<AtsEnginePolicy, Map<string, AtsEnginePolicy>>(() => new Map());

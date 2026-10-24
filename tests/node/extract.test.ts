@@ -11,7 +11,14 @@ import {
 import { findGutter } from "../../src/node/layout.js";
 import { optional } from "../../src/node/peer.js";
 import { buildDocx } from "../fixtures/buildDocx.js";
-import { buildPdf, LEFT_COLUMN, RIGHT_COLUMN, ruledTable, text } from "../fixtures/buildPdf.js";
+import {
+  buildPdf,
+  LEFT_COLUMN,
+  RIGHT_COLUMN,
+  ruledTable,
+  text,
+  unicodeFont,
+} from "../fixtures/buildPdf.js";
 
 /** The real PDF parser on generated PDFs, end to end rather than against a mock. */
 describe("PDF layout detection", () => {
@@ -70,6 +77,30 @@ describe("PDF layout detection", () => {
     const ratio = (await extract(ops)).layout?.columnRatio;
     expect(ratio).not.toBeNull();
     expect(ratio).toBeLessThan(0.15);
+  }, 60_000);
+
+  // Review finding (2026-10-24): a city alone flush right on the employer's line, over the dates
+  // on the title's line, was read as a second column, so the roles lost their dates.
+  it("reads a city flush right over its dates as tab stops, not a column", async () => {
+    const font = unicodeFont();
+    const rows: [string, string][] = [];
+    for (const [employer, title] of [
+      ["Sahyadri Systems Ltd", "व्यवसाय विश्लेषक"],
+      ["Ganga Logistics", "डेटा विश्लेषक"],
+      ["Himgiri Media Pvt Ltd", "संचालन प्रबंधक"],
+      ["Thar Insurance", "परियोजना प्रबंधक"],
+    ])
+      rows.push([employer, "हैदराबाद"], [title, "2019 – 2022"], ["• रिपोर्टिंग सुधारी", ""]);
+    const ops = rows.flatMap(([left, right], index) => {
+      const y = 720 - index * 14;
+      return right
+        ? [font.show(50, y, left), font.show(562 - font.width(right), y, right)]
+        : [font.show(50, y, left)];
+    });
+    const { text: extracted } = await extractResume(font.pages([ops.join("\n")]), "pdf");
+    const lines = extracted.split("\n");
+    expect(lines[0]).toBe("Sahyadri Systems Ltd\tहैदराबाद");
+    expect(lines[1]).toBe("व्यवसाय विश्लेषक\t2019 – 2022");
   }, 60_000);
 
   it("counts ruled table grids from the page's drawing operators", async () => {

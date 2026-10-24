@@ -1,7 +1,14 @@
 import * as z from "zod/mini";
 
+import { ATS_DOCUMENT_FORMAT, type AtsResumeDocument } from "../../document/types.js";
 import type { AtsEnginePolicy } from "../../policy/schema.js";
-import { findGroundingViolations, type GroundingViolation } from "../../repair/grounding.js";
+import {
+  findGroundingViolations,
+  groundingWords,
+  isGrounded,
+  normalizeForGrounding,
+  type GroundingViolation,
+} from "../../repair/grounding.js";
 import { ongoingIn, writtenYears } from "../../repair/merge.js";
 import { normalizeText } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
@@ -138,6 +145,125 @@ function ungroundedDates(
     resume.education[i]!.degree,
   ]);
   return violations;
+}
+
+/**
+ * The converted resume with every summary and bullet that does not occur in `source` blanked, and
+ * those dropped. Conversion leaves free text unchecked (a model may rejoin a wrapped line); before
+ * it is scored, a bullet the model wrote, or one text planted in the resume steered it to write,
+ * must not add a word the resume does not have.
+ */
+export function groundedText(
+  resume: AtsConvertedResume,
+  source: string,
+): { resume: AtsConvertedResume; dropped: string[] } {
+  const normalized = normalizeForGrounding(source);
+  const words = groundingWords(normalized);
+  const dropped: string[] = [];
+  const keep = (value: string) => {
+    if (!value.trim() || isGrounded(value, normalized, words)) return value;
+    dropped.push(value);
+    return "";
+  };
+  const bullets = (values: readonly string[]) => values.map(keep).filter(Boolean);
+  return {
+    resume: {
+      ...resume,
+      summary: keep(resume.summary),
+      experience: resume.experience.map((role) => ({
+        ...role,
+        summary: keep(role.summary),
+        highlights: bullets(role.highlights),
+      })),
+      education: resume.education.map((row) => ({ ...row, summary: keep(row.summary) })),
+      projects: resume.projects.map((project) => ({
+        ...project,
+        summary: keep(project.summary),
+        highlights: bullets(project.highlights),
+      })),
+    },
+    dropped,
+  };
+}
+
+/**
+ * A converted resume as an `ats-resume@1` document, for `check` to read field by field: how a
+ * resume in a language no pack reads is scored with a model's help. An entry whose identifying
+ * fields were all blanked as ungrounded is dropped, never scored on its bullets alone. Section
+ * titles are the standard English ones; the resume's own were in a language the engine does not
+ * read.
+ */
+export function convertedToDocument(resume: AtsConvertedResume): AtsResumeDocument {
+  const kept = <T>(items: readonly T[], identity: (item: T) => string[]) =>
+    items.filter((item) => identity(item).some((value) => value.trim()));
+  const experience = kept(resume.experience, (role) => [role.company, role.role]);
+  const education = kept(resume.education, (row) => [row.school, row.degree]);
+  const projects = kept(resume.projects, (project) => [project.name]);
+  const skills = resume.skills.filter((group) => group.keywords.length);
+  const sections: AtsResumeDocument["sections"] = [];
+  if (resume.summary.trim())
+    sections.push({ kind: "summary", title: "Summary", text: resume.summary });
+  if (experience.length)
+    sections.push({
+      kind: "experience",
+      title: "Experience",
+      items: experience.map((role) => ({
+        title: role.role,
+        employer: role.company,
+        location: role.location,
+        start: role.startDate,
+        end: role.endDate,
+        current: role.current,
+        summary: role.summary,
+        highlights: role.highlights,
+      })),
+    });
+  if (education.length)
+    sections.push({
+      kind: "education",
+      title: "Education",
+      items: education.map((row) => ({
+        school: row.school,
+        credential: row.degree,
+        field: row.field,
+        start: row.startDate,
+        end: row.endDate,
+        current: row.current,
+        summary: row.summary,
+      })),
+    });
+  if (projects.length)
+    sections.push({
+      kind: "projects",
+      title: "Projects",
+      items: projects.map((project) => ({
+        name: project.name,
+        role: project.role,
+        url: project.link,
+        summary: project.summary,
+        highlights: project.highlights,
+        skills: project.skills,
+      })),
+    });
+  if (skills.length)
+    sections.push({
+      kind: "skills",
+      title: "Skills",
+      items: skills.map((group) => ({ name: group.name, keywords: group.keywords })),
+    });
+  const { basics } = resume;
+  return {
+    format: ATS_DOCUMENT_FORMAT,
+    basics: {
+      name: basics.fullName,
+      headline: basics.headline || basics.role,
+      email: basics.email,
+      phone: basics.phone,
+      location: basics.location,
+      links: resume.links.map((link) => link.url).filter((url) => url.trim()),
+    },
+    sections,
+  };
 }
 
 /** Sets each string at `paths` (as `findGroundingViolations` reports them) to "". */

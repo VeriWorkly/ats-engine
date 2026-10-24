@@ -345,6 +345,20 @@ describe("detection", () => {
     );
   });
 
+  // A language the policy recognises but no pack reads is read as detection reads it (2026-10-24:
+  // a resume read with AI help scored its Italian bullets by the English rules).
+  it("reads a recognised language no pack has as that language, by id or script", () => {
+    const english =
+      "Jane Doe\njane@example.com\nExperience\nEngineer, Acme Corp, 2019 - 2022\n- Built the billing service";
+    const italian = check(english, { languages: ["it"] });
+    expect(italian.locale).toMatchObject({ languages: [], unsupported: "it" });
+    expect(check(english, { languages: ["Cyrillic"] }).locale.unsupported).toBe("Cyrillic");
+    expect(check(english).locale.unsupported).toBeNull();
+    // Its English-only rules are off, as for a resume detected as Italian.
+    const rules = (report: ReturnType<typeof check>) => report.rules.map((rule) => rule.id);
+    expect(rules(italian).length).toBeLessThan(rules(check(english)).length);
+  });
+
   it("keeps German stopwords out of an English posting's keywords", () => {
     const report = check("Jane Doe\nArt director.", {
       jobDescription: "Requirements\nArt direction and die-cut packaging design",

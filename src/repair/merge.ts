@@ -99,7 +99,12 @@ export function ongoingIn(source: string, policy: AtsEnginePolicy) {
   /** The words of `list` that are (or are not) everyday words. */
   const pattern = (list: readonly string[], isEveryday: boolean) =>
     alternatives(list.filter((word) => everyday.has(folded(word)) === isEveryday));
-  const openEnded = pattern(rp.openEnded, false);
+  // A model reads resumes in languages no pack reads too: their words for a role still held count.
+  const allOpenEnded = [
+    ...rp.openEnded,
+    ...policy.text.otherLanguages.flatMap((other) => other.openEnded),
+  ];
+  const openEnded = pattern(allOpenEnded, false);
   const everydayOpenEnded = pattern(rp.openEnded, true);
   const dash = `(?:[-–—]|${alternatives(rp.rangeWords)})`;
   // An open end after a dash or range word ("– present", "bis heute") or ending the line ("Jan

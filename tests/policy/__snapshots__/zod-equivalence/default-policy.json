@@ -2159,6 +2159,8 @@
     "employerWords": [
       "at"
     ],
+    "layoutEmployerWords": [],
+    "fieldTitleWords": [],
     "documentTitles": [
       "resume",
       "résumé",
@@ -2228,6 +2230,13 @@
       "lcsw",
       "frcs",
       "mrcp"
+    ],
+    "namePrefixes": [
+      "dr\\.?",
+      "prof\\.?",
+      "mrs?\\.?",
+      "ms\\.?",
+      "mx\\.?"
     ],
     "regionCodes": [
       "AL",
@@ -2745,13 +2754,15 @@
       "polytechnic",
       "seminary"
     ],
+    "universityWords": [],
+    "courseWords": [],
     "degrees": {
-      "3": "(?:\\b|^)((?:high\\s+school(?!\\s*\\(\\s*class\\s+(?:x|10)(?:th)?(?![a-z]))|secondary\\s+school(?!\\s+certificate))(?:\\s+(?:diploma|certificate))?|g\\.?e\\.?d\\.?|a[\\s-]levels?)(?![\\p{L}\\p{M}])",
+      "3": "(?:\\b|^)((?:high\\s+school(?!\\s*\\(\\s*class\\s+(?:x|10)(?:th)?(?![a-z]))|secondary\\s+school(?!\\s+certificate))(?:\\s+(?:diploma|certificate))?|g\\.?e\\.?d\\.?|a[\\s-]levels?)(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:diploma\\s+di\\s+maturit[àa]|maturit[àa]|аттестат|świadectwo\\s+dojrzałości|matura|gymnasieexamen|havo|vwo)(?![\\p{L}\\p{M}])",
       "4": "(?:\\b|^)((?<!(?:high|secondary)\\s+school\\s+)diploma|(?:graduate\\s+)?certificate\\s+(?:in|of)\\b)(?![\\p{L}\\p{M}])",
       "5": "(?:\\b|^)(associate(?:'?s)?\\s+(?:degree|of\\s+[a-z]+)|a\\.a\\.s?\\.?|(?<!,\\s*)aas?(?=\\s+(?:in|of)\\b))(?![\\p{L}\\p{M}])",
-      "6": "(?:\\b|^)(bachelor(?:'?s)?(?:\\s+of\\s+[a-z]+)?|b\\.s\\.c?\\.?|b\\.?sc\\.?|b\\.a\\.|b\\.?eng\\.?|b\\.?tech\\.?|b\\.?b\\.?a\\.?|b\\.?f\\.?a\\.?|b\\.\\s?ed\\.?|ll\\.?b\\.?|b[as])(?![\\p{L}\\p{M}])",
-      "7": "(?:\\b|^)(j\\.\\s?d\\.?(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)|j\\.d\\.?(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}j\\.d\\.?))|juris\\s+doctor|m\\.\\s?d\\.|m\\.\\s?ed\\.?|m\\.f\\.a\\.|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$|\\s+in\\s)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm))|(?<!scrum\\s)master(?!\\s+data(?![a-z]))(?:'?s)?(?:\\s+of\\s+[a-z]+)?|m\\.s\\.c?\\.?|m\\.?sc\\.?|m\\.a\\.|m\\.?eng\\.?|m\\.?b\\.?a\\.?|m\\.?tech\\.?|(?<=,\\s*)m[as](?=\\s+(?!(?:or|and|usa?)(?![a-z]))\\p{L}|\\s*\\()(?!\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b)|(?<!,\\s*|\\d\\s?)m[as](?!-|\\.\\s+\\p{L}|\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b))(?![\\p{L}\\p{M}])",
-      "8": "(?:\\b|^)(doctorate|ph\\.?d\\.?|d\\.?phil\\.?)(?![\\p{L}\\p{M}])"
+      "6": "(?:\\b|^)(bachelor(?:'?s)?(?:\\s+of\\s+[a-z]+)?|b\\.s\\.c?\\.?|b\\.?sc\\.?|b\\.a\\.|b\\.?eng\\.?|b\\.?tech\\.?|b\\.?b\\.?a\\.?|b\\.?f\\.?a\\.?|b\\.\\s?ed\\.?|b\\.\\s?com\\.?|bcom|ll\\.?b\\.?|b[as])(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:laurea(?:\\s+triennale)?|licencjat|бакалавр|kandidatexamen|hbo[\\s-]bachelor)(?![\\p{L}\\p{M}])",
+      "7": "(?:\\b|^)(j\\.\\s?d\\.?(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)|j\\.d\\.?(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}j\\.d\\.?))|juris\\s+doctor|m\\.\\s?d\\.|m\\.\\s?ed\\.?|m\\.f\\.a\\.|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$|\\s+in\\s)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm))|(?<!scrum\\s)master(?!\\s+data(?![a-z]))(?:'?s)?(?:\\s+of\\s+[a-z]+)?|m\\.s\\.c?\\.?|m\\.?sc\\.?|m\\.a\\.|m\\.?eng\\.?|m\\.?b\\.?a\\.?|m\\.?tech\\.?|m\\.\\s?com\\.?|mcom|(?<=,\\s*)m[as](?=\\s+(?!(?:or|and|usa?)(?![a-z]))\\p{L}|\\s*\\()(?!\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b)|(?<!,\\s*|\\d\\s?)m[as](?!-|\\.\\s+\\p{L}|\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b))(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:laurea\\s+magistrale|laurea\\s+specialistica|магистр|magisterexamen|masterexamen|doctoraal)(?![\\p{L}\\p{M}])",
+      "8": "(?:\\b|^)(doctorate|ph\\.?d\\.?|d\\.?phil\\.?)(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:dottorato(?:\\s+di\\s+ricerca)?|кандидат\\s+наук|доктор\\s+наук|doktorat|doktorsexamen|doctoraat)(?![\\p{L}\\p{M}])"
     }
   },
   "text": {
@@ -2821,7 +2832,8 @@
           "también",
           "años",
           "experiencia"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "pt",
@@ -2838,7 +2850,8 @@
           "ao",
           "para",
           "como"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "it",
@@ -2855,6 +2868,12 @@
           "degli",
           "alla",
           "anni"
+        ],
+        "openEnded": [
+          "oggi",
+          "attuale",
+          "in corso",
+          "presente"
         ]
       },
       {
@@ -2872,7 +2891,8 @@
           "aux",
           "les",
           "nous"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "de",
@@ -2889,7 +2909,8 @@
           "zur",
           "zum",
           "auf"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "nl",
@@ -2904,6 +2925,10 @@
           "werkervaring",
           "jaar",
           "ervaring"
+        ],
+        "openEnded": [
+          "heden",
+          "huidig"
         ]
       },
       {
@@ -2919,6 +2944,11 @@
           "jako",
           "lat",
           "zespołu"
+        ],
+        "openEnded": [
+          "obecnie",
+          "nadal",
+          "teraz"
         ]
       },
       {
@@ -2934,67 +2964,114 @@
           "utveckling",
           "arbetat",
           "ansvarig"
+        ],
+        "openEnded": [
+          "nuvarande",
+          "pågående",
+          "idag"
         ]
       },
       {
         "script": "Cyrillic",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "настоящее время",
+          "наст. время",
+          "н.в.",
+          "сейчас",
+          "теперішній час"
+        ]
       },
       {
         "id": "el",
         "script": "Greek",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "σήμερα"
+        ]
       },
       {
         "script": "Arabic",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "حتى الآن",
+          "الحاضر"
+        ]
       },
       {
         "id": "he",
         "script": "Hebrew",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "היום",
+          "הווה"
+        ]
       },
       {
         "id": "ja",
         "script": "Hiragana",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "現在",
+          "至今"
+        ]
       },
       {
         "id": "ja",
         "script": "Katakana",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "現在",
+          "至今"
+        ]
       },
       {
         "script": "Han",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "至今",
+          "现在",
+          "現在",
+          "目前"
+        ]
       },
       {
         "id": "ko",
         "script": "Hangul",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "현재"
+        ]
       },
       {
         "id": "th",
         "script": "Thai",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "ปัจจุบัน"
+        ]
       },
       {
         "script": "Devanagari",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "script": "Bengali",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "id": "ta",
         "script": "Tamil",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "id": "te",
         "script": "Telugu",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       }
     ],
     "contentLineVerbs": [
