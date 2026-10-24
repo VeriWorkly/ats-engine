@@ -57,9 +57,14 @@ export type AtsAiResult<T> = {
 /**
  * `truncated`: the reply hit `maxTokens` before it was complete. Not retried — the same budget
  * truncates again and is billed again; raise `maxTokens` instead.
+ *
+ * `unusable`: the reply read, but held nothing the input supports (`repairParse` filled no field
+ * the parse left empty: it returned none, or only values not in the resume or already parsed).
+ * Not retried: asked again about the same resume a model rarely finds more, and each attempt is
+ * billed.
  */
 export type AtsAiErrorCode =
-  "config" | "provider" | "refused" | "truncated" | "invalid_output" | "aborted";
+  "config" | "provider" | "refused" | "truncated" | "invalid_output" | "unusable" | "aborted";
 
 /**
  * A task that produced no result. `code` says why; `status` is the provider's HTTP status when
@@ -70,6 +75,8 @@ export class AtsAiError extends Error {
   readonly status?: number;
   readonly usage?: LlmUsage;
   readonly attempts: number;
+  /** For `unusable`: the values the reply gave that were dropped as not in the input. */
+  readonly rejected: GroundingViolation[];
 
   constructor(
     code: AtsAiErrorCode,
@@ -78,6 +85,7 @@ export class AtsAiError extends Error {
       status?: number | undefined;
       usage?: LlmUsage | undefined;
       attempts?: number | undefined;
+      rejected?: GroundingViolation[] | undefined;
       cause?: unknown;
     } = {},
   ) {
@@ -87,6 +95,7 @@ export class AtsAiError extends Error {
     this.status = options.status;
     this.usage = options.usage;
     this.attempts = options.attempts ?? 0;
+    this.rejected = options.rejected ?? [];
   }
 }
 
@@ -413,7 +422,20 @@ export async function runTask<Raw, Result>(
       });
     }
 
-    const { result, rejected } = spec.finish(raw);
+    // A reply that reads but holds nothing usable fails with what was spent on it.
+    let finished: ReturnType<typeof spec.finish>;
+    try {
+      finished = spec.finish(raw);
+    } catch (thrown) {
+      if (!(thrown instanceof AtsAiError)) throw thrown;
+      throw new AtsAiError(thrown.code, thrown.message, {
+        usage: usage(),
+        attempts: attempt,
+        rejected: thrown.rejected,
+        cause: thrown.cause,
+      });
+    }
+    const { result, rejected } = finished;
     return {
       result,
       rejected,

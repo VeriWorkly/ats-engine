@@ -41,6 +41,26 @@ export const regexString = (label: string) =>
     }),
   );
 
+/**
+ * A pattern whose first capture group holds the value the engine reads ("5" in "5+ years"): one
+ * with no capturing group would match and read nothing, so it is refused.
+ */
+export const capturingRegexString = (label: string) =>
+  regexString(label).check(
+    z.superRefine((pattern, ctx) => {
+      // Joined with an empty alternative, it matches "" and reports every group, set or not.
+      const groups =
+        failure(() => policyRegex(pattern)) === null
+          ? policyRegex(`${pattern}|`).exec("")!.length - 1
+          : 1;
+      if (groups === 0)
+        ctx.addIssue({
+          code: "custom",
+          message: `${label} needs a capturing group: the engine reads the value from group 1`,
+        });
+    }),
+  );
+
 /** Regex flags `new RegExp` accepts. Sticky `y` is refused: it tests one position, not the text. */
 export const regexFlags = z._default(z.string(), "").check(
   z.superRefine((flags, ctx) => {
@@ -115,6 +135,9 @@ export const term = z.pipe(
   z.string().check(z.minLength(1)),
   z.transform((value) => value.toLowerCase()),
 );
+
+/** Language names to their English name, both lower-cased as they are looked up: "Castellano". */
+export const languageNameMap = z.record(term, term);
 
 /** Credential patterns keyed by ISCED 2011 level; see `resumeParse.degrees`. */
 export const iscedDegrees = z.object({

@@ -174,7 +174,8 @@ describe.skipIf(!policy)("ATS engine calibration against the shipped policy", ()
 
   it("matches a phrase in the resume against its component words in the posting", async () => {
     const report = await check(
-      "jane@example.com I do machine learning every day and ship models.",
+      // The contact line is read for no keyword: the sentence is on a line of its own.
+      "jane@example.com\nI do machine learning every day and ship models.",
       "Requirements\nStrong machine learning ability and model deployment.",
     );
 

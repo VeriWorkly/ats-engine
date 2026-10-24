@@ -70,12 +70,13 @@ for (const resume of generateResumes(GENERATED_COUNT))
     record(`generated, ${rendering}`, "generated", `${resume.id}/${rendering}`, checks);
   }
 
-// The same generator in German, French and Hindi, read with detection as a host reads them. Text
-// and DOCX only: the test PDF writer's Helvetica has no encoding for umlauts or Devanagari.
+// The same generator in each pack's language, read with detection as a host reads them, as text,
+// DOCX and a one-column PDF in a Unicode font (umlauts, accents and Devanagari as a word processor
+// writes them, in reading order).
 const OTHER_LANGUAGES = ["de", "fr", "hi", "es", "pt"] as const;
 for (const language of OTHER_LANGUAGES)
   for (const resume of generateResumes(GENERATED_COUNT, undefined, language))
-    for (const rendering of ["text", "docx"] as const) {
+    for (const rendering of ["text", "docx", "pdf"] as const) {
       const { text, layout } = await renderResume(resume, rendering);
       const checks = fieldChecks(checkTimed(text, layout), resume);
       record(

@@ -13,54 +13,12 @@
       "rejected": []
     },
     "repairParse": {
-      "result": {
-        "name": "Jane Doe",
-        "email": "jane@example.com",
-        "phone": "+1 415 555 0142",
-        "links": [],
-        "roles": [
-          {
-            "start": {
-              "year": 2020,
-              "month": 1
-            },
-            "end": null,
-            "current": true,
-            "title": "Senior Engineer",
-            "employer": "Acme Corporation"
-          }
-        ],
-        "education": [
-          {
-            "school": "State University",
-            "credential": "BSc",
-            "isced": 6,
-            "end": {
-              "year": 2016,
-              "month": null
-            }
-          }
-        ],
-        "skills": [
-          "TypeScript",
-          "Go"
-        ],
-        "certifications": [],
-        "spokenLanguages": [],
-        "monthsOfExperience": 81,
-        "highestIsced": 6,
-        "provenance": {
-          "name": "parser",
-          "email": "parser",
-          "phone": "parser",
-          "roles": "parser",
-          "education": "parser",
-          "skills": "parser",
-          "certifications": "none",
-          "spokenLanguages": "none"
-        }
+      "error": {
+        "name": "AtsAiError",
+        "code": "unusable",
+        "message": "The reply filled no field the parse left empty."
       },
-      "rejected": []
+      "cause": "<undefined>"
     },
     "convertResume": {
       "error": {

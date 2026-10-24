@@ -56,6 +56,24 @@ function splitSkills(line: string): string[] {
 }
 
 /**
+ * A link without the sentence's punctuation after it ("(see example.com).") but with a closing
+ * bracket it opened itself ("…/wiki/Ada_(language)").
+ */
+function withoutTrailingPunctuation(link: string) {
+  const opened = link.split("(").length - 1;
+  let closed = link.split(")").length - 1;
+  let end = link.length;
+  for (; end > 0; end -= 1) {
+    const char = link[end - 1]!;
+    if (char === ")") {
+      if (closed <= opened) break;
+      closed -= 1;
+    } else if (!".,;:!?'\"".includes(char)) break;
+  }
+  return link.slice(0, end);
+}
+
+/**
  * The certification and spoken-language rows, in page order: from their own sections and from a
  * labelled line among the skills ("Languages: English (native)"). What such a line names as rows
  * is not also a skill, so `skillLines` holds the line without it ("Languages: English, Python"
@@ -204,9 +222,7 @@ export function parseReadLines(
       name,
       email: joined.match(EMAIL)?.[0] ?? "",
       phone: findPhone(joined, policy, now),
-      links: (joined.match(LINK) ?? []).map((link) =>
-        link.replace(/(?<![).,;:!?'"])[).,;:!?'"]+$/, ""),
-      ),
+      links: (joined.match(LINK) ?? []).map(withoutTrailingPunctuation),
       roles,
       education,
       skills,

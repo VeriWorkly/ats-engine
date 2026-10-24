@@ -83,8 +83,9 @@ export function shapeReport(report: AtsReport, detail: AtsReportDetail): AtsShap
     primaryWarning: primaryWarning(report),
     checksPassed: report.checksPassed,
     checksTotal: report.checksTotal,
-    matchedKeywordCount: report.matchedKeywords.length,
-    missingKeywordCount: report.missingKeywords.length,
+    // The lists stop at 12; a report stored before the counts has only them.
+    matchedKeywordCount: report.keywordCounts?.matched ?? report.matchedKeywords.length,
+    missingKeywordCount: report.keywordCounts?.missing ?? report.missingKeywords.length,
     parsedRoleCount: report.parsed.roles.length,
     remainingFixCount: Math.max(0, report.failedChecks.length - 1),
     // A report stored by an engine before advice existed has none.

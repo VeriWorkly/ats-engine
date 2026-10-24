@@ -3,7 +3,7 @@ import * as z from "zod/mini";
 import type { AtsEnginePolicy } from "../../policy/schema.js";
 import { mergeGrounded, type AtsRepairCandidate } from "../../repair/merge.js";
 import type { AtsParsedResume, AtsReport } from "../../types.js";
-import type { TaskSpec } from "../run.js";
+import { AtsAiError, type TaskSpec } from "../run.js";
 import { toStrictJsonSchema } from "../schema.js";
 import { flag, list, trimmedText } from "./fields.js";
 
@@ -94,6 +94,16 @@ export function repairParseSpec(
         policy,
         now,
       });
+      // A repair that filled nothing is no repair: reported, so a host does not show the parse
+      // as "repaired by a model" unchanged.
+      if (!Object.values(merged.provenance).includes("ai"))
+        throw new AtsAiError(
+          "unusable",
+          violations.length
+            ? `The reply filled no field: ${violations.length} value(s) it gave do not appear in the resume.`
+            : "The reply filled no field the parse left empty.",
+          { rejected: violations },
+        );
       return { result: merged, rejected: violations };
     },
   };

@@ -110,7 +110,7 @@ The resource `rubric://default` is the whole rubric as JSON.
   Without it, the language is detected from the resume and from the posting. It sets the
   language of both, so give it only when the resume was read in the wrong one: `en` with a
   German posting reads the posting as English too.
-- `region` is `US`, `GB`, `DE`, `FR`, `IN`, `ES`, `BR` or `PT`. Without it, the region is inferred from the
+- `region` is `US`, `GB`, `DE`, `FR`, `IN`, `ES`, `BR`, `PT`, `MX`, `AR`, `CO` or `CL`. Without it, the region is inferred from the
   resume.
 - `target_ats` is `greenhouse`, `lever` or `taleo`. It adds what that vendor documents publicly,
   each note with a link to the vendor's page. It never changes the score.
@@ -124,7 +124,7 @@ adds the vendor's notes.
 ## Privacy
 
 The server runs on your computer, over stdio. It makes no network requests and calls no AI
-model. It reads only the files you name in a request, a PDF or DOCX in a separate process that
+model. It reads only the files you name in a request, a PDF, DOCX or HTML file in a separate process that
 is stopped after 60 seconds or when the request is cancelled, as many at once as your computer
 has CPU cores, and nothing leaves your machine except
 what your assistant itself sends to its model provider: the tool results it reads, which include

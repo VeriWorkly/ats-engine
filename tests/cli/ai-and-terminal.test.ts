@@ -15,6 +15,7 @@ import {
   type Terminal,
 } from "../../src/cli/terminal.js";
 import { ENGINE_VERSION } from "../../src/version.js";
+import { ITALIAN_RESUME } from "../fixtures/locale-resumes.js";
 
 const dir = mkdtempSync(join(tmpdir(), "ats-cli-ai-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -311,7 +312,27 @@ describe("--ai", () => {
     expect(err.join("\n")).toMatch(
       /Sending the resume to gemini at generativelanguage\.googleapis\.com \(gemini-test\)/,
     );
+    expect(err.join("\n")).toContain(
+      "Your name, email and phone number are replaced with placeholders first; the check read " +
+        "no links, so any in the file are sent as written.",
+    );
     expect([...out, ...err].join("\n")).not.toContain("secret-gemini-key");
+  });
+
+  it("promises to hide only the contact details the parser read", async () => {
+    const path = join(dir, "nameless.txt");
+    writeFileSync(path, RESUME.split("\n").slice(1).join("\n"));
+    const { fetch } = fakeFetch(() => chatReply(INSIGHTS));
+    await main(
+      ["check", path, "--ai", "--provider", "gemini", "--model", "gemini-test"],
+      context({ env: { GEMINI_API_KEY: "key" }, fetch }),
+    );
+    const notice = err.join("\n");
+    expect(notice).toContain(
+      "Your email and phone number are replaced with placeholders first; the check read no " +
+        "name or links, so any in the file are sent as written.",
+    );
+    expect(notice).not.toContain("Your name");
   });
 
   it("talks to Anthropic's Messages API with the Anthropic preset", async () => {
@@ -372,6 +393,130 @@ describe("--ai", () => {
     );
     expect(code).toBe(1);
     expect(err.join("\n")).toMatch(/Raise --max-tokens \(now 50\)/);
+  });
+
+  // Step 5 of the language plan: a resume in a language no pack reads is read by the model.
+  describe("on a resume in a language no pack reads", () => {
+    const italianPath = join(dir, "it.txt");
+    writeFileSync(italianPath, ITALIAN_RESUME);
+    const CONVERTED = {
+      basics: {
+        fullName: "Giulia Rossi",
+        role: null,
+        headline: null,
+        email: "giulia.rossi@example.it",
+        phone: "+39 333 123 4567",
+        location: "Milano",
+      },
+      links: [],
+      summary:
+        "Ingegnere del software con sette anni di esperienza nei sistemi di pagamento e nel cloud.",
+      experience: [
+        {
+          company: "Esempio Tecnologie S.r.l.",
+          role: "Ingegnere del software senior",
+          location: null,
+          startDate: "2021-01",
+          endDate: null,
+          current: true,
+          summary: null,
+          highlights: ["Progettazione di una piattaforma di pagamenti per due milioni di clienti"],
+        },
+        // Invented: no word of it is in the file, so it is dropped, not scored.
+        {
+          company: "Globex Holdings",
+          role: "Chief Architect",
+          location: null,
+          startDate: "2015",
+          endDate: "2017",
+          current: false,
+          summary: null,
+          highlights: ["Grew revenue 300%"],
+        },
+      ],
+      education: [
+        {
+          school: "Università degli Studi di Esempio",
+          degree: "Laurea in Ingegneria Informatica",
+          field: null,
+          startDate: null,
+          endDate: "2017",
+          current: false,
+          summary: null,
+        },
+      ],
+      projects: [],
+      skills: [{ name: "Competenze", keywords: ["Go", "Java", "Kubernetes", "PostgreSQL"] }],
+    };
+    const reply = (call: Call) =>
+      chatReply(JSON.stringify(call.body).includes("You convert a resume") ? CONVERTED : INSIGHTS);
+
+    it("reads its fields with the model, checks each against the file, then scores them", async () => {
+      const { fetch, calls } = fakeFetch(reply);
+      const code = await main(
+        ["check", italianPath, "--json", "--ai", "--provider", "ollama", "--model", "llama"],
+        context({ fetch }),
+      );
+      expect(code).toBe(0);
+      expect(calls).toHaveLength(2);
+      const report = JSON.parse(out.join("\n"));
+      expect(report.readWithAi).toMatchObject({
+        provider: "ollama",
+        model: "llama",
+        language: "it",
+      });
+      expect(report.readWithAi.rejected).toBeGreaterThan(0);
+      expect(report.parsed.provenance.roles).toBe("structured");
+      // Still read as Italian: the English writing rules stay off its bullets.
+      expect(report.locale.unsupported).toBe("it");
+      expect(report.parsed.education[0]).toMatchObject({ isced: 6 });
+      expect(report.parsed.roles).toHaveLength(1);
+      expect(report.parsed.roles[0]).toMatchObject({
+        title: "Ingegnere del software senior",
+        employer: "Esempio Tecnologie S.r.l.",
+        current: true,
+      });
+      expect(report.parsed.skills).toEqual(["Go", "Java", "Kubernetes", "PostgreSQL"]);
+      expect(report.ai.insights.priorityOrder).toEqual(INSIGHTS.priorityOrder);
+      expect(err.join("\n")).toMatch(
+        /looks Italian, which the engine does not read yet\. Sending the whole resume, contact details included/,
+      );
+    });
+
+    it("says it was read with AI help above the report", async () => {
+      const { fetch } = fakeFetch(reply);
+      expect(
+        await main(
+          ["check", italianPath, "--ai", "--provider", "ollama", "--model", "llama"],
+          context({ fetch }),
+        ),
+      ).toBe(0);
+      expect(out.join("\n")).toMatch(
+        /^Read with AI help \(llama\): the fields below come from the model/,
+      );
+    });
+
+    it("keeps the engine's own reading when the model fails", async () => {
+      const { fetch } = fakeFetch(() => ({ status: 500, body: { error: "down" } }));
+      const code = await main(
+        ["check", italianPath, "--json", "--ai", "--provider", "ollama", "--model", "llama"],
+        context({ fetch }),
+      );
+      expect(code).toBe(1);
+      const report = JSON.parse(out.join("\n"));
+      expect(report.readWithAi).toBeUndefined();
+      expect(report.locale.unsupported).toBe("it");
+    });
+
+    it("sends an English resume only for the analysis", async () => {
+      const { fetch, calls } = fakeFetch(reply);
+      await main(
+        ["check", resumePath, "--ai", "--provider", "ollama", "--model", "llama"],
+        context({ fetch }),
+      );
+      expect(calls).toHaveLength(1);
+      expect(JSON.stringify(calls[0]!.body)).not.toContain("You convert a resume");
+    });
   });
 
   it("still gates on --min-score when the analysis succeeds", async () => {

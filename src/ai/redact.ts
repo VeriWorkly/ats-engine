@@ -88,6 +88,18 @@ const nameLetters = (part: string) =>
     )
     .join(String.raw`\s*`);
 
+/**
+ * Whether the parsed name is replaced: one the parser read, not also read as a job title. Two
+ * characters are a whole Chinese or Korean name, but too short in Latin script ("Al").
+ */
+export function redactsName(parsed: Pick<AtsParsedResume, "name" | "roles">): boolean {
+  const name = parsed.name.trim();
+  return (
+    (name.length >= 3 || (name.length === 2 && /[\p{sc=Han}\p{sc=Hangul}]/u.test(name))) &&
+    !parsed.roles.some((role) => role.title.trim().toLowerCase() === name.toLowerCase())
+  );
+}
+
 export function createRedaction(
   parsed: Pick<AtsParsedResume, "name" | "email" | "phone" | "links" | "roles">,
   source: string,
@@ -109,10 +121,7 @@ export function createRedaction(
 
   const name = parsed.name.trim();
   const parts = name.split(/\s+/).filter(Boolean);
-  // Two characters are a whole Chinese or Korean name, but too short in Latin script ("Al").
-  const named =
-    (name.length >= 3 || (name.length === 2 && /[\p{sc=Han}\p{sc=Hangul}]/u.test(name))) &&
-    !parsed.roles.some((role) => role.title.trim().toLowerCase() === name.toLowerCase());
+  const named = redactsName(parsed);
 
   const links = new Set(parsed.links.map((link) => link.trim()).filter((link) => link.length >= 3));
   // An address built from the name identifies the person; five letters at least ("carolina.edu" is not "Li Na").

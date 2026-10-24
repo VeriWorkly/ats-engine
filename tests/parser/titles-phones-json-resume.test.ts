@@ -171,6 +171,14 @@ describe("phone number followed by a line starting with digits", () => {
   it("stays linear on hostile digit runs", () => {
     budget(() => findPhone("1 1 ".repeat(12_500), DEFAULT_POLICY, NOW));
     budget(() => findPhone("1\n1\n".repeat(12_500), DEFAULT_POLICY, NOW));
+    budget(() => findPhone("1–".repeat(25_000), DEFAULT_POLICY, NOW));
+  });
+
+  it("reads a number a word processor printed with en dashes, not a date range", () => {
+    expect(findPhone("jane@example.com | +1–415–555–0134", DEFAULT_POLICY, NOW)).toBe(
+      "+1–415–555–0134",
+    );
+    expect(findPhone("Acme 2019–2022 | 01/2019–03/2022", DEFAULT_POLICY, NOW)).toBe("");
   });
 });
 

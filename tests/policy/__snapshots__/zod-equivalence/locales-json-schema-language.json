@@ -159,6 +159,14 @@
         "minLength": 1
       }
     },
+    "namePrefixes": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "regionCodes": {
       "minItems": 1,
       "type": "array",
@@ -256,6 +264,38 @@
       }
     },
     "employerWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "layoutEmployerWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "fieldTitleWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "universityWords": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "courseWords": {
       "minItems": 1,
       "type": "array",
       "items": {

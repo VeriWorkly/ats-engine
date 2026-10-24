@@ -83,13 +83,13 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "bereits",
   ],
   sections: {
-    experience: String.raw`^(?:berufserfahrung|berufspraxis|beruflicher\s+werdegang|berufliche\s+erfahrung|berufst[äa]tigkeit|praxiserfahrung|arbeitserfahrung|werdegang|erfahrung)`,
-    education: String.raw`^(?:ausbildung|bildungsweg|bildung|schulbildung|schulische\s+ausbildung|studium|akademische\s+ausbildung|hochschulbildung)`,
-    skills: String.raw`^(?:top-?kenntnisse|kenntnisse|f[äa]higkeiten|kompetenzen|fachkenntnisse|it[\s-]kenntnisse|edv[\s-]kenntnisse|technische\s+(?:kenntnisse|f[äa]higkeiten))`,
+    experience: String.raw`^(?:berufserfahrung(?:en)?|berufspraxis|beruflicher\s+werdegang|berufliche\s+erfahrung(?:en)?|berufliche\s+stationen|praktische\s+erfahrung(?:en)?|berufst[äa]tigkeit|praxiserfahrung|arbeitserfahrung|werdegang|praktik(?:a|um)|erfahrung(?:en)?)`,
+    education: String.raw`^(?:ausbildung|berufsausbildung|schul-\s*und\s+(?:berufs)?ausbildung|bildungsweg|bildung|schulbildung|schulische\s+ausbildung|studium|akademische\s+ausbildung|akademischer\s+werdegang|hochschulbildung)`,
+    skills: String.raw`^(?:top-?kenntnisse|kenntnisse|f[äa]higkeiten|kompetenzen|fachkenntnisse|it[\s-]kenntnisse|edv[\s-]kenntnisse|technische\s+(?:kenntnisse|f[äa]higkeiten)|(?:besondere|sonstige|weitere|fachliche)\s+(?:kenntnisse|kompetenzen|f[äa]higkeiten)|(?:pc|computer|software)-?kenntnisse|fachkompetenzen)`,
     projects: String.raw`^(?:projekte|projekterfahrung|ausgew[äa]hlte\s+projekte)`,
-    certifications: String.raw`^(?:zertifikate|zertifizierungen|lizenzen|(?:fort-?\s*und\s+)?weiterbildung(?:en)?)`,
+    certifications: String.raw`^(?:zertifikate|zertifizierungen|lizenzen|(?:fort-?\s*und\s+)?weiterbildung(?:en)?|zusatzqualifikationen|bescheinigungen|schulungen)`,
     languages: String.raw`^(?:sprachen|sprachkenntnisse|fremdsprachen|fremdsprachenkenntnisse)`,
-    other: String.raw`^(?:kontakt|profil|kurzprofil|zusammenfassung|[üu]ber\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\s+engagement|referenzen|pers[öo]nliche\s+(?:daten|angaben))`,
+    other: String.raw`^(?:kontakt|profil|kurzprofil|zusammenfassung|[üu]ber\s+mich|weiterbildungen?|fortbildungen?|auszeichnungen|publikationen|ver[öo]ffentlichungen|interessen|hobbys|ehrenamt|ehrenamtliches\s+engagement|referenzen|pers[öo]nliche\s+(?:daten|angaben)|sonstiges|ehrenamtliche\s+t[äa]tigkeit(?:en)?|mitgliedschaften)`,
   },
   // "Verhandlungssicher" is C1, as "fließend" is; "sehr gute Kenntnisse" B2, "gute Kenntnisse" B1.
   languageLevels: {
@@ -97,7 +97,7 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
       "C2",
     [String.raw`zweisprachig(?:e[mnrs]?)?`]: "C1",
     [String.raw`verhandlungssicher(?:e[mnrs]?)?`]: "C1",
-    [String.raw`fließend(?:e[mnrs]?)?`]: "C1",
+    [String.raw`flie(?:ß|ss)end(?:e[mnrs]?)?`]: "C1",
     [String.raw`sehr\s+gute?[mnrs]?(?:\s+${KENNTNISSE})?`]: "B2",
     [String.raw`gute?[mnrs]?\s+${KENNTNISSE}`]: "B1",
     [String.raw`(?:${STEMS})?(?:grund|basis|schul)kenntnissen?`]: "A2",
@@ -113,6 +113,7 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   // november; every other German spelling is listed whole.
   months: {
     januar: 1,
+    maerz: 3,
     jän: 1,
     jänner: 1,
     februar: 2,
@@ -146,10 +147,30 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   sinceWords: ["seit", "ab"],
   // "ab 03/2020" ends the line; "Umsatz ab 2017 um 30 % gesteigert" is a sentence.
   lineEndDateWords: ["ab"],
-  leaveWords: ["elternzeit", "mutterschutz", "auszeit", "sabbatjahr", "karenz"],
+  leaveWords: [
+    "elternzeit",
+    "mutterschutz",
+    "auszeit",
+    "sabbatjahr",
+    "karenz",
+    String.raw`berufliche\s+neuorientierung`,
+  ],
   seasons: { frühjahr: [3, 5], frühling: [3, 5], sommer: [6, 8], herbst: [9, 11] },
   durationUnits: ["jahr", "jahre", "jahren", "monat", "monate", "monaten", "mon"],
   nameLabels: ["name", "vor- und nachname"],
+  // "Prof. Dr. med. Anna Schmidt", "Dipl.-Ing. Hans Müller": each cut in turn.
+  namePrefixes: [
+    String.raw`dr\.-ing\.`,
+    String.raw`(?:med|rer\.\s?nat|rer\.\s?pol|phil|jur|habil)\.`,
+    String.raw`dipl\.-\p{L}{2,6}\.`,
+    String.raw`mag\.(?:a\.?)?`,
+    String.raw`ing\.`,
+    String.raw`dkfm\.`,
+    "herr",
+    "frau",
+  ],
+  // Legal forms: an employer, never a title.
+  organisationWords: ["ag", "kg", "ug", "gbr", "ohg", String.raw`e\.\s?v\.`],
   employerWords: ["bei"],
   titleWords: [
     compound("entwickler(?:in)?"),
@@ -171,16 +192,23 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "werkstudent(?:in)?",
     compound("manager(?:in)?"),
     compound("designer(?:in)?"),
+    compound("mitarbeiter(?:in)?"),
+    String.raw`\p{L}{0,30}(?:fach|hilfs)kraft`,
+    compound("informatiker(?:in)?"),
+    compound("(?:mechatron|elektron|mechan)iker(?:in)?"),
+    // A prefix is required: bare "Kaufmann" is a common surname.
+    String.raw`\p{L}{2,30}kaufmann|\p{L}{0,30}kauffrau`,
+    String.raw`auszubildende[rn]?`,
   ],
   schoolWords: [
     "universität",
     compound("hochschule"),
     "fachhochschule",
-    "gymnasium",
+    compound("gymnasium"),
     compound("schule"),
-    "akademie",
+    compound("akademie"),
     "institut",
-    "kolleg",
+    compound("kolleg"),
   ],
   documentTitles: ["lebenslauf", "tabellarischer lebenslauf"],
   dateOfBirthLabels: ["geburtsdatum", String.raw`geboren(?:\s+am)?`, String.raw`geb\.`],
@@ -269,9 +297,9 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     clearance: [String.raw`sicherheitsüberprüfung`, String.raw`sicherheitsfreigabe`],
     // "Verhandlungssichere Englischkenntnisse", "fließend Deutsch".
     languagePatterns: [
-      String.raw`(?:fließende?[mnrs]?|verhandlungssichere?[mnrs]?|sehr\s+gute?[mnrs]?)\s+(\p{L}+?)(?:kenntnisse|-)`,
+      String.raw`(?:flie(?:ß|ss)ende?[mnrs]?|verhandlungssichere?[mnrs]?|sehr\s+gute?[mnrs]?)\s+(\p{L}+?)(?:kenntnisse|-)`,
       // The adjective inflected before a bare name, too: "Verhandlungssicheres Englisch".
-      String.raw`(?:fließend|verhandlungssicher)(?:e[mnrs]?)?\s+(?:in\s+)?(\p{L}+)`,
+      String.raw`(?:flie(?:ß|ss)end|verhandlungssicher)(?:e[mnrs]?)?\s+(?:in\s+)?(\p{L}+)`,
     ],
     // Each also as its "-kenntnisse" compound, in the dative too: "Englischkenntnisse (C1)", "mit
     // guten Englischkenntnissen".
@@ -394,6 +422,9 @@ export const de: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "fließend",
     "fließende",
     "fließendes",
+    "fliessend",
+    "fliessende",
+    "fliessendes",
     "fundierte",
     "fundiertes",
     "fundierten",

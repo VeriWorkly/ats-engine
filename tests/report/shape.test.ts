@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { computeVerdict, shapeReport, type AtsReport } from "../../src/index.js";
+import {
+  check,
+  computeVerdict,
+  DEFAULT_POLICY,
+  shapeReport,
+  type AtsReport,
+} from "../../src/index.js";
 
 function report(overrides: Partial<AtsReport> = {}): AtsReport {
   return {
@@ -241,6 +247,37 @@ describe("ATS report shaping — the anonymous/authenticated split", () => {
     expect(shaped.missingKeywordCount).toBe(3);
     expect(JSON.stringify(shaped)).not.toContain("kubernetes");
     expect(JSON.stringify(shaped)).not.toContain("communication");
+  });
+
+  it("counts every keyword, past the twelve the lists show", () => {
+    const asked = [
+      "Kafka",
+      "Snowflake",
+      "Airflow",
+      "Looker",
+      "Terraform",
+      "Kubernetes",
+      "Spark",
+      "Flink",
+      "Redshift",
+      "BigQuery",
+      "Tableau",
+      "Elasticsearch",
+      "Cassandra",
+      "Redis",
+      "GraphQL",
+      "Rust",
+      "Scala",
+    ];
+    const full = check("Jane Doe\njane@example.com\nSkills\nPython", DEFAULT_POLICY, {
+      jobDescription: `Requirements\n${asked.map((term) => `- ${term}`).join("\n")}`,
+      now: new Date("2026-10-01"),
+    });
+    expect(full.missingKeywords).toHaveLength(12);
+    expect(full.keywordCounts).toEqual({ matched: 0, missing: 17 });
+    const shaped = shapeReport(full, "restricted");
+    if (!shaped.restricted) throw new Error("expected a restricted report");
+    expect(shaped.missingKeywordCount).toBe(17);
   });
 
   it("gives authenticated callers the full report untouched, flagged as unrestricted", () => {

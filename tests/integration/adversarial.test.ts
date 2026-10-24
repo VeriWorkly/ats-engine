@@ -33,6 +33,7 @@ const SHAPES: Record<string, string> = {
   "post-nominal dots": `Jane Doe, ${rep("AB.", 4_000)}!`,
   "post-nominal commas": `Jane Doe${rep(", AB", 4_000)}!`,
   "dash run": rep("-"),
+  "em dash run": rep("a—"),
   "lt run": rep("<"),
   "w-tag run": rep("<w:a "),
   "devanagari run": rep("क"),
@@ -100,6 +101,10 @@ const SHAPES: Record<string, string> = {
   "slash compound run": rep("HTML/CSS/"),
   "slash number run": rep("a/1/"),
   "link run": rep("a://b/"),
+  "two-label link run": rep("a.com/"),
+  "two-label host run": rep("a.co a.co/"),
+  // Names of several capitalised words offered as alternatives.
+  "or name run": rep("A B or C D "),
   "scheme run": rep("a+b.c-"),
   // Many short lines: every line reader searches for dates.
   "digit lines": rep("1\n"),
@@ -160,6 +165,34 @@ const SHAPES: Record<string, string> = {
   "date line run": rep("Jan 2020 - Present\n"),
   "expiry after date run": rep("2027 तक "),
   "linkedin heading run": rep("Top-Kenntnisse "),
+  // Honorifics before a name, a role layout shown once, a header's country domain and city.
+  "honorific run": rep("Dr. "),
+  "layout en run": rep("Analista en Acme S.L. en "),
+  "country domain run": rep("a.com.ar."),
+  "header city run": rep("Bogotá D.C. | "),
+  "foundation run": rep("Fundação "),
+  // Navigation found once, from the outermost: nested or unclosed navigation scans once.
+  "navigation run": rep('<div role="navigation"><nav>'),
+  "escaped class run": `<style>${rep(".a\\:b ")}{display:none}</style>`,
+  // Ordinal days and arrows in dates, en dashes in a phone number, a link's commas and brackets,
+  // a line of abbreviations under Certifications, role headers written as bullets.
+  "ordinal day run": rep("1st Jan "),
+  "arrow range run": rep("2019 → "),
+  "en dash digit run": rep("1–"),
+  "link comma run": `https://a${rep(",a")}`,
+  "link bracket run": `https://a/${rep("(a)")}`,
+  "link closing bracket run": `https://a/${rep(")")}`,
+  "abbreviation list run": `Certifications\n${rep("AB, ")}`,
+  "bulleted header run": `Experience\n${rep("- Engineer, Acme Corp 2019 - 2020\n")}`,
+  // Ordinary words beside a degree's: "a level 2", "certificate of sponsorship", "must be".
+  "a level run": rep("a level   "),
+  "certificate of run": rep("certificate of good  "),
+  "must be run": rep("must   be "),
+  "promotion run": rep("sales - promotion "),
+  // Hiding read from markup: a self-closed hiding tag, a style rule, alternate content.
+  "self-closed hiding run": rep('<span style="display:none"/>'),
+  "style rule run": rep(".k{color:#fff} "),
+  "alternate content run": rep("<mc:Choice "),
 };
 
 const POLICY = withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES);
@@ -172,7 +205,7 @@ describe("50 KB adversarial input", () => {
     const html = `<p>${input}</p>`;
     expectFast(() => jobTextFromHtml(html), 1_500);
     // Every region's credential patterns, compiled only under its region.
-    for (const region of ["DE", "FR", "GB", "IN", "ES", "BR", "PT"])
+    for (const region of ["DE", "FR", "GB", "IN", "ES", "BR", "PT", "MX", "AR", "CO", "CL"])
       expectFast(
         () =>
           check(resume, POLICY, {

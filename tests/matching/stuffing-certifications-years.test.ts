@@ -318,7 +318,7 @@ describe("a bullet naming a later employer does not move the role", () => {
   });
 });
 
-describe("a few hidden characters are layout, not hidden keywords", () => {
+describe("a few hidden characters cost no points, and are not read", () => {
   const body =
     "Experience\nSenior Data Engineer\nAcme Corp | Jan 2018 - Present\n- Built Spark pipelines\nSkills\nSpark, Airflow\nKubernetes";
   const job = "Requirements\n- Kubernetes\n- Spark";
@@ -331,11 +331,13 @@ describe("a few hidden characters are layout, not hidden keywords", () => {
     hiddenText: hidden,
   });
 
-  it("reads a line the hidden-text rule passes", () => {
+  // Below the rule's threshold, hidden "Snowflake Airflow dbt" lifted a match from 25 to 100.
+  it("sets aside a hidden line the hidden-text rule passes", () => {
     const report = check(body, job, layout("Kubernetes"));
     expect(rule(report, "integrity.hiddenText")).toMatchObject({ passed: true });
-    expect(report.jobMatchScore).toBe(check(body, job).jobMatchScore);
-    expect(report.requirements.map((r) => r.status)).toEqual(["met", "met"]);
+    expect(report.requirements.map((r) => r.status)).toEqual(["missing", "met"]);
+    // A stray hidden character sets nothing aside.
+    expect(check(body, job, layout("|")).jobMatchScore).toBe(check(body, job).jobMatchScore);
   });
 
   it("still sets aside hidden text past the rule's threshold", () => {

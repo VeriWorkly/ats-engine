@@ -10,10 +10,12 @@ import { memo } from "../util/memo.js";
  * ligatures, doubled spaces). Case is folded too: recasing a present value is repair.
  */
 export function normalizeForGrounding(text: string): string {
-  // Digits of every script fold to ASCII first, so "2019" grounds in "२०१९" and back.
+  // Digits of every script fold to ASCII first, so "2019" grounds in "२०१९" and back. An en or
+  // em dash is never part of a word or an address, so it stands apart: "Email—jane@example.com".
   return normalizeText(text)
     .normalize("NFKD")
-    .replace(/[‐-―−]/g, "-")
+    .replace(/[–—―]/g, " - ")
+    .replace(/[‐-‒−]/g, "-")
     .replace(/[‘’ʼ]/g, "'")
     .replace(/[“”]/g, '"')
     .replace(/\s+/g, " ")
@@ -54,6 +56,18 @@ function trimMarks(text: string) {
 }
 
 /**
+ * Without hyphens at its ends ("-jane@example.com"), which no address starts or ends with; a
+ * loop, as `-+$` rescans a run of hyphens from each one.
+ */
+function trimDashes(text: string) {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "-") start += 1;
+  while (end > start && text[end - 1] === "-") end -= 1;
+  return text.slice(start, end);
+}
+
+/**
  * The addresses one token may be: as written ("janedoe.dev/[draft]"), and split at the marks
  * before its path, each without marks at its ends ("[janedoe.dev]", "janedoe.dev·github.com/x").
  * A mark inside a path is part of it: "janedoe.dev/a·b" is not "janedoe.dev/a".
@@ -83,10 +97,12 @@ function addressGrounded(value: string, normalized: string) {
         addressesIn(token).some(
           (address) =>
             bare(
-              address
-                // A label ("Email:"), not part of the address; "https://" is kept.
-                .replace(/^\p{L}+:(?!\/\/)/u, "")
-                .replace(/(?<![.:;!?])[.:;!?]+$/, ""),
+              trimDashes(
+                address
+                  // A label ("Email:"), not part of the address; "https://" is kept.
+                  .replace(/^\p{L}+:(?!\/\/)/u, "")
+                  .replace(/(?<![.:;!?])[.:;!?]+$/, ""),
+              ),
             ) === target,
         ),
       ),
@@ -169,6 +185,8 @@ export function isGrounded(
     return Boolean(gaps!.glued[first] || (next >= 0 && gaps!.glued[next]));
   };
 
+  // Most rejected values occur nowhere: the native search rules them out before the scan.
+  if (!joined.includes(target)) return false;
   return occurs(joined, target, (at) => {
     if (anywhere) return true;
     if (starts[at] !== 1 || starts[at + target.length] !== 1) return false;

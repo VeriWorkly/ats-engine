@@ -81,6 +81,16 @@ describe("file name", () => {
     expect(item?.fix).toContain("Jane-Doe-Resume.pdf");
   });
 
+  it.each([
+    [{ name: "Resume.final" }, "Jane-Doe-Resume.", ["final"]],
+    [{ name: "Resume.final", format: "pdf" as const }, "Jane-Doe-Resume.pdf.", ["final"]],
+    [{ name: "Resume.v2.PDF" }, "Jane-Doe-Resume.PDF.", ["v2"]],
+  ])("strips only a known extension: %j", (file, suggested, marks) => {
+    const item = advice(check({ file }), "file.name");
+    expect(item?.fix).toContain(suggested);
+    for (const mark of marks) expect(item!.evidence).toContain(`"${mark}"`);
+  });
+
   it("reads a hostile file name in linear time", () => {
     const hostile = `${"v1 (2) ".repeat(5_000)}${"a_".repeat(20_000)}.pdf`;
     expectFast(() => named(hostile), 1_000, "file name");

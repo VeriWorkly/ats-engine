@@ -88,6 +88,12 @@ describe("experience and skills headings beyond software's", () => {
     ["Additional Experience", "experience"],
     ["Military Experience", "experience"],
     ["Freelance Experience", "experience"],
+    ["Work Experiences", "experience"],
+    ["EXPERIENCES", "experience"],
+    ["Job History", "experience"],
+    ["Employment History", "experience"],
+    ["Career", "experience"],
+    ["Positions Held", "experience"],
     ["Technical Proficiencies", "skills"],
     ["Tech Stack", "skills"],
     ["Tools & Technologies", "skills"],
@@ -318,6 +324,13 @@ describe("a job title that starts with a heading word", () => {
     ]);
   });
 
+  it("reads History Teacher as a title, and History alone as no heading", () => {
+    expect(
+      rows("Jane Doe\nExperience\nHistory Teacher\nSpringfield High School\nJan 2019 - Present"),
+    ).toMatchObject([{ title: "History Teacher", employer: "Springfield High School" }]);
+    expect(segmentResume(["Jane Doe", "History", "x"], DEFAULT_POLICY)[0]?.kind).toBe("other");
+  });
+
   it("does not take the next role's title as an Experience Designer's employer", () => {
     expect(
       rows(
@@ -369,17 +382,30 @@ describe("date spellings that dropped the role", () => {
     ["Analyst, Initech Jan '20 - Mar '22", { year: 2020, month: 1 }, { year: 2022, month: 3 }],
     ["Intern, Pied Piper Summer 2018", { year: 2018, month: 6 }, { year: 2018, month: 8 }],
     ["Lead, Umbrella Jan2020 - Mar2021", { year: 2020, month: 1 }, { year: 2021, month: 3 }],
+    [
+      "Engineer, Acme 1st Jan 2020 - 3rd Mar 2022",
+      { year: 2020, month: 1 },
+      { year: 2022, month: 3 },
+    ],
+    [
+      "Engineer, Acme Jan 21st, 2020 - Mar 2nd, 2022",
+      { year: 2020, month: 1 },
+      { year: 2022, month: 3 },
+    ],
   ])("reads %j", (line, start, end) => {
     const [role] = rows(`Jane Doe\nExperience\n${line}`);
     expect(role).toMatchObject({ start, end, current: false });
     expect(role.employer).not.toMatch(/\d|Jan/);
   });
 
-  it("reads 2020 - Today as current", () => {
-    expect(rows("Jane Doe\nExperience\nManager, Hooli 2020 - Today")).toMatchObject([
-      { title: "Manager", employer: "Hooli", current: true },
-    ]);
-  });
+  it.each(["Manager, Hooli 2020 - Today", "Manager, Hooli May 2019 → Present"])(
+    "reads %j as current",
+    (line) => {
+      expect(rows(`Jane Doe\nExperience\n${line}`)).toMatchObject([
+        { title: "Manager", employer: "Hooli", current: true },
+      ]);
+    },
+  );
 
   it("does not read an ISO month, or the digits of an ORCID iD, as a range", () => {
     expect(rows("Jane Doe\nExperience\nReleased 2021-03")).toEqual([]);
@@ -863,6 +889,18 @@ describe("links", () => {
         "Jane Doe\ndribbble.com/janedoe | orcid.org/0000-0002-1825-0097 | janedoe.dev | jane@janedoe.dev",
       ).links,
     ).toEqual(["dribbble.com/janedoe", "orcid.org/0000-0002-1825-0097", "janedoe.dev"]);
+  });
+
+  it("keeps a link's own brackets and commas, not the sentence's", () => {
+    expect(
+      parse(
+        "Jane Doe\nSee (https://en.wikipedia.org/wiki/Ada_(language)), https://example.com/?ids=1,2, and https://example.com/a.",
+      ).links,
+    ).toEqual([
+      "https://en.wikipedia.org/wiki/Ada_(language)",
+      "https://example.com/?ids=1,2",
+      "https://example.com/a",
+    ]);
   });
 });
 

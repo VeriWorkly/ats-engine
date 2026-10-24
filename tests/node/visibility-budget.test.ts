@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { measureVisibility } from "../../src/node/hidden.js";
 import { extractResume } from "../../src/node/index.js";
 import { indexDrawn, MAX_POINT_CHECKS, type Drawn } from "../../src/node/surroundings.js";
-import { buildPdf } from "../fixtures/buildPdf.js";
+import { buildPdf, chromePage, chromeTable } from "../fixtures/buildPdf.js";
+import { expectFast } from "../fixtures/timing.js";
 
 /** A crowded page cannot hold the visibility replay: work is bounded by a count of point checks, asserted here with a lowered budget. */
 
@@ -84,6 +85,44 @@ describe("a crowded page cannot hold the visibility replay", () => {
     }
     const { layout } = await extractResume(buildPdf([...shapes, ...runs].join("\n")), "pdf");
     expect(layout?.hiddenTextChars).toBeUndefined();
+  });
+
+  it("still counts the ruled tables of such a page", async () => {
+    const shapes: string[] = [];
+    const runs: string[] = [];
+    for (let i = 0; i < 2_000; i += 1) {
+      shapes.push(`${100 + (i % 50)} 100 1 1 re f`);
+      runs.push(`BT /F1 10 Tf ${100 + (i % 50)} 120 Td (a) Tj ET`);
+    }
+    const table = chromePage(chromeTable(3, 2));
+    const { layout } = await extractResume(buildPdf([table, ...shapes, ...runs].join("\n")), "pdf");
+    expect(layout?.hiddenTextChars).toBeUndefined();
+    expect(layout?.tableCount).toBe(1);
+  });
+});
+
+describe("a soft mask's glyphs are checked within a budget", () => {
+  // Each paint through the mask checked every glyph of it: 24,000 of each took 6 to 21 s.
+  it("reads 24,000 glyphs under 24,000 paints in the time of a resume", () => {
+    const ops = OPS as unknown as Record<string, number>;
+    const fnArray: number[] = [ops.beginGroup];
+    const argsArray: unknown[][] = [[{ smask: {} }]];
+    for (let i = 0; i < 24_000; i += 1) {
+      fnArray.push(ops.beginText, ops.setFont, ops.setTextMatrix, ops.showText);
+      argsArray.push(
+        [],
+        ["F1", 10],
+        [[1, 0, 0, 1, 50 + (i % 500), 700]],
+        [[{ unicode: "a", width: 500 }]],
+      );
+    }
+    fnArray.push(ops.endGroup, ops.setGState);
+    argsArray.push([{ smask: {} }], [[["SMask", true]]]);
+    for (let i = 0; i < 24_000; i += 1) {
+      fnArray.push(ops.constructPath);
+      argsArray.push([ops.fill, [], new Float32Array([10, 10 + (i % 50), 11, 11 + (i % 50)])]);
+    }
+    expectFast(() => measureVisibility(ops, { fnArray, argsArray }, [0, 0, 612, 792]), 2_000);
   });
 });
 

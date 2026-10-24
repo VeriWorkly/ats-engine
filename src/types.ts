@@ -122,8 +122,14 @@ export type AtsReport = {
   matchedKeywordGroups: AtsKeywordGroups;
   missingKeywordGroups: AtsKeywordGroups;
   /**
+   * How many terms the posting names that the resume has and lacks, past the 12 the lists show:
+   * the counts a restricted report gives. Absent from a report stored by an engine before it.
+   */
+  keywordCounts?: { matched: number; missing: number };
+  /**
    * Evidence of every failed check that stops an ATS reading the document (parse and extraction),
-   * then a note when the job posting was longer than `MAX_JOB_TEXT_CHARS` and cut.
+   * then a note when the resume was cut at 50,000 characters, when the job posting was longer than
+   * `MAX_JOB_TEXT_CHARS` and cut, and when it lists more requirements than are judged (25).
    */
   parsingWarnings: string[];
   strengths: string[];

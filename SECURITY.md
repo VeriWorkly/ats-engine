@@ -29,13 +29,14 @@ review a policy's patterns as you would code — `tests/integration/regressions.
 adversarial suite against a private policy when one is present.
 
 **Size.** Resume text is cut at 50 000 characters, postings at 20 000 (`MAX_JOB_TEXT_CHARS`, on
-every path; `check` says so in `parsingWarnings`), a structured document is
+every path; `check` says of either cut in `parsingWarnings`), a structured document is
 bounded in depth, array length and node count before it is validated, a policy or a locale pack
 nested deeper than 5 000 levels (or one that contains itself) is refused as invalid with
 `AtsPolicyError` rather than overflowing the stack, a DOCX may expand to at most
-64 MB and hold at most 2 MB of the XML `mammoth` parses, 2 MB of page headers and footers and
-8 MB of embedded HTML pages (`w:altChunk`, each read once however often it is named; a part past
-these is neither read nor measured), and PDF text reading stops at the cap or
+64 MB and hold at most 2 MB of the XML `mammoth` parses, 2 MB of the page headers and footers
+its sections place and 8 MB of the embedded HTML pages its body places (`w:altChunk`, each read
+once however often it is named; a part past these, or one nothing places, is neither read nor
+measured), and PDF text reading stops at the cap or
 after the first 100 pages, whichever comes first (the page count still counts every page). PDF
 images have no size cap: pdf.js decodes every image in full, about 12 bytes a pixel, whatever
 its size, and a 420 KB file with one 144 MP image held 1.8 GB. The table pass decodes no image,
@@ -181,8 +182,8 @@ reads at most 20 MB. `npm run smoke` fails if the core, `/document`, `/format`, 
 **The MCP server.** `@veriworkly/ats-engine-mcp` talks over stdio only, makes no network requests
 and calls no model. It reads the files a tool call names, with the rights of the user running it,
 and nothing else; folders, pipes, devices, network paths and files over 20 MB are refused, and so
-is a `job_path` that is not a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file. It reads a PDF or
-DOCX in its own `/node/child` process, one per file, stopped after 60 seconds or when the call is
+is a `job_path` that is not a `.txt`, `.md`, `.html`, `.pdf` or `.docx` file. It reads a PDF,
+DOCX or HTML file in its own `/node/child` process, one per file, stopped after 60 seconds or when the call is
 cancelled, so a file that exhausts memory, crashes the parser or never ends takes down that
 process and not the server. It reads as many files at once as the machine has CPU cores; further
 calls wait their turn, so many calls at once cannot start a process each. Memory still needs an

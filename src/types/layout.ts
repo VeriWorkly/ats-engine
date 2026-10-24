@@ -32,6 +32,11 @@ export type AtsLayoutSignals = {
   metadataText?: string;
   /** A PDF that opened without a password but is encrypted (an owner password). Advice only. */
   encrypted?: boolean;
+  /**
+   * The text ran past `MAX_EXTRACTED_CHARS` (50,000) and was cut there: `parsingWarnings` says
+   * so. Absent when nothing was cut.
+   */
+  textCut?: boolean;
   /** A Word document's tracked changes and comments still in the file. DOCX only; advice only. */
   trackedChanges?: number;
   comments?: number;

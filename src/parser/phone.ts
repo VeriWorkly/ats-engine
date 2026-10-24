@@ -10,9 +10,10 @@ import { findDateRange } from "./dates.js";
 /**
  * A run that could be a phone number: an optional "+", then 7 to 15 digits (E.164) with at most
  * three separators between any two. Linear by construction (every repetition consumes a digit;
- * libphonenumber's own finder is quadratic on "1 1 1 …"). Separators never include a line break.
+ * libphonenumber's own finder is quadratic on "1 1 1 …"). Separators never include a line break;
+ * they include the dashes a word processor turns a hyphen into ("+1–415–555–0134").
  */
-const CANDIDATE = /(?<![\p{L}\p{N}+])(?:\+[ \t]?)?\(?\d(?:[ \t.\-()/]{0,3}\d){6,14}(?!\d)/gu;
+const CANDIDATE = /(?<![\p{L}\p{N}+])(?:\+[ \t]?)?\(?\d(?:[ \t.\-‐‑‒–—()/]{0,3}\d){6,14}(?!\d)/gu;
 
 /** A full numeric date ("04.05.1990", "2021/03/15"), which has the digits of a phone number. */
 const NUMERIC_DATE = /^\d{1,4}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{1,4}$/;

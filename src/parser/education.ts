@@ -11,11 +11,44 @@ type EducationMatchers = {
   schoolsAll: RegExp;
   /** Highest level first, so a line naming two credentials is recorded at the higher one. */
   levels: Array<{ isced: AtsIscedLevel; re: RegExp }>;
+  /** `universityWords`, where a program named by its field alone is the first degree. */
+  universities: RegExp | null;
+  /** `courseWords`: a course or a term abroad, never a degree. */
+  courses: RegExp;
+  /** A city or a country, whole. */
+  places: RegExp;
 };
+
+/** The first part of an education line, before its first separator: the field, when it leads. */
+const LEADING_PART = /^[^,|·•\t–—]+/u;
+
+/**
+ * ISCED 6 for "Administración de Empresas, Universidad de Antioquia, 2015": a field alone before a
+ * university the policy names (`universityWords`), where postgraduate programs always name
+ * themselves. Null when the school leads or a degree is written, and when what leads is no field:
+ * a date ("Marzo 2010 – 2015"), a place ("Medellín"), or a course or a term abroad
+ * (`courseWords`: "Curso de Inglés", "Semestre de intercambio").
+ */
+function fieldAtUniversity(line: string, school: string, policy: AtsEnginePolicy) {
+  const { universities, courses, places } = matchersFor(policy.resumeParse);
+  if (!universities || !school || !universities.test(school)) return null;
+  const field = LEADING_PART.exec(line)?.[0].trim() ?? "";
+  const isField =
+    /\p{L}{3}/u.test(field) &&
+    !/\d/u.test(field) &&
+    !school.includes(field) &&
+    !field.includes(school) &&
+    !courses.test(field) &&
+    !places.test(field);
+  return isField ? (6 as AtsIscedLevel) : null;
+}
 
 const matchersFor = memo((rp: AtsEnginePolicy["resumeParse"]): EducationMatchers => ({
   schools: wordListRegex(rp.schoolWords),
   schoolsAll: wordListRegex(rp.schoolWords, "gi"),
+  universities: rp.universityWords.length ? wordListRegex(rp.universityWords) : null,
+  courses: wordListRegex(rp.courseWords.length ? rp.courseWords : ["(?!)"]),
+  places: new RegExp(`^(?:${[...rp.cityNames, ...rp.placeNames].join("|") || "(?!)"})$`, "iu"),
   levels: Object.entries(rp.degrees)
     .filter((entry): entry is [string, string] => typeof entry[1] === "string")
     .map(([level, pattern]) => ({
@@ -56,11 +89,26 @@ export function parseEducation(
 
   // The line that named the last entry, while that entry still lacks a school or a credential.
   let open: { at: number; entry: AtsParsedEducation } | null = null;
+  // The last entry, the line that last named it and the line it opened on.
+  let last: { at: number; from: number; entry: AtsParsedEducation } | null = null;
+  // A line holding only a date range or a year: what it ends, else undefined.
+  const datesOn = (line: string | undefined) => {
+    if (line === undefined) return undefined;
+    const range = findDateRange(line, policy.resumeParse, now, { aheadYears: DEGREE_YEARS });
+    if (range) return /\p{L}/u.test(line.replace(range.matched, "")) ? undefined : range.range.end;
+    return /^[\s(]*\d{4}[\s).]*$/u.test(line) ? loneYear(line, now) : undefined;
+  };
 
   lines.forEach((line, at) => {
     const degree = degreeLevel(line, policy);
     const isSchool = schools.test(line);
-    if (!degree && !isSchool) return;
+    if (!degree && !isSchool) {
+      // Dates on a line of their own under an entry end it ("BSc Computer Science" over
+      // "University of Leeds" over "2015 – 2019"), unless such a line heads each entry instead.
+      if (last?.at === at - 1 && !last.entry.end && datesOn(lines[last.from - 1]) === undefined)
+        last.entry.end = datesOn(line) ?? null;
+      return;
+    }
 
     // An expected graduation may be ahead of today, up to a degree's length.
     const range = findDateRange(line, policy.resumeParse, now, { aheadYears: DEGREE_YEARS });
@@ -73,7 +121,7 @@ export function parseEducation(
     const entry: AtsParsedEducation = {
       school,
       credential: degree?.matched ?? "",
-      isced: degree?.isced ?? null,
+      isced: degree?.isced ?? fieldAtUniversity(line, school, policy),
       end: range ? range.range.end : loneYear(line, now),
     };
 
@@ -90,11 +138,13 @@ export function parseEducation(
       other.credential ||= entry.credential;
       other.isced ??= entry.isced;
       other.end ??= entry.end;
+      last = { at, from: open!.at, entry: other };
       open = null;
       return;
     }
 
     entries.push(entry);
+    last = { at, from: at, entry };
     open = entry.school && entry.isced ? null : { at, entry };
   });
 
@@ -153,8 +203,15 @@ function schoolName(text: string, credential: string, policy: AtsEnginePolicy) {
         .replace(/\s+/g, " ")
         .trim()
         .replace(/(?<![\s,–—-])[\s,–—-]+$/, "");
-    // A school word alone is a heading ("SCHOOL"), not the name of one.
-    const named = (at: number) => schools.test(name(at)) && name(at).replace(schoolsAll, "").trim();
+    // A school word alone is a heading ("SCHOOL"), not the name of one, unless a comma parts it
+    // from a credential: an institution named by its word ("Tecnólogo en Logística, SENA, 2013").
+    // Parted by a column gap, it is the end of a name ("Lakeview  University").
+    const named = (at: number) =>
+      schools.test(name(at)) &&
+      (name(at).replace(schoolsAll, "").trim() ||
+        (separator === PART &&
+          credential !== "" &&
+          pieces.some((piece, i) => i !== at && piece.includes(credential))));
 
     let at = pieces.findIndex(
       (piece, i) => named(i) && !(credential && piece.includes(credential)),

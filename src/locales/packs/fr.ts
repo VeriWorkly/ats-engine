@@ -1,3 +1,4 @@
+import { wholeWord as word } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
@@ -12,7 +13,6 @@ import type { AtsLanguagePackInput } from "../schema.js";
  * a baccalauréat is a bachelor's degree in Québec; the words every French-speaking country uses
  * for a degree (licence, doctorat, diplôme d'ingénieur) are here.
  */
-const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 const e = "[eéèê]";
 
 /** The French language pack: recognised by its function words; region FR by default. */
@@ -64,15 +64,20 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   ],
   sections: {
     experience: String.raw`^(?:exp${e}riences?(?:\s+(?:professionnelles?|pertinentes?))?|parcours\s+professionnel|historique\s+professionnel|emplois?\s+occup${e}s|stages?(?:\s+et\s+alternances?)?|alternances?)`,
-    education: String.raw`^(?:formations?(?:\s+(?:acad${e}miques?|universitaires?|initiales?|et\s+dipl[ôo]mes))?|${e}tudes(?:\s+sup${e}rieures)?|cursus(?:\s+(?:universitaire|scolaire|acad${e}mique))?|dipl[ôo]mes(?:\s+et\s+formations?)?|parcours\s+(?:acad${e}mique|scolaire|universitaire))`,
-    skills: String.raw`^(?:principales\s+comp${e}tences|comp${e}tences(?!\s+linguistiques)(?:\s+(?:techniques|informatiques|cl${e}s|professionnelles))?|savoir[\s-]faire|outils(?:\s+et\s+technologies)?|connaissances\s+(?:techniques|informatiques)|informatique)`,
+    education: String.raw`^(?:formations?(?:\s+(?:acad${e}miques?|universitaires?|initiales?|et\s+dipl[ôo]mes))?|${e}tudes(?:\s+sup${e}rieures)?|cursus(?:\s+(?:universitaire|scolaire|acad${e}mique))?|scolarit${e}|dipl[ôo]mes(?:\s+et\s+formations?)?|parcours\s+(?:acad${e}mique|scolaire|universitaire))`,
+    skills: String.raw`^(?:principales\s+comp${e}tences|comp${e}tences(?!\s+linguistiques)(?:\s+(?:techniques|informatiques|cl${e}s|professionnelles))?|savoir[\s-]faire|outils(?:\s+et\s+technologies)?|connaissances(?:\s+(?:techniques|informatiques))?|aptitudes|savoir[\s-]${e}tre|informatique)`,
     projects: String.raw`^(?:projets(?:\s+(?:personnels|professionnels|acad${e}miques|r${e}alis${e}s))?|r${e}alisations)`,
-    certifications: String.raw`^(?:certifications?|certificats?|habilitations)`,
+    certifications: String.raw`^(?:(?:licences\s+et\s+)?certifications?|certificats?|habilitations|licences)`,
     languages: String.raw`^(?:langues(?:\s+${e}trang[eè]res)?|comp${e}tences\s+linguistiques)`,
-    other: String.raw`^(?:profil(?:\s+professionnel)?|r${e}sum${e}(?:\s+professionnel)?|[àa]\s+propos(?:\s+de\s+moi)?|objectif(?:\s+professionnel)?|centres?\s+d['’]int${e}r[eê]ts?|loisirs|int${e}r[eê]ts|activit${e}s(?:\s+extra[\s-]?professionnelles)?|b${e}n${e}volat|engagements?(?:\s+associatifs)?|publications|r${e}f${e}rences|distinctions|prix(?:\s+et\s+distinctions)?|informations\s+personnelles|coordonn${e}es|divers)`,
+    other: String.raw`^(?:profil(?:\s+professionnel)?|r${e}sum${e}(?:\s+professionnel)?|[àa]\s+propos(?:\s+de\s+moi)?|objectif(?:\s+professionnel)?|centres?\s+d['’]int${e}r[eê]ts?|loisirs|int${e}r[eê]ts|activit${e}s(?:\s+extra[\s-]?professionnelles)?|b${e}n${e}volat|engagements?(?:\s+associatifs)?|publications|r${e}f${e}rences|distinctions|prix(?:\s+et\s+distinctions)?|informations\s+personnelles|coordonn${e}es|divers|vie\s+associative|informations\s+compl${e}mentaires|qualit${e}s(?:\s+personnelles)?)`,
   },
   // "Bilingue" and "courant" are C1, as "fließend" is; "bon niveau" B2, "intermédiaire" B1.
   languageLevels: {
+    [String.raw`bilingue\s+ou\s+langue\s+natale|langue\s+natale|natif|native`]: "C2",
+    [String.raw`capacit${e}\s+professionnelle\s+compl[eè]te`]: "C2",
+    [String.raw`capacit${e}\s+professionnelle`]: "C1",
+    [String.raw`comp${e}tence\s+professionnelle\s+limit${e}e`]: "B1",
+    [String.raw`avanc${e}e?`]: "C1",
     [String.raw`langue\s+maternelle|maternelle`]: "C2",
     [String.raw`bilingue`]: "C1",
     [String.raw`courant(?:e)?|lu,?\s+${e}crit,?\s+parl${e}`]: "C1",
@@ -130,6 +135,7 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "actuel",
     "en cours",
     "maintenant",
+    "ce jour",
   ],
   // "Mars 2019 à juin 2021", "du 03/2019 au 06/2021", "jusqu'à 2021".
   rangeWords: ["à", "au", String.raw`jusqu['’]\s?(?:à|au|en)`],
@@ -139,17 +145,27 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   leaveWords: [
     String.raw`cong${e}\s+(?:parental|(?:de\s+)?(?:maternit${e}|paternit${e})|sabbatique)`,
     String.raw`ann${e}e\s+sabbatique`,
+    String.raw`ann${e}e\s+de\s+c${e}sure`,
   ],
   seasons: { printemps: [3, 5], été: [6, 8], automne: [9, 11], hiver: [1, 3] },
   durationUnits: ["an", "ans", "année", "années", "mois"],
   nameLabels: ["nom", String.raw`nom\s+et\s+pr${e}nom`, String.raw`pr${e}nom\s+et\s+nom`],
+  // "M." is not here: it is as often an initial ("M. Kestrel").
+  namePrefixes: [String.raw`mme\.?`, String.raw`mlle\.?`, String.raw`pr\.?`],
   employerWords: ["chez"],
   // Each with its feminine: "ingénieure", "développeuse", "cheffe de projet".
   titleWords: [
     String.raw`ing${e}nieure?`,
     String.raw`d${e}veloppeu(?:r|se)`,
     "programmeu(?:r|se)",
-    String.raw`chef(?:fe)?\s+de\s+(?:projet|produit|${e}quipe|service|rayon)`,
+    String.raw`chef(?:fe)?\s+(?:de\s+(?:projet|produit|service|rayon|chantier|cuisine)|d['’]${e}quipe)`,
+    String.raw`professeure?`,
+    String.raw`chercheu(?:r|se)`,
+    String.raw`doctorante?`,
+    String.raw`pr${e}sidente?`,
+    "vendeu(?:r|se)",
+    "serveu(?:r|se)",
+    "caissi(?:er|ère)",
     String.raw`charg${e}e?\s+(?:de|d['’])\s*(?:client${e}le|mission|affaires|recrutement|communication|projet)`,
     "responsable",
     "directeur",
@@ -206,7 +222,19 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
       "|",
     ),
   workplaceWords: [String.raw`t${e}l${e}travail`, "hybride", String.raw`[àa]\s+distance`],
-  organisationWords: ["sas", "sasu", "sarl", "eurl", String.raw`s\.a\.`, "sca", "snc"],
+  organisationWords: [
+    "sas",
+    "sasu",
+    "sarl",
+    "eurl",
+    String.raw`s\.a\.`,
+    "sca",
+    "snc",
+    "sprl",
+    "srl",
+    "asbl",
+    String.raw`s[àa]rl`,
+  ],
   contentLineVerbs: [
     "développé",
     "conçu",
@@ -315,12 +343,16 @@ export const fr: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   // "Bac+N" is the `FR` region's too, and here for a French posting read under another region.
   // A baccalauréat named for its field is Québec's bachelor's; France names it for a stream.
   degrees: {
+    // Upper secondary in French-speaking Switzerland, Belgium and Québec.
+    "3": word(
+      String.raw`dipl[ôo]me\s+d['’]${e}tudes\s+(?:secondaires|professionnelles)|maturit${e}\s+(?:gymnasiale|professionnelle|f${e}d${e}rale)|cfc|cess`,
+    ),
     // Québec's DEC, from a CEGEP; only before its field, since "Dec" is also December.
     "5": word(
       String.raw`bac\s*\+\s*2|d\.?\s?e\.?\s?c\.?(?=\s+(?:en|\())|dipl[ôo]me\s+d['’]${e}tudes\s+coll${e}giales`,
     ),
     "6": word(
-      String.raw`licence(?:\s+professionnelle)?|bac(?:calaur[ée]at)?\s+en\s+\p{L}+|bac\s*\+\s*3`,
+      String.raw`licence(?:\s+professionnelle)?|bac(?:calaur[ée]at)?\s+en\s+\p{L}+|bac\s*\+\s*3|bacheli(?:er|[eè]re)\s+en`,
     ),
     "7": word(
       String.raw`dipl[ôo]me\s+d['’]ing${e}nieur|ing${e}nieur\s+dipl[ôo]m${e}|mast[eè]re(?:\s+sp${e}cialis${e})?|bac\s*\+\s*5`,

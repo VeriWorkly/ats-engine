@@ -130,6 +130,15 @@ describe("a certification not held", () => {
     expect(found.evidence[0]).toMatch(/^(?:CISSP|AWS Certified Solutions Architect)/);
   });
 
+  it.each([
+    ["CPA (inactive)", "CPA: inactive"],
+    ["CPA (expired)", "CPA: expired"],
+    ["CPA, lapsed", "CPA: lapsed"],
+  ])("is partial when its status says it is no longer held: %s", (row, detail) => {
+    expect(judge(listing(row), "CPA required")).toMatchObject({ status: "partial", detail });
+    expect(judge(listing("CPA, AICPA"), "CPA required").status).toBe("met");
+  });
+
   // Rows with one name collapsed onto the first: a renewal listed below a lapsed row was partial.
   it.each([
     "AWS Certified Developer, Amazon Web Services, 2015, expired 2018\nAWS Certified Solutions Architect, Amazon Web Services, 2023, expires 2029",

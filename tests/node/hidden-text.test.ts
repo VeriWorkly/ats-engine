@@ -308,6 +308,71 @@ describe("hidden text", () => {
     expect(layout?.imageCount).toBe(0);
   });
 
+  // The run's middle is seen, the rest is not: its letters are judged one by one.
+  it("finds text on two boxes of its colour either side of its middle", async () => {
+    // The line runs from 50 to 243pt, its middle at 147: the gap between the boxes.
+    const layout = await hidden(`0 g 40 690 105 30 re f 148 690 300 30 re f 0 g ${line(700)}`);
+    expect(layout).toMatchObject({ hiddenTextChars: KEYWORD_CHARS, hiddenText: KEYWORDS });
+  });
+
+  it("finds the half of a line a box drawn over it covers", async () => {
+    // "Kubernetes" starts at 164pt, past the line's middle at 156.
+    const covered = `0 g ${line(700, "Senior Engineer at Acme Kubernetes Terraform")} 0 g 162 695 300 20 re f`;
+    const layout = await hidden(covered);
+    expect(layout.hiddenText).toBe("Kubernetes Terraform");
+  });
+
+  // Real-file check (2026-10-24, Chrome's print to PDF): a box over the middle of a bullet hid the
+  // whole bullet, and took its visible keywords out of the match.
+  it("finds only the stretch a box drawn over a line's middle covers", async () => {
+    const text = "Senior Engineer at Acme Kubernetes Terraform";
+    const layout = await hidden(`0 g ${line(700, text)} 0 g 110 695 50 20 re f`);
+    expect(layout.hiddenTextChars).toBeGreaterThan(0);
+    expect(layout.hiddenTextChars).toBeLessThan(text.length / 2);
+    expect(layout.hiddenText).not.toMatch(/Senior|Terraform/);
+  });
+
+  it.each([
+    ["half on a band of another colour", `0.9 0.9 0.9 rg 148 690 300 30 re f 0 g ${line(700)}`],
+    ["beside a box drawn after it", `0 g ${line(700)} 0 g 300 695 100 20 re f`],
+  ])("does not flag a line %s", async (_, content) => {
+    expect((await hidden(content)).hiddenTextChars).toBe(0);
+  });
+
+  // An optional content layer (`/OC`) the catalog turns off is never printed, though its text is read.
+  const layered = (off: boolean) =>
+    extractResume(
+      buildPdf(
+        `${visible}\n/OC /MC0 BDC 0 g ${line(700)} EMC\n${line(600, "Experience")}`,
+        "/Properties<</MC0 7 0 R>>",
+        "",
+        ["<</Type/OCG/Name(Layer)>>"],
+        { catalog: `/OCProperties<</OCGs[7 0 R]/D<<${off ? "/OFF[7 0 R]" : ""}>>>>` },
+      ),
+      "pdf",
+    );
+
+  it("finds text in a layer the document turns off", async () => {
+    const { text, layout } = await layered(true);
+    expect(text).toContain(KEYWORDS);
+    expect(layout).toMatchObject({ hiddenTextChars: KEYWORD_CHARS, hiddenText: KEYWORDS });
+  });
+
+  it("does not flag text in a layer the document shows, nor take a shape in one turned off as covering", async () => {
+    expect((await layered(false)).layout?.hiddenTextChars).toBe(0);
+    const { layout } = await extractResume(
+      buildPdf(
+        `${visible}\n${line(700)}\n/OC /MC0 BDC 1 1 1 rg 40 690 400 30 re f EMC`,
+        "/Properties<</MC0 7 0 R>>",
+        "",
+        ["<</Type/OCG/Name(Layer)>>"],
+        { catalog: "/OCProperties<</OCGs[7 0 R]/D<</OFF[7 0 R]>>>>" },
+      ),
+      "pdf",
+    );
+    expect(layout?.hiddenTextChars).toBe(0);
+  });
+
   it("reports it on the resume, quoting it", async () => {
     const { text, layout } = await extractResume(
       buildPdf(`${visible}\n1 1 1 rg ${line(700, `${KEYWORDS} ${KEYWORDS}`)}`),

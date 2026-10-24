@@ -1,3 +1,5 @@
+import { wholeWord } from "../../text/text.js";
+
 /**
  * What follows a bare two-letter form that is a US state code rather than a degree, when no
  * comma comes before it: a ZIP code, a year, or a month and year. A degree is followed by its
@@ -29,6 +31,13 @@ const LLM_DEGREE = String.raw`llm(?=${DEGREE_POSITION}|\s+in\s)(?:(?=[^\n]{0,80}
 const JD_DEGREE = String.raw`j\.\s?d\.?(?=${DEGREE_POSITION})|j\.d\.?(?:(?=[^\n]{0,80}?${LAW_CONTEXT})|(?<=${LAW_CONTEXT}[^\n]{0,80}j\.d\.?))`;
 
 /** The community policy's parsing vocabulary. Month names and "still here" words are the schema's defaults. */
+/**
+ * Degrees in the languages no built-in pack reads (Italian, Polish, Russian, Swedish, Dutch), so a
+ * resume read with AI help, or a degree an English resume carries from abroad, has its level.
+ * Edged by letters, not `\b`, which does not see Cyrillic as a word.
+ */
+const other = wholeWord;
+
 export const DEFAULT_RESUME_PARSE = {
   // Experience headings of every field (a nurse's "Clinical Experience", a fresher's
   // "Internships"). A heading the policy does not know is read as part of the section above it,
@@ -36,9 +45,10 @@ export const DEFAULT_RESUME_PARSE = {
   // Certification and language headings are the schema's defaults. "Top Skills" is a LinkedIn
   // export sidebar heading. Volunteer work is "other": it adds no months to the work history. A
   // word that is also a skill ("Leadership"), a role's title or a line of a role ("Tools:") is
-  // not a heading alone.
+  // not a heading alone. "History" heads the work history only after a word naming work ("Job
+  // History"), not as a subject ("History Teacher").
   sections: {
-    experience: String.raw`^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment|selected|additional|other|military|freelance)\s+)?(?:experience|employment|history)|^internships?|^academic\s+(?:appointments|positions)|^professional\s+background`,
+    experience: String.raw`^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment|selected|additional|other|military|freelance)\s+)?(?:experiences?|employment)|^(?:work|professional|career|employment|job|military)\s+history|^internships?|^academic\s+(?:appointments|positions)|^professional\s+background|^positions\s+held|^career$`,
     education: String.raw`^educational\s+(?:background|qualifications?|history|details)|^education|^academic\s+(?:background|qualifications?|history|record|credentials)`,
     skills: String.raw`^(?:(?:technical|core|key|top)\s+)?skills|^technologies|^core\s+competenc(?:y|ies)|^areas\s+of\s+expertise|^technical\s+proficienc(?:y|ies)|^tech(?:nology)?\s+stack|^tools\s+(?:&|and)\s+technolog(?:y|ies)`,
     projects: String.raw`^(?:(?:personal|academic|side|selected|key)\s+)?projects|^open[\s-]source\s+(?:projects|contributions)`,
@@ -113,18 +123,20 @@ export const DEFAULT_RESUME_PARSE = {
   // ("MS-Excel"), before a ZIP code, or as the salutation "Ms."; matched case-insensitively, so
   // the salutation is told by its dot. BA and BS read as degrees anywhere. Dotted and spelled-out
   // forms stay unconditional. "Associate" and "certificate" alone are not degrees; "Master Data
-  // Management" is a discipline. "Secondary School Certificate" is India's Class X (level 2, the
+  // Management" is a discipline. "A level 2 support" and "a level of" are no A-levels, and a
+  // "Certificate of Sponsorship" or "of Employment" is a document. "Secondary School Certificate" is India's Class X (level 2, the
   // IN region's), so neither it nor "High School (Class X)" is claimed at level 3.
+  // B.Com and M.Com are read with no region: Australia, South Africa and Ireland write them too.
   // J.D. and M.D. are level 7 in ISCED 2011, matched dotted only ("MD" is Maryland, "JD" a job
   // description); "MFA" undotted is multi-factor authentication.
   // Keyed by ISCED 2011 level. Level 4 is any diploma or certificate that is not a school one,
   // so its pattern steps around level 3's.
   degrees: {
-    "3": String.raw`(?:\b|^)((?:high\s+school(?!\s*\(\s*class\s+(?:x|10)(?:th)?(?![a-z]))|secondary\s+school(?!\s+certificate))(?:\s+(?:diploma|certificate))?|g\.?e\.?d\.?|a[\s-]levels?)(?![\p{L}\p{M}])`,
-    "4": String.raw`(?:\b|^)((?<!(?:high|secondary)\s+school\s+)diploma|(?:graduate\s+)?certificate\s+(?:in|of)\b)(?![\p{L}\p{M}])`,
+    "3": String.raw`(?:\b|^)((?:high\s+school(?!\s*\(\s*class\s+(?:x|10)(?:th)?(?![a-z]))|secondary\s+school(?!\s+certificate))(?:\s+(?:diploma|certificate))?|g\.?e\.?d\.?|a(?:-levels?|\slevels?(?!\s{1,3}(?:\d(?!\d)|of(?![\p{L}\p{M}])))))(?![\p{L}\p{M}])|${other(String.raw`diploma\s+di\s+maturit[àa]|maturit[àa]|аттестат|świadectwo\s+dojrzałości|matura|gymnasieexamen|havo|vwo`)}`,
+    "4": String.raw`(?:\b|^)((?<!(?:high|secondary)\s+school\s+)diploma|(?:graduate\s+)?certificate\s+(?:in|of(?!\s+(?:sponsorship|employment|insurance|incorporation|good\s+(?:standing|conduct)|deposit|origin|eligibility|conformity|analysis|authenticity|residence)\b))\b)(?![\p{L}\p{M}])`,
     "5": String.raw`(?:\b|^)(associate(?:'?s)?\s+(?:degree|of\s+[a-z]+)|a\.a\.s?\.?|(?<!,\s*)aas?(?=\s+(?:in|of)\b))(?![\p{L}\p{M}])`,
-    "6": String.raw`(?:\b|^)(bachelor(?:'?s)?(?:\s+of\s+[a-z]+)?|b\.s\.c?\.?|b\.?sc\.?|b\.a\.|b\.?eng\.?|b\.?tech\.?|b\.?b\.?a\.?|b\.?f\.?a\.?|b\.\s?ed\.?|ll\.?b\.?|b[as])(?![\p{L}\p{M}])`,
-    "7": String.raw`(?:\b|^)(${JD_DEGREE}|juris\s+doctor|m\.\s?d\.|m\.\s?ed\.?|m\.f\.a\.|ll\.m\.?|${LLM_DEGREE}|(?<!scrum\s)master(?!\s+data(?![a-z]))(?:'?s)?(?:\s+of\s+[a-z]+)?|m\.s\.c?\.?|m\.?sc\.?|m\.a\.|m\.?eng\.?|m\.?b\.?a\.?|m\.?tech\.?|(?<=,\s*)m[as](?=${SUBJECT_AFTER})(?!${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER})|(?<!,\s*|\d\s?)m[as](?!-|\.\s+\p{L}|${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER}))(?![\p{L}\p{M}])`,
-    "8": String.raw`(?:\b|^)(doctorate|ph\.?d\.?|d\.?phil\.?)(?![\p{L}\p{M}])`,
+    "6": String.raw`(?:\b|^)(bachelor(?:'?s)?(?:\s+of\s+[a-z]+)?|b\.s\.c?\.?|b\.?sc\.?|b\.a\.|b\.?eng\.?|b\.?tech\.?|b\.?b\.?a\.?|b\.?f\.?a\.?|b\.\s?ed\.?|b\.\s?com\.?|bcom|ll\.?b\.?|b[as])(?![\p{L}\p{M}])|${other(String.raw`laurea(?:\s+triennale)?|licencjat|бакалавр|kandidatexamen|hbo[\s-]bachelor`)}`,
+    "7": String.raw`(?:\b|^)(${JD_DEGREE}|juris\s+doctor|m\.\s?d\.|m\.\s?ed\.?|m\.f\.a\.|ll\.m\.?|${LLM_DEGREE}|(?<!scrum\s)master(?!\s+data(?![a-z]))(?:'?s)?(?:\s+of\s+[a-z]+)?|m\.s\.c?\.?|m\.?sc\.?|m\.a\.|m\.?eng\.?|m\.?b\.?a\.?|m\.?tech\.?|m\.\s?com\.?|mcom|(?<=,\s*)m[as](?=${SUBJECT_AFTER})(?!${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER})|(?<!,\s*|\d\s?)m[as](?!-|\.\s+\p{L}|${STATE_CODE_AFTER}|${MS_PRODUCT_AFTER}))(?![\p{L}\p{M}])|${other(String.raw`laurea\s+magistrale|laurea\s+specialistica|магистр|magisterexamen|masterexamen|doctoraal`)}`,
+    "8": String.raw`(?:\b|^)(doctorate|ph\.?d\.?|d\.?phil\.?)(?![\p{L}\p{M}])|${other(String.raw`dottorato(?:\s+di\s+ricerca)?|кандидат\s+наук|доктор\s+наук|doktorat|doktorsexamen|doctoraat`)}`,
   },
 };

@@ -38,9 +38,9 @@ const YEAR_ONLY = /^\d{4}$/;
 /** A letter of any script with its combining marks: the guard either side of a month name. */
 const LETTER = String.raw`[\p{L}\p{M}]`;
 
-/** The day of a written-out date, before the month name ("15. ") or after ("1, "). */
-const DAY_BEFORE = String.raw`\d{1,2}\.?\s+`;
-const DAY_AFTER = String.raw`(?:\d{1,2},?\s+)?`;
+/** The day of a written-out date, before the month name ("15. ", "1st ") or after ("1, ", "3rd "). */
+const DAY_BEFORE = String.raw`\d{1,2}(?:\.|st|nd|rd|th)?\s+`;
+const DAY_AFTER = String.raw`(?:\d{1,2}(?:st|nd|rd|th)?,?\s+)?`;
 
 const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers => {
   // Keys are folded like resume text (`normalizeText`, lower case), which `parseDate` compares against.
@@ -52,7 +52,8 @@ const buildMatchers = memo((rp: AtsEnginePolicy["resumeParse"]): DateMatchers =>
   const openEnded = `(?:${rp.openEnded
     .map((word) => escapeRegex(normalizeText(word)).replace(/\\?\s+/g, String.raw`\s*`))
     .join("|")})(?!${LETTER})`;
-  const separator = String.raw`\s*(?:[‐‑‒–—―−~-]|${wordListPattern(rp.rangeWords)})\s*`;
+  // A dash of any width, a tilde, an arrow ("May 2019 → Present"), or a word ("to").
+  const separator = String.raw`\s*(?:[‐‑‒–—―−~→-]|${wordListPattern(rp.rangeWords)})\s*`;
   // Between a month's name and its year: spaces, a dash or a slash ("Jan-2020", "jan/2019"), or a
   // word a language writes there ("marzo de 2020").
   const joiner = rp.monthYearJoiners.length
@@ -193,19 +194,21 @@ const ISO_DATE = /^(\d{4})(?:-(\d{1,2}))?(?:-\d{1,2})?(?:T.*)?$/;
 
 /**
  * A date from a structured document field: `YYYY-MM-DD`, `YYYY-MM` or `YYYY`, else any spelling
- * the policy reads. Held to the same plausibility bounds as a parsed date.
+ * the policy reads, a two-digit year placed as a range's start would be ("Jan '19", "01/19"). An
+ * end field's season is its last month. Held to the same plausibility bounds as a parsed date.
  */
 export function parseDocumentDate(
   raw: string | undefined,
   rp: AtsEnginePolicy["resumeParse"],
   now: Date,
+  edge: "start" | "end" = "start",
 ): AtsParsedDate | null {
   const value = raw?.trim();
   if (!value) return null;
   const iso = ISO_DATE.exec(value);
   const date = iso
     ? { year: Number(iso[1]), month: iso[2] ? Number(iso[2]) : null }
-    : parseDate(value, rp);
+    : placedStart(value, rp, now, edge);
   return isPlausibleDate(date, now) ? date : null;
 }
 
@@ -228,8 +231,13 @@ function afterStart(date: AtsParsedDate | null, startYear: number): AtsParsedDat
 }
 
 /** A date read as a range start would be: a two-digit year goes in the century keeping it within `YEARS_AHEAD`. */
-function placedStart(raw: string, rp: AtsEnginePolicy["resumeParse"], now: Date) {
-  const parsed = parseDate(raw, rp);
+function placedStart(
+  raw: string,
+  rp: AtsEnginePolicy["resumeParse"],
+  now: Date,
+  edge: "start" | "end" = "start",
+) {
+  const parsed = parseDate(raw, rp, edge);
   return TWO_DIGIT_YEAR.test(raw.trim())
     ? withCentury(parsed, now.getUTCFullYear() + YEARS_AHEAD)
     : parsed;

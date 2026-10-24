@@ -1143,6 +1143,8 @@
     "employerWords": [
       "at"
     ],
+    "layoutEmployerWords": [],
+    "fieldTitleWords": [],
     "documentTitles": [
       "resume",
       "résumé",
@@ -1212,6 +1214,13 @@
       "lcsw",
       "frcs",
       "mrcp"
+    ],
+    "namePrefixes": [
+      "dr\\.?",
+      "prof\\.?",
+      "mrs?\\.?",
+      "ms\\.?",
+      "mx\\.?"
     ],
     "regionCodes": [
       "AL",
@@ -1674,6 +1683,8 @@
     "schoolWords": [
       "university"
     ],
+    "universityWords": [],
+    "courseWords": [],
     "degrees": {
       "6": "bachelor"
     }
@@ -1745,7 +1756,8 @@
           "también",
           "años",
           "experiencia"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "pt",
@@ -1762,7 +1774,8 @@
           "ao",
           "para",
           "como"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "it",
@@ -1779,6 +1792,12 @@
           "degli",
           "alla",
           "anni"
+        ],
+        "openEnded": [
+          "oggi",
+          "attuale",
+          "in corso",
+          "presente"
         ]
       },
       {
@@ -1796,7 +1815,8 @@
           "aux",
           "les",
           "nous"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "de",
@@ -1813,7 +1833,8 @@
           "zur",
           "zum",
           "auf"
-        ]
+        ],
+        "openEnded": []
       },
       {
         "id": "nl",
@@ -1828,6 +1849,10 @@
           "werkervaring",
           "jaar",
           "ervaring"
+        ],
+        "openEnded": [
+          "heden",
+          "huidig"
         ]
       },
       {
@@ -1843,6 +1868,11 @@
           "jako",
           "lat",
           "zespołu"
+        ],
+        "openEnded": [
+          "obecnie",
+          "nadal",
+          "teraz"
         ]
       },
       {
@@ -1858,67 +1888,114 @@
           "utveckling",
           "arbetat",
           "ansvarig"
+        ],
+        "openEnded": [
+          "nuvarande",
+          "pågående",
+          "idag"
         ]
       },
       {
         "script": "Cyrillic",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "настоящее время",
+          "наст. время",
+          "н.в.",
+          "сейчас",
+          "теперішній час"
+        ]
       },
       {
         "id": "el",
         "script": "Greek",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "σήμερα"
+        ]
       },
       {
         "script": "Arabic",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "حتى الآن",
+          "الحاضر"
+        ]
       },
       {
         "id": "he",
         "script": "Hebrew",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "היום",
+          "הווה"
+        ]
       },
       {
         "id": "ja",
         "script": "Hiragana",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "現在",
+          "至今"
+        ]
       },
       {
         "id": "ja",
         "script": "Katakana",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "現在",
+          "至今"
+        ]
       },
       {
         "script": "Han",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "至今",
+          "现在",
+          "現在",
+          "目前"
+        ]
       },
       {
         "id": "ko",
         "script": "Hangul",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "현재"
+        ]
       },
       {
         "id": "th",
         "script": "Thai",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": [
+          "ปัจจุบัน"
+        ]
       },
       {
         "script": "Devanagari",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "script": "Bengali",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "id": "ta",
         "script": "Tamil",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       },
       {
         "id": "te",
         "script": "Telugu",
-        "detectionWords": []
+        "detectionWords": [],
+        "openEnded": []
       }
     ],
     "contentLineVerbs": [

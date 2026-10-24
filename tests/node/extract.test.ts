@@ -8,10 +8,18 @@ import {
   MAX_EXTRACTED_CHARS,
   normalizeExtractedText,
 } from "../../src/node/extract.js";
+import { check, DEFAULT_POLICY } from "../../src/index.js";
 import { findGutter } from "../../src/node/layout.js";
 import { optional } from "../../src/node/peer.js";
 import { buildDocx } from "../fixtures/buildDocx.js";
-import { buildPdf, LEFT_COLUMN, RIGHT_COLUMN, ruledTable, text } from "../fixtures/buildPdf.js";
+import {
+  buildPdf,
+  LEFT_COLUMN,
+  RIGHT_COLUMN,
+  ruledTable,
+  text,
+  unicodeFont,
+} from "../fixtures/buildPdf.js";
 
 /** The real PDF parser on generated PDFs, end to end rather than against a mock. */
 describe("PDF layout detection", () => {
@@ -72,6 +80,30 @@ describe("PDF layout detection", () => {
     expect(ratio).toBeLessThan(0.15);
   }, 60_000);
 
+  // Review finding (2026-10-24): a city alone flush right on the employer's line, over the dates
+  // on the title's line, was read as a second column, so the roles lost their dates.
+  it("reads a city flush right over its dates as tab stops, not a column", async () => {
+    const font = unicodeFont();
+    const rows: [string, string][] = [];
+    for (const [employer, title] of [
+      ["Sahyadri Systems Ltd", "व्यवसाय विश्लेषक"],
+      ["Ganga Logistics", "डेटा विश्लेषक"],
+      ["Himgiri Media Pvt Ltd", "संचालन प्रबंधक"],
+      ["Thar Insurance", "परियोजना प्रबंधक"],
+    ])
+      rows.push([employer, "हैदराबाद"], [title, "2019 – 2022"], ["• रिपोर्टिंग सुधारी", ""]);
+    const ops = rows.flatMap(([left, right], index) => {
+      const y = 720 - index * 14;
+      return right
+        ? [font.show(50, y, left), font.show(562 - font.width(right), y, right)]
+        : [font.show(50, y, left)];
+    });
+    const { text: extracted } = await extractResume(font.pages([ops.join("\n")]), "pdf");
+    const lines = extracted.split("\n");
+    expect(lines[0]).toBe("Sahyadri Systems Ltd\tहैदराबाद");
+    expect(lines[1]).toBe("व्यवसाय विश्लेषक\t2019 – 2022");
+  }, 60_000);
+
   it("counts ruled table grids from the page's drawing operators", async () => {
     const { layout } = await extract(ruledTable(4, 3));
     expect(layout?.tableCount).toBeGreaterThanOrEqual(1);
@@ -87,6 +119,38 @@ describe("PDF layout detection", () => {
 });
 
 describe("resume extraction", () => {
+  it("says when a resume is cut at 50,000 characters, so skills past the cut are not lost silently", async () => {
+    const filler = Array.from(
+      { length: 900 },
+      (_, i) => `- Delivered project ${i} on schedule for the platform team`,
+    );
+    const lines = [
+      "Jane Doe",
+      "jane@example.com",
+      "Experience",
+      "Engineer, Acme Corp Jan 2019 - Present",
+      ...filler,
+      "Skills",
+      "Kubernetes, Terraform",
+    ];
+    const warning = "The resume is longer than 50,000 characters; only its first 50,000 were read.";
+    const job = { jobDescription: "Requirements\n- Kubernetes", now: new Date("2026-10-01") };
+    const extractions = [
+      await extractResume(buildDocx(lines), "docx"),
+      await extractResume(new TextEncoder().encode(lines.join("\n")), "text"),
+    ];
+    for (const { text: extracted, layout } of extractions) {
+      const report = check(extracted, DEFAULT_POLICY, { ...job, layout });
+      expect(report.parsingWarnings).toContain(warning);
+      expect(report.missingKeywords).toContain("kubernetes");
+    }
+    // A short resume, uploaded or pasted, says nothing.
+    const short = await extractResume(buildDocx(lines.slice(0, 6)), "docx");
+    expect(short.layout).not.toHaveProperty("textCut");
+    expect(check(short.text, DEFAULT_POLICY, job).parsingWarnings).not.toContain(warning);
+    expect(check(lines.join("\n"), DEFAULT_POLICY, job).parsingWarnings).toContain(warning);
+  }, 60_000);
+
   it("reads a DOCX's paragraphs as lines", async () => {
     const docx = buildDocx(["Jane Doe", "Senior Engineer, Acme & Co", "2019 - 2023"]);
     const { text: extracted, layout } = await extractResume(docx, "docx");

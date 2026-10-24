@@ -1,7 +1,13 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { BULLET, VOCABULARY_TOKEN } from "../text/text.js";
 import type { JobSection } from "./jobSections.js";
-import { canonicalize, extractVocabulary, opensSentence, type Vocabulary } from "./vocabulary.js";
+import {
+  canonicalize,
+  extractVocabulary,
+  opensSentence,
+  TRAILING,
+  type Vocabulary,
+} from "./vocabulary.js";
 
 /**
  * Terms a posting writes only as names: always capitalised, at least once mid-sentence, only in
@@ -37,20 +43,23 @@ export function proseNames(
   if (lists < km.proseNames.minListLines) return names;
 
   const kept = new Set(extractVocabulary(listed, km, vocab).keys());
+  const tools = new Set(vocab.skillTokens);
   for (const skill of km.proseNames.skills) {
     const token = canonicalize(skill, km, vocab);
     if (token) kept.add(token);
+    if (token) tools.add(token);
   }
+  const tool = (word: string) => tools.has(canonicalize(word, km, vocab) ?? "");
   const cues = new Set(km.proseNames.cues);
   const re = new RegExp(VOCABULARY_TOKEN.source, "gu");
   let match: RegExpExecArray | null;
   while ((match = re.exec(prose))) {
-    const raw = match[0].replace(/(?<![./])[./]+$/, "");
+    const raw = match[0].replace(TRAILING, "");
     const token = canonicalize(raw, km, vocab);
     if (!token) continue;
     // Only a plain capitalised word is a name; "PostgreSQL", "AWS" and "C++" are skills' shapes.
     if (!PLAIN_CAPITAL.test(raw)) kept.add(token);
-    else if (!opensSentence(prose, match.index) && namedAt(prose, match.index, raw, cues))
+    else if (!opensSentence(prose, match.index) && namedAt(prose, match.index, raw, cues, tool))
       names.add(token);
     // Written once without a name's signs ("written in Rust"): not only a name.
     else if (!opensSentence(prose, match.index)) kept.add(token);
@@ -69,12 +78,20 @@ const AFTER = /^[ \t]+([\p{L}\p{M}]+)/u;
 /**
  * Whether the capitalised word at `index` is written as a name: beside another capitalised word
  * that does not open the sentence ("Harbor Point"; "Using Rust" is no name), or after a cue
- * ("At Freightways").
+ * ("At Freightways"). Never after a tool the policy knows: that names its product ("Apache
+ * Pulsar", "Snowflake Cortex").
  */
-function namedAt(prose: string, index: number, raw: string, cues: ReadonlySet<string>) {
+function namedAt(
+  prose: string,
+  index: number,
+  raw: string,
+  cues: ReadonlySet<string>,
+  tool: (word: string) => boolean,
+) {
   const head = prose.slice(Math.max(0, index - 40), index);
   const before = BEFORE.exec(head)?.[1];
   const after = AFTER.exec(prose.slice(index + raw.length, index + raw.length + 40))?.[1];
+  if (before && tool(before)) return false;
   if (before && cues.has(before.toLowerCase())) return true;
   if (after && PLAIN_CAPITAL.test(after)) return true;
   return Boolean(

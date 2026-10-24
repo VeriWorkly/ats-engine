@@ -59,11 +59,26 @@ export const DEFAULT_ANALYZE_PROMPT = [
 ].join(" ");
 
 /**
+ * Verbs a keyword suggestion may open with, in the languages the engine reads (the prompt asks
+ * for the resume's language): capitalised only because they open the sentence.
+ */
+const INSTRUCTIONS = new Set([
+  ...["add", "include", "mention", "list", "highlight", "show", "showcase", "use", "name"],
+  ...["emphasize", "emphasise", "feature", "put", "cite", "note", "consider", "describe"],
+  ...["ajoutez", "ajoute", "ajouter", "mentionnez", "mentionne", "mentionner", "incluez"],
+  ...["inclure", "indiquez", "citez", "précisez", "mettez", "utilisez", "intégrez"],
+  ...["añade", "añada", "agrega", "agregue", "incluye", "incluya", "menciona", "mencione"],
+  ...["destaca", "destaque", "indica", "indique", "usa", "utiliza", "utilice"],
+  ...["adicione", "adiciona", "inclua", "acrescente"],
+  ...["ergänzen", "ergänze", "nennen", "nenne", "erwähnen", "erwähne", "fügen", "füge"],
+]);
+
+/**
  * Keeps the keyword suggestions that point at the posting: an item survives if it occurs in the
  * posting as written, or names a keyword the engine extracted from it ("Add Kubernetes to your
  * skills"). A list in one item is held to that part by part. A sentence naming a keyword cannot
- * carry anything else: every number and every capitalised word after its first must occur in the
- * posting or the resume.
+ * carry anything else: every number and every capitalised word but an opening instruction verb
+ * must occur in the posting or the resume.
  */
 function groundKeywords(items: string[], report: AtsReport, job: string, resume: string) {
   const normalizedJob = normalizeForGrounding(job);
@@ -76,14 +91,17 @@ function groundKeywords(items: string[], report: AtsReport, job: string, resume:
   const resumeWords = groundingWords(normalizedResume);
   const named = (word: string) =>
     isGrounded(word, normalizedJob, jobWords) || isGrounded(word, normalizedResume, resumeWords);
-  /** Numbers, and capitalised words after the first: what a sentence could smuggle in. */
+  /**
+   * Numbers and capitalised words: what a sentence could smuggle in. Only an opening instruction
+   * verb is exempt; any other first word ("Snowflake and Kubernetes") is a claim like the rest.
+   */
   const claims = (part: string) =>
     part
       .trim()
       .split(/\s+/)
-      .slice(1)
       // "(Google)" and "\"Google\"" are Google.
       .map((word) => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}+#]+$/gu, ""))
+      .filter((word, index) => !(index === 0 && INSTRUCTIONS.has(word.toLowerCase())))
       .filter((word) => /\p{N}|^\p{Lu}/u.test(word));
 
   const grounded = (part: string) => {

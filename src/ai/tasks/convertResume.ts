@@ -1,7 +1,14 @@
 import * as z from "zod/mini";
 
+import { ATS_DOCUMENT_FORMAT, type AtsResumeDocument } from "../../document/types.js";
 import type { AtsEnginePolicy } from "../../policy/schema.js";
-import { findGroundingViolations, type GroundingViolation } from "../../repair/grounding.js";
+import {
+  findGroundingViolations,
+  groundingWords,
+  isGrounded,
+  normalizeForGrounding,
+  type GroundingViolation,
+} from "../../repair/grounding.js";
 import { ongoingIn, writtenYears } from "../../repair/merge.js";
 import { normalizeText } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
@@ -140,6 +147,145 @@ function ungroundedDates(
   return violations;
 }
 
+/**
+ * The converted resume with every summary and bullet that does not occur in `source` blanked, and
+ * those dropped. Conversion leaves free text unchecked (a model may rejoin a wrapped line); before
+ * it is scored, a bullet the model wrote, or one text planted in the resume steered it to write,
+ * must not add a word the resume does not have.
+ */
+export function groundedText(
+  resume: AtsConvertedResume,
+  source: string,
+): { resume: AtsConvertedResume; dropped: string[] } {
+  const normalized = normalizeForGrounding(source);
+  const words = groundingWords(normalized);
+  const dropped: string[] = [];
+  const keep = (value: string) => {
+    if (!value.trim() || isGrounded(value, normalized, words)) return value;
+    dropped.push(value);
+    return "";
+  };
+  const bullets = (values: readonly string[]) => values.map(keep).filter(Boolean);
+  return {
+    resume: {
+      ...resume,
+      summary: keep(resume.summary),
+      experience: resume.experience.map((role) => ({
+        ...role,
+        summary: keep(role.summary),
+        highlights: bullets(role.highlights),
+      })),
+      // A degree and its field the file writes together stay as written ("Бакалавр информатики"),
+      // not joined by an English "in".
+      education: resume.education.map((row) => {
+        const together = `${row.degree} ${row.field}`;
+        const joined =
+          row.degree.trim() && row.field.trim() && isGrounded(together, normalized, words);
+        return {
+          ...row,
+          ...(joined && { degree: together, field: "" }),
+          summary: keep(row.summary),
+        };
+      }),
+      projects: resume.projects.map((project) => ({
+        ...project,
+        summary: keep(project.summary),
+        highlights: bullets(project.highlights),
+      })),
+    },
+    dropped,
+  };
+}
+
+/** The fields that say which role, study or project an entry is. */
+const IDENTITY = {
+  experience: (role: AtsConvertedResume["experience"][number]) => [role.company, role.role],
+  education: (row: AtsConvertedResume["education"][number]) => [row.school, row.degree],
+  projects: (project: AtsConvertedResume["projects"][number]) => [project.name],
+};
+
+const identified = (values: readonly string[]) => values.some((value) => value.trim());
+
+/**
+ * A converted resume as an `ats-resume@1` document, for `check` to read field by field: how a
+ * resume in a language no pack reads is scored with a model's help. An entry whose identifying
+ * fields were all blanked as ungrounded is dropped, never scored on its bullets alone. Section
+ * titles are the standard English ones; the resume's own were in a language the engine does not
+ * read.
+ */
+export function convertedToDocument(resume: AtsConvertedResume): AtsResumeDocument {
+  const kept = <T>(items: readonly T[], identity: (item: T) => string[]) =>
+    items.filter((item) => identified(identity(item)));
+  const experience = kept(resume.experience, IDENTITY.experience);
+  const education = kept(resume.education, IDENTITY.education);
+  const projects = kept(resume.projects, IDENTITY.projects);
+  const skills = resume.skills.filter((group) => group.keywords.length);
+  const sections: AtsResumeDocument["sections"] = [];
+  if (resume.summary.trim())
+    sections.push({ kind: "summary", title: "Summary", text: resume.summary });
+  if (experience.length)
+    sections.push({
+      kind: "experience",
+      title: "Experience",
+      items: experience.map((role) => ({
+        title: role.role,
+        employer: role.company,
+        location: role.location,
+        start: role.startDate,
+        end: role.endDate,
+        current: role.current,
+        summary: role.summary,
+        highlights: role.highlights,
+      })),
+    });
+  if (education.length)
+    sections.push({
+      kind: "education",
+      title: "Education",
+      items: education.map((row) => ({
+        school: row.school,
+        credential: row.degree,
+        field: row.field,
+        start: row.startDate,
+        end: row.endDate,
+        current: row.current,
+        summary: row.summary,
+      })),
+    });
+  if (projects.length)
+    sections.push({
+      kind: "projects",
+      title: "Projects",
+      items: projects.map((project) => ({
+        name: project.name,
+        role: project.role,
+        url: project.link,
+        summary: project.summary,
+        highlights: project.highlights,
+        skills: project.skills,
+      })),
+    });
+  if (skills.length)
+    sections.push({
+      kind: "skills",
+      title: "Skills",
+      items: skills.map((group) => ({ name: group.name, keywords: group.keywords })),
+    });
+  const { basics } = resume;
+  return {
+    format: ATS_DOCUMENT_FORMAT,
+    basics: {
+      name: basics.fullName,
+      headline: basics.headline || basics.role,
+      email: basics.email,
+      phone: basics.phone,
+      location: basics.location,
+      links: resume.links.map((link) => link.url).filter((url) => url.trim()),
+    },
+    sections,
+  };
+}
+
 /** Sets each string at `paths` (as `findGroundingViolations` reports them) to "". */
 function blank<T>(value: T, paths: readonly string[]): T {
   const result = JSON.parse(JSON.stringify(value)) as T;
@@ -155,8 +301,8 @@ function blank<T>(value: T, paths: readonly string[]): T {
 }
 
 /**
- * Ungrounded identity values are blanked rather than failing the conversion. Contact details are
- * not redacted.
+ * Ungrounded identity values are blanked rather than failing the conversion, and an entry they
+ * leave with no identity is dropped. Contact details are not redacted.
  */
 export function convertResumeSpec(
   input: ConvertResumeInput,
@@ -188,6 +334,23 @@ export function convertResumeSpec(
         result[section].forEach((entry, index) => {
           if (paths.includes(`${section}[${index}].current`)) entry.current = false;
         });
+      // An entry named only by invented values is itself invented ("Grew revenue 300%" at a
+      // company the resume never names): dropped, not kept as bullets without an owner.
+      const withoutInvented = <T>(
+        items: T[],
+        original: readonly T[],
+        identity: (item: T) => string[],
+      ) =>
+        items.filter(
+          (item, index) => identified(identity(item)) || !identified(identity(original[index]!)),
+        );
+      result.experience = withoutInvented(
+        result.experience,
+        resume.experience,
+        IDENTITY.experience,
+      );
+      result.education = withoutInvented(result.education, resume.education, IDENTITY.education);
+      result.projects = withoutInvented(result.projects, resume.projects, IDENTITY.projects);
       return { result, rejected };
     },
   };

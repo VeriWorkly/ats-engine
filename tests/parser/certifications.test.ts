@@ -150,6 +150,37 @@ describe("a certification line becomes a row", () => {
     ]);
   });
 
+  it("reads LinkedIn's name, issuer and dates on three lines as one row", () => {
+    expect(
+      certs(
+        "AWS Certified Solutions Architect\nAmazon Web Services\nIssued Jan 2021 · Expires Jan 2024\nPMP\nProject Management Institute\nIssued Mar 2020",
+      ),
+    ).toEqual([
+      {
+        name: "AWS Certified Solutions Architect",
+        issuer: "Amazon Web Services",
+        date: { year: 2021, month: 1 },
+        expires: { year: 2024, month: 1 },
+      },
+      {
+        name: "PMP",
+        issuer: "Project Management Institute",
+        date: { year: 2020, month: 3 },
+        expires: null,
+      },
+    ]);
+  });
+
+  it("reads a line of abbreviations as one row each, and a labelled list's items as they are", () => {
+    const names = (lines: string) => certs(lines).map((row) => [row.name, row.issuer]);
+    expect(names("PMP, CSM, CISSP\nIssued Mar 2020")).toEqual([
+      ["PMP", ""],
+      ["CSM", ""],
+      ["CISSP", ""],
+    ]);
+    expect(names("PMP, PMI")).toEqual([["PMP", "PMI"]]);
+  });
+
   // A renewal listed as a second row with the same name collapsed onto the first, lapsed one.
   it.each([
     "CISSP, ISC2, 2015, expired 2021\nCISSP, ISC2, 2023, expires 2029",

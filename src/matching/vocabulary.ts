@@ -36,21 +36,23 @@ function fold(word: string, km: AtsEnginePolicy["keywordMatch"], vocab: Vocabula
 }
 
 /** A "." or "/" a word picked up from the sentence around it: "JavaScript.", "and/". */
-const TRAILING = /(?<![./])[./]+$/;
+export const TRAILING = /(?<![./])[./]+$/;
 
 /**
  * A link, from its scheme on ("https://careers.example.com/jobs/123"), or from "www." or a host
- * of three labels or more ending in one of `linkDomains`. Never a skill; "Node.js/React" and
- * "System.Text.Json" are not links. Linear: a host starts only where a label starts, and is at
- * most eight labels of 63 characters.
+ * of three labels or more ending in one of `linkDomains`, or of two with a path after it
+ * ("github.com/jane/kafka"; only a plain word of the list, so "ASP.NET/C#/SQL" stays skills).
+ * Never a skill; "Node.js/React" and "System.Text.Json" are not links. Linear: a host starts only
+ * where a label starts, and is at most eight labels of 63 characters.
  */
-const linkOf = memo(
-  (km: AtsEnginePolicy["keywordMatch"]) =>
-    new RegExp(
-      String.raw`(?<![\p{L}\p{N}+.-])\p{L}[\p{L}\p{N}+.-]{0,30}:\/\/\S*|(?<![\p{L}\p{N}+.@/-])(?:www\.(?:[\p{L}\p{N}-]{1,63}\.){0,7}\p{L}{2,63}|(?:[\p{L}\p{N}-]{1,63}\.){2,8}(?:${(km.linkDomains ?? []).join("|") || "(?!)"}))(?![\p{L}\p{N}-])(?:\/\S*)?`,
-      "gu",
-    ),
-);
+const linkOf = memo((km: AtsEnginePolicy["keywordMatch"]) => {
+  const domains = km.linkDomains ?? [];
+  const plain = domains.filter((domain) => /^\p{L}+$/u.test(domain));
+  return new RegExp(
+    String.raw`(?<![\p{L}\p{N}+.-])\p{L}[\p{L}\p{N}+.-]{0,30}:\/\/\S*|(?<![\p{L}\p{N}+.@/-])(?:www\.(?:[\p{L}\p{N}-]{1,63}\.){0,7}\p{L}{2,63}|(?:[\p{L}\p{N}-]{1,63}\.){2,8}(?:${domains.join("|") || "(?!)"})|[\p{L}\p{N}-]{1,63}\.(?:${plain.join("|") || "(?!)"})(?=\/[^\s/]))(?![\p{L}\p{N}-])(?:\/\S*)?`,
+    "gu",
+  );
+});
 
 /**
  * The words a token stands for, each with its offset in the token. A slash joins words asked

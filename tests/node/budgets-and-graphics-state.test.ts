@@ -23,6 +23,7 @@ import {
   buildRichDocx,
   documentXml,
   marginXml,
+  placedMargins,
   relationshipsXml,
 } from "../fixtures/buildDocx.js";
 import { buildPdf, buildPdfPages, stream } from "../fixtures/buildPdf.js";
@@ -334,9 +335,10 @@ describe("DOCX headers and footers share one budget", () => {
       ["word/header1.xml", marginXml("hdr", "<w:p><w:r><w:t>jane@example.com</w:t></w:r></w:p>")],
     ];
     for (let n = 2; n <= 8; n += 1) headers.push([`word/header${n}.xml`, filler]);
+    const { sectPr, entries } = placedMargins(headers);
     const docx = buildRichDocx(
-      "<w:p><w:r><w:t>Jane Doe, Senior Engineer at Acme</w:t></w:r></w:p>",
-      headers,
+      `<w:p><w:r><w:t>Jane Doe, Senior Engineer at Acme</w:t></w:r></w:p>${sectPr}`,
+      entries,
     );
     const { text } = await expectFastAsync(() => extractResume(docx, "docx"), 2_000);
     expect(text).toContain("jane@example.com");

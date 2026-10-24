@@ -23,7 +23,7 @@ To try it without installing anything, upload a resume to the [VeriWorkly ATS ch
 - Matches a resume to a job posting. Each requirement is marked met, partly met, missing or unverifiable, with the resume lines that support it. Years of experience, degrees and languages are compared as values, not as keywords: "Fluent German" asks for C1 and is met by German at C1 or above (a resume written in German, with no row for German, reads as C1 in it, never as native), and "AWS certification" is met by a certification row that names AWS. A clearance is compared by level: "Secret" partly meets "Top Secret" and fully meets "Confidential", as the UK's "SC" partly meets "DV". The level a posting's title names ("Senior Backend Engineer") is judged by the resume's latest title and years: a senior title meets it, and 5 years with a title that names no level meet it too. A statement about the right to work is read for what it says: "Requires H-1B visa sponsorship" never meets "Authorized to work without sponsorship", and a green card does not meet "Must be a U.S. citizen" (U.S. citizenship is the only citizenship the community policy names). A slash joins skills asked together: "HTML/CSS" asks for HTML and CSS, so HTML alone partly meets it, as AWS alone partly meets "AWS/GCP/Azure"; beside an "or" each part is one of the choices, so React alone meets "React/Redux or Vue". A name written with a slash ("CI/CD", "TCP/IP") stays whole. The posting's keywords are split into hard skills and soft skills ("communication", "teamwork"). A resume claims a soft skill more often than it shows one, so a soft skill counts for a tenth of a named skill in the match score.
 - Flags integrity problems: hidden text (white, tiny, off-page or covered), instructions aimed at AI screeners, invisible and look-alike characters, a pasted job posting, and keyword stuffing.
 - Gives advice that is never scored: a file name like `Resume_final_v3 (2).pdf`, a file over 2 MB, a password, tracked changes or comments left in a Word document, details that can invite age bias where the region calls for it, and what a named ATS (Greenhouse, Lever, Taleo) documents on its own public pages.
-- Reads German, French, Hindi, Spanish and Portuguese resumes, and applies US, UK, German, French, Indian, Spanish, Brazilian and Portuguese conventions for dates, phone numbers, degrees, and whether a photo or date of birth belongs on the page. A resume in a language with no pack (Italian, Dutch, Russian…) is not judged by the English-only writing rules. [LOCALES.md](./LOCALES.md) explains how to add more.
+- Reads German, French, Hindi, Spanish and Portuguese resumes, and applies US, UK, German, French, Indian, Spanish, Brazilian, Portuguese, Mexican, Argentine, Colombian and Chilean conventions for dates, phone numbers, degrees, and whether a photo or date of birth belongs on the page. A resume in a language with no pack (Italian, Dutch, Russian…) is not judged by the English-only writing rules. [LOCALES.md](./LOCALES.md) explains how to add more.
 - Adds optional AI analysis, parse repair and resume conversion with your own API key. Any name, employer, title, school, email, URL or skill a model returns is checked against the resume text and dropped if it is not there.
 
 ## Install
@@ -95,19 +95,19 @@ Advice (not scored):
       Fix: Name it Mei-Lin-Chen-Resume.pdf.
 ```
 
-| Option            | What it does                                                                                                   |
-| ----------------- | -------------------------------------------------------------------------------------------------------------- |
-| `--job <file>`    | Match against a job posting (`.txt`, `.md`, `.pdf`, `.docx` or a saved `.html`) and list each requirement      |
-| `--job-url <url>` | Match against a Greenhouse, Lever or Ashby posting, read from the board's public API                           |
-| `--policy <file>` | Use your own scoring policy JSON instead of the bundled one                                                    |
-| `--json`          | Print the full report as JSON, `advice` included                                                               |
-| `--min-score <n>` | Exit with code 2 when the readiness score is below `n`, for CI checks                                          |
-| `--lang <code>`   | Read the resume and posting in `de`, `fr`, `hi`, `es`, `pt`, or `en` for English only, instead of detecting it |
-| `--region <code>` | Read the resume as from `US`, `GB`, `DE`, `FR`, `IN`, `ES`, `BR` or `PT` instead of guessing                   |
-| `--text`          | Also print the text in the order an ATS reads it (with `--json`, as the report's `lines`)                      |
-| `--ats <name>`    | Add the documented notes on one ATS (`greenhouse`, `lever`, `taleo`), each with its source                     |
-| `-h`, `--help`    | Print the options                                                                                              |
-| `-v`, `--version` | Print the engine version, for bug reports                                                                      |
+| Option            | What it does                                                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `--job <file>`    | Match against a job posting (`.txt`, `.md`, `.pdf`, `.docx` or a saved `.html`) and list each requirement            |
+| `--job-url <url>` | Match against a Greenhouse, Lever or Ashby posting, read from the board's public API                                 |
+| `--policy <file>` | Use your own scoring policy JSON instead of the bundled one                                                          |
+| `--json`          | Print the full report as JSON, `advice` included                                                                     |
+| `--min-score <n>` | Exit with code 2 when the readiness score is below `n`, for CI checks                                                |
+| `--lang <code>`   | Read the resume and posting in `de`, `fr`, `hi`, `es`, `pt`, or `en` for English only, instead of detecting it       |
+| `--region <code>` | Read the resume as from `US`, `GB`, `DE`, `FR`, `IN`, `ES`, `BR`, `PT`, `MX`, `AR`, `CO` or `CL` instead of guessing |
+| `--text`          | Also print the text in the order an ATS reads it (with `--json`, as the report's `lines`)                            |
+| `--ats <name>`    | Add the documented notes on one ATS (`greenhouse`, `lever`, `taleo`), each with its source                           |
+| `-h`, `--help`    | Print the options                                                                                                    |
+| `-v`, `--version` | Print the engine version, for bug reports                                                                            |
 
 The resume can be a `.pdf`, `.docx`, `.html`, `.txt` or `.md` file, or a `.json` [JSON Resume](https://jsonresume.org) or `ats-resume@1` document. `--job-url` takes an `https` posting address on those three boards only and asks the board's public API, never the page; for any other site, save the page and pass it with `--job`. The exit code is 0 when the check ran, 1 on an error, and 2 when the score is below `--min-score`.
 
@@ -118,6 +118,8 @@ In a terminal the output is coloured and opens with a VeriWorkly banner. Output 
 ### AI analysis from the command line
 
 Add `--ai` to have a model explain the report and suggest what to fix first. The score itself never depends on the model.
+
+A resume in a language no pack reads (Italian, Dutch, Russian…) is first **read with AI help**: the whole resume, contact details included, goes to the model, which returns its fields (`convertResume`); every name, employer, title, school, skill, email, link, bullet and summary must appear in the file or it is dropped, and the engine scores what is left as a structured document. The report says so above it (`readWithAi` in `--json`, with the language and how many values were dropped). If the model fails, the engine's own reading stands.
 
 ```sh
 # macOS and Linux (PowerShell: $env:GEMINI_API_KEY = "...")
@@ -139,7 +141,7 @@ ats-engine check resume.pdf --ai --provider ollama --model llama3.1
 
 The CLI reads the API key from the environment, never from a flag, so it stays out of your shell history. It looks for the provider's usual variable first (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY` or `TOGETHER_API_KEY`), then the shared `ATS_AI_API_KEY`. A server on `localhost` needs no key, and the CLI refuses to send a key over plain `http` to any other host. `ATS_AI_PROVIDER`, `ATS_AI_MODEL`, `ATS_AI_BASE_URL`, `ATS_AI_MAX_TOKENS` and `ATS_AI_TIMEOUT` can replace the flags, which is handy in CI; a `--provider` flag ignores `ATS_AI_BASE_URL`.
 
-Before the resume is sent, the CLI names the provider and host it is about to send to, and the candidate's name, email, phone number and links are replaced with placeholders. With `--json`, the analysis is added to the report as an `ai` field. If the provider call fails, the CLI still prints the report and exits with code 1, or 2 when the score is also below `--min-score`.
+Before the resume is sent, the CLI names the provider and host it is about to send to, and the candidate's email and phone number, and the name and links the check read, are replaced with placeholders; the notice says when no name or link was read. With `--json`, the analysis is added to the report as an `ai` field. If the provider call fails, the CLI still prints the report and exits with code 1, or 2 when the score is also below `--min-score`.
 
 ## Use it from an AI assistant (MCP)
 
@@ -164,18 +166,18 @@ Keep your resume in a repository and check it on every push. The step fails when
     min-score: 80 # optional
 ```
 
-| Input       | What it does                                                                                                                          |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `resume`    | Path to the resume (required)                                                                                                         |
-| `job`       | Path to a job posting to match against                                                                                                |
-| `min-score` | Fail the step below this readiness score (0–100)                                                                                      |
-| `language`  | Read the resume in this language (`en`, `de`, `fr`, `hi`, `es`, `pt`) instead of detecting it; needs `version` 0.19.0 or later        |
-| `region`    | Read the resume as from this country (`US`, `GB`, `DE`, `FR`, `IN`, `ES`, `BR`, `PT`)                                                 |
-| `version`   | Engine version to run. Defaults to the release the action ships with, so your score only moves when you change it                     |
-| `ats`       | Add the documented notes for the ATS you apply through (`greenhouse`, `lever`, `taleo`) to the advice; needs `version` 0.3.0 or later |
-| `summary`   | `false` to leave the job summary out                                                                                                  |
+| Input       | What it does                                                                                                                                                                                     |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `resume`    | Path to the resume (required)                                                                                                                                                                    |
+| `job`       | Path to a job posting to match against                                                                                                                                                           |
+| `min-score` | Fail the step below this readiness score (0–100)                                                                                                                                                 |
+| `language`  | Read the resume in this language (`en`, `de`, `fr`, `hi`, `es`, `pt`) instead of detecting it; needs `version` 0.19.0 or later                                                                   |
+| `region`    | Read the resume as from this country (`US`, `GB`, `DE`, `FR`, `IN`, `ES`, `BR`, `PT`, `MX`, `AR`, `CO`, `CL`)                                                                                    |
+| `version`   | Engine version to run. Defaults to the release the action ships with, and `@main` takes each new release: set it, or pin the action to a commit SHA, so your score only moves when you change it |
+| `ats`       | Add the documented notes for the ATS you apply through (`greenhouse`, `lever`, `taleo`) to the advice; needs `version` 0.3.0 or later                                                            |
+| `summary`   | `false` to leave the job summary out                                                                                                                                                             |
 
-Outputs: `score`, `job-match`, `failed-checks` (JSON) and `report` (the path of the full JSON report). The step fails if the engine has not finished within 10 minutes. Pin `@main` to a commit SHA if you want the action itself fixed too.
+Outputs: `score`, `job-match`, `failed-checks` (JSON) and `report` (the path of the full JSON report). The step fails if the engine has not finished within 10 minutes. Pin `@main` to a commit SHA to fix the action and its default `version` together.
 
 ## Use it in your app
 
@@ -261,26 +263,27 @@ check(resumeText, policy, { region: "IN" });
 
 ### What's in a report
 
-| Field                                          | Contents                                                                                                                                                                                                                                        |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `readinessScore`                               | Overall score, 0 to 100                                                                                                                                                                                                                         |
-| `categories`                                   | Score per category: `parse`, `contact`, `structure`, `content`, `format`, `writing`, and `integrity` (penalties), each `{ category, score, passed, total, lost, possible }`                                                                     |
-| `checksPassed`, `checksTotal`                  | How many of the rules that applied passed                                                                                                                                                                                                       |
-| `failedChecks`                                 | Each failed rule with `id`, `category`, `severity`, `evidence`, `scoreImpact` and `fix`                                                                                                                                                         |
-| `rules`                                        | Every rule that applied, passed or failed, in the same shape                                                                                                                                                                                    |
-| `prioritizedFixes`                             | The fixes of the failed checks, costliest first, at most 6                                                                                                                                                                                      |
-| `parsingWarnings`                              | Evidence of the failed checks that stop an ATS reading the file: parsing, and columns, tables or letter spacing; then a note when the resume is in a language no attached pack reads; then a note when the posting was cut at 20,000 characters |
-| `strengths`                                    | Evidence of up to 5 passed checks, the ones worth the most points                                                                                                                                                                               |
-| `wordCount`                                    | Words in the resume text                                                                                                                                                                                                                        |
-| `parsed`                                       | What an ATS would store: name, email, phone, links, roles, education, skills, certifications, spoken languages, months of experience, highest ISCED level, provenance                                                                           |
-| `jobMatchScore`                                | Job match, 0 to 100, or `null` without a posting                                                                                                                                                                                                |
-| `requirements`                                 | Each requirement of the posting with its `status`, `importance`, `kind`, `terms`, `evidence` and `detail`; empty without a posting, at most 25                                                                                                  |
-| `matchedKeywords`, `missingKeywords`           | Posting terms found and not found in the resume, hard skills first, at most 12                                                                                                                                                                  |
-| `matchedKeywordGroups`, `missingKeywordGroups` | The same terms as `{ hard, soft }`, at most 12 each; soft skills weigh less in the match                                                                                                                                                        |
-| `locale`                                       | The languages and region the resume was read as, and `unsupported`: the language it is written in when no pack reads it (`"it"`, or a script such as `"Cyrillic"`), with a parsing warning that says so                                         |
-| `version`, `engine`                            | The policy's `version`, and the engine version and policy fingerprint, to reproduce the result                                                                                                                                                  |
-| `advice`                                       | Not scored: `{ id, kind, message, evidence?, fix?, source? }`, see below                                                                                                                                                                        |
-| `lines`                                        | The text as the engine read it, line by line, only with `includeLines: true`                                                                                                                                                                    |
+| Field                                          | Contents                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readinessScore`                               | Overall score, 0 to 100                                                                                                                                                                                                                                                                                                         |
+| `categories`                                   | Score per category: `parse`, `contact`, `structure`, `content`, `format`, `writing`, and `integrity` (penalties), each `{ category, score, passed, total, lost, possible }`                                                                                                                                                     |
+| `checksPassed`, `checksTotal`                  | How many of the rules that applied passed                                                                                                                                                                                                                                                                                       |
+| `failedChecks`                                 | Each failed rule with `id`, `category`, `severity`, `evidence`, `scoreImpact` and `fix`                                                                                                                                                                                                                                         |
+| `rules`                                        | Every rule that applied, passed or failed, in the same shape                                                                                                                                                                                                                                                                    |
+| `prioritizedFixes`                             | The fixes of the failed checks, costliest first, at most 6                                                                                                                                                                                                                                                                      |
+| `parsingWarnings`                              | Evidence of the failed checks that stop an ATS reading the file: parsing, and columns, tables or letter spacing; then a note when the resume is in a language no attached pack reads; then a note when the resume was cut at 50,000 characters, when the posting was cut at 20,000, and when it lists more than 25 requirements |
+| `strengths`                                    | Evidence of up to 5 passed checks, the ones worth the most points                                                                                                                                                                                                                                                               |
+| `wordCount`                                    | Words in the resume text                                                                                                                                                                                                                                                                                                        |
+| `parsed`                                       | What an ATS would store: name, email, phone, links, roles, education, skills, certifications, spoken languages, months of experience, highest ISCED level, provenance                                                                                                                                                           |
+| `jobMatchScore`                                | Job match, 0 to 100, or `null` without a posting                                                                                                                                                                                                                                                                                |
+| `requirements`                                 | Each requirement of the posting with its `status`, `importance`, `kind`, `terms`, `evidence` and `detail`; empty without a posting, at most 25                                                                                                                                                                                  |
+| `matchedKeywords`, `missingKeywords`           | Posting terms found and not found in the resume, hard skills first, at most 12                                                                                                                                                                                                                                                  |
+| `matchedKeywordGroups`, `missingKeywordGroups` | The same terms as `{ hard, soft }`, at most 12 each; soft skills weigh less in the match                                                                                                                                                                                                                                        |
+| `keywordCounts`                                | `{ matched, missing }`: how many terms each list holds before the cut at 12                                                                                                                                                                                                                                                     |
+| `locale`                                       | The languages and region the resume was read as, and `unsupported`: the language it is written in when no pack reads it (`"it"`, or a script such as `"Cyrillic"`), with a parsing warning that says so                                                                                                                         |
+| `version`, `engine`                            | The policy's `version`, and the engine version and policy fingerprint, to reproduce the result                                                                                                                                                                                                                                  |
+| `advice`                                       | Not scored: `{ id, kind, message, evidence?, fix?, source? }`, see below                                                                                                                                                                                                                                                        |
+| `lines`                                        | The text as the engine read it, line by line, only with `includeLines: true`                                                                                                                                                                                                                                                    |
 
 `advice` is always present and often empty. `kind` is `file` (name, size, password, tracked changes, comments; only for what the `file` option describes or the layout measured), `age` (an old graduation year or a long stated or dated career, only in regions whose pack asks for it) or `ats` (a named target ATS's documented notes, each with the vendor page as `source`). Its text comes from the policy's `advice` section. It is never part of `readinessScore`, `categories`, `failedChecks` or `prioritizedFixes`: the same resume scores the same with or without it.
 
@@ -311,11 +314,11 @@ VeriWorkly's own server is open source and uses most of the package: file upload
 
 ## AI features
 
-Scoring never needs a model. The AI tasks are optional extras that run on your own API key. The CLI's `--ai` runs `analyze`; the library has all three:
+Scoring never needs a model. The AI tasks are optional extras that run on your own API key. The CLI's `--ai` runs `analyze`, and `convertResume` first for a resume in a language no pack reads; the library has all three:
 
 - `analyze` explains a report in plain language and suggests improvements.
 - `repairParse` fills in fields the parser missed, using only values found in the resume.
-- `convertResume` turns free text into a structured resume.
+- `convertResume` turns free text into a structured resume. `convertedToDocument(result)` makes it an `ats-resume@1` document for `check`: how a resume in a language without a pack is scored.
 
 Each call returns the result together with the values that were dropped for not appearing in the resume, token usage, the number of attempts, and the prompt version, so you can bill and audit calls yourself.
 

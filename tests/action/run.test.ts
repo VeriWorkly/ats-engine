@@ -260,20 +260,28 @@ describe("the ats input", () => {
 
 describe("the Action's npx run", () => {
   // npx installs no optional peers, so the Action asks for the PDF and DOCX readers. The tests
-  // above never reach npx: a preload stands in for spawnSync and records its arguments.
+  // above never reach npx: a preload stands in for spawn and records its arguments.
   const preload = join(dir, "preload.mjs");
   const record = join(dir, "argv.json");
   writeFileSync(
     preload,
     `import cp from "node:child_process";
+import { EventEmitter } from "node:events";
 import { syncBuiltinESMExports } from "node:module";
 import { writeFileSync } from "node:fs";
-cp.spawnSync = (command, args, options) => {
-  writeFileSync(${JSON.stringify(record)}, JSON.stringify({ args, timeout: options?.timeout }));
-  if (process.env.STUB_TIMED_OUT)
-    return { status: null, signal: "SIGKILL", stdout: "", stderr: "",
-      error: Object.assign(new Error("spawnSync npx ETIMEDOUT"), { code: "ETIMEDOUT" }) };
-  return { status: 0, stdout: JSON.stringify({ readinessScore: 90, failedChecks: [] }), stderr: "" };
+import { PassThrough } from "node:stream";
+cp.spawn = (command, args, options) => {
+  writeFileSync(${JSON.stringify(record)}, JSON.stringify({ args }));
+  const child = Object.assign(new EventEmitter(), {
+    stdout: new PassThrough(),
+    stderr: new PassThrough(),
+  });
+  let open = 2;
+  for (const stream of [child.stdout, child.stderr])
+    stream.on("end", () => --open || child.emit("close", 0));
+  child.stdout.end(JSON.stringify({ readinessScore: 90, failedChecks: [] }));
+  child.stderr.end();
+  return child;
 };
 syncBuiltinESMExports();
 `,
@@ -287,8 +295,7 @@ syncBuiltinESMExports();
         env: { ...process.env, ATS_RESUME: "resume.pdf", RUNNER_TEMP: dir, ...env },
       },
     );
-  const recorded = () =>
-    JSON.parse(readFileSync(record, "utf8")) as { args: string[]; timeout?: number };
+  const recorded = () => JSON.parse(readFileSync(record, "utf8")) as { args: string[] };
   const spawned = (env: Record<string, string>) => {
     expect(stubbed(env).status).toBe(0);
     return recorded().args;
@@ -314,13 +321,65 @@ syncBuiltinESMExports();
     ]);
   });
 
-  // A file that freezes the reader held the runner until the job's own limit, 6 hours.
-  it("stops the engine after 10 minutes and says so", () => {
-    expect(stubbed({ ATS_ENGINE_CLI: "" }).status).toBe(0);
-    expect(recorded().timeout).toBe(10 * 60 * 1000);
-    const run = stubbed({ ATS_ENGINE_CLI: "", STUB_TIMED_OUT: "1" });
-    expect(run.status).toBe(1);
-    expect(run.stdout).toContain("::error::ats-engine did not finish within 10 minutes.");
+  // A file that freezes the reader held the runner until the job's own limit, 6 hours; and
+  // stopping npx alone left the CLI under it running, holding the step open.
+  it("stops the engine and what it started after 10 minutes, and says so", () => {
+    const pids = join(dir, "pids.json");
+    const delay = join(dir, "delay.txt");
+    // npx and the CLI under it: the CLI shares the output pipe, and neither ever ends.
+    const hang = join(dir, "hang.mjs");
+    writeFileSync(
+      hang,
+      `import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const cli = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "inherit" });
+writeFileSync(${JSON.stringify(pids)}, JSON.stringify([process.pid, cli.pid]));
+setInterval(() => {}, 1000);
+`,
+    );
+    // Ten minutes pass in a moment; the delay asked for is recorded.
+    const shorten = join(dir, "shorten.mjs");
+    writeFileSync(
+      shorten,
+      `import { writeFileSync } from "node:fs";
+const wait = globalThis.setTimeout;
+globalThis.setTimeout = (run, ms, ...rest) => {
+  if (ms < 60_000) return wait(run, ms, ...rest);
+  writeFileSync(${JSON.stringify(delay)}, String(ms));
+  return wait(run, 500, ...rest);
+};
+`,
+    );
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const run = spawnSync(
+      process.execPath,
+      ["--import", pathToFileURL(shorten).href, join(root, "action/run.mjs")],
+      {
+        encoding: "utf8",
+        timeout: 30_000,
+        env: { ...process.env, ATS_RESUME: "resume.md", RUNNER_TEMP: dir, ATS_ENGINE_CLI: hang },
+      },
+    );
+    const started = JSON.parse(readFileSync(pids, "utf8")) as number[];
+    try {
+      expect(readFileSync(delay, "utf8")).toBe(String(10 * 60 * 1000));
+      expect(run.status).toBe(1);
+      expect(run.stdout).toContain("::error::ats-engine did not finish within 10 minutes.");
+      // Stopped by the time the step ends, give or take the system reaping them.
+      const until = Date.now() + 5_000;
+      while (started.some(alive) && Date.now() < until)
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+      expect(started.filter(alive)).toEqual([]);
+    } finally {
+      for (const pid of started.filter(alive)) process.kill(pid, "SIGKILL");
+    }
   });
 
   it("passes a local build only the CLI's own arguments", () => {

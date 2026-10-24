@@ -8,6 +8,7 @@
  * - fully transparent (`ca 0`), unless the same text is drawn visibly in the same place (the
  *   selectable copy Chrome lays over text with a shadow, outline or gradient fill);
  * - smaller than 2pt;
+ * - in an optional content layer (`/OC`) the document turns off;
  * - wholly outside the clip (the page, a form's box, the paths `W` clips to, each by its bounds);
  * - within 1.25:1 contrast of what lies beneath, after its blend mode: the topmost shape or blank
  *   image filled before it (blended by its opacity with what lies under it; a border's inside is
@@ -237,6 +238,14 @@ type Run = {
   box: Box;
   order: number;
   size: number;
+  /** In optional content the document turns off. */
+  off: boolean;
+  /** Text space to page space: a point along the run is `[advance, fontSize * share]` through it. */
+  device: Matrix;
+  /** Its width in text space. */
+  advance: number;
+  /** Each glyph's characters (`from`, `to` in `text`) and the advance to its middle. */
+  glyphs: Array<{ from: number; to: number; at: number }>;
 } & GraphicsState;
 
 /**
@@ -259,6 +268,14 @@ const MAX_MARKS = 2_000;
 
 /** Soft-mask glyph/paint pairs matched; past this the rest are taken as painted visibly. */
 const MAX_MASK_PAIRS = 100_000;
+/**
+ * Soft-mask glyphs checked against what is painted through the mask, across a page: each paint
+ * checks every glyph, so 24,000 of each took 6 to 21 s. Past this, a mask's glyphs are taken as
+ * painted visibly.
+ */
+const MAX_MASK_CHECKS = 2_000_000;
+/** Point checks spent looking inside runs seen at their middle (`hiddenStretches`), across a page. */
+const MAX_STRETCH_CHECKS = 10_000_000;
 /** Visible glyphs transparent runs are compared with, across a page; past this the rest are not. */
 const MAX_PIECE_CHECKS = 2_000_000;
 /**
@@ -361,12 +378,31 @@ export async function readImages(
   return pixels;
 }
 
-/** `pixels`: what the page's images let show (`readImages`); without it every masked image is see-through and only inline images can be blank. */
+/** Thrown by `measureVisibility` for a page too crowded to measure, with the ruled tables it counted first. */
+export class CrowdedPage extends Error {
+  constructor(
+    cause: unknown,
+    readonly tables: number,
+  ) {
+    super((cause as Error)?.message, { cause });
+  }
+}
+
+/** pdf.js's optional content configuration: which layers (`/OC` groups) the document shows. */
+export type OptionalContent = { isVisible(group: unknown): boolean };
+
+/**
+ * `pixels`: what the page's images let show (`readImages`); without it every masked image is
+ * see-through and only inline images can be blank. `optionalContent`: the document's layers
+ * (`getOptionalContentConfig`); text in a layer turned off is hidden, and what a layer turned off
+ * paints covers nothing. Without it every layer shows.
+ */
 export function measureVisibility(
   ops: Ops,
   list: OperatorList,
   pageBox: Box,
   pixels?: ReadonlyMap<string, string | null>,
+  optionalContent?: OptionalContent,
 ): PageVisibility {
   const stack: GraphicsState[] = [];
   const initial: GraphicsState = {
@@ -402,6 +438,10 @@ export function measureVisibility(
   };
   // Inside a soft mask's own content: listed among the page's operators, but not painted.
   let maskDepth = 0;
+  // Open marked content, each whether its layer shows (pdf.js paints only where all do), and how
+  // many of them do not.
+  const marked: boolean[] = [];
+  let offDepth = 0;
 
   const drawn: Drawn[] = [];
   const runs: Run[] = [];
@@ -418,10 +458,17 @@ export function measureVisibility(
     fill: string;
     order: number;
   }> = [];
+  // Glyphs checked so far, and whether the mask in force is past the budget and taken as visible.
+  let maskChecks = 0;
+  let maskSpent = false;
   /** Something painted, unless it only builds a soft mask. */
   const paint = (item: Omit<Drawn, "alpha">, masked = state.softMask) => {
-    if (maskDepth) return;
-    if (state.softMask)
+    if (maskDepth || offDepth) return;
+    if (state.softMask && !maskSpent && (maskChecks += maskGlyphs.length) > MAX_MASK_CHECKS) {
+      for (const glyph of maskGlyphs) drawnGlyphs.add(cell(glyph.text, glyph.center));
+      maskSpent = true;
+    }
+    if (state.softMask && !maskSpent)
       for (const glyph of maskGlyphs) {
         const [x, y] = glyph.center;
         const [x0, y0, x1, y1] = item.box;
@@ -482,12 +529,16 @@ export function measureVisibility(
     const { fontSize, hScale } = state;
     let text = "";
     let advance = 0;
+    const placed: Run["glyphs"] = [];
     for (const glyph of glyphs) {
       if (typeof glyph === "number") advance -= (glyph / 1000) * fontSize;
       else if (glyph && typeof glyph === "object") {
         const { unicode, width } = glyph as { unicode?: string; width?: number };
+        const wide = ((width ?? 0) / 1000) * fontSize;
+        const from = text.length;
         text += unicode ?? "";
-        advance += ((width ?? 0) / 1000) * fontSize;
+        placed.push({ from, to: text.length, at: (advance + wide / 2) * hScale });
+        advance += wide;
       }
     }
     advance *= hScale;
@@ -505,12 +556,16 @@ export function measureVisibility(
     runs.push({
       ...state,
       text,
+      off: offDepth > 0,
       origin: apply(device, 0, 0),
       // No font size set is no size known (NaN, never tiny); a zero scale (`0 Tz`) leaves no size.
       size: fontSize ? Math.abs(fontSize) * scale : Number.NaN,
       box,
       center,
       order,
+      device,
+      advance,
+      glyphs: placed,
     });
   };
 
@@ -542,10 +597,20 @@ export function measureVisibility(
       }
       if (isList(place)) transform(place);
       if (isList(matrix)) transform(matrix);
+    } else if (fn === ops.beginMarkedContent || fn === ops.beginMarkedContentProps) {
+      const [tag, properties] = args;
+      const shows =
+        fn !== ops.beginMarkedContentProps ||
+        tag !== "OC" ||
+        (optionalContent?.isVisible(properties) ?? true);
+      marked.push(shows);
+      if (!shows) offDepth += 1;
+    } else if (fn === ops.endMarkedContent) {
+      if (marked.pop() === false) offDepth -= 1;
     } else if (fn === ops.clip || fn === ops.eoClip) clipNext = true;
     else if ((fn === ops.beginGroup || fn === ops.endGroup) && isSoftMaskGroup(args[0])) {
       // A new mask's glyphs replace the last one's.
-      if (fn === ops.beginGroup && !maskDepth) maskGlyphs = [];
+      if (fn === ops.beginGroup && !maskDepth) [maskGlyphs, maskSpent] = [[], false];
       maskDepth = Math.max(0, maskDepth + (fn === ops.beginGroup ? 1 : -1));
     } else if (fn === ops.setFillRGBColor && typeof args[0] === "string") set({ fill: args[0] });
     else if (fn === ops.setStrokeRGBColor && typeof args[0] === "string") set({ stroke: args[0] });
@@ -593,7 +658,7 @@ export function measureVisibility(
         fillsRules.has(op) && state.alpha > 0,
         strokes.has(op) && state.strokeAlpha > 0,
       ];
-      if (!maskDepth && (filled || stroked) && isList(data)) {
+      if (!maskDepth && !offDepth && (filled || stroked) && isList(data)) {
         const [a, b, c, d] = state.ctm;
         pathRules(
           data,
@@ -624,7 +689,7 @@ export function measureVisibility(
           for (const box of split?.boxes ?? [lastPath])
             paint({ box, order, kind: "shape", fill: state.fill });
           // A hole paints nothing; under a soft mask its path may show anywhere or nowhere.
-          if (!maskDepth)
+          if (!maskDepth && !offDepth)
             for (const box of split?.holes ?? [])
               drawn.push({
                 box,
@@ -636,6 +701,7 @@ export function measureVisibility(
           const [mx0, my0, mx1, my1] = lastPath;
           if (
             !maskDepth &&
+            !offDepth &&
             state.alpha > 0 &&
             marks.length < MAX_MARKS &&
             Math.max(mx1 - mx0, my1 - my0) <= MARK_SIZE
@@ -660,11 +726,40 @@ export function measureVisibility(
     }
   });
 
-  const around = indexDrawn(
+  // Counted before the index can give up on a crowded page: its tables are still tables.
+  const tables = countRuledTables(
+    rules,
+    runs.map((run) => run.center),
+  );
+  const index = indexDrawn(
     drawn,
     [...runs.map((run) => run.center), ...throughMask.map((glyph) => glyph.center)],
     pageBox,
   );
+  // Points inside runs (`hiddenStretches`) are looked up in an index of their own, spanning every
+  // run's box, with its own budget: past it they are no longer looked for, and the page is still
+  // measured.
+  let stretchIndex: typeof index | undefined;
+  let inStretch = false;
+  const around: typeof index = (point, order) => {
+    if (inStretch) {
+      stretchIndex ??= indexDrawn(
+        drawn,
+        runs.flatMap(({ box }): Array<[number, number]> => [
+          [box[0], box[1]],
+          [box[2], box[3]],
+        ]),
+        pageBox,
+        MAX_STRETCH_CHECKS,
+      );
+      return stretchIndex(point, order);
+    }
+    try {
+      return index(point, order);
+    } catch (error) {
+      throw new CrowdedPage(error, tables);
+    }
+  };
   // The colour seen at a point under `top`, the last fill there: blended by its opacity with what
   // lies beneath it, else the white page; "" when unknown. `through`: how much of this layer the
   // fills above it let show. A fill counts as opaque once what lies beneath it would show no more
@@ -741,7 +836,7 @@ export function measureVisibility(
   // that start within it.
   const lines = new Map<number, Run[]>();
   for (const run of runs)
-    if (run.mode % 4 !== 3 && !transparentRun(run)) {
+    if (run.mode % 4 !== 3 && !transparentRun(run) && !run.off) {
       drawnGlyphs.add(cell(run.text, run.center));
       const key = Math.round(run.origin[1]);
       if (lines.has(key)) lines.get(key)!.push(run);
@@ -784,6 +879,76 @@ export function measureVisibility(
     [x0 + (x1 - x0) / 4, y],
     [x1 - (x1 - x0) / 4, y],
   ];
+
+  // Whether what of a run lies at a point is hidden: under what is drawn after it, or, unless
+  // `doubt` (its middle lies on an unknown background), lost against what lies under it there.
+  const hiddenAt = (run: Run, point: [number, number], doubt: boolean) => {
+    const { top, covered } = around(point, run.order);
+    if (covered || doubt) return covered;
+    return paintsOf(run).every(({ colour }) => lost(point, top, colour, run.blend));
+  };
+  // The point `advance` along a run and `share` of its font size up, on the page.
+  const along = (run: Run, advance: number, share: number) =>
+    apply(run.device, advance, run.fontSize * share);
+  // Whether `MAX_STRETCH_CHECKS` is spent: no more runs are looked inside.
+  let stretchesSpent = false;
+  /**
+   * The stretches of a run seen at its middle that are hidden all the same: a box drawn over half
+   * of it, or two boxes of its colour under it either side of its middle. Read where a quarter of
+   * its width or height in is hidden, then glyph by glyph: a glyph is hidden when it is a quarter
+   * and three quarters up its height.
+   */
+  const hiddenStretches = (run: Run, top: Drawn | undefined): string[] => {
+    if (stretchesSpent) return [];
+    inStretch = true;
+    try {
+      const doubt = shown(run.center, top) === "";
+      const corners = [0.25, 0.75].flatMap((x) =>
+        [0.25, 0.75].map((y) => along(run, run.advance * x, y)),
+      );
+      if (!corners.some((point) => hiddenAt(run, point, doubt))) return [];
+      return glyphStretches(run, doubt).stretches;
+    } catch {
+      stretchesSpent = true;
+      return [];
+    } finally {
+      inStretch = false;
+    }
+  };
+  // The stretches of a run whose glyphs are hidden, a glyph hidden when it is a quarter and three
+  // quarters up its height; `all` when every glyph is.
+  const glyphStretches = (run: Run, doubt: boolean) => {
+    const stretches: string[] = [];
+    let open = -1;
+    let all = true;
+    run.glyphs.forEach(({ from, at }, index) => {
+      const shut = [0.25, 0.75].every((share) => hiddenAt(run, along(run, at, share), doubt));
+      all &&= shut;
+      if (shut && open < 0) open = from;
+      if (!shut && open >= 0) stretches.push(run.text.slice(open, from));
+      if (!shut) open = -1;
+      if (shut && index === run.glyphs.length - 1) stretches.push(run.text.slice(open));
+    });
+    return { stretches: stretches.map((stretch) => stretch.trim()).filter(Boolean), all };
+  };
+  /**
+   * The stretches hidden of a run hidden at its middle, when some of its glyphs still show: a box
+   * over half a line hides that half, not the line (2026-10-24: a box over the end of a bullet took
+   * the whole bullet, and its visible keywords, out of the match). Null when every glyph is hidden.
+   */
+  const partlyHidden = (run: Run, top: Drawn | undefined): string[] | null => {
+    if (stretchesSpent || !run.glyphs.length) return null;
+    inStretch = true;
+    try {
+      const { stretches, all } = glyphStretches(run, shown(run.center, top) === "");
+      return all ? null : stretches;
+    } catch {
+      stretchesSpent = true;
+      return null;
+    } finally {
+      inStretch = false;
+    }
+  };
 
   const hidden: string[] = [];
   let previous: Run | undefined;
@@ -834,7 +999,29 @@ export function measureVisibility(
     // An unknown background, or text in a pattern, gets the benefit of the doubt.
     const blended = paints.every(({ colour }) => lost(run.center, top, colour, run.blend));
 
-    if (!(invisible || transparent || tiny || clipped || blended || covered)) continue;
+    if (!(invisible || transparent || tiny || clipped || blended || covered || run.off)) {
+      // Seen at its middle; a stretch of it may still be hidden. Its own pieces: no run joins them.
+      const stretches = unseen || transparentRun(run) ? [] : hiddenStretches(run, top);
+      for (const stretch of stretches) hidden.push(stretch);
+      if (stretches.length) previous = undefined;
+      continue;
+    }
+    // Hidden at its middle by a plain box drawn over it or by its colour on what is under it, but
+    // maybe not end to end. A hole or a blend is judged at the middle alone, as before: the glyph
+    // check does not follow either.
+    const plain = !hole && !holeOver && !over;
+    if (
+      plain &&
+      (at.covered || blended) &&
+      !(invisible || transparent || tiny || clipped || run.off)
+    ) {
+      const stretches = partlyHidden(run, top);
+      if (stretches) {
+        for (const stretch of stretches) hidden.push(stretch);
+        previous = undefined;
+        continue;
+      }
+    }
     // Runs one after another on a line are one text (Chrome draws a glyph at a time); a gap of a
     // space's width is a space.
     const gap = previous ? run.box[0] - previous.box[2] : NaN;
@@ -855,9 +1042,6 @@ export function measureVisibility(
     hidden,
     images: drawn.filter((d) => d.kind === "image").map((d) => d.box),
     marks,
-    tables: countRuledTables(
-      rules,
-      runs.map((run) => run.center),
-    ),
+    tables,
   };
 }

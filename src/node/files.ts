@@ -35,6 +35,12 @@ export type AtsReadFileOptions = {
    * stay here either way.
    */
   extract?: ((data: Uint8Array, format: AtsResumeFormat) => Promise<AtsExtraction>) | undefined;
+  /**
+   * Reads a saved job posting page's bytes for `readJobFile`; by default in this process. A page
+   * of many megabytes takes seconds, so such a host runs this in `/node/child` too (a request
+   * with `job: true`).
+   */
+  readJobPage?: ((data: Uint8Array) => Promise<AtsJobFile>) | undefined;
 };
 
 /** The folder, the pipe or device, and the file over the limit, refused with their reasons. */
@@ -151,6 +157,13 @@ function readableText(text: string, format: string): string {
 /** A job posting read from a file: its text, and the employer when the file names one. */
 export type AtsJobFile = { text: string; company?: string };
 
+/** A saved job posting page: its posting's text, and the employer its JSON-LD names. */
+export function readJobPage(data: Uint8Array): AtsJobFile {
+  const html = decodeText(data);
+  const company = extractJobPosting(html)?.company;
+  return company ? { text: jobTextFromHtml(html), company } : { text: jobTextFromHtml(html) };
+}
+
 /**
  * A job posting file's text, normalised as a fetched posting is: `.html` and `.xhtml` read for its posting, PDF
  * and Word as a resume is, `.txt` and `.md` as text. A saved page's JSON-LD names the employer.
@@ -164,9 +177,7 @@ export async function readJobFile(path: string, options?: AtsReadFileOptions): P
   const data = await readFileBytes(path, options);
   let job: AtsJobFile;
   if (/\.x?html?$/i.test(path)) {
-    const html = decodeText(data);
-    const company = extractJobPosting(html)?.company;
-    job = company ? { text: jobTextFromHtml(html), company } : { text: jobTextFromHtml(html) };
+    job = options?.readJobPage ? await options.readJobPage(data) : readJobPage(data);
   } else {
     const format = detectResumeFormat(path);
     const text =

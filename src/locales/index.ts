@@ -14,7 +14,7 @@ import { es } from "./packs/es.js";
 import { fr } from "./packs/fr.js";
 import { hi } from "./packs/hi.js";
 import { pt } from "./packs/pt.js";
-import { BR, DE, ES, FR, GB, IN, PT, US } from "./packs/regions.js";
+import { AR, BR, CL, CO, DE, ES, FR, GB, IN, MX, PT, US } from "./packs/regions.js";
 import { deepFreeze } from "../util/memo.js";
 import { languagePackSchema, regionPackSchema } from "./schema.js";
 
@@ -25,12 +25,12 @@ export type {
   AtsRegionPack,
   AtsRegionPackInput,
 } from "./schema.js";
-export { de, es, fr, hi, pt, BR, DE, ES, FR, GB, IN, PT, US };
+export { de, es, fr, hi, pt, AR, BR, CL, CO, DE, ES, FR, GB, IN, MX, PT, US };
 
 /** Every pack this package ships. English is the policy's own base vocabulary, not a pack. */
 export const BUILT_IN_LOCALES = /* @__PURE__ */ deepFreeze({
   languages: [de, fr, hi, es, pt],
-  regions: [US, DE, FR, GB, IN, ES, BR, PT],
+  regions: [US, DE, FR, GB, IN, ES, BR, PT, MX, AR, CO, CL],
 });
 
 /** JSON Schema for a language pack written as JSON. Patterns are checked when it is attached. */

@@ -110,6 +110,27 @@ export function relationshipsXml(entries: Array<[id: string, type: string, targe
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${items}</Relationships>`;
 }
 
+/**
+ * Header and footer parts (`word/header1.xml`, `word/footer1.xml`) as Word places them: the
+ * `w:sectPr` that names them, to end a `buildRichDocx` body with, and the entries to add, the
+ * parts and the relationships naming them. A part no section names is not printed.
+ */
+export function placedMargins(parts: Array<[name: string, content: string]>) {
+  const named = parts.map(([name], i): [string, string, string] => [
+    `margin${i}`,
+    name.includes("footer") ? "footer" : "header",
+    name.replace(/^word\//, ""),
+  ]);
+  const references = named.map(
+    ([id, type]) => `<w:${type}Reference w:type="default" r:id="${id}"/>`,
+  );
+  const entries: Array<[string, string]> = [
+    ["word/_rels/document.xml.rels", relationshipsXml(named)],
+    ...parts,
+  ];
+  return { sectPr: `<w:sectPr>${references.join("")}</w:sectPr>`, entries };
+}
+
 const NAMESPACES = [
   'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"',
   'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',

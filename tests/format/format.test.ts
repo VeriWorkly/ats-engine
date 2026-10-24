@@ -88,6 +88,17 @@ describe("format helpers", () => {
     expect(roleSpanMonths({ start: null, end: null, current: true }, now)).toBe(0);
   });
 
+  it("counts a role's span only up to now, as tenure does", () => {
+    const now = new Date("2026-09-30T00:00:00Z");
+    const span = (end: { year: number; month: number | null }) =>
+      roleSpanMonths({ start: { year: 2026, month: 1 }, end, current: false }, now);
+    expect(span({ year: 2030, month: 1 })).toBe(9);
+    expect(span({ year: 2026, month: null })).toBe(9);
+    expect(roleSpanMonths({ start: { year: 2027, month: 1 }, end: null, current: true }, now)).toBe(
+      0,
+    );
+  });
+
   it("formats a certification row and a spoken-language row", () => {
     expect(
       formatCertification({

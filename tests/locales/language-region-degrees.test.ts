@@ -535,6 +535,17 @@ describe("the fingerprint names the policy as applied", () => {
   it("still changes with the vocabulary a pack applies", () => {
     expect(policyFingerprint(DE_POLICY)).not.toBe(policyFingerprint(P));
   });
+
+  // N4 B29: detection words decide which bullets a pack's language governs, so they are part of
+  // the reading; the order packs are read in is not.
+  it("changes with the detection words of a language a resume is read in", () => {
+    const fingerprint = (packs: (typeof de)[]) =>
+      score(DE_RESUME, withLocales(DEFAULT_POLICY, { languages: packs }), { now: NOW }).engine
+        .policy;
+    const extended = { ...de, detectionWords: [...de.detectionWords!, "zwischen"] };
+    expect(fingerprint([extended])).not.toBe(fingerprint([de]));
+    expect(fingerprint([de, hi])).toBe(fingerprint([hi, de]));
+  });
 });
 
 describe("rule ids are unique", () => {
@@ -576,6 +587,29 @@ describe("degrees the review found unread", () => {
   });
 });
 
+// N4 B25: ordinary words a region's or the base's degree pattern read as a credential.
+describe("ordinary words are not degrees", () => {
+  it.each([
+    ["You will provide a level 2 support service", "GB"],
+    ["You must be computer literate", "IN"],
+    ["Experience in sales promotion in retail", "DE"],
+    ["We cannot offer a Certificate of Sponsorship", "GB"],
+    ["We cannot offer a Certificate of Sponsorship", "US"],
+  ])("does not read %j as a degree asked in %s", (line, region) => {
+    expect(requirement(line, localized([], region))?.kind).not.toBe("education");
+  });
+
+  it.each([
+    ["A Levels: Maths, Physics, 2013", 3, DEFAULT_POLICY],
+    ["A-level 3 subjects, 2013", 3, DEFAULT_POLICY],
+    ["Certificate of Higher Education", 4, DEFAULT_POLICY],
+    ["BE Computer Science, Anna University", 6, IN_POLICY],
+    ["Promotion in Informatik, TU München", 8, DE_POLICY],
+  ])("still reads %j at level %i", (line, level, policy) => {
+    expect(isced(line, policy)).toBe(level);
+  });
+});
+
 // Review finding (2026-10-24): a Portuguese resume from Portugal took Brazil's region.
 describe("Portugal", () => {
   const text = [
@@ -597,5 +631,224 @@ describe("Portugal", () => {
       current: true,
     });
     expect(report.parsed.education.map((row) => row.isced)).toEqual([7, 3]);
+  });
+
+  it("reads Lisboa in the header as Portugal without a +351 number", () => {
+    const report = check(text.replace("+351 912 345 678", "912 345 678"));
+    expect(report.locale.region).toBe("PT");
+  });
+});
+
+// Review finding (2026-10-24): Mexican, Argentine, Colombian and Chilean resumes took Spain's
+// region, so national numbers went unread, state codes stayed in the employer and local schooling
+// had no level.
+describe("Mexico, Argentina, Colombia and Chile", () => {
+  const resume = (header: string, role: string, education: string[]) =>
+    [
+      "Ana Sofía Ramírez",
+      header,
+      "Experiencia laboral",
+      role,
+      "• Dirigí un equipo de 20 vendedores en la zona centro",
+      "• Incrementé las ventas un 18% en dos años",
+      "Educación",
+      ...education,
+    ].join("\n");
+
+  it.each([
+    [
+      "MX",
+      "ana.ramirez@gmail.com | 55 1234 5678 | Monterrey, N.L.",
+      "Gerente de Ventas | Grupo Bimbo S.A.B. de C.V. | Monterrey, N.L. | Ene 2019 – Actual",
+      [
+        "Técnico Superior Universitario en Mercadotecnia, Universidad Tecnológica de Querétaro, 2012",
+        "Preparatoria, Colegio de Bachilleres, 2010",
+      ],
+      "55 1234 5678",
+      "Grupo Bimbo S.A.B. de C.V.",
+      [5, 3],
+    ],
+    [
+      "AR",
+      "martin.gomez@example.com.ar | 011 2345-6789",
+      "Ejecutivo de Cuenta, Arcor, CABA, marzo de 2015 – diciembre de 2018",
+      [
+        "Tecnicatura en Programación, Universidad Tecnológica Nacional, 2014",
+        "Secundario completo, Escuela Normal 1, 2008",
+      ],
+      "011 2345-6789",
+      "Arcor",
+      [5, 3],
+    ],
+    [
+      "CO",
+      "valentina@gmail.com | 310 123 4567 | Bogotá D.C.",
+      "Analista de Riesgos, Bancolombia, Bogotá, D.C., febrero 2018 - diciembre 2021",
+      [
+        "Tecnólogo en Gestión Empresarial, SENA, 2013",
+        "Bachiller Académico, Colegio San José, 2009",
+      ],
+      "310 123 4567",
+      "Bancolombia",
+      [5, 3],
+    ],
+    [
+      "CL",
+      "felipe.soto@example.cl | 9 8765 4321 | Santiago, Chile",
+      "Jefe de Proyectos, Codelco, Santiago, RM, abril 2019 – a la fecha",
+      [
+        "Técnico de Nivel Superior en Administración, INACAP, 2012",
+        "Enseñanza Media, Liceo Bicentenario, 2009",
+      ],
+      "9 8765 4321",
+      "Codelco",
+      [5, 3],
+    ],
+  ])(
+    "reads %s from the header, with its numbers, places and schooling",
+    (region, header, role, education, phone, employer, levels) => {
+      const report = check(resume(header, role, education));
+      expect(report.locale.region).toBe(region);
+      expect(report.parsed.phone).toBe(phone);
+      expect(report.parsed.roles[0]?.employer).toBe(employer);
+      expect(report.parsed.education.map((row) => row.isced)).toEqual(levels);
+    },
+  );
+
+  it("names an institution by its own word beside a credential", () => {
+    const report = check(
+      resume("felipe.soto@example.cl", "Jefe de Proyectos, Codelco, abril 2019 – a la fecha", [
+        "Técnico de Nivel Superior en Administración, INACAP, 2012",
+      ]),
+    );
+    expect(report.parsed.education[0]?.school).toBe("INACAP");
+  });
+
+  it("is not named by a startup's .co address or by a role's city further down", () => {
+    const startup = check(
+      resume(
+        "ana@acme.co | Madrid",
+        "Gerente de Ventas | Grupo Bimbo S.A.B. de C.V. | Monterrey | 2019 – actual",
+        [],
+      ),
+    );
+    expect(startup.locale.region).toBe("ES");
+  });
+
+  it("leaves an English resume's region to its phone number", () => {
+    const report = check(
+      "Jane Doe\njane@example.co.uk | London\nExperience\nEngineer, Acme Ltd, 2019 - 2022\n- Built the billing service in Go\n- Cut the release time by half",
+    );
+    expect(report.locale.region).toBeNull();
+  });
+});
+
+// A linguist's review of every pack (2026-10-24): what each found unread or misread.
+describe("the language review's findings", () => {
+  const ES = localized(["es"], "ES");
+  const AR = localized(["es"], "AR");
+  const BR = localized(["pt"], "BR");
+  const PT = localized(["pt"], "PT");
+  const FR = localized(["fr"], "FR");
+  const CH = localized(["de"], "DE");
+
+  it.each([
+    // Hindi and India.
+    ["10+2, Kendriya Vidyalaya, 2014", 3, IN_POLICY],
+    ["Xth, St. Mary's School, 2012", 2, IN_POLICY],
+    ["B.Pharma, Example College, 2018", 6, IN_POLICY],
+    ["बी.एड, लखनऊ विश्वविद्यालय, 2016", 6, HI_POLICY],
+    ["पी.एच.डी., दिल्ली विश्वविद्यालय", 8, HI_POLICY],
+    ["बी.एस.सी., कानपुर विश्वविद्यालय", 6, HI_POLICY],
+    ["12वीं, केंद्रीय विद्यालय, 2014", 3, HI_POLICY],
+    ["आई.टी.आई., सरकारी संस्थान", 4, HI_POLICY],
+    // Spanish and Latin America.
+    ["Tecnología en Sistemas, Universidad Distrital, 2012", 5, ES],
+    ["Graduado en Derecho, Universidad de Sevilla, 2014", 6, ES],
+    ["Profesorado de Matemática, Instituto Joaquín V. González, 2012", 6, AR],
+    // Portuguese.
+    ["Bacharelato em Gestão, Universidade do Minho, 2004", 6, PT],
+    ["Doutoramento em Física, Universidade de Lisboa, 2019", 8, PT],
+    // Text is NFKC-normalised before reading, so "2º" reads as "2o".
+    ["2o grau completo, Escola Estadual, 1998", 3, BR],
+    // German-speaking countries.
+    ["Matura, BRG Wien, 2010", 3, CH],
+    ["dipl. Pflegefachfrau HF, Careum Bildungszentrum", 6, CH],
+    ["Dipl.-Ing. FH, Hochschule München", 6, CH],
+    // French.
+    ["Brevet de technicien supérieur, Lycée Exemple, 2015", 5, FR],
+  ])("reads %s at level %i", (line, level, policy) => {
+    expect(isced(line, policy)).toBe(level);
+  });
+
+  it.each([
+    // A date or a rank, not Class XII.
+    ["Graduated 12th May 2019", IN_POLICY],
+    // An Argentine "diplomatura" is an extension course.
+    ["Diplomatura en Marketing Digital, UBA, 2020", AR],
+    // BAFA, a youth-leader certificate, is no lower secondary.
+    ["Brevet d'aptitude aux fonctions d'animateur (BAFA), 2014", FR],
+    // English names a field, not a degree, at a university.
+    ["Computer Science, Stanford University, 2015", DEFAULT_POLICY],
+  ])("reads no level from %s", (line, policy) => {
+    expect(isced(line, policy)).toBeNull();
+  });
+
+  it("reads a Hindi posting's years in the plural", () => {
+    const report = check(EN_RESUME, {
+      jobDescription: "आवश्यकताएँ\n- 5 वर्षों का अनुभव",
+      languages: ["hi"],
+    });
+    expect(report.requirements[0]?.kind).toBe("experience");
+  });
+
+  it.each([
+    ["es", "Jefe de Proyectos, Acme S.A.U.    2019 – 2022", "Jefe de Proyectos", "Acme S.A.U."],
+    ["fr", "Chef d'équipe, Exemple SARL    2019 – 2022", "Chef d'équipe", "Exemple SARL"],
+    [
+      "de",
+      "Wissenschaftlicher Mitarbeiter, Exempla AG    2019 – 2022",
+      "Wissenschaftlicher Mitarbeiter",
+      "Exempla AG",
+    ],
+  ])("reads the %s title and employer of %s", (language, line, title, employer) => {
+    const text = ["Kim Lee", "kim@example.com", "Experience", line].join("\n");
+    expect(check(text, { languages: [language] }).parsed.roles[0]).toMatchObject({
+      title,
+      employer,
+    });
+  });
+
+  it.each([
+    ["es", "Inglés (Competencia bilingüe o nativa)", "C2"],
+    ["fr", "Anglais (Capacité professionnelle complète)", "C2"],
+    ["pt", "Inglês (Proficiência profissional limitada)", "B1"],
+    ["de", "Englisch (fliessend)", "C1"],
+  ])("reads LinkedIn's %s level in %s", (language, line, cefr) => {
+    const text = ["Kim Lee", "kim@example.com", "Languages", line].join("\n");
+    expect(check(text, { languages: [language] }).parsed.spokenLanguages[0]?.cefr).toBe(cefr);
+  });
+
+  it("detects a Colombian resume as Spanish from words Portuguese does not share", () => {
+    const text = [
+      "Valentina Restrepo Cardona",
+      "valentina.restrepo@example.co | +57 310 123 4567",
+      "Perfil profesional",
+      "Analista financiera con experiencia en riesgo de crédito y en la elaboración de modelos.",
+      "Experiencia profesional",
+      "Analista de Riesgos",
+      "Bancolombia",
+      "Febrero 2018 - Diciembre 2021",
+      "• Elaboré informes para la junta directiva",
+      "Formación académica",
+      "Administración de Empresas, Universidad de Antioquia, 2015",
+    ].join("\n");
+    const report = check(text);
+    expect(report.locale.languages).toEqual(["es"]);
+    expect(report.locale.region).toBe("CO");
+    expect(report.parsed.education[0]).toMatchObject({
+      school: "Universidad de Antioquia",
+      isced: 6,
+    });
   });
 });

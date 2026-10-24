@@ -1,13 +1,31 @@
 // The built MCP server over stdio, driven with the SDK's client: each tool's structured answer is
 // the engine's `check` on the same input, and a mistake in a call is a tool error, not a crash.
+import type { ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Every child `extractInChild` forks, so a test can see whether it was stopped. The server under
+// test is spawned by the SDK, which this mock does not reach.
+const forked = vi.hoisted(() => [] as ChildProcess[]);
+vi.mock("node:child_process", async (original) => {
+  const real = await original<typeof import("node:child_process")>();
+  return {
+    ...real,
+    fork: (...args: Parameters<typeof real.fork>) => {
+      const child = real.fork(...args);
+      forked.push(child);
+      return child;
+    },
+  };
+});
 
 import {
   check,
@@ -437,8 +455,76 @@ describe("file reading is bounded", () => {
   it("stops the child reading a file when the call is cancelled", async () => {
     const { extractInChild } = await import("../src/inputs.js");
     const controller = new AbortController();
+    forked.length = 0;
     const reading = extractInChild(new Uint8Array(pdf), "pdf", controller.signal);
     setTimeout(() => controller.abort(), 20);
     await expect(reading).rejects.toThrow("The call was cancelled.");
+    // The process itself ends, not only the call: a child left running holds its memory.
+    const [child] = forked;
+    expect(child).toBeDefined();
+    const ended = child!.exitCode !== null || child!.signalCode !== null;
+    if (!ended)
+      await Promise.race([
+        once(child!, "exit"),
+        new Promise((_, fail) => setTimeout(() => fail(new Error("child still running")), 5_000)),
+      ]);
+    expect(child!.exitCode !== null || child!.signalCode !== null).toBe(true);
+  });
+});
+
+describe("the extraction child", () => {
+  it("passes on the reader's own reason for a file it cannot read", async () => {
+    const { extractInChild } = await import("../src/inputs.js");
+    const damaged = new TextEncoder().encode("%PDF-1.7\nnot a pdf at all");
+    const error = (await extractInChild(damaged, "pdf").catch((caught: unknown) => caught)) as {
+      message: string;
+      cause?: unknown;
+    };
+    expect(error.message).toMatch(/PDF/);
+    expect(error.cause).toMatch(/^\w*(?:Exception|Error): /);
+  });
+
+  // A 19 MB page held the server for 6 s, with no timeout.
+  it("reads a saved job posting page in a child, employer and all", async () => {
+    const { readJob } = await import("../src/inputs.js");
+    const posting = {
+      "@type": "JobPosting",
+      title: "Platform Engineer",
+      description: "<p>We need Kubernetes and Go.</p>",
+      hiringOrganization: { "@type": "Organization", name: "Globex" },
+    };
+    const page = join(dir, "posting.html");
+    writeFileSync(
+      page,
+      `<html><head><script type="application/ld+json">${JSON.stringify(posting)}</script></head>` +
+        "<body><h1>Platform Engineer</h1><p>We need Kubernetes and Go.</p></body></html>",
+    );
+    forked.length = 0;
+    const job = await readJob({ job_path: page });
+    expect(forked).toHaveLength(1);
+    expect(job).toMatchObject({ company: "Globex", text: expect.stringContaining("Kubernetes") });
+  });
+
+  it("answers a malformed request instead of crashing", async () => {
+    const path = createRequire(import.meta.url).resolve("@veriworkly/ats-engine/node/child");
+    const { fork } = await import("node:child_process");
+    const child = fork(path, [], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
+    try {
+      const answer = once(child, "message");
+      // @ts-expect-error: a request the protocol does not allow, as a buggy host might send
+      child.send(null);
+      expect((await answer)[0]).toEqual({
+        id: -1,
+        ok: false,
+        message: "Invalid extraction request.",
+      });
+      // Still running, and still reading.
+      const next = once(child, "message");
+      const buffer = Buffer.from(RESUME.join("\n")).toString("base64");
+      child.send({ id: 2, format: "text", buffer });
+      expect((await next)[0]).toMatchObject({ id: 2, ok: true });
+    } finally {
+      child.kill();
+    }
   });
 });

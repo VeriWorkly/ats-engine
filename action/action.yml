@@ -22,11 +22,11 @@ inputs:
     required: false
     default: ""
   region:
-    description: Read the resume as from this country (US, GB, DE, FR, IN, ES, BR or PT). Empty means inferred.
+    description: Read the resume as from this country (US, GB, DE, FR, IN, ES, BR, PT, MX, AR, CO or CL). Empty means inferred.
     required: false
     default: ""
   version:
-    description: Version of @veriworkly/ats-engine to run. Defaults to the engine release this action ships with, so a later release cannot change your score until you move to it.
+    description: Version of @veriworkly/ats-engine to run. Defaults to the engine release this action ships with, which moves with the action's ref (@main takes each new release). Set it, or pin the action to a commit SHA, so a later release cannot change your score until you move to it.
     required: false
     default: "0.20.0"
   ats:

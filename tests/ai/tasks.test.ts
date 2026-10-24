@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createAtsAi } from "../../src/ai/index.js";
+import { convertedToDocument, createAtsAi, groundedText } from "../../src/ai/index.js";
 import { createRedaction } from "../../src/ai/redact.js";
 import { scriptedProvider } from "../../src/ai/testing/index.js";
 import { DEFAULT_POLICY } from "../../src/policy/default.js";
@@ -289,6 +289,22 @@ describe("repairParse", () => {
     const sent = JSON.parse(provider.calls[0]!.messages[0]!.content);
     expect(sent.resume).toBe(SOURCE);
   });
+
+  // Item 48 (owner, 2026-10-24): a repair that fills nothing is reported, not passed off as one.
+  it.each([
+    ["no values", {}, /filled no field the parse left empty/],
+    ["only invented values", { name: "John Smith", email: "x@fabricated.example" }, /2 value\(s\)/],
+  ])("reports a reply with %s as unusable, once, with what it cost", async (_, reply, message) => {
+    const provider = scriptedProvider(JSON.stringify(reply), JSON.stringify({ name: "Jane Doe" }));
+    const ai = createAtsAi({ provider, routes: { repairParse: { ...route, retries: 2 } } });
+    const failure = await ai
+      .repairParse({ resumeText: SOURCE, report: { parsed: empty } })
+      .catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: "unusable", attempts: 1 });
+    expect((failure as Error).message).toMatch(message);
+    // Not retried: the second scripted reply is never asked for.
+    expect(provider.calls).toHaveLength(1);
+  });
 });
 
 describe("convertResume", () => {
@@ -328,5 +344,108 @@ describe("convertResume", () => {
       "basics.email",
       "experience[0].role",
     ]);
+  });
+
+  it("drops an entry whose every identity value was invented", async () => {
+    const provider = scriptedProvider(
+      JSON.stringify({
+        basics: { fullName: "Jane Doe" },
+        experience: [
+          { company: "Acme Corporation", role: "Senior Engineer", highlights: ["Built it"] },
+          { company: "Initech", role: "VP Sales", highlights: ["Grew revenue 300%"] },
+        ],
+        education: [{ school: "Hogwarts", degree: "PhD Magic" }],
+        projects: [{ name: "Moonshot", highlights: ["Landed on the moon"] }],
+      }),
+    );
+    const ai = createAtsAi({ provider, routes });
+    const outcome = await ai.convertResume({ resumeText: RESUME });
+
+    expect(outcome.result.experience.map((role) => role.company)).toEqual(["Acme Corporation"]);
+    expect(outcome.result.education).toEqual([]);
+    expect(outcome.result.projects).toEqual([]);
+    expect(outcome.rejected.map((violation) => violation.path)).toEqual(
+      expect.arrayContaining(["experience[1].company", "experience[1].role", "projects[0].name"]),
+    );
+  });
+});
+
+describe("groundedText and convertedToDocument", () => {
+  const converted = {
+    basics: { fullName: "Jane Doe", role: "", headline: "", email: "", phone: "", location: "" },
+    links: [],
+    summary: "Award-winning Kubernetes AWS Terraform expert.",
+    experience: [
+      {
+        company: "Acme Corporation",
+        role: "Senior Engineer",
+        location: "",
+        startDate: "2020-01",
+        endDate: "",
+        current: true,
+        summary: "",
+        highlights: [
+          "Built payment systems in TypeScript, cutting failures 40%.",
+          // Planted by the model, or by text in the resume that steered it: not in the file.
+          "Led Kubernetes AWS Terraform migration",
+        ],
+      },
+      // Its identity was blanked as ungrounded: dropped, never scored on its bullets.
+      {
+        company: "",
+        role: "",
+        location: "",
+        startDate: "",
+        endDate: "",
+        current: false,
+        summary: "",
+        highlights: ["Grew revenue 300%"],
+      },
+    ],
+    education: [],
+    projects: [],
+    skills: [{ name: "Skills", keywords: ["TypeScript"] }],
+  };
+
+  it("drops the summaries and bullets the resume does not have, and scores the rest", () => {
+    const { resume, dropped } = groundedText(converted, RESUME);
+    expect(dropped).toEqual([
+      "Award-winning Kubernetes AWS Terraform expert.",
+      "Led Kubernetes AWS Terraform migration",
+      "Grew revenue 300%",
+    ]);
+    const document = convertedToDocument(resume);
+    const report = check(document, DEFAULT_POLICY, {
+      jobDescription: JOB,
+      now: new Date("2026-10-01"),
+    });
+    expect(report.parsed.roles).toEqual([
+      expect.objectContaining({ title: "Senior Engineer", employer: "Acme Corporation" }),
+    ]);
+    expect(report.matchedKeywords).not.toContain("kubernetes");
+  });
+
+  it("keeps a degree and its field as the file writes them together", () => {
+    const source = "Анна Петрова\nОбразование\nБакалавр информатики, Московский университет, 2017";
+    const row = {
+      school: "Московский университет",
+      degree: "Бакалавр",
+      field: "информатики",
+      startDate: "",
+      endDate: "2017",
+      current: false,
+      summary: "",
+    };
+    const { resume } = groundedText(
+      { ...converted, summary: "", experience: [], education: [row] },
+      source,
+    );
+    expect(resume.education[0]).toMatchObject({ degree: "Бакалавр информатики", field: "" });
+    // Apart in the file, they stay apart.
+    const apart = groundedText(
+      { ...converted, summary: "", experience: [], education: [{ ...row, field: "физики" }] },
+      source,
+    );
+    expect(apart.resume.education[0]).toMatchObject({ degree: "Бакалавр", field: "физики" });
   });
 });

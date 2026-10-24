@@ -123,7 +123,8 @@ export function formatTenure(months: number): string {
 /**
  * Calendar months one role spans, inclusive of both ends. A current role runs to `now`; a role
  * with only a start counts as one month. A missing start month is January, a missing end month
- * December, as in the parser.
+ * December, as in the parser. No month after `now` counts, as in tenure: "2025 – 2026" read in
+ * March 2026 runs to March.
  */
 export function roleSpanMonths(
   role: Pick<AtsParsedRole, "start" | "end" | "current">,
@@ -132,7 +133,7 @@ export function roleSpanMonths(
   if (!role.start) return 0;
   const from = monthIndex(role.start);
   const to = role.current ? nowMonth(now) : role.end ? monthIndex(role.end, 12) : from;
-  return Math.max(0, to - from + 1);
+  return Math.max(0, Math.min(to, nowMonth(now)) - from + 1);
 }
 
 /** What each ISCED 2011 level is called on a report. */
@@ -149,13 +150,24 @@ export const ISCED_LABELS: Readonly<Record<AtsIscedLevel, string>> = /* @__PURE_
 /** Control characters (a raw escape sequence can recolour or clear a terminal); line breaks and tabs stay. */
 const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g; // eslint-disable-line no-control-regex
 
-/** Every string in `value`, at any depth, with control characters removed (JSON does not escape C1). */
+/** Deeper than any report nests; a caller's value may nest past the call stack, or loop. */
+const MAX_PRINTABLE_DEPTH = 256;
+
+/**
+ * Every string in `value`, at any depth up to `MAX_PRINTABLE_DEPTH`, with control characters
+ * removed (JSON does not escape C1). What nests deeper is left out, not walked until the stack
+ * runs out.
+ */
 export function printable<T>(value: T): T {
-  if (typeof value === "string") return value.replace(CONTROLS, "") as T;
-  if (Array.isArray(value)) return value.map(printable) as T;
-  if (value && typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(value).map(([key, child]) => [key, printable(child)]),
-    ) as T;
-  return value;
+  return printableAt(value, 0) as T;
+}
+
+function printableAt(value: unknown, depth: number): unknown {
+  if (typeof value === "string") return value.replace(CONTROLS, "");
+  if (!value || typeof value !== "object") return value;
+  if (depth >= MAX_PRINTABLE_DEPTH) return undefined;
+  if (Array.isArray(value)) return value.map((child) => printableAt(child, depth + 1));
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [key, printableAt(child, depth + 1)]),
+  );
 }

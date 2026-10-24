@@ -738,8 +738,8 @@ Excel, SQL, Tally`,
       ],
       education: [
         { school: "Example Institute of Management", isced: 7, credential: "MBA" },
-        // B.Com is an Indian credential: its level is read only with the IN region (a host passes `region`).
-        { school: "Sample College", isced: null, credential: "B.Com" },
+        // B.Com is read with no region: Australia, South Africa and Ireland write it too.
+        { school: "Sample College", isced: 6, credential: "B.Com" },
       ],
       skills: ["Excel", "SQL", "Tally"],
     },
@@ -813,7 +813,7 @@ Certificaciones
 Power BI Data Analyst Associate, Microsoft, 2023
 Conocimientos técnicos
 Python, SQL, Power BI, Excel`,
-      locale: { languages: ["es"], region: "ES" },
+      locale: { languages: ["es"], region: "MX" },
       name: "Carlos Méndez Ortega",
       email: "carlos.mendez@example.com.mx",
       phone: "+52 55 1234 5678",

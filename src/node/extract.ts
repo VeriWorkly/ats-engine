@@ -35,7 +35,10 @@ export type AtsResumeFormat = "pdf" | "docx" | "html" | "text";
  */
 export type AtsExtraction = { text: string; layout?: AtsLayoutSignals };
 
-/** Text beyond this is not a resume; the scorer rejects longer input anyway. */
+/**
+ * Text beyond this is not a resume, and the scorer reads no more: a file's text is cut here and
+ * `layout.textCut` set, which `check` reports in `parsingWarnings`.
+ */
 export const MAX_EXTRACTED_CHARS = 50_000;
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -62,22 +65,27 @@ export function detectResumeFormat(fileName: string, mimeType = ""): AtsResumeFo
  * not a space: a tab is the column gap the parser splits a title from its employer at.
  */
 export function normalizeExtractedText(text: string): string {
+  return collapse(text).slice(0, MAX_EXTRACTED_CHARS);
+}
+
+function collapse(text: string) {
   return text
     .replace(/\0/g, "")
     .replace(/[ \t]+/g, (run) => (run.includes("\t") ? "\t" : " "))
     .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, MAX_EXTRACTED_CHARS);
+    .trim();
 }
 
 /**
  * A text file's characters: UTF-16 by its byte-order mark, else UTF-8, and Windows-1252 where the
- * bytes are not UTF-8. A UTF-8 file with a stray byte is not decoded wholesale as Windows-1252.
+ * bytes are not UTF-8. A UTF-8 file with a stray byte is not decoded wholesale as Windows-1252,
+ * nor is one whose UTF-8 byte-order mark says what it is.
  */
 export function decodeText(data: Uint8Array): string {
-  const [first, second] = data;
+  const [first, second, third] = data;
   if (first === 0xff && second === 0xfe) return new TextDecoder("utf-16le").decode(data);
   if (first === 0xfe && second === 0xff) return new TextDecoder("utf-16be").decode(data);
+  const marked = first === 0xef && second === 0xbb && third === 0xbf;
   // A file with fewer valid multibyte characters than stray bytes is Windows-1252 throughout.
   let [multibyte, stray] = [0, 0];
   for (let at = 0, length = 0; at < data.length; at += length || 1) {
@@ -85,7 +93,8 @@ export function decodeText(data: Uint8Array): string {
     if (length > 1) multibyte += 1;
     if (!length) stray += 1;
   }
-  if (stray > multibyte) return cp1252(data);
+  // The decoders below drop the mark itself.
+  if (stray > multibyte && !marked) return cp1252(data);
   if (!stray) return new TextDecoder().decode(data);
   // Stray bytes are each written as their Windows-1252 character in UTF-8 and the whole is
   // decoded once: a decode per stray byte is quadratic.
@@ -243,5 +252,14 @@ export async function extractResume(
             : null;
   // A format from outside the type (over IPC, say) is refused, not read as text.
   if (!raw) throw new Error(`Unsupported resume format "${String(format)}".`);
-  return { ...raw, text: normalizeExtractedText(raw.text) };
+  const text = collapse(raw.text);
+  // With no layout to carry the flag (a text file), the text is read as if pasted: `check` cuts
+  // it and says so. Twice the cut leaves room for what its own normalising removes.
+  if (!raw.layout) return { text: text.slice(0, MAX_EXTRACTED_CHARS * 2) };
+  if (text.length <= MAX_EXTRACTED_CHARS) return { ...raw, text };
+  // Skills often come last: the cut is reported, never silent.
+  return {
+    text: text.slice(0, MAX_EXTRACTED_CHARS),
+    layout: { ...raw.layout, textCut: true },
+  };
 }

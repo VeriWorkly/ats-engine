@@ -67,6 +67,24 @@ describe("grounding: values must occur in the source", () => {
   it("treats an empty value as asserting nothing", () => {
     expect(isGrounded("", normalizeForGrounding(SOURCE))).toBe(true);
   });
+
+  it.each([
+    "jane@example.com—555 0199",
+    "Email—jane@example.com",
+    "Email:—jane@example.com",
+    "—jane@example.com",
+    "jane@example.com–",
+    "jane@example.com-",
+    "-jane@example.com | 555 0199",
+  ])("grounds an email glued to a dash in %j", (source) => {
+    expect(isGrounded("jane@example.com", normalizeForGrounding(source))).toBe(true);
+  });
+
+  it("does not ground an email inside a longer one", () => {
+    expect(isGrounded("jane@example.com", normalizeForGrounding("mary-jane@example.com"))).toBe(
+      false,
+    );
+  });
 });
 
 describe("grounding: walking a returned object", () => {
@@ -548,11 +566,29 @@ describe("grounding: a shared source index", () => {
     expectFast(() => findGroundingViolations(candidate, source), 500);
   });
 
+  it("checks thousands of absent values against a long document quickly", () => {
+    const source = "Senior Engineer at Acme Corporation. ".repeat(1_350); // 50 KB
+    const candidate = { skills: Array.from({ length: 2_500 }, (_, i) => `Missing skill ${i}`) };
+    const violations = expectFast(() => findGroundingViolations(candidate, source), 300);
+    expect(violations).toHaveLength(2_500);
+  });
+
   it("reads an address glued to a run of marks in bounded time", () => {
     const source = `janedoe.dev/${"·".repeat(50_000)}x`;
     expectFast(
       () =>
         expect(findGroundingViolations({ url: "https://janedoe.dev/x" }, source)).toHaveLength(1),
+      500,
+    );
+  });
+
+  it.each([
+    ["hyphens", "-"],
+    ["em dashes", "—"],
+  ])("reads an email glued to 50,000 %s in bounded time", (_, dash) => {
+    const source = `${dash.repeat(50_000)}jane@example.com${dash.repeat(50_000)} x`;
+    expectFast(
+      () => expect(findGroundingViolations({ email: "jane@example.com" }, source)).toHaveLength(0),
       500,
     );
   });
@@ -577,6 +613,30 @@ describe("merge: tenure fields are grounded too", () => {
     );
     expect(merged.roles[0]!.start).toBeNull();
     expect(merged.monthsOfExperience).toBeNull();
+  });
+
+  it("keeps a year but drops a month the document does not write", () => {
+    const role = (start: number, end: number) => ({
+      title: "Engineer",
+      employer: "Globex Ltd",
+      start: { year: 2019, month: start },
+      end: { year: 2022, month: end },
+      current: false,
+    });
+    const yearsOnly = "Experience\nEngineer, Globex Ltd\n2019 - 2022\nBuilt the thing.";
+    const { merged } = merge(emptyParsed, candidate({ roles: [role(9, 1)] }), yearsOnly);
+    expect(merged.roles[0]).toMatchObject({
+      start: { year: 2019, month: null },
+      end: { year: 2022, month: null },
+    });
+    expect(merged.monthsOfExperience).toBe(48);
+
+    // Months the document writes, in any of its date forms, stay.
+    for (const written of ["Sep 2019 - Jan 2022", "09/2019 – 01/2022", "09/19 - 01/22"]) {
+      const source = yearsOnly.replace("2019 - 2022", written);
+      const roles = merge(emptyParsed, candidate({ roles: [role(9, 1)] }), source).merged.roles;
+      expect(roles[0]).toMatchObject({ start: { month: 9 }, end: { month: 1 } });
+    }
   });
 
   it("keeps current only when the document says present", () => {

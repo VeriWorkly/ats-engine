@@ -88,6 +88,16 @@ describe("a languages line becomes rows", () => {
     ]);
   });
 
+  // N4 B33: two level words in a row, the one reached later written last.
+  it("reads the higher of two levels a row states", () => {
+    expect(languages("Languages\nSpanish (school level, now fluent), German (A2, now B2)")).toEqual(
+      [
+        { language: "Spanish", level: "school level, fluent", cefr: "C1" },
+        { language: "German", level: "A2, B2", cefr: "B2" },
+      ],
+    );
+  });
+
   it("reads a level after a dash or a colon", () => {
     expect(languages("Languages\nEnglish – Native\nHindi: Fluent")).toEqual([
       { language: "English", level: "Native", cefr: "C2" },

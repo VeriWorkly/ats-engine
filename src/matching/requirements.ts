@@ -34,12 +34,18 @@ import {
 // Requirements or Preferred heading, its status, the terms it names and the resume lines that
 // evidence it. Deterministic; no model is involved.
 
-const MAX_REQUIREMENTS = 25;
+/** Requirements judged; `check` says in `parsingWarnings` when a posting lists more. */
+export const MAX_REQUIREMENTS = 25;
 const MAX_REQUIREMENT_CHARS = 300;
 const MAX_EVIDENCE = 2;
 const MAX_TERMS = 6;
-/** Lines searched for evidence. */
-const MAX_EVIDENCE_LINES = 1_000;
+/** Sentence lines sampled for the languages a resume is written in. */
+const MAX_SAMPLE_LINES = 1_000;
+/**
+ * Lines searched for evidence: every line of a real resume, as the job match reads (50,000
+ * characters in 5,000 lines is ten a line), not every line of 50,000 one-letter lines.
+ */
+const MAX_EVIDENCE_LINES = 5_000;
 /** Years of dated work that let "or equivalent experience" stand in for a degree. */
 const EQUIVALENT_MONTHS = 24;
 const WEAK_LANGUAGE = /\b(?:beginner|basic|elementary|limited|a1|a2)\b/iu;
@@ -62,7 +68,7 @@ export function writtenLanguages(
 ): string[] {
   const names = policy.keywordMatch.requirements.languageNames;
   const lines = text
-    .split("\n", MAX_EVIDENCE_LINES)
+    .split("\n", MAX_SAMPLE_LINES)
     .map((line) => line.replace(BULLET_PREFIX, ""))
     .filter((line) => readsAsSentence(line) && !isDatedLine(line, policy));
   const sample = sampleOf(lines.join("\n"));
@@ -809,6 +815,7 @@ function withoutOptional(text: string, matchers: Matchers) {
 
 /**
  * The posting's requirement statements: each line, or sentence of a long one, under its headings.
+ * All of them: `judgeRequirements` judges the first `MAX_REQUIREMENTS`.
  */
 export function requirementLines(jobText: string, policy: AtsEnginePolicy) {
   const sections = segmentJob(jobText, policy);
@@ -831,21 +838,19 @@ export function requirementLines(jobText: string, policy: AtsEnginePolicy) {
         : [],
   );
 
-  return source
-    .flatMap((section) =>
-      section.text
-        .split("\n")
-        .flatMap((line) =>
-          line.length > MAX_REQUIREMENT_CHARS ? line.split(/(?<=[.;])\s+/) : [line],
-        )
-        .map((line) => line.replace(BULLET_PREFIX, "").trim())
-        .filter((line) => /\p{L}/u.test(line) && !isOfferLine(line, policy))
-        .map((line) => ({
-          text: line.slice(0, MAX_REQUIREMENT_CHARS),
-          importance: section.kind === "preferred" ? ("preferred" as const) : ("required" as const),
-        })),
-    )
-    .slice(0, MAX_REQUIREMENTS);
+  return source.flatMap((section) =>
+    section.text
+      .split("\n")
+      .flatMap((line) =>
+        line.length > MAX_REQUIREMENT_CHARS ? line.split(/(?<=[.;])\s+/) : [line],
+      )
+      .map((line) => line.replace(BULLET_PREFIX, "").trim())
+      .filter((line) => /\p{L}/u.test(line) && !isOfferLine(line, policy))
+      .map((line) => ({
+        text: line.slice(0, MAX_REQUIREMENT_CHARS),
+        importance: section.kind === "preferred" ? ("preferred" as const) : ("required" as const),
+      })),
+  );
 }
 
 const titleWordOf = memo(
@@ -998,6 +1003,10 @@ export function judgeRequirements(
     });
   };
   const BRACKETED = /\([^()]*\)|\[[^[\]]*\]/gu;
+  const notHeldOpening = new RegExp(
+    String.raw`^\s*${wordListPattern(km.requirements.notHeld ?? ["(?!)"])}`,
+    "iu",
+  );
   const today = now.getUTCFullYear() * 12 + now.getUTCMonth() + 1;
   const monthOf = (date: { year: number; month: number | null }, edge: "start" | "end") =>
     date.year * 12 + (date.month ?? (edge === "start" ? 1 : 12));
@@ -1009,11 +1018,15 @@ export function judgeRequirements(
     const expired = row.expires && statesExpiry(row) && monthOf(row.expires, "end") < today;
     const dated = expired || (row.date && monthOf(row.date, "start") > today);
     const bracketed = !dated && unfinishedIn(name, true);
+    // An issuer that is a word no longer or not yet held: "CPA (inactive)", "PMP, expired".
+    const status = notHeldOpening.exec(row.issuer.slice(0, 300))?.[0];
     const lapsed = expired
       ? `${row.name}: expired ${row.expires!.year}`
       : dated || bracketed || unfinishedIn(row.issuer.slice(0, 300).replace(BRACKETED, " "), false)
         ? `${row.name}: not yet held`
-        : null;
+        : status
+          ? `${row.name}: ${status.toLowerCase()}`
+          : null;
     // Unfinished by a word in the name's own brackets, the row is an item of a one-line list and
     // its issuer the next item ("Six Sigma Green Belt (in progress), PMP, 2019"): what only the
     // issuer names is held. A date stays the whole row's.
@@ -1112,15 +1125,20 @@ export function judgeRequirements(
   // The highest level a resume line names, or -1.
   const lineLevel = (line: string) => degreeLevels(line, policy)[0]?.isced ?? -1;
 
-  const lines = requirementLines(jobText, policy).flatMap((line) => {
-    const years = matchers.years.map((re) => re.exec(line.text)).find(Boolean) ?? null;
-    if (!years || (!matchers.authorization.test(line.text) && !matchers.clearance.test(line.text)))
-      return [line];
-    return [
-      { ...line, text: line.text.slice(0, years.index).trim() },
-      { ...line, text: line.text.slice(years.index).trim() },
-    ].filter((part) => part.text.length > 0);
-  });
+  const lines = requirementLines(jobText, policy)
+    .slice(0, MAX_REQUIREMENTS)
+    .flatMap((line) => {
+      const years = matchers.years.map((re) => re.exec(line.text)).find(Boolean) ?? null;
+      if (
+        !years ||
+        (!matchers.authorization.test(line.text) && !matchers.clearance.test(line.text))
+      )
+        return [line];
+      return [
+        { ...line, text: line.text.slice(0, years.index).trim() },
+        { ...line, text: line.text.slice(years.index).trim() },
+      ].filter((part) => part.text.length > 0);
+    });
 
   // The clearance levels each resume line holds, read once.
   const heldOn = new WeakMap<object, number[] | null>();
@@ -1326,9 +1344,8 @@ export function judgeRequirements(
     // RabbitMQ").
     const skillRoots = new Set(named.filter(isSkill).map(([token]) => find(token)));
     const skills = named.filter((entry) => isSkill(entry) || skillRoots.has(find(entry[0])));
-    const picked = (
-      skills.length ? skills : named.filter(([, term]) => term.label.length > 3)
-    ).slice(0, MAX_TERMS);
+    // Else the plainer words, of three letters or more as in the job match ("dbt", "git").
+    const picked = (skills.length ? skills : named).slice(0, MAX_TERMS);
     const groups = new Map<string, Array<[string, string]>>();
     for (const [token, term] of picked) {
       const root = find(token);

@@ -1,14 +1,26 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
+import { BULLET } from "../text/text.js";
 import { findDateRange } from "./dates.js";
 import { despaceLines, isBareSectionHeading } from "./sections.js";
 
 /** The first word of a wrapped line's continuation: entirely lowercase ("iOS", "eBay" start lines). */
 const CONTINUATION = /^\p{Ll}+(?![\p{L}\p{N}])/u;
+/** A line of parts separated by "|", not a Markdown table row (which ends in one). */
+const PIPED = /\|(?!\s*$)/u;
+const ROW_END = /\|\s*$/u;
+
+/**
+ * Whether `line` goes on with `previous`: a lowercase opening, or the next part of a piped line
+ * ("PMP | PMI | Issued Jan 2024" over "| Expires Jan 2027").
+ */
+const continues = (previous: string, line: string) =>
+  CONTINUATION.test(line) ||
+  (/^\|\s/u.test(line) && !ROW_END.test(line) && PIPED.test(previous) && !ROW_END.test(previous));
 
 /**
  * Lines broken only because the page ran out of width, joined back. A continuation is a line
  * after one that runs near the full text width without ending a sentence, opening with a
- * lowercase word. A hyphen wrap ("real-" / "time") rejoins without a space. A bare section
+ * lowercase word or the next "|" part. A hyphen wrap ("real-" / "time") rejoins without a space. A bare section
  * heading is never a continuation.
  */
 function joinWrapped(lines: string[], policy: AtsEnginePolicy): string[] {
@@ -23,14 +35,28 @@ function joinWrapped(lines: string[], policy: AtsEnginePolicy): string[] {
       previous !== undefined &&
       previous.length >= fullWidth &&
       !/[.!?]$/.test(previous) &&
-      CONTINUATION.test(line) &&
+      continues(previous, line) &&
       !isBareSectionHeading(line, policy) &&
-      !isDateLine(line, policy)
+      !isDateLine(line, policy) &&
+      !(CONTINUATION.test(line) && isRowHeader(previous, policy))
     )
       joined[last] = previous.endsWith("-") ? previous + line : `${previous} ${line}`;
     else joined.push(line);
   }
   return joined;
+}
+
+/**
+ * A line set in columns (a tab), or an unbulleted line ending in a date range: a role's header,
+ * which a lowercase description under it never continues (it would be read as the employer). A
+ * sentence with a range inside it ("… from 2015 – 2023 at three …") may still wrap.
+ */
+function isRowHeader(line: string, policy: AtsEnginePolicy) {
+  if (line.includes("\t")) return true;
+  const found = BULLET.test(line) ? null : findDateRange(line, policy.resumeParse);
+  return (
+    found !== null && !/\p{L}/u.test(line.slice(line.indexOf(found.matched) + found.matched.length))
+  );
 }
 
 /** A line that is a date range and nothing else ("janv. 2021 – aujourd'hui"): a role's dates. */

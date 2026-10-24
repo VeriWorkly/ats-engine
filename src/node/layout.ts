@@ -112,6 +112,7 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
     let shared = 0;
     let flush = 0;
     let short = 0;
+    let dated = 0;
     let sharedRight = 0;
     let rightOnly = 0;
 
@@ -135,16 +136,25 @@ export function findGutter(runs: readonly PositionedRun[], pageWidth: number): G
       if (l && r && Math.abs(lSize - rSize) <= 0.2 * Math.max(lSize, rSize)) {
         shared += 1;
         sharedRight += r;
-        if (reach >= edge - FLUSH) flush += 1;
-        if (r <= TAB_STOP_CHARS && stop) short += 1;
+        const flushed = reach >= edge - FLUSH;
+        if (flushed) flush += 1;
+        // A city alone flush right ("Berlin", "पुणे") over its dates is a tab stop too.
+        if (r <= TAB_STOP_CHARS && (stop || flushed)) short += 1;
+        if (stop) dated += 1;
       } else if (r && !l) rightOnly += 1;
     }
 
     if (!besideEachOther(rows.values(), split)) continue;
 
-    // Tab stops: flush right, beside text on the left, a few characters with a digit or comma. A
-    // right side of words, or with more lines of its own than it shares, is a column.
-    const tabs = shared > 0 && flush >= 0.8 * shared && short >= 0.8 * shared && rightOnly < shared;
+    // Tab stops: flush right, beside text on the left, a few characters, at least two in five with
+    // a digit or comma (dates, with their places between). A right side of words, or with more
+    // lines of its own than it shares, is a column.
+    const tabs =
+      shared > 0 &&
+      flush >= 0.8 * shared &&
+      short >= 0.8 * shared &&
+      dated >= 0.4 * shared &&
+      rightOnly < shared;
     if (tabs) right -= sharedRight;
     if (straddling > straddleAllowance || left + right === 0) continue;
     found.push({ ratio: Math.min(left, right) / (left + right), split, tabs, straddling });

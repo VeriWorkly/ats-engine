@@ -8,9 +8,20 @@ import type { AtsResumeFormat } from "./extract.js";
  * channel of `child_process.fork`. The `id` lets the parent discard a late reply from a job it
  * already timed out. The buffer travels base64-encoded because IPC messages are JSON.
  */
-export type AtsExtractRequest = { id: number; format: AtsResumeFormat; buffer: string };
+export type AtsExtractRequest = {
+  id: number;
+  format: AtsResumeFormat;
+  buffer: string;
+  /** Read an `html` file as a saved job posting page (`readJobPage`), not as a resume. */
+  job?: boolean;
+};
 
-/** The child's answer to one request: the extraction, or why it failed. */
+/**
+ * The child's answer to one request: the extraction (with `company` for a job posting page that
+ * names one), or why it failed. `cause` is the reader's own error behind `message`
+ * ("InvalidPDFException: Invalid PDF structure."), for a log. A request with no `id` is answered
+ * with `id` -1.
+ */
 export type AtsExtractResponse =
-  | { id: number; ok: true; text: string; layout?: AtsLayoutSignals }
-  | { id: number; ok: false; message: string };
+  | { id: number; ok: true; text: string; layout?: AtsLayoutSignals; company?: string }
+  | { id: number; ok: false; message: string; cause?: string };

@@ -14,22 +14,35 @@
  */
 
 import { extractResume } from "./extract.js";
+import { readJobPage } from "./files.js";
 import type { AtsExtractRequest, AtsExtractResponse } from "./protocol.js";
 
-process.on("message", (request: AtsExtractRequest) => {
+/** "InvalidPDFException: Invalid PDF structure.": the reader's own words behind a message. */
+const reasonOf = (cause: unknown) =>
+  cause instanceof Error ? `${cause.name}: ${cause.message}` : undefined;
+
+process.on("message", (request: AtsExtractRequest | null) => {
   void (async () => {
+    // A malformed request is answered, not thrown on: a throw here would end the process.
+    const id = typeof request?.id === "number" ? request.id : -1;
     let response: AtsExtractResponse;
     try {
-      const { text, layout } = await extractResume(
-        Buffer.from(request.buffer, "base64"),
-        request.format,
-      );
-      response = { id: request.id, ok: true, text, layout };
+      if (typeof request?.buffer !== "string") throw new Error("Invalid extraction request.");
+      const data = Buffer.from(request.buffer, "base64");
+      if (request.job) {
+        if (request.format !== "html") throw new Error("Only an html job posting is read here.");
+        response = { id, ok: true, ...readJobPage(data) };
+      } else {
+        const { text, layout } = await extractResume(data, request.format);
+        response = { id, ok: true, text, layout };
+      }
     } catch (error) {
+      const cause = reasonOf((error as { cause?: unknown } | null)?.cause);
       response = {
-        id: request.id,
+        id,
         ok: false,
         message: error instanceof Error ? error.message : "Resume extraction failed",
+        ...(cause && { cause }),
       };
     }
     process.send?.(response);

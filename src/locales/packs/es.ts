@@ -1,3 +1,4 @@
+import { wholeWord as word } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
@@ -12,14 +13,13 @@ import type { AtsLanguagePackInput } from "../schema.js";
  * Credentials that differ by country (bachillerato, ciclo formativo, TSU) belong to the region
  * packs; the words every Spanish-speaking country uses for a degree are here.
  */
-const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 const a = "[aá]";
 const e = "[eé]";
 const i = "[ií]";
 const o = "[oó]";
 const u = "[uú]";
 /** A company's legal form ending a name: "S.L.", "S.A. de C.V.", "Ltda.". */
-const LEGAL_FORM = String.raw`(?:s\.\s?l\.(?:\s?u\.)?|s\.\s?a\.(?:\s+de\s+c\.\s?v\.)?|s\.\s?a\.\s?s\.|s\.\s?r\.\s?l\.|ltda\.?)(?=[\s,|]|$)`;
+const LEGAL_FORM = String.raw`(?:s\.\s?l\.(?:\s?u\.)?|s\.\s?a\.(?:\s?u\.|\s+de\s+c\.\s?v\.)?|s\.?\s?a\.?\s+de\s+c\.?\s?v\.?|s\.\s?a\.\s?s\.|s\.\s?r\.\s?l\.|ltda\.?)(?=[\s,|]|$)`;
 
 /** The Spanish language pack: recognised by its function words; region ES by default. */
 export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
@@ -34,12 +34,10 @@ export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   // y Más", "Colegio Por Un Mundo Mejor", "food drive con familias").
   detectionWords: [
     "una",
-    "desde",
     "sus",
     "también",
     "años",
     "experiencia",
-    "mediante",
     "nuestro",
     "nuestra",
     "equipo",
@@ -50,7 +48,6 @@ export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "ventas",
     // A CV's own words, spelled apart from Portuguese ("formação", "dados", "trabalho").
     "formación",
-    "académica",
     "conocimientos",
     "datos",
     "trabajo",
@@ -60,24 +57,36 @@ export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "educación",
     "herramientas",
     "planificación",
+    "tambien",
+    "educacion",
+    "formacion",
+    "profesional",
+    "elaboración",
+    "informes",
+    "análisis",
+    "logros",
   ],
   sections: {
-    experience: String.raw`^(?:experiencia(?:\s+(?:laboral|profesional|relevante))?|trayectoria\s+(?:profesional|laboral)|historial\s+(?:laboral|profesional)|empleos?\s+anteriores|pr${a}cticas(?:\s+profesionales)?)`,
-    education: String.raw`^(?:formaci${o}n(?:\s+(?:acad${e}mica|profesional|complementaria|universitaria))?|educaci${o}n|estudios(?:\s+(?:realizados|universitarios|acad${e}micos))?|t${i}tulos?(?:\s+acad${e}micos?)?)`,
+    experience: String.raw`^(?:experiencia(?:\s+(?:laboral|profesional|relevante))?|trayectoria\s+(?:profesional|laboral)|historial\s+(?:laboral|profesional)|empleos?\s+anteriores|pr${a}cticas(?:\s+profesionales)?|antecedentes\s+(?:laborales|profesionales))`,
+    education: String.raw`^(?:formaci${o}n(?:\s+(?:acad${e}mica|profesional|complementaria|universitaria))?|educaci${o}n|estudios(?:\s+(?:realizados|universitarios|acad${e}micos))?|t${i}tulos?(?:\s+acad${e}micos?)?|antecedentes\s+(?:acad${e}micos|educacionales)|escolaridad|preparaci${o}n\s+acad${e}mica|titulaci${o}n(?:\s+acad${e}mica)?)`,
     skills: String.raw`^(?:habilidades(?:\s+(?:t${e}cnicas|profesionales|clave))?|competencias(?!\s+ling${u}${i}sticas)(?:\s+(?:t${e}cnicas|profesionales|clave|digitales))?|conocimientos(?:\s+(?:t${e}cnicos|inform${a}ticos))?|herramientas(?:\s+y\s+tecnolog${i}as)?|aptitudes|tecnolog${i}as|inform${a}tica)`,
     projects: String.raw`^(?:proyectos(?:\s+(?:personales|profesionales|destacados|acad${e}micos))?)`,
     certifications: String.raw`^(?:certificaciones|certificados|licencias|cursos(?:\s+y\s+certificaciones|\s+complementarios)?)`,
     languages: String.raw`^(?:idiomas|lenguas|competencias\s+ling${u}${i}sticas)`,
-    other: String.raw`^(?:contactar|contacto|extracto|perfil(?:\s+profesional)?|resumen(?:\s+profesional)?|sobre\s+m${i}|acerca\s+de\s+m${i}|objetivo(?:\s+profesional)?|intereses|aficiones|voluntariado|publicaciones|referencias|premios(?:\s+y\s+reconocimientos)?|reconocimientos|datos\s+personales|informaci${o}n\s+(?:personal|adicional)|otros(?:\s+datos)?)`,
+    other: String.raw`^(?:contactar|contacto|extracto|perfil(?:\s+profesional)?|resumen(?:\s+profesional)?|sobre\s+m${i}|acerca\s+de\s+m${i}|objetivo(?:\s+profesional)?|intereses|aficiones|voluntariado|publicaciones|referencias|premios(?:\s+y\s+reconocimientos)?|reconocimientos|datos\s+personales|informaci${o}n\s+(?:personal|adicional)|otros(?:\s+datos)?|antecedentes\s+personales|logros)`,
   },
   // "Nativo" and "lengua materna" are C2; "bilingüe", "fluido" and "avanzado" C1.
   languageLevels: {
+    [String.raw`competencia\s+biling[uü]e\s+o\s+nativa`]: "C2",
+    [String.raw`competencia\s+profesional\s+completa`]: "C2",
+    [String.raw`competencia\s+b${a}sica\s+profesional`]: "C1",
+    [String.raw`competencia\s+b${a}sica\s+limitada`]: "B1",
     [String.raw`(?:lengua\s+)?materna|nativ[oa]`]: "C2",
     [String.raw`biling[uü]e`]: "C1",
     [String.raw`fluid[oa]|avanzad[oa]|dominio`]: "C1",
-    [String.raw`intermedio[\s-]alto|alto`]: "B2",
-    [String.raw`intermedio`]: "B1",
-    [String.raw`b${a}sico|elemental`]: "A2",
+    [String.raw`(?:intermedio|medio)[\s-]alto|alto`]: "B2",
+    [String.raw`intermedio|medio`]: "B1",
+    [String.raw`b${a}sic[oa]|elemental`]: "A2",
     [String.raw`principiante`]: "A1",
   },
   credentialWords: {
@@ -141,15 +150,57 @@ export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   ],
   durationUnits: ["año", "años", "mes", "meses"],
   nameLabels: ["nombre", String.raw`nombre\s+(?:y\s+apellidos|completo)`],
+  // "Dra. Ana López", Mexico's "Lic." and "Ing." before a graduate's name.
+  namePrefixes: [
+    String.raw`dra\.?`,
+    String.raw`lic(?:d[oa])?\.`,
+    String.raw`lcd[oa]\.`,
+    String.raw`ing\.`,
+    String.raw`arq\.`,
+    String.raw`mtr[oa]\.`,
+    String.raw`sr[a]?\.`,
+    String.raw`srta\.`,
+  ],
   // "Diseñadora UX en Acme S.L.": "en" parts a title from its employer only where a legal form ends
   // the company within six words and before a comma; "Especialista en Marketing" keeps it.
   employerWords: [String.raw`en(?=\s+(?:[^\s,|]+\s+){0,6}?${LEGAL_FORM})`],
+  // Once one role reads "Cargo en Empresa S.L.", the resume's other roles are read that way too.
+  layoutEmployerWords: ["en"],
+  // "Ingeniero en Sistemas", "Licenciada en Derecho": a field follows these, never an employer.
+  fieldTitleWords: [
+    "ingenier[oa]",
+    "licenciad[oa]",
+    "t[ée]cnic[oa]",
+    "tecn[óo]log[oa]",
+    "especialista",
+    "egresad[oa]",
+    "graduad[oa]",
+    "diplomad[oa]",
+    "doctor(?:a)?",
+    "mag[ií]ster",
+    "maestr[oa]",
+    "bachiller",
+    "profesional",
+  ],
+  // "Administración de Empresas, Universidad de Antioquia": a pregrado; postgraduate programs
+  // name themselves (maestría, especialización) and technologist ones say "Tecnología en".
+  universityWords: ["universidad"],
+  courseWords: [
+    "curso",
+    "intercambio",
+    "semestre",
+    "diplomado",
+    "seminario",
+    "taller",
+    String.raw`extensi${o}n`,
+    "certificado",
+  ],
   // Each with its feminine: "ingeniera", "desarrolladora", "jefa de proyecto".
   titleWords: [
     "ingenier[oa]",
     "desarrollador(?:a)?",
     "programador(?:a)?",
-    String.raw`jef[ea]\s+de\s+(?:proyecto|producto|equipo|ventas|${a}rea|departamento)`,
+    String.raw`jef[ea]\s+(?:de|del)`,
     "director(?:a)?",
     "gerente",
     "responsable",
@@ -176,7 +227,17 @@ export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     "disenador(?:a)?",
     String.raw`l${i}der`,
     "supervisor(?:a)?",
-    "científic[oa]",
+    String.raw`cient${i}fic[oa]`,
+    "pasante",
+    "ejecutiv[oa]",
+    "vendedor(?:a)?",
+    "abogad[oa]",
+    String.raw`m${e}dic[oa]`,
+    "secretari[oa]",
+    "gestor(?:a)?",
+    "investigador(?:a)?",
+    "encargad[oa]",
+    "representante",
   ],
   schoolWords: [
     "universidad",
@@ -187,6 +248,8 @@ export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
     String.raw`tecnol${o}gico`,
     String.raw`polit${e}cnic[oa]`,
     "conservatorio",
+    // Colombia's "Fundación Universitaria Los Libertadores", "Corporación Universitaria Minuto de Dios".
+    String.raw`(?:fundaci${o}n|corporaci${o}n)\s+universitaria`,
   ],
   documentTitles: [String.raw`curr${i}culum(?:\s+vitae)?`, String.raw`hoja\s+de\s+vida`],
   dateOfBirthLabels: [String.raw`fecha\s+de\s+nacimiento`, String.raw`nacid[oa]\s+el`],
@@ -217,7 +280,8 @@ export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
   organisationWords: [
     String.raw`s\.\s?l\.(?:\s?u\.)?`,
     "slu?",
-    String.raw`s\.\s?a\.(?:\s+de\s+c\.\s?v\.)?`,
+    String.raw`s\.\s?a\.(?:\s?u\.|\s+de\s+c\.\s?v\.)?`,
+    String.raw`s\.?\s?a\.?\s+de\s+c\.?\s?v\.?`,
     String.raw`s\.\s?a\.\s?s\.`,
     String.raw`ltda\.?`,
     String.raw`s\.\s?r\.\s?l\.`,
@@ -337,17 +401,28 @@ export const es: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({
       euskera: "basque",
       vasco: "basque",
       basque: "basque",
+      coreano: "korean",
     },
     seniorityLevels: {
-      entry: ["becari[oa]", "practicante", String.raw`reci${e}n\s+(?:titulad[oa]|egresad[oa])`],
+      entry: [
+        "becari[oa]",
+        "practicante",
+        "pasante",
+        "trainee",
+        String.raw`reci${e}n\s+(?:titulad[oa]|egresad[oa])`,
+      ],
       senior: [String.raw`s${e}nior`],
     },
   },
   // A university degree by its name; secondary and vocational schooling differ by country and are
   // the region packs'.
   degrees: {
+    // Short-cycle tertiary across Latin America: "Tecnología en Sistemas", "Técnico Superior".
+    "5": word(
+      String.raw`tecnolog${i}a\s+en(?=\s)|t${e}cnic[oa]\s+(?:superior|profesional|universitario)`,
+    ),
     "6": word(
-      String.raw`grado(?=\s+(?:en|de)\s)|licenciatura|licenciad[oa]|ingenier${i}a(?=\s+(?:en|de|civil|industrial|comercial|el${e}ctrica|mec${a}nica|qu${i}mica|inform${a}tica|electr${o}nica|ambiental)\s)|diplomatura`,
+      String.raw`grado(?=\s+(?:en|de)\s)|licenciatura|licenciad[oa]|ingenier${i}a(?=\s+(?:en|de|t${e}cnica|superior|civil|industrial|comercial|el${e}ctrica|mec${a}nica|qu${i}mica|inform${a}tica|electr${o}nica|ambiental)\s)`,
     ),
     // A specialisation is a postgraduate degree in Latin America.
     "7": word(

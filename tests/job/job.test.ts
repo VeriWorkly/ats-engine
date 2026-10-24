@@ -6,6 +6,7 @@ import {
   jobTextFromHtml,
   MAX_JOB_TEXT_CHARS,
 } from "../../src/job/index.js";
+import { check, DEFAULT_POLICY } from "../../src/index.js";
 import { expectFast } from "../fixtures/timing.js";
 
 const page = (head: string, body: string) =>
@@ -117,6 +118,19 @@ describe("extractJobPosting", () => {
     expect(extractJobPosting(html)?.description).toBe("Ship & test");
   });
 
+  it("unescapes a description that was HTML-escaped twice more", () => {
+    const html = page(
+      ld({
+        "@type": "JobPosting",
+        title: "Dev",
+        description:
+          "&amp;lt;p&amp;gt;Ship &amp;amp;amp; test&amp;lt;/p&amp;gt;&amp;lt;ul&amp;gt;&amp;lt;li&amp;gt;Go&amp;lt;/li&amp;gt;&amp;lt;/ul&amp;gt;",
+      }),
+      "",
+    );
+    expect(extractJobPosting(html)?.description).toBe("Ship & test\n• Go");
+  });
+
   it("skips broken JSON-LD and pages without a posting", () => {
     expect(
       extractJobPosting(page('<script type="application/ld+json">{nope</script>', "")),
@@ -143,6 +157,33 @@ describe("jobTextFromHtml", () => {
       "<nav>Sign in</nav><footer>© Example</footer>",
     );
     expect(jobTextFromHtml(html)).toBe(`Data Engineer\n${description}`);
+  });
+
+  it("heads the structured requirement fields, so they never fall under the description's last heading", () => {
+    const description =
+      "<h2>About the role</h2><p>Build batch and streaming pipelines in Spark and Kafka, own " +
+      "data quality checks, and work with analysts on the warehouse model every day.</p>" +
+      "<h2>Benefits</h2><p>Health insurance, a learning budget and flexible hours for everyone.</p>";
+    const html = page(
+      `<script type="application/ld+json">${JSON.stringify({
+        "@type": "JobPosting",
+        title: "Data Engineer",
+        description,
+        qualifications: "Kubernetes",
+        skills: ["Terraform"],
+        responsibilities: "Own the Snowflake warehouse",
+      })}</script>`,
+      "",
+    );
+    const text = jobTextFromHtml(html);
+    expect(text).toContain("Qualifications\nKubernetes\nTerraform\nResponsibilities\nOwn the");
+    const report = check("Jane Doe\njane@example.com\nSkills\nSpark, Kafka", DEFAULT_POLICY, {
+      jobDescription: text,
+    });
+    expect(report.missingKeywords).toEqual(
+      expect.arrayContaining(["kubernetes", "terraform", "snowflake"]),
+    );
+    expect(report.requirements.map((row) => row.text)).toContain("Kubernetes");
   });
 
   it("falls back to the visible text", () => {
