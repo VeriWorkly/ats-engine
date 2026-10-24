@@ -123,7 +123,8 @@ A language pack is a fragment of a policy's vocabulary. Every field is optional:
 - Patterns (`sections.*`, `degrees.*`, `jobSections.*`) are added as alternatives. `withLocales`
   compiles the combinations, so a named group your pattern shares with the policy's or another
   pack's (a duplicate in one alternation) is an `AtsPolicyError` at startup, not at scoring time.
-- Attached packs don't enter the policy fingerprint; the vocabulary they apply to a resume does.
+- Attached packs don't enter the policy fingerprint; the vocabulary they apply to a resume does, and
+  so do the detection words of the languages it is read in.
 
 See `src/locales/packs/de.ts` for a complete example. `atsLanguagePackJsonSchema` and
 `atsRegionPackJsonSchema` validate a pack written as JSON.
@@ -146,16 +147,16 @@ A language pack needs a `script` or at least ten `detectionWords`.
 
 A region pack names itself with these:
 
-| Field          | Required | What it is                                                                                                                                                                                         | Example                                            |
-| -------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `id`           | yes      | ISO 3166-1 alpha-2 code, uppercase                                                                                                                                                                 | `"DE"`                                             |
-| `name`         | yes      | The country's name                                                                                                                                                                                 | `"Deutschland"`                                    |
-| `status`       | yes      | `"verified"` or `"community"`                                                                                                                                                                      | `"community"`                                      |
-| `maintainers`  | no       | Who reviews the pack                                                                                                                                                                               | `[]`                                               |
-| `phoneCountry` | yes      | The country a phone number without a country code is read as; one libphonenumber supports                                                                                                          | `"DE"`                                             |
-| `dateOrder`    | yes      | How an all-numeric date is ordered: `"MDY"`, `"DMY"` or `"YMD"`                                                                                                                                    | `"DMY"`                                            |
-| `rules`        | no       | Changes to the policy's rules by id: `weight` replaces the weight (every non-zero band of a banded rule), `severity` the severity. `weight: 0` turns a rule off; an id the policy lacks is ignored | `{ "ats-v2.format.photo": { "weight": 0 } }`       |
-| `ageAdvice`    | no       | Turns on the age advice; see **`ageAdvice`** below                                                                                                                                                 | `{ "graduationYears": 20, "experienceYears": 20 }` |
+| Field          | Required | What it is                                                                                                                                                                                                                                                       | Example                                            |
+| -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `id`           | yes      | ISO 3166-1 alpha-2 code, uppercase                                                                                                                                                                                                                               | `"DE"`                                             |
+| `name`         | yes      | The country's name                                                                                                                                                                                                                                               | `"Deutschland"`                                    |
+| `status`       | yes      | `"verified"` or `"community"`                                                                                                                                                                                                                                    | `"community"`                                      |
+| `maintainers`  | no       | Who reviews the pack                                                                                                                                                                                                                                             | `[]`                                               |
+| `phoneCountry` | yes      | The country a phone number without a country code is read as; one libphonenumber supports                                                                                                                                                                        | `"DE"`                                             |
+| `dateOrder`    | yes      | How an all-numeric date is ordered: `"MDY"`, `"DMY"` or `"YMD"`                                                                                                                                                                                                  | `"DMY"`                                            |
+| `rules`        | no       | Changes to the policy's rules by id: `weight` replaces the weight (every non-zero band of a banded rule), `severity` the severity. `weight: 0` turns a rule off; an id the policy lacks is ignored, one a typo away from an id it has refused (`AtsPolicyError`) | `{ "ats-v2.format.photo": { "weight": 0 } }`       |
+| `ageAdvice`    | no       | Turns on the age advice; see **`ageAdvice`** below                                                                                                                                                                                                               | `{ "graduationYears": 20, "experienceYears": 20 }` |
 
 Both kinds carry any of the vocabulary fields below. Each is added to the policy field it names:
 lists are joined, patterns become alternatives, and maps are merged, a key in the pack replacing
@@ -217,8 +218,8 @@ the taglines never read as a name (`resumeParse.notNames`), the `writing` and `a
 and their weights, which only a region pack's `rules` and `ageAdvice` adjust.
 
 `requirements.seniorityLevels` maps a seniority level's name to title words added to it:
-`{ "entry": ["praktikant(?:in)?"] }`. The levels themselves (`entry`, `mid`, `senior`, `lead`),
-their order and the years each takes stay the policy's.
+`{ "entry": ["praktikant(?:in)?"] }`, in any case. The levels themselves (`entry`, `mid`,
+`senior`, `lead`), their order and the years each takes stay the policy's.
 
 Things to know:
 

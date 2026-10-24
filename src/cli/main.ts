@@ -3,6 +3,7 @@
 import { parseArgs } from "node:util";
 
 import type { FetchLike } from "../ai/http.js";
+import { redactsName } from "../ai/redact.js";
 import { convertedToDocument, groundedText } from "../ai/tasks/convertResume.js";
 import {
   adviceLabel,
@@ -388,10 +389,19 @@ async function runCheck(argv: string[], context: CliContext): Promise<number> {
 
   let ai: ReturnType<typeof aiJson> | undefined;
   if (aiConfig && !aiFailed) {
-    // Printed before anything leaves the machine; `analyze` redacts these (ai/redact.ts).
+    // Printed before anything leaves the machine, and promising only what `analyze` will redact
+    // (ai/redact.ts): a name or link the parser did not read is sent as written.
+    const named = redactsName(report.parsed);
+    const linked = report.parsed.links.some((link) => link.trim().length >= 3);
+    const hidden = [named && "name", "email", "phone number", linked && "links"].filter(Boolean);
+    const unread = [!named && "name", !linked && "links"].filter(Boolean);
     console.error(
       `\nSending the resume to ${aiConfig.provider} at ${aiConfig.host} (${aiConfig.model}) for ` +
-        "analysis. Your name, email, phone number and links are replaced with placeholders first.",
+        `analysis. Your ${hidden.slice(0, -1).join(", ")} and ${hidden.at(-1)} are replaced ` +
+        "with placeholders first" +
+        (unread.length
+          ? `; the check read no ${unread.join(" or ")}, so any in the file are sent as written.`
+          : "."),
     );
     try {
       const run = await analyzeReport(

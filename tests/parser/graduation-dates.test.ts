@@ -32,3 +32,29 @@ describe("an expected graduation written with a two-digit end year", () => {
     expect(roles[0]?.end?.year ?? null).not.toBe(2027);
   });
 });
+
+describe("an education entry's dates on a line of their own", () => {
+  const endsOf = (...lines: string[]) =>
+    parseResume(
+      ["Jane Doe", "jane.doe@example.com", "Education", ...lines],
+      DEFAULT_POLICY,
+      now,
+    ).education.map((entry) => entry.end?.year ?? null);
+
+  it("end the entry above, on one line or two", () => {
+    expect(endsOf("BSc Computer Science", "University of Leeds", "2015 – 2019")).toEqual([2019]);
+    expect(endsOf("BSc Computer Science, University of Leeds", "2015 – 2019")).toEqual([2019]);
+    expect(endsOf("University of Leeds", "BSc Computer Science", "2019")).toEqual([2019]);
+  });
+
+  it("do not end the entry above when they head each entry", () => {
+    expect(
+      endsOf(
+        "2015 – 2019",
+        "BSc Computer Science, University of Leeds",
+        "2019 – 2021",
+        "MSc Data Science, University College London",
+      ),
+    ).toEqual([null, null]);
+  });
+});

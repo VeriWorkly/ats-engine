@@ -1,6 +1,6 @@
 // Runs the ats-engine CLI on the resume, writes the step outputs and the job summary, and fails
 // the step below min-score. Runs without a build or dependencies: npx fetches the engine.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { appendFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -55,15 +55,55 @@ const [command, prefix] = local
   : process.platform === "win32"
     ? [process.execPath, [join(dirname(process.execPath), "node_modules/npm/bin/npx-cli.js")]]
     : ["npx", []];
+/**
+ * Ends the process and everything it started: killing npx alone leaves the CLI under it running,
+ * holding the output pipe open, so the step would wait for it anyway. On Linux and macOS the
+ * process leads its own group; on Windows `taskkill /T` follows the tree.
+ */
+function stopTree(pid) {
+  try {
+    if (process.platform === "win32")
+      spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" });
+    else process.kill(-pid, "SIGKILL");
+  } catch {
+    // Already gone.
+  }
+}
+
 // Outside the repository, or npx would run a local copy of the engine instead of the pinned one.
 // Ten minutes covers npx's download and any resume; a file that freezes the reader would
 // otherwise hold the runner until the job's limit.
-const run = spawnSync(command, [...prefix, ...(local ? cliArgs : args)], {
-  cwd: env.RUNNER_TEMP || tmpdir(),
-  encoding: "utf8",
-  maxBuffer: 64 * 1024 * 1024,
-  timeout: 10 * 60 * 1000,
-  killSignal: "SIGKILL",
+const TIMEOUT_MS = 10 * 60 * 1000;
+const MAX_OUTPUT_CHARS = 64 * 1024 * 1024;
+const run = await new Promise((done) => {
+  const child = spawn(command, [...prefix, ...(local ? cliArgs : args)], {
+    cwd: env.RUNNER_TEMP || tmpdir(),
+    detached: process.platform !== "win32",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const result = { status: null, stdout: "", stderr: "", error: undefined };
+  const stop = (error) => {
+    result.error ??= error;
+    stopTree(child.pid);
+  };
+  const timer = setTimeout(
+    () => stop(Object.assign(new Error("timed out"), { code: "ETIMEDOUT" })),
+    TIMEOUT_MS,
+  );
+  // A cancelled job stops the engine too: it is in a process group of its own.
+  const cancel = () => stop(new Error("cancelled"));
+  process.once("SIGINT", cancel).once("SIGTERM", cancel);
+  for (const name of ["stdout", "stderr"])
+    child[name].setEncoding("utf8").on("data", (chunk) => {
+      result[name] += chunk;
+      if (result[name].length > MAX_OUTPUT_CHARS) stop(new Error(`${name} is over 64 MB`));
+    });
+  child.on("error", (error) => (result.error ??= error));
+  child.on("close", (status) => {
+    clearTimeout(timer);
+    process.off("SIGINT", cancel).off("SIGTERM", cancel);
+    done({ ...result, status });
+  });
 });
 // The CLI's warnings can quote the resume, and the runner reads a "::" line as a workflow
 // command: they are passed on with commands stopped, under a token no resume can guess.

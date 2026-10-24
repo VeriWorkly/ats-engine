@@ -245,14 +245,150 @@ function landmark(html: string): number {
 /** Each attribute of a tag, name and value; one forward pass, each match consuming input. */
 const ATTRIBUTE = /([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
 
-/** Whether one of a start tag's attributes, as `name=value`, matches `pattern`. */
-function hiddenByAttributes(tag: string, pattern: RegExp): boolean {
-  return [...tag.slice(1 + tagName(tag).length).matchAll(ATTRIBUTE)].some(([, name, ...values]) =>
-    pattern.test(
-      `${name}=${values.find((part) => part !== undefined) ?? ""}`.toLowerCase().replace(/\s/g, ""),
-    ),
-  );
+/**
+ * A start tag's attributes, each as `name=value` lowercased without whitespace. With `sheet`, the
+ * declarations a page's style sheet gives its classes and id come first, each as a `style`
+ * attribute: the tag's own `style` overrides them.
+ */
+function attributesOf(tag: string, sheet?: StyleSheet): string[] {
+  const styled: string[] = [];
+  const found: string[] = [];
+  let shown = false;
+  for (const [, name, ...values] of tag.slice(1 + tagName(tag).length).matchAll(ATTRIBUTE)) {
+    const value = values.find((part) => part !== undefined) ?? "";
+    found.push(`${name}=${value}`.toLowerCase().replace(/\s/g, ""));
+    const key = name!.toLowerCase();
+    if (sheet?.rules.size && (key === "class" || key === "id"))
+      for (const token of value.toLowerCase().split(/\s+/)) {
+        const selector = `${key === "id" ? "#" : "."}${token}`;
+        shown ||= sheet.shown.has(selector);
+        const declarations = token && sheet.rules.get(selector);
+        if (declarations) styled.push(`style=${declarations}`);
+      }
+  }
+  // A class the sheet shows on some screen or in some state ("hidden lg:flex", a menu opened on
+  // hover) leaves the element to its own attributes.
+  return shown ? found : [...styled, ...found];
 }
+
+/**
+ * Whether the text colour the attributes set last is white or near white: each channel at least
+ * 240 (`#f0f0f0`), the colour 1.25:1 contrast against white allows.
+ */
+function white(attributes: readonly string[]): boolean {
+  let colour = "";
+  for (const attribute of attributes)
+    if (attribute.startsWith("style="))
+      for (const declaration of attribute.slice(6).split(";"))
+        if (declaration.startsWith("color:"))
+          colour = declaration.slice(6).replace(/!important$/, "");
+  if (colour === "white") return true;
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(colour)?.[1];
+  const channels = hex
+    ? (hex.length === 3 ? [...hex].map((digit) => digit + digit) : hex.match(/../g)!).map((pair) =>
+        parseInt(pair, 16),
+      )
+    : /^rgba?\((\d{1,3}),(\d{1,3}),(\d{1,3})(?:,[\d.%]{1,8})?\)$/
+        .exec(colour)
+        ?.slice(1, 4)
+        .map(Number);
+  return !!channels && channels.every((channel) => channel >= 240);
+}
+
+/** Whether any start tag paints a background (`background`, `bgcolor`), which leaves white text unjudged. */
+function tagsPaint(html: string): boolean {
+  for (const [at, end] of tagsFrom(html, 0))
+    if (
+      indexOfIgnoreCase(html, "background", at, end) !== -1 ||
+      indexOfIgnoreCase(html, "bgcolor", at, end) !== -1
+    )
+      return true;
+  return false;
+}
+
+/** Whether one of a start tag's attributes, as `name=value`, matches `pattern`. */
+const hiddenByAttributes = (attributes: readonly string[], pattern: RegExp) =>
+  attributes.some((attribute) => pattern.test(attribute));
+
+/**
+ * One selector a style sheet's hiding is read for: a class or an id, after an optional element
+ * name. A name may hold escapes, as utility classes do (".lg\:flex" for class "lg:flex").
+ */
+const SIMPLE_SELECTOR = /^(?:[a-z][a-z0-9]*)?([.#](?:[\w-]|\\.)+)$/i;
+/** Every class and id a selector names. */
+const SELECTOR_NAMES = /[.#](?:[\w-]|\\.)+/g;
+/** A selector's name as the document writes it: ".lg\:flex" is class "lg:flex". */
+const unescaped = (name: string) => name.replace(/\\(.)/g, "$1").toLowerCase();
+
+/** What a page's style sheet declares per class and id, and the ones it may show. */
+type StyleSheet = { rules: Map<string, string>; shown: Set<string> };
+
+/**
+ * What a page's `<style>` blocks declare for each class (".name") and id ("#name"), normalised as
+ * `attributesOf` normalises a `style` attribute, and whether any of it paints a background. Only
+ * simple selectors are read. A class or id an at-rule names (`@media (max-width: 600px)`) is left
+ * out: a rule that hides it on one screen may show it on another; so is a block for print only.
+ * One forward pass over each block.
+ */
+function readStyleSheet(html: string): { sheet: StyleSheet; painted: boolean } {
+  const sheet = new Map<string, string>();
+  const responsive = new Set<string>();
+  let painted = false;
+  for (let at = findTag(html, "<style", 0); at !== -1;) {
+    const open = tagEnd(html, at);
+    if (open === -1) break;
+    const close = findTag(html, "</style", open);
+    const media = /\smedia\s*=\s*["']?([^"'>]*)/i.exec(html.slice(at, open))?.[1] ?? "";
+    const block = html.slice(open + 1, close === -1 ? html.length : close);
+    if (!media || /screen|all/i.test(media)) {
+      // Comments dropped; one that never closes ends the sheet.
+      const kept: string[] = [];
+      let from = 0;
+      for (let comment = block.indexOf("/*"); comment !== -1; comment = block.indexOf("/*", from)) {
+        kept.push(block.slice(from, comment));
+        const end = block.indexOf("*/", comment + 2);
+        from = end === -1 ? block.length : end + 2;
+      }
+      const css = kept.join("") + block.slice(from);
+      painted ||= /background/i.test(css);
+      // The selector of the outermost block open, and of the innermost.
+      let [depth, start, outer, selector] = [0, 0, "", ""];
+      for (let i = 0; i < css.length; i += 1) {
+        const char = css[i];
+        if (char === "{") {
+          selector = css.slice(start, i).trim();
+          if (depth === 0) outer = selector;
+          [depth, start] = [depth + 1, i + 1];
+        } else if (char === "}") {
+          const rule = depth === 1 ? outer : selector;
+          if (depth && !rule.startsWith("@"))
+            for (const part of rule.split(",")) {
+              const simple = SIMPLE_SELECTOR.exec(part.trim())?.[1];
+              const key = simple && unescaped(simple);
+              if (key && depth > 1) responsive.add(key);
+              else if (key) sheet.set(key, `${sheet.get(key) ?? ""};${css.slice(start, i)}`);
+              // Named in a compound selector (".nav:hover .menu", ".open > .menu"), it may show
+              // in some state: a menu opened by hovering is no hidden text (2026-10-24, a real
+              // careers page read as a resume flagged its whole navigation).
+              else
+                for (const name of part.match(SELECTOR_NAMES) ?? [])
+                  responsive.add(unescaped(name));
+            }
+          [depth, start] = [Math.max(0, depth - 1), i + 1];
+        } else if (char === ";" && depth === 0) start = i + 1;
+      }
+    }
+    if (close === -1) break;
+    at = findTag(html, "<style", close);
+  }
+  for (const key of responsive) sheet.delete(key);
+  for (const [key, declarations] of sheet)
+    sheet.set(key, declarations.toLowerCase().replace(/\s/g, ""));
+  return { sheet: { rules: sheet, shown: responsive }, painted };
+}
+
+/** A start tag naming the element a page's navigation or footer (`role="navigation"`, `"contentinfo"`). */
+const NAVIGATION_ROLE = /\srole\s*=\s*["']?(?:navigation|contentinfo)(?![\w-])/i;
 
 /** Elements that have no end tag: hiding one hides nothing after it. */
 const VOID = new Set("br hr img input meta link".split(" "));
@@ -286,12 +422,18 @@ export function readHtml(html: string, mode?: "page" | "document"): HtmlReading 
     }
   }
   const hides = mode === "page" ? PAGE_HIDING : mode && DOCUMENT_HIDING;
+  // A resume's style sheet hides by class too; white text hides on a page that paints no
+  // background anywhere, which leaves it white.
+  const { sheet, painted } =
+    mode === "document" ? readStyleSheet(html) : { sheet: undefined, painted: true };
+  const plain = !painted && !tagsPaint(html);
   const out: string[] = [];
   const hidden: string[] = [];
   let tables = 0;
   let index = 0;
 
   let text = 0; // where the text since the last tag began
+  let navEnd = -1; // where the navigation the reading is in ends
   while (index < html.length) {
     const open = html.indexOf("<", index);
     if (open === -1) {
@@ -323,20 +465,33 @@ export function readHtml(html: string, mode?: "page" | "document"): HtmlReading 
       if (!tag.endsWith("/>")) index = skipElement(html, name, index);
       continue;
     }
-    // Hidden by its attributes; size or visibility hides only a leaf (its end tag the next tag).
-    const next = html.indexOf("<", index);
+    // Where a page's navigation or footer ends: their closed menus are a site's, not a resume's
+    // hidden text (2026-10-24: a saved page's mega-menu read as 5,082 hidden characters). Found
+    // from the outermost one only, so nested or unclosed navigation is scanned once.
     if (
+      mode === "document" &&
       starts &&
-      hides &&
-      /\s/.test(tag) &&
-      !VOID.has(name) &&
-      (hiddenByAttributes(tag, hides) ||
+      index > navEnd &&
+      !tag.endsWith("/>") &&
+      (name === "nav" || name === "footer" || NAVIGATION_ROLE.test(tag))
+    )
+      navEnd = skipElement(html, name, index);
+    // Hidden by its attributes; size, visibility or white text hides only a leaf (its end tag the
+    // next tag).
+    const next = html.indexOf("<", index);
+    const attributes =
+      starts && hides && /\s/.test(tag) && !VOID.has(name) && attributesOf(tag, sheet);
+    if (
+      attributes &&
+      (hiddenByAttributes(attributes, hides) ||
         (mode === "document" &&
           indexOfIgnoreCase(html, `</${name}`, next, next + 1) === next &&
-          hiddenByAttributes(tag, LEAF_HIDING)))
+          (hiddenByAttributes(attributes, LEAF_HIDING) || (plain && white(attributes)))))
     ) {
-      const end = tag.endsWith("/>") ? index : skipElement(html, name, index);
-      if (mode === "document") hidden.push(readHtml(html.slice(index, end)).text);
+      // A `/>` closes only a void element: `<span hidden/>` opens a span, as a browser reads it.
+      const end = skipElement(html, name, index);
+      if (mode === "document" && index >= navEnd)
+        hidden.push(readHtml(html.slice(index, end)).text);
       index = end;
       continue;
     }

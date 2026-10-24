@@ -175,7 +175,18 @@ export function groundedText(
         summary: keep(role.summary),
         highlights: bullets(role.highlights),
       })),
-      education: resume.education.map((row) => ({ ...row, summary: keep(row.summary) })),
+      // A degree and its field the file writes together stay as written ("Бакалавр информатики"),
+      // not joined by an English "in".
+      education: resume.education.map((row) => {
+        const together = `${row.degree} ${row.field}`;
+        const joined =
+          row.degree.trim() && row.field.trim() && isGrounded(together, normalized, words);
+        return {
+          ...row,
+          ...(joined && { degree: together, field: "" }),
+          summary: keep(row.summary),
+        };
+      }),
       projects: resume.projects.map((project) => ({
         ...project,
         summary: keep(project.summary),
@@ -186,6 +197,15 @@ export function groundedText(
   };
 }
 
+/** The fields that say which role, study or project an entry is. */
+const IDENTITY = {
+  experience: (role: AtsConvertedResume["experience"][number]) => [role.company, role.role],
+  education: (row: AtsConvertedResume["education"][number]) => [row.school, row.degree],
+  projects: (project: AtsConvertedResume["projects"][number]) => [project.name],
+};
+
+const identified = (values: readonly string[]) => values.some((value) => value.trim());
+
 /**
  * A converted resume as an `ats-resume@1` document, for `check` to read field by field: how a
  * resume in a language no pack reads is scored with a model's help. An entry whose identifying
@@ -195,10 +215,10 @@ export function groundedText(
  */
 export function convertedToDocument(resume: AtsConvertedResume): AtsResumeDocument {
   const kept = <T>(items: readonly T[], identity: (item: T) => string[]) =>
-    items.filter((item) => identity(item).some((value) => value.trim()));
-  const experience = kept(resume.experience, (role) => [role.company, role.role]);
-  const education = kept(resume.education, (row) => [row.school, row.degree]);
-  const projects = kept(resume.projects, (project) => [project.name]);
+    items.filter((item) => identified(identity(item)));
+  const experience = kept(resume.experience, IDENTITY.experience);
+  const education = kept(resume.education, IDENTITY.education);
+  const projects = kept(resume.projects, IDENTITY.projects);
   const skills = resume.skills.filter((group) => group.keywords.length);
   const sections: AtsResumeDocument["sections"] = [];
   if (resume.summary.trim())
@@ -281,8 +301,8 @@ function blank<T>(value: T, paths: readonly string[]): T {
 }
 
 /**
- * Ungrounded identity values are blanked rather than failing the conversion. Contact details are
- * not redacted.
+ * Ungrounded identity values are blanked rather than failing the conversion, and an entry they
+ * leave with no identity is dropped. Contact details are not redacted.
  */
 export function convertResumeSpec(
   input: ConvertResumeInput,
@@ -314,6 +334,23 @@ export function convertResumeSpec(
         result[section].forEach((entry, index) => {
           if (paths.includes(`${section}[${index}].current`)) entry.current = false;
         });
+      // An entry named only by invented values is itself invented ("Grew revenue 300%" at a
+      // company the resume never names): dropped, not kept as bullets without an owner.
+      const withoutInvented = <T>(
+        items: T[],
+        original: readonly T[],
+        identity: (item: T) => string[],
+      ) =>
+        items.filter(
+          (item, index) => identified(identity(item)) || !identified(identity(original[index]!)),
+        );
+      result.experience = withoutInvented(
+        result.experience,
+        resume.experience,
+        IDENTITY.experience,
+      );
+      result.education = withoutInvented(result.education, resume.education, IDENTITY.education);
+      result.projects = withoutInvented(result.projects, resume.projects, IDENTITY.projects);
       return { result, rejected };
     },
   };

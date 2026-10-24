@@ -69,9 +69,14 @@ const MAX_JSON_DEPTH = 32;
 
 function textOf(value: unknown, depth = 0): string {
   if (depth > MAX_JSON_DEPTH) return "";
-  // JSON-LD descriptions are often HTML escaped once more ("&lt;p&gt;"): unescape, then strip.
-  if (typeof value === "string")
-    return jobHtmlToText(value.includes("&lt;") ? decodeEntities(value) : value);
+  // JSON-LD descriptions are often HTML escaped once more ("&lt;p&gt;"), some twice
+  // ("&amp;lt;p&amp;gt;"): unescape until the tags show, then strip.
+  if (typeof value === "string") {
+    let text = value;
+    for (let pass = 0; pass < 3 && text.includes("&amp;lt;"); pass += 1)
+      text = decodeEntities(text);
+    return jobHtmlToText(text.includes("&lt;") ? decodeEntities(text) : text);
+  }
   if (Array.isArray(value))
     return value
       .map((item) => textOf(item, depth + 1))
@@ -132,8 +137,20 @@ function jsonLdNodes(html: string): Record<string, unknown>[] {
   return nodes;
 }
 
-/** The schema.org `JobPosting` a page publishes for search engines, or null when it has none. */
-export function extractJobPosting(html: string): AtsJobPosting | null {
+/**
+ * The structured requirement fields, in order, with the heading the posting text gives each: set
+ * after the description with no heading, they would fall under its last one ("Benefits").
+ */
+const REQUIREMENT_FIELDS = [
+  ["qualifications", "Qualifications"],
+  ["skills", "Qualifications"],
+  ["experienceRequirements", "Qualifications"],
+  ["educationRequirements", "Qualifications"],
+  ["responsibilities", "Responsibilities"],
+] as const;
+
+/** The posting, and its requirement fields under their headings, as posting text lines. */
+function readPosting(html: string) {
   const nodes = jsonLdNodes(html);
   const node = nodes.find(isJobPosting);
   if (!node) return null;
@@ -148,22 +165,26 @@ export function extractJobPosting(html: string): AtsJobPosting | null {
   const description = textOf(node.description);
   if (!description) return null;
 
-  const requirements = [
-    node.qualifications,
-    node.skills,
-    node.experienceRequirements,
-    node.educationRequirements,
-    node.responsibilities,
-  ]
-    .map((value) => textOf(value))
-    .filter(Boolean);
+  const fields = REQUIREMENT_FIELDS.map(([key, heading]) => ({
+    heading,
+    text: textOf(node[key]),
+  })).filter((field) => field.text);
+  const headed = fields.flatMap((field, i) =>
+    field.heading === fields[i - 1]?.heading ? [field.text] : [field.heading, field.text],
+  );
 
-  return {
+  const posting: AtsJobPosting = {
     title: textOf(node.title),
     company: textOf(company),
     description,
-    requirements,
+    requirements: fields.map((field) => field.text),
   };
+  return { posting, headed };
+}
+
+/** The schema.org `JobPosting` a page publishes for search engines, or null when it has none. */
+export function extractJobPosting(html: string): AtsJobPosting | null {
+  return readPosting(html)?.posting ?? null;
 }
 
 /** Below this a description is a teaser ("See the full description below"). */
@@ -174,11 +195,12 @@ const MIN_POSTING_DESCRIPTION_CHARS = 200;
  * its visible text otherwise.
  */
 export function jobTextFromHtml(html: string, maxChars = Number.POSITIVE_INFINITY): string {
-  const posting = extractJobPosting(html);
-  if (!posting || posting.description.length < MIN_POSTING_DESCRIPTION_CHARS)
+  const read = readPosting(html);
+  if (!read || read.posting.description.length < MIN_POSTING_DESCRIPTION_CHARS)
     return jobHtmlToText(html, maxChars);
+  const { posting, headed } = read;
   return normalizeJobText(
-    [posting.title, posting.company, posting.description, ...posting.requirements].join("\n"),
+    [posting.title, posting.company, posting.description, ...headed].join("\n"),
     maxChars,
   );
 }

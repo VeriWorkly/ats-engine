@@ -249,6 +249,29 @@ describe("parseAtsPolicy", () => {
       }),
     ).toThrow(AtsPolicyError);
   });
+
+  it("rejects a synonym keyed by more than one word, which words are never looked up by", () => {
+    const synonyms = (map: Record<string, string>) => ({
+      ...MINIMAL,
+      keywordMatch: {
+        ...MINIMAL.keywordMatch,
+        synonyms: map,
+        phrases: ["amazon web services"],
+      },
+    });
+    let error: unknown;
+    try {
+      parseAtsPolicy(synonyms({ "Amazon Web Services": "aws" }));
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(AtsPolicyError);
+    expect((error as AtsPolicyError).issues.map((issue) => issue.path)).toEqual([
+      "keywordMatch.synonyms.amazon web services",
+    ]);
+    // The other way round is how a phrase and its abbreviation are one term.
+    expect(() => parseAtsPolicy(synonyms({ aws: "amazon web services" }))).not.toThrow();
+  });
 });
 
 /** A policy that validates must not be able to throw at match time. */
@@ -296,6 +319,39 @@ describe("regex fields are validated at parse time, not at match time", () => {
         },
       }),
     ).toThrow(AtsPolicyError);
+  });
+
+  it("rejects a pattern without the capture group its value is read from", () => {
+    const requirements = (field: string, pattern: string) => ({
+      ...MINIMAL,
+      keywordMatch: { ...MINIMAL.keywordMatch, requirements: { [field]: [pattern] } },
+    });
+    for (const [policy, path] of [
+      [
+        requirements("yearsPatterns", String.raw`\d+\+?\s+years`),
+        "keywordMatch.requirements.yearsPatterns.0",
+      ],
+      [
+        requirements("languagePatterns", String.raw`fluent\s+in\s+(?:\p{L}+)`),
+        "keywordMatch.requirements.languagePatterns.0",
+      ],
+      [
+        { ...MINIMAL, advice: { age: { experiencePatterns: [String.raw`\d+ years`] } } },
+        "advice.age.experiencePatterns.0",
+      ],
+    ] as const) {
+      let error: unknown;
+      try {
+        parseAtsPolicy(policy);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(AtsPolicyError);
+      expect((error as AtsPolicyError).issues.map((issue) => issue.path)).toEqual([path]);
+    }
+    expect(() =>
+      parseAtsPolicy(requirements("yearsPatterns", String.raw`(\d+)\+?\s+years`)),
+    ).not.toThrow();
   });
 
   it("still accepts a legitimate pattern that merely looks exotic", () => {
@@ -423,6 +479,18 @@ describe("the engine holds no state", () => {
 
     expect(JSON.stringify(resume)).toBe(resumeBefore);
     expect(JSON.stringify(DEFAULT_POLICY)).toBe(policyBefore);
+  });
+
+  // N4 B31: a host's own unparsed policy, read with a day-first date order.
+  it("neither freezes a host's own policy nor keeps reading it as it was", () => {
+    const policy = structuredClone(DEFAULT_POLICY) as typeof DEFAULT_POLICY & { rules: unknown[] };
+    const resume =
+      "Jane Doe\njane@example.com\nExperience\nEngineer, Acme 15/07/2019 - 20/08/2022\n- Built the billing service";
+    const ids = () => check(resume, policy).rules.map((rule) => rule.id);
+    expect(ids()).toContain("ats-v2.contact.email");
+    expect(Object.isFrozen(policy.rules)).toBe(false);
+    policy.rules = policy.rules.filter((rule) => rule.id !== "ats-v2.contact.email");
+    expect(ids()).not.toContain("ats-v2.contact.email");
   });
 
   it("survives degenerate input without throwing", () => {

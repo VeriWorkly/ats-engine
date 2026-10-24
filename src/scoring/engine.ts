@@ -6,16 +6,20 @@ import { localizePolicy, type AtsLocaleOptions } from "../locales/resolve.js";
 import { computeJobMatch } from "../matching/jobMatch.js";
 import {
   judgeRequirements,
+  MAX_REQUIREMENTS,
+  requirementLines,
   withHeadings,
   writtenLanguages,
   type HeadedSection,
 } from "../matching/requirements.js";
+import { EMAIL } from "../parser/contact.js";
 import { readingDatesAt } from "../parser/dates.js";
+import type { ResumeSection } from "../parser/sections.js";
 import { DEFAULT_POLICY } from "../policy/default.js";
-import { policyFingerprint } from "../policy/fingerprint.js";
+import { appliedFingerprint } from "../policy/fingerprint.js";
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { BULLET_PREFIX, normalizeText } from "../text/text.js";
-import type { AtsFileInfo, AtsLayoutSignals, AtsReport } from "../types.js";
+import type { AtsFileInfo, AtsLayoutSignals, AtsParsedResume, AtsReport } from "../types.js";
 import { ENGINE_VERSION } from "../version.js";
 import { rollUpCategories } from "./categories.js";
 import { readResume } from "./context.js";
@@ -35,6 +39,26 @@ const MAX_COVER_STEPS = 200_000;
 const BREAK = "\u2063";
 
 const readAll = () => (line: string) => line as string | undefined;
+
+/** Words past which a line is a paragraph, or a resume extracted as one run: never a contact line. */
+const CONTACT_LINE_WORDS = 40;
+
+/**
+ * The contact lines: lines above the first heading, or under one that is not a resume section
+ * ("Contact"), holding an email address or the phone number. Read for no keyword: a skill beside
+ * an email shows no experience ("jane@example.com | Kafka Snowflake").
+ */
+function contactLines(sections: readonly ResumeSection[], parsed: AtsParsedResume) {
+  const phone = parsed.phone.replace(/\D/g, "").slice(-7);
+  const holds = (line: string) =>
+    (EMAIL.test(line) || (phone.length === 7 && line.replace(/\D/g, "").includes(phone))) &&
+    line.split(/\s+/, CONTACT_LINE_WORDS + 1).length <= CONTACT_LINE_WORDS;
+  return new Set(
+    sections
+      .filter((section) => !section.headed || section.kind === "other")
+      .flatMap((section) => section.lines.filter(holds)),
+  );
+}
 
 /**
  * What of each resume line is visible: not the text the layout reports as hidden (white on
@@ -455,11 +479,19 @@ export function check(
     active.map((rule) => [rule.id, "metric" in rule ? String(rule.metric) : ""]),
   );
 
-  // The match and requirements read only what a reader sees. Text is set aside only when the
-  // hidden-text rule fails: below its threshold a few hidden characters are layout.
-  const hiddenRule = active.find((rule) => metricOf.get(rule.id) === "hiddenTextChars");
-  const hiding = !hiddenRule || failedChecks.some((rule) => rule.id === hiddenRule.id);
-  const visible = hiding ? visibleLines(layout, lines) : readAll;
+  // The match and requirements read only what a reader sees, however little is hidden: below the
+  // hidden-text rule's threshold, three hidden keywords still lifted a match from 25 to 100. A
+  // stray hidden character costs nothing: a line under four characters is never set aside.
+  const seen = visibleLines(layout, lines);
+  // Nor the contact lines. Each line still goes through `seen`, which counts copies.
+  const contact = contactLines(sections, parsed);
+  const visible = () => {
+    const keep = seen();
+    return (line: string) => {
+      const kept = keep(line);
+      return contact.has(line) ? undefined : kept;
+    };
+  };
   // A `BREAK` between the lines kept either side of one set aside, so they do not join into a
   // phrase.
   const keep = visible();
@@ -496,6 +528,7 @@ export function check(
     caughtGaming(failedChecks) && jobMatch.score !== null
       ? Math.min(jobMatch.score, readinessScore)
       : jobMatch.score;
+  const asked = jobDescription ? requirementLines(jobDescription, policy).length : 0;
 
   return {
     version: policy.version,
@@ -505,8 +538,10 @@ export function check(
     missingKeywords: jobMatch.missing,
     matchedKeywordGroups: jobMatch.matchedGroups,
     missingKeywordGroups: jobMatch.missingGroups,
+    keywordCounts: jobMatch.counts,
     // What stops an ATS reading the document: parse checks and the format checks that measure
-    // extraction. Length and a photo are format choices and stay out. Then a posting cut short.
+    // extraction. Length and a photo are format choices and stay out. Then a resume or a posting
+    // cut short.
     parsingWarnings: failedChecks
       .filter(
         (rule) =>
@@ -516,8 +551,18 @@ export function check(
       .map((rule) => rule.evidence)
       .concat(locale.unsupported ? unsupportedLanguageNote(locale.unsupported) : [])
       .concat(
+        prepared.truncated || layout?.textCut === true
+          ? "The resume is longer than 50,000 characters; only its first 50,000 were read."
+          : [],
+      )
+      .concat(
         posting && posting.length > MAX_JOB_TEXT_CHARS
           ? `The job posting is ${posting.length.toLocaleString("en")} characters; only its first ${MAX_JOB_TEXT_CHARS.toLocaleString("en")} were read.`
+          : [],
+      )
+      .concat(
+        asked > MAX_REQUIREMENTS
+          ? `The posting lists ${asked} requirements; only the first ${MAX_REQUIREMENTS} were judged.`
           : [],
       ),
     strengths: strengthsOf(active, results),
@@ -533,7 +578,13 @@ export function check(
     wordCount: ctx.wordCount,
     parsed,
     locale,
-    engine: { version: ENGINE_VERSION, policy: policyFingerprint(policy) },
+    engine: {
+      version: ENGINE_VERSION,
+      policy: appliedFingerprint(
+        policy,
+        basePolicy.locales.languages.filter((pack) => locale.languages.includes(pack.id)),
+      ),
+    },
     requirements: judgeRequirements(
       jobDescription,
       shownSections,

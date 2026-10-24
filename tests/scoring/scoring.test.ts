@@ -239,7 +239,7 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
 
   it("matches synonyms, abbreviations, and multi-word phrases across resume and job text", async () => {
     const resume =
-      "jane@example.com Built systems with JavaScript. Led project management for a cross-team initiative.";
+      "jane@example.com\nBuilt systems with JavaScript. Led project management for a cross-team initiative.";
     const jobDescription = [
       "Requirements",
       "JS and project management required.",
@@ -266,10 +266,11 @@ describe("ATS deterministic scoring — policy-driven engine", () => {
       "ML is a plus.",
     ].join("\n");
 
-    const resumeWithNeither = check("jane@example.com Experience Skills", jobDescription);
-    const resumeWithRequired = check("jane@example.com Built with JavaScript", jobDescription);
+    // The contact line is read for no keyword: the text is below it.
+    const resumeWithNeither = check("jane@example.com\nExperience Skills", jobDescription);
+    const resumeWithRequired = check("jane@example.com\nBuilt with JavaScript", jobDescription);
     const resumeWithPreferred = check(
-      "jane@example.com Familiar with machine learning",
+      "jane@example.com\nFamiliar with machine learning",
       jobDescription,
     );
 
@@ -326,7 +327,7 @@ describe("ATS category rollup", () => {
 
   it("accurately parses and matches tech tokens like .NET and CI/CD without dropping leading dots or slashes", async () => {
     const resume =
-      "jane@example.com Engineered microservices using .NET and set up CI/CD pipelines.";
+      "jane@example.com\nEngineered microservices using .NET and set up CI/CD pipelines.";
     const jobDescription = ["Requirements", ".NET and CI/CD required."].join("\n");
 
     const report = check(resume, jobDescription);

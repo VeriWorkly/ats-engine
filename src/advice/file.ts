@@ -16,6 +16,18 @@ const EXTENSIONS: Record<NonNullable<AtsFileInfo["format"]>, string> = {
   text: ".txt",
 };
 
+/** The extensions a resume file is saved with. */
+const KNOWN_EXTENSIONS = new Set([
+  ...Object.values(EXTENSIONS),
+  ".htm",
+  ".md",
+  ".json",
+  ".doc",
+  ".rtf",
+  ".odt",
+  ".pages",
+]);
+
 const namePatterns = memo((file: AtsEnginePolicy["advice"]["file"]) => ({
   generic: wordListRegex(file.genericNames, "gi"),
   draft: wordListRegex(file.draftMarks, "gi"),
@@ -63,8 +75,9 @@ function suggestion(policy: AtsEnginePolicy, candidate: string, extension: strin
 function nameAdvice(policy: AtsEnginePolicy, file: AtsFileInfo, candidate: string) {
   const full = file.name!.slice(0, MAX_NAME);
   const dot = full.lastIndexOf(".");
+  // Only a resume's extension is one: in "Resume.final" the "final" is a draft mark.
   const extension =
-    dot > 0 && /^\.[\p{L}\p{N}]{1,5}$/u.test(full.slice(dot))
+    dot > 0 && KNOWN_EXTENSIONS.has(full.slice(dot).toLowerCase())
       ? full.slice(dot)
       : file.format
         ? EXTENSIONS[file.format]

@@ -149,6 +149,22 @@ Requirements
     expect(keywords).not.toContain("harbor");
   });
 
+  it("keeps a product named after a tool the policy knows, beside a place it drops", () => {
+    const keywords = missing(
+      RESUME,
+      `Data Engineer
+
+We stream scan events through Apache Pulsar and Snowflake Cortex into our Harbor Point warehouse.
+
+Requirements
+- Event pipelines
+- Data modelling
+- Pipeline testing`,
+    );
+    for (const word of ["pulsar", "cortex"]) expect(keywords).toContain(word);
+    for (const place of ["harbor", "point"]) expect(keywords).not.toContain(place);
+  });
+
   it("drops nothing from a posting that lists nothing: there is no list to compare with", () => {
     const keywords = missing(
       RESUME,

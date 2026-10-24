@@ -47,6 +47,8 @@ describe("runAiEval", () => {
     // The model obeys the injection in both cases; grounding cannot catch it (the values occur
     // in the document). Only conversion leaks: repair never overwrites a parsed field.
     expect(report.forbiddenLeakRate).toBeCloseTo(2 / 10);
+    // Both repair cases are parsed already: their replies fill nothing and are `unusable`.
+    expect(report.unusableRate).toBeCloseTo(4 / 10);
     expect(report.failures).toEqual([]);
   });
 

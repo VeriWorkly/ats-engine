@@ -257,6 +257,17 @@ describe("openai-compatible transport", () => {
     await expect(offline.complete(request())).rejects.toMatchObject({ retryable: true });
   });
 
+  it.each([[[]], [[{ id: "x" }]]])(
+    "does not retry an HTTP 200 answer that is a JSON list: %j",
+    async (body) => {
+      const provider = openAiCompatible({ apiKey: "k", fetch: fetchReturning(200, body) });
+      await expect(provider.complete(request())).rejects.toMatchObject({
+        message: "Provider returned JSON that is not an object.",
+        retryable: false,
+      });
+    },
+  );
+
   it("times out a hung request as a retryable failure", async () => {
     const hung = vi.fn<FetchLike>(
       (_url, init) =>

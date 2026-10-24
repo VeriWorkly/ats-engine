@@ -89,11 +89,26 @@ export function parseEducation(
 
   // The line that named the last entry, while that entry still lacks a school or a credential.
   let open: { at: number; entry: AtsParsedEducation } | null = null;
+  // The last entry, the line that last named it and the line it opened on.
+  let last: { at: number; from: number; entry: AtsParsedEducation } | null = null;
+  // A line holding only a date range or a year: what it ends, else undefined.
+  const datesOn = (line: string | undefined) => {
+    if (line === undefined) return undefined;
+    const range = findDateRange(line, policy.resumeParse, now, { aheadYears: DEGREE_YEARS });
+    if (range) return /\p{L}/u.test(line.replace(range.matched, "")) ? undefined : range.range.end;
+    return /^[\s(]*\d{4}[\s).]*$/u.test(line) ? loneYear(line, now) : undefined;
+  };
 
   lines.forEach((line, at) => {
     const degree = degreeLevel(line, policy);
     const isSchool = schools.test(line);
-    if (!degree && !isSchool) return;
+    if (!degree && !isSchool) {
+      // Dates on a line of their own under an entry end it ("BSc Computer Science" over
+      // "University of Leeds" over "2015 – 2019"), unless such a line heads each entry instead.
+      if (last?.at === at - 1 && !last.entry.end && datesOn(lines[last.from - 1]) === undefined)
+        last.entry.end = datesOn(line) ?? null;
+      return;
+    }
 
     // An expected graduation may be ahead of today, up to a degree's length.
     const range = findDateRange(line, policy.resumeParse, now, { aheadYears: DEGREE_YEARS });
@@ -123,11 +138,13 @@ export function parseEducation(
       other.credential ||= entry.credential;
       other.isced ??= entry.isced;
       other.end ??= entry.end;
+      last = { at, from: open!.at, entry: other };
       open = null;
       return;
     }
 
     entries.push(entry);
+    last = { at, from: at, entry };
     open = entry.school && entry.isced ? null : { at, entry };
   });
 

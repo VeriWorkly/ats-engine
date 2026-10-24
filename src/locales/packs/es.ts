@@ -1,3 +1,4 @@
+import { wholeWord as word } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
@@ -12,7 +13,6 @@ import type { AtsLanguagePackInput } from "../schema.js";
  * Credentials that differ by country (bachillerato, ciclo formativo, TSU) belong to the region
  * packs; the words every Spanish-speaking country uses for a degree are here.
  */
-const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 const a = "[aá]";
 const e = "[eé]";
 const i = "[ií]";

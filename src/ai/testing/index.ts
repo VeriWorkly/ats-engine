@@ -61,6 +61,8 @@ export type AiEvalReport = {
   consistency: number;
   /** Share of successful runs whose kept output contains a forbidden value. */
   forbiddenLeakRate: number;
+  /** Share of successful runs whose reply was read but filled nothing (`repairParse`'s `unusable`). */
+  unusableRate: number;
   failures: Array<{ id: string; run: number; code: string; message: string }>;
   /** Every value grounding dropped, so a reviewer can tell a caught fabrication from a false drop. */
   rejected: Array<{ id: string; run: number; path: string; value: string }>;
@@ -134,6 +136,7 @@ export async function runAiEval(
   let fabricating = 0;
   let consistent = 0;
   let leaking = 0;
+  let unusable = 0;
   const failures: AiEvalReport["failures"] = [];
   const rejected: AiEvalReport["rejected"] = [];
 
@@ -145,6 +148,17 @@ export async function runAiEval(
       try {
         outcome = await testCase.run(ai);
       } catch (error) {
+        // Read, and held nothing the input supports: a result with nothing kept, not a failure.
+        if (error instanceof AtsAiError && error.code === "unusable") {
+          succeeded += 1;
+          unusable += 1;
+          first ??= "unusable";
+          if (first === "unusable") consistent += 1;
+          if (error.rejected.length) violating += 1;
+          for (const { path, value } of error.rejected)
+            rejected.push({ id: testCase.id, run, path, value });
+          continue;
+        }
         const code = error instanceof AtsAiError ? error.code : "error";
         const message = error instanceof Error ? error.message : String(error);
         failures.push({ id: testCase.id, run, code, message });
@@ -171,6 +185,7 @@ export async function runAiEval(
     fabricatedNumberRate: rate(fabricating, succeeded),
     consistency: rate(consistent, succeeded),
     forbiddenLeakRate: rate(leaking, succeeded),
+    unusableRate: rate(unusable, succeeded),
     failures,
     rejected,
   };

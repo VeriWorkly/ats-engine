@@ -354,7 +354,7 @@
       "category": "integrity",
       "severity": "error",
       "passEvidence": "The resume is not a copy of the posting.",
-      "failEvidence": "{pct}% of the job posting appears word for word in the resume, such as \"{sample}\".",
+      "failEvidence": "{pct}% of the job posting, or of its requirements, appears word for word in the resume, such as \"{sample}\".",
       "fix": "Describe your own experience. A pasted posting is caught the moment a recruiter reads the resume.",
       "penalty": true,
       "kind": "bands",
@@ -1986,7 +1986,7 @@
   },
   "resumeParse": {
     "sections": {
-      "experience": "^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment|selected|additional|other|military|freelance)\\s+)?(?:experience|employment|history)|^internships?|^academic\\s+(?:appointments|positions)|^professional\\s+background",
+      "experience": "^(?:(?:work|professional|relevant|clinical|research|teaching|leadership|industry|internship|career|employment|selected|additional|other|military|freelance)\\s+)?(?:experiences?|employment)|^(?:work|professional|career|employment|job|military)\\s+history|^internships?|^academic\\s+(?:appointments|positions)|^professional\\s+background|^positions\\s+held|^career$",
       "education": "^educational\\s+(?:background|qualifications?|history|details)|^education|^academic\\s+(?:background|qualifications?|history|record|credentials)",
       "skills": "^(?:(?:technical|core|key|top)\\s+)?skills|^technologies|^core\\s+competenc(?:y|ies)|^areas\\s+of\\s+expertise|^technical\\s+proficienc(?:y|ies)|^tech(?:nology)?\\s+stack|^tools\\s+(?:&|and)\\s+technolog(?:y|ies)",
       "projects": "^(?:(?:personal|academic|side|selected|key)\\s+)?projects|^open[\\s-]source\\s+(?:projects|contributions)",
@@ -2757,8 +2757,8 @@
     "universityWords": [],
     "courseWords": [],
     "degrees": {
-      "3": "(?:\\b|^)((?:high\\s+school(?!\\s*\\(\\s*class\\s+(?:x|10)(?:th)?(?![a-z]))|secondary\\s+school(?!\\s+certificate))(?:\\s+(?:diploma|certificate))?|g\\.?e\\.?d\\.?|a[\\s-]levels?)(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:diploma\\s+di\\s+maturit[àa]|maturit[àa]|аттестат|świadectwo\\s+dojrzałości|matura|gymnasieexamen|havo|vwo)(?![\\p{L}\\p{M}])",
-      "4": "(?:\\b|^)((?<!(?:high|secondary)\\s+school\\s+)diploma|(?:graduate\\s+)?certificate\\s+(?:in|of)\\b)(?![\\p{L}\\p{M}])",
+      "3": "(?:\\b|^)((?:high\\s+school(?!\\s*\\(\\s*class\\s+(?:x|10)(?:th)?(?![a-z]))|secondary\\s+school(?!\\s+certificate))(?:\\s+(?:diploma|certificate))?|g\\.?e\\.?d\\.?|a(?:-levels?|\\slevels?(?!\\s{1,3}(?:\\d(?!\\d)|of(?![\\p{L}\\p{M}])))))(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:diploma\\s+di\\s+maturit[àa]|maturit[àa]|аттестат|świadectwo\\s+dojrzałości|matura|gymnasieexamen|havo|vwo)(?![\\p{L}\\p{M}])",
+      "4": "(?:\\b|^)((?<!(?:high|secondary)\\s+school\\s+)diploma|(?:graduate\\s+)?certificate\\s+(?:in|of(?!\\s+(?:sponsorship|employment|insurance|incorporation|good\\s+(?:standing|conduct)|deposit|origin|eligibility|conformity|analysis|authenticity|residence)\\b))\\b)(?![\\p{L}\\p{M}])",
       "5": "(?:\\b|^)(associate(?:'?s)?\\s+(?:degree|of\\s+[a-z]+)|a\\.a\\.s?\\.?|(?<!,\\s*)aas?(?=\\s+(?:in|of)\\b))(?![\\p{L}\\p{M}])",
       "6": "(?:\\b|^)(bachelor(?:'?s)?(?:\\s+of\\s+[a-z]+)?|b\\.s\\.c?\\.?|b\\.?sc\\.?|b\\.a\\.|b\\.?eng\\.?|b\\.?tech\\.?|b\\.?b\\.?a\\.?|b\\.?f\\.?a\\.?|b\\.\\s?ed\\.?|b\\.\\s?com\\.?|bcom|ll\\.?b\\.?|b[as])(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:laurea(?:\\s+triennale)?|licencjat|бакалавр|kandidatexamen|hbo[\\s-]bachelor)(?![\\p{L}\\p{M}])",
       "7": "(?:\\b|^)(j\\.\\s?d\\.?(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)|j\\.d\\.?(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}j\\.d\\.?))|juris\\s+doctor|m\\.\\s?d\\.|m\\.\\s?ed\\.?|m\\.f\\.a\\.|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$|\\s+in\\s)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm))|(?<!scrum\\s)master(?!\\s+data(?![a-z]))(?:'?s)?(?:\\s+of\\s+[a-z]+)?|m\\.s\\.c?\\.?|m\\.?sc\\.?|m\\.a\\.|m\\.?eng\\.?|m\\.?b\\.?a\\.?|m\\.?tech\\.?|m\\.\\s?com\\.?|mcom|(?<=,\\s*)m[as](?=\\s+(?!(?:or|and|usa?)(?![a-z]))\\p{L}|\\s*\\()(?!\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b)|(?<!,\\s*|\\d\\s?)m[as](?!-|\\.\\s+\\p{L}|\\s+\\d{5}(?!\\d)|(?:,\\s*|\\s+)\\d{4}(?!\\d)|\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{4}(?!\\d)|\\s+(?:excel|office|word|access|teams|project|outlook|powerpoint|windows|azure|dynamics|sql|visio|sharepoint)\\b))(?![\\p{L}\\p{M}])|(?<![\\p{L}\\p{M}])(?:laurea\\s+magistrale|laurea\\s+specialistica|магистр|magisterexamen|masterexamen|doctoraal)(?![\\p{L}\\p{M}])",
@@ -6681,7 +6681,7 @@
           "3": "(?<![\\p{L}\\p{M}])(?:abitur|fachabitur|matura|(?:berufs)?maturit[äa]t|berufsmatura|reifepr[üu]fung|efz|eidg(?:en[öo]ssisches|\\.)\\s+f[äa]higkeitszeugnis|(?:allgemeine\\s+|fachgebundene\\s+)?hochschulreife|fachhochschulreife|(?:abgeschlossene\\s+)?berufsausbildung|ausbildung\\s+(?:zum|zur|als)(?:\\s+\\p{L}[\\p{L}-]{0,40})?|gesellen(?:brief|prüfung))(?![\\p{L}\\p{M}])",
           "6": "(?<![\\p{L}\\p{M}])(?:dipl(?:om|\\.)(?:-\\p{L}+)?\\.?\\s*\\(?(?:fh|ba|hf)\\)?(?!\\p{L})|dipl(?:om|\\.)[^\\n,;|]{0,60}?\\s\\(?hf(?!\\p{L})|eidg\\.\\s?dipl\\.|eidg(?:en[öo]ssischer|\\.)\\s+fachausweis|\\p{L}{0,30}(?<!haus|bürger|welt|europa|bundes|landes|kreis|stadt|vereins|kapell|konzert|ballett|schach)meister(?:in|prüfung|brief|titel)?|staatl(?:ich|\\.)\\s*gepr(?:üfte[nr]?|\\.)\\s+\\p{L}+)(?![\\p{L}\\p{M}])",
           "7": "(?<![\\p{L}\\p{M}])(?:(?<!eidg\\.\\s?)dipl(?:om|\\.)(?:-\\p{L}+)?\\.?(?![\\p{L}-])(?!\\.?\\s*\\(?(?:fh|ba|hf)(?!\\p{L}))(?![^\\n,;|]{0,60}?\\s\\(?hf(?!\\p{L}))|magister|staatsexamen)(?![\\p{L}\\p{M}])",
-          "8": "(?<![\\p{L}\\p{M}])(?:promotion\\s+(?:zum|zur|in|im|an\\s+der)|promoviert|doktorarbeit|doktorgrad|dr\\.[\\s-]?(?:rer|phil|ing|med|jur|iur|oec|sc)\\.)(?![\\p{L}\\p{M}])"
+          "8": "(?<![\\p{L}\\p{M}])(?:(?<!(?<![\\p{L}\\p{M}])(?:sales|trade|product|brand|price|retail|store|consumer|marketing|event|career|internal|a|the|for|of|and|or|on|to|your|our)[\\s-]{1,3})promotion\\s+(?:zum|zur|in|im|an\\s+der)|promoviert|doktorarbeit|doktorgrad|dr\\.[\\s-]?(?:rer|phil|ing|med|jur|iur|oec|sc)\\.)(?![\\p{L}\\p{M}])"
         },
         "id": "DE",
         "name": "Deutschland",
@@ -6936,7 +6936,7 @@
         "degrees": {
           "2": "(?<![\\p{L}\\p{M}])(?:class\\s+(?:x|10)(?:th)?|10th(?!\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|rank|position|place))(?:\\s+(?:standard|grade|class))?|xth|(?:std\\.?|standard)\\s+(?:x|10)(?:th)?|matric(?:ulation)?|s\\.?s\\.?l\\.?c\\.?|s\\.?s\\.?c\\.?|secondary\\s+school\\s+certificate)(?![\\p{L}\\p{M}])",
           "3": "(?<![\\p{L}\\p{M}])(?:class\\s+(?:xii|12)(?:th)?|12th(?!\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|rank|position|place))(?:\\s+(?:standard|grade|class))?|xiith|10\\s*\\+\\s*2|(?:std\\.?|standard)\\s+(?:xii|12)(?:th)?|h\\.?s\\.?c\\.?|intermediate\\s+(?:\\(|board|education|exam|from|in\\s+(?:science|commerce|arts|mpc|bipc))|higher\\s+secondary|senior\\s+secondary|pre[\\s-]university|(?:ii\\s+|2nd\\s+)?p\\.?u\\.?c\\.?)(?![\\p{L}\\p{M}])",
-          "6": "(?<![\\p{L}\\p{M}])(?:b\\.?\\s?com\\.?|b\\.?c\\.?a\\.?|b\\.?b\\.?a\\.?|b\\.\\s?e\\.?|be(?=\\s*\\(|\\s+(?:in\\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\\p{L}\\p{M}]))|b\\.?\\s?pharm(?:a|acy)?\\.?|ll\\.?b\\.?)(?![\\p{L}\\p{M}])",
+          "6": "(?<![\\p{L}\\p{M}])(?:b\\.?\\s?com\\.?|b\\.?c\\.?a\\.?|b\\.?b\\.?a\\.?|b\\.\\s?e\\.?|(?<!(?:must|will|would|should|shall|can|could|may|might|to|not|also)\\s{1,3})be(?=\\s*\\(|\\s+(?:in\\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\\p{L}\\p{M}]))|b\\.?\\s?pharm(?:a|acy)?\\.?|ll\\.?b\\.?)(?![\\p{L}\\p{M}])",
           "7": "(?<![\\p{L}\\p{M}])(?:m\\.?\\s?com\\.?|m\\.?c\\.?a\\.?|m\\.\\s?e\\.?|pgdm|pgdba|post[\\s-]?graduate\\s+diploma|m\\.?b\\.?b\\.?s\\.?|m\\.?\\s?pharm(?:a)?\\.?|m\\.?\\s?phil\\.?|ll\\.m\\.?|llm(?=\\s*[,()]|\\s+in\\s|\\s+(?:19|20)\\d{2}(?!\\d)|\\s*$)(?:(?=[^\\n]{0,80}?(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L}))|(?<=(?<!\\p{L})(?:laws?|universit(?:y|ies)|college|school|faculty)(?!\\p{L})[^\\n]{0,80}llm)))(?![\\p{L}\\p{M}])"
         },
         "id": "IN",

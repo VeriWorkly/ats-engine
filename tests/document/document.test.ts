@@ -134,6 +134,32 @@ describe("structured document input", () => {
     expect(check(doc).parsed.roles[0]!.start).toBeNull();
   });
 
+  it("reads a field's two-digit year and an end's season as printed text does", () => {
+    const doc: AtsResumeDocument = {
+      ...DOCUMENT,
+      sections: [
+        {
+          kind: "experience",
+          title: "Experience",
+          items: [
+            { title: "Engineer", employer: "Acme", start: "Jan '19", end: "Summer 2021" },
+            { title: "Analyst", employer: "Initech", start: "01/17", end: "12/18" },
+          ],
+        },
+      ],
+    };
+    expect(check(doc).parsed.roles.map(({ start, end }) => [start, end])).toEqual([
+      [
+        { year: 2019, month: 1 },
+        { year: 2021, month: 8 },
+      ],
+      [
+        { year: 2017, month: 1 },
+        { year: 2018, month: 12 },
+      ],
+    ]);
+  });
+
   it("reports empty fields as provenance none", () => {
     const doc: AtsResumeDocument = {
       format: ATS_DOCUMENT_FORMAT,
@@ -181,6 +207,13 @@ describe("input validation", () => {
       expect((error as AtsInputError).issues[0]?.path).toBe("basics.name");
     }
   });
+
+  it.each(["ats-resume@2", "ATS-RESUME@1", "ats-resume"])(
+    "rejects a document naming the format as %j instead of reading it as text",
+    (format) => {
+      expect(() => prepareResume({ ...DOCUMENT, format })).toThrow(AtsInputError);
+    },
+  );
 
   it("bounds arrays so a caller cannot make the engine walk them", () => {
     const huge = {

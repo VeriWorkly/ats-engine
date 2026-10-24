@@ -1,6 +1,6 @@
 import * as z from "zod/mini";
 
-import { regexString, wordList } from "../primitives.js";
+import { capturingRegexString, wordList } from "../primitives.js";
 
 /** A message, what was found (quoted into `evidence`) and what to do, as templates. */
 const text = (message: string, evidence: string | undefined, fix: string) =>
@@ -146,9 +146,12 @@ export const adviceSchema = z.prefault(
          * A stated total such as "30+ years of experience"; the first capture group is the years.
          * Bounded repetition only: these run over the whole resume.
          */
-        experiencePatterns: z._default(z.array(regexString("advice.age.experiencePatterns")), [
-          String.raw`(?<!\p{N})(\d{1,2})\s?\+?\s?(?:years?|yrs\.?)['’]?\s(?:of\s)?(?:[\p{L}-]{1,30}\s){0,2}?experience`,
-        ]),
+        experiencePatterns: z._default(
+          z.array(capturingRegexString("advice.age.experiencePatterns")),
+          [
+            String.raw`(?<!\p{N})(\d{1,2})\s?\+?\s?(?:years?|yrs\.?)['’]?\s(?:of\s)?(?:[\p{L}-]{1,30}\s){0,2}?experience`,
+          ],
+        ),
       }),
       {},
     ),

@@ -5,12 +5,13 @@ import { contrast, MIN_CONTRAST, paintOver } from "./hidden.js";
 /**
  * Hidden text in a Word document. A run is hidden when Word would not show it:
  * - marked hidden (`w:vanish`);
- * - smaller than 2pt (`w:sz` is in half-points);
+ * - smaller than 2pt (`w:sz` is in half-points), or squashed (`w:w`) as narrow;
  * - white or near white on a white background: the shading under the run (its own, its
  *   paragraph's, its cell's), else the page colour. Text boxes are not judged: their fill is not
- *   read.
+ *   read;
+ * - read from an alternate-content Fallback that Word, showing the Choice, does not show.
  *
- * Character styles that hide text are not followed.
+ * Each is read from the run's own formatting, else its character style, else its paragraph's.
  */
 
 const MAX_XML_BYTES = 8 * 1024 * 1024;
@@ -343,22 +344,25 @@ function attributeValue(raw: string): string | null {
   return unknown ? null : value;
 }
 
+/** A relationships part: by type, the id and target of each relationship, in order. */
+type Relationships = Map<string, Array<[id: string, target: string]>>;
+
 const QNAME = /^(?:([A-Za-z_][\w.-]*):)?([A-Za-z_][\w.-]*)$/;
 const RELS_TAG = /<(\/?)([^\s<>/=]+)((?:\s+[^\s<>/=]+\s*=\s*(?:"[^"<]*"|'[^'<]*'))*)\s*(\/?)>/y;
 const RELS_ATTR = /\s+([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 
 /**
- * A relationships part as `mammoth` reads it: the targets of each type, in order, of the
+ * A relationships part as `mammoth` reads it: the ids and targets of each type, in order, of the
  * `Relationship` elements in the package namespace directly under the root. Null for anything
  * `mammoth`'s parser would not read the same way: a DTD, an unknown entity or prefix, unbalanced
  * or malformed tags, markup-compatibility content, or nesting past `MAX_RELS_DEPTH`. Linear; each
  * element copies the prefixes in scope, so depth is bounded too.
  */
-function relationshipTargets(bytes: Buffer): Map<string, string[]> | null {
+function relationshipTargets(bytes: Buffer): Relationships | null {
   // The decoder drops one byte-order mark, `mammoth` another.
   const text = new TextDecoder().decode(bytes);
   const xml = withoutMarkup(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
-  const targets = new Map<string, string[]>();
+  const targets: Relationships = new Map();
   const scopes: Array<Map<string, string>> = [new Map()];
   let roots = 0;
   for (let at = xml.indexOf("<"); at >= 0; at = xml.indexOf("<", at)) {
@@ -394,7 +398,7 @@ function relationshipTargets(bytes: Buffer): Map<string, string[]> | null {
     if (scopes.length === 2 && namespace === PACKAGE_RELATIONSHIPS && local === "Relationship") {
       const type = values.get("Type") ?? "undefined";
       if (!targets.has(type)) targets.set(type, []);
-      targets.get(type)!.push(values.get("Target") ?? "");
+      targets.get(type)!.push([values.get("Id") ?? "", values.get("Target") ?? ""]);
     }
     if (!selfClosing) scopes.push(scope);
   }
@@ -418,8 +422,8 @@ const relationshipsOf = (path: string) => {
   return joinPath(dirname!, "_rels", `${basename}.rels`);
 };
 
-/** A page header or footer part: `docxMargins` reads it, `mammoth` does not. */
-const HEADER_OR_FOOTER = /^word\/(?:header|footer)\d*\.xml$/;
+/** A part the main document may place by relationship id: an embedded chunk, a header or footer. */
+type Placeable = { id: string; path: string; type: "aFChunk" | "header" | "footer" };
 
 /**
  * The parts `mammoth` 1.x's `docx-reader` reads, and how many times it reads each: content types,
@@ -427,6 +431,9 @@ const HEADER_OR_FOOTER = /^word\/(?:header|footer)\d*\.xml$/;
  * relationships (twice), styles, numbering, notes and comments, and their relationships. A
  * relationship may name any part, and each read inflates it again. Null where a relationships
  * file cannot be read.
+ *
+ * Beside them, by relationship id, the parts this reads and `mammoth` does not: page headers and
+ * footers, and embedded chunks. Only those the document places are read (`placedIds`).
  */
 function mammothParts(files: Map<string, ZipEntry>) {
   const exists = (path: string) => files.get(path)?.dir === false;
@@ -438,23 +445,24 @@ function mammothParts(files: Map<string, ZipEntry>) {
     if (xml) parsed.set(path, (parsed.get(path) ?? 0) + 1);
   };
   read("[Content_Types].xml");
-  const relationships = (path: string) => {
+  const relationships = (path: string): Relationships | null => {
     read(path);
-    if (!exists(path)) return new Map<string, string[]>();
+    if (!exists(path)) return new Map();
     const content = inflate(files.get(path)!, MAX_RELS_BYTES);
     return content && relationshipTargets(content);
   };
-  const existing = (from: Map<string, string[]>, type: string, base: string) =>
+  const named = (from: Relationships, type: string, base: string) =>
     (from.get(RELATIONSHIP_TYPE + type) ?? [])
-      .map((target) => joinPath(base, target).replace(/^\//, ""))
-      .filter(exists);
-  const find = (from: Map<string, string[]>, type: string, base: string, fallback: string) =>
-    existing(from, type, base)[0] ?? fallback;
+      .map(([id, target]): [string, string] => [id, joinPath(base, target).replace(/^\//, "")])
+      .filter(([, path]) => exists(path));
+  const find = (from: Relationships, type: string, base: string, fallback: string) =>
+    named(from, type, base)[0]?.[1] ?? fallback;
 
   const packageRelationships = relationships("_rels/.rels");
   if (!packageRelationships) return null;
   const main = find(packageRelationships, "officeDocument", "", "word/document.xml");
-  if (!exists(main)) return { main, reads, parsed, styles: null, chunks: [], comments: null };
+  if (!exists(main))
+    return { main, reads, parsed, styles: null, comments: null, placeable: [] as Placeable[] };
   const related = relationships(relationshipsOf(main));
   if (!related) return null;
   const [base] = splitPath(main);
@@ -468,16 +476,17 @@ function mammothParts(files: Map<string, ZipEntry>) {
     read(path);
   }
   // HTML a web builder embeds whole (`w:altChunk`, usually MHT): `mammoth` skips it, this reads
-  // it, once however often it is named.
-  const chunks = [...new Set(existing(related, "aFChunk", base!))];
-  for (const chunk of chunks) read(chunk, false);
-  for (const key of files.keys()) if (HEADER_OR_FOOTER.test(key)) read(key, false);
+  // it, once however often it is named. Page headers and footers, which `docxMargins` reads.
+  const placeable = (["aFChunk", "header", "footer"] as const).flatMap((type) =>
+    named(related, type, base!).map(([id, path]): Placeable => ({ id, path, type })),
+  );
+  for (const path of new Set(placeable.map((p) => p.path))) read(path, false);
   return {
     main,
     reads,
     parsed,
     styles: exists(styles) ? styles : null,
-    chunks,
+    placeable,
     comments: exists(comments) ? comments : null,
   };
 }
@@ -719,41 +728,118 @@ export function hiddenSignals(runs: readonly string[]) {
 const xmlText = (text: string) =>
   text.replace(/&#?\w+;/g, (reference) => entity(reference) ?? reference);
 
+/** How a run looks, as far as hiding goes: each property unset where nothing sets it. */
+type RunLook = {
+  vanish?: boolean;
+  color?: string | null;
+  size?: number | null;
+  scale?: number | null;
+};
+/** The run property tags that hide text, by what they set, and patterns finding each in a style. */
+const LOOK_TAG_NAMES = { vanish: "w:vanish", color: "w:color", size: "w:sz", scale: "w:w" };
+const LOOK_TAGS = Object.fromEntries(
+  Object.entries(LOOK_TAG_NAMES).map(([key, name]) => [
+    key,
+    new RegExp(`<${name}(?=[\\s/>])([^<>]*)>`),
+  ]),
+) as Record<keyof RunLook, RegExp>;
+/** Text below 2pt (`w:sz` is in half-points) is hidden; a run of no set size is Word's 11pt. */
+const MIN_SIZE = 4;
+const DEFAULT_SIZE = 22;
+
+/** A run property's value from its tag's attributes: `w:vanish` on unless switched off, the rest numbers or a colour. */
+function lookValue(key: keyof RunLook, attrs: string) {
+  const value = attr(attrs, "val");
+  if (key === "vanish") return !/^(?:0|false|off)$/.test(value ?? "");
+  if (key === "color") return value;
+  return Number(value) || null;
+}
+
+/** The run properties a style sets: its `w:rPr`, without the old look a tracked change keeps. */
+function styleLook(style: string): RunLook {
+  const look: RunLook = {};
+  // A style's paragraph properties come first and may hold the paragraph mark's run properties.
+  const paragraph = style.indexOf("</w:pPr>");
+  const start = style.indexOf("<w:rPr", Math.max(paragraph, 0));
+  if (start < 0) return look;
+  const end = style.indexOf("</w:rPr>", start);
+  let rPr = style.slice(start, end < 0 ? undefined : end);
+  const change = rPr.indexOf("<w:rPrChange");
+  if (change >= 0) rPr = rPr.slice(0, change);
+  for (const key of Object.keys(LOOK_TAGS) as Array<keyof RunLook>) {
+    const tag = LOOK_TAGS[key].exec(rPr);
+    if (tag) (look as Record<string, unknown>)[key] = lookValue(key, tag[1]!);
+  }
+  return look;
+}
+
 /**
- * The shading each paragraph style gives its paragraphs: a hex colour, `null` for none, "" where
- * unknown. Followed through `w:basedOn` (ten steps). An undefined style adds no shading. `xml`
- * null: the part could not be read, and every style is unknown.
+ * What the styles part says of a paragraph's or run's look:
+ * - `shading`: the shading each paragraph style gives its paragraphs: a hex colour, `null` for
+ *   none, "" where unknown. An undefined style adds no shading.
+ * - `look`: the run properties a run's character style, then its paragraph's style (the default
+ *   paragraph style where it names none), give it: a style marked hidden, white or tiny hides
+ *   what it is applied to as direct formatting does.
+ *
+ * Followed through `w:basedOn` (ten steps). `xml` null: the part could not be read, and every
+ * style's shading is unknown.
  */
-function styleShading(xml: string | null): (id: string | null) => string | null {
-  const styles = new Map<string, { shd: string | null | undefined; basedOn: string | null }>();
+function readStyles(xml: string | null) {
+  type Style = { shd: string | null | undefined; basedOn: string | null; look: RunLook };
+  const styles = new Map<string, Style>();
+  let defaultParagraph: string | null = null;
   for (let at = xml?.indexOf("<w:style ") ?? -1; xml && at >= 0;) {
     // `<w:style …/>` is empty: what follows is the next style's.
     const open = xml.indexOf(">", at);
     const end = xml[open - 1] === "/" ? open + 1 : xml.indexOf("</w:style>", at);
     if (open < 0 || end < 0) break;
     const style = xml.slice(at, end);
-    const id = attr(/^<w:style\b([^<>]*)>/.exec(style)?.[1] ?? "", "styleId");
+    const attrs = /^<w:style\b([^<>]*)>/.exec(style)?.[1] ?? "";
+    const id = attr(attrs, "styleId");
     const shd = /<w:shd\b([^<>]*)>/.exec(style);
     const basedOn = /<w:basedOn\b([^<>]*)>/.exec(style);
-    if (id)
+    if (id) {
       styles.set(id, {
         shd: shd ? shading(shd[1]!) : undefined,
         basedOn: basedOn ? attr(basedOn[1]!, "val") : null,
+        look: styleLook(style),
       });
+      if (
+        attr(attrs, "type") === "paragraph" &&
+        /^(?:1|true|on)$/.test(attr(attrs, "default") ?? "")
+      )
+        defaultParagraph ??= id;
+    }
     at = xml.indexOf("<w:style ", end);
   }
-  return (id) => {
-    if (xml === null) return "";
+  /** The styles of a chain, nearest first; a looping or over-long chain stops at ten. */
+  const chain = (id: string | null) => {
+    const found: Style[] = [];
     for (let step = 0; id !== null && step < 10; step += 1) {
       const style = styles.get(id);
-      if (!style) return null;
-      if (style.shd !== undefined) return style.shd;
+      if (!style) break;
+      found.push(style);
       id = style.basedOn;
     }
-    // A looping or over-long chain names no shading: the page shows.
-    return null;
+    return found;
+  };
+  return {
+    shading(id: string | null): string | null {
+      if (xml === null) return "";
+      // A chain naming no shading leaves the page showing.
+      return chain(id).find((style) => style.shd !== undefined)?.shd ?? null;
+    },
+    look(paragraph: string | null, character: string | null): RunLook {
+      const look: RunLook = {};
+      for (const style of [...chain(character), ...chain(paragraph ?? defaultParagraph)])
+        for (const [key, value] of Object.entries(style.look))
+          if (!(key in look)) (look as Record<string, unknown>)[key] = value;
+      return look;
+    },
   };
 }
+
+type StyleSheet = ReturnType<typeof readStyles>;
 
 /** A part's content, or null where damaged (`mammoth` refuses those). Throws `UNMEASURABLE_DOCX` past `MAX_XML_BYTES`. */
 function inflatePart(entry: ZipEntry): Buffer | null {
@@ -770,19 +856,98 @@ function inflatePart(entry: ZipEntry): Buffer | null {
   return null;
 }
 
+/** A branch of `mc:AlternateContent`, or the block itself, with any prefix. Stops at the next `<`: linear. */
+const ALTERNATE =
+  /<(\/?)(?:[A-Za-z_][\w.-]*:)?(AlternateContent|Choice|Fallback)(?=[\s/>])[^<>]*>/g;
+const RUN_TEXT = /<w:t(?:\s[^<>]*)?>([^<]*)<\/w:t>/g;
+const words = (text: string) =>
+  xmlText(text)
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+
+/**
+ * The XML with one branch of each `mc:AlternateContent` block: Word shows its first `mc:Choice`,
+ * `mammoth` reads its first `mc:Fallback`. `keep` names the branch read; the others are cut out.
+ * Keeping the Fallback, `unshown` holds its runs with a word no Choice of the block holds: text
+ * `mammoth` reads that Word does not show.
+ */
+function alternateBranch(xml: string, keep: "Choice" | "Fallback") {
+  const pieces: string[] = [];
+  // The input copied up to `at`; the output's length so far.
+  let at = 0;
+  let length = 0;
+  // Open elements, and for a block how many branches of `keep` it has had.
+  const stack: Array<{ name: string; kept: number }> = [];
+  // The depth whose element is being cut out, and where it starts.
+  let cutDepth = 0;
+  let cutStart = 0;
+  // Each outermost block: where it lies in the output, and the words its Choices show.
+  const blocks: Array<{ start: number; end: number; shown: Set<string> }> = [];
+  for (const match of xml.matchAll(ALTERNATE)) {
+    const [tag, closing, name] = match;
+    if (tag.endsWith("/>")) continue;
+    if (!closing) {
+      const parent = stack.at(-1);
+      const branch = parent?.name === "AlternateContent" && name !== "AlternateContent";
+      if (name === "AlternateContent" && !stack.length)
+        blocks.push({ start: length + match.index - at, end: -1, shown: new Set() });
+      stack.push({ name: name!, kept: 0 });
+      if (branch && (name !== keep || parent.kept++ > 0) && !cutDepth) {
+        pieces.push(xml.slice(at, match.index));
+        length += match.index - at;
+        cutDepth = stack.length;
+        cutStart = match.index;
+      }
+      continue;
+    }
+    // A stray end tag is not this reader's to match: `mammoth` refuses such XML.
+    if (stack.at(-1)?.name !== name) continue;
+    stack.pop();
+    const end = match.index + tag.length;
+    if (cutDepth > stack.length) {
+      if (name === "Choice")
+        for (const word of words(xml.slice(cutStart, end).replace(/<[^<>]*>/g, " ")))
+          blocks.at(-1)?.shown.add(word);
+      cutDepth = 0;
+      at = end;
+    }
+    if (name === "AlternateContent" && !stack.length) blocks.at(-1)!.end = length + end - at;
+  }
+  // A cut that never closes drops the rest.
+  if (!cutDepth) pieces.push(xml.slice(at));
+  const kept = pieces.join("");
+  const unshown: string[] = [];
+  if (keep === "Fallback")
+    for (const { start, end, shown } of blocks) {
+      if (end < 0) continue;
+      for (const [, text] of kept.slice(start, end).matchAll(RUN_TEXT))
+        if (words(text!).some((word) => !shown.has(word))) unshown.push(text!);
+    }
+  return { xml: kept, unshown };
+}
+
 /** A part's hidden runs, those among them not marked `w:vanish`, and paragraph text without `w:vanish` runs. */
 type PartRuns = { hidden: string[]; shownHidden: string[]; lines: string[] };
+
+const stylesCache = new WeakMap<DocxArchive, StyleSheet>();
+
+/** The archive's styles part, read once. Throws `UNMEASURABLE_DOCX` past `MAX_XML_BYTES`. */
+function archiveStyles(archive: DocxArchive): StyleSheet {
+  let styles = stylesCache.get(archive);
+  if (styles) return styles;
+  const entry = archive.parts.styles ? archive.files.get(archive.parts.styles) : undefined;
+  const content = entry && inflatePart(entry);
+  styles = readStyles(content ? withoutMarkup(content.toString("utf8")) : entry ? null : "");
+  stylesCache.set(archive, styles);
+  return styles;
+}
 
 /**
  * Reads the runs of one part (document, header, footer) for those a reader cannot see. `page` is
  * the page colour and `behindText` whether a shape lies behind the text.
  */
-function scanRuns(
-  xml: string,
-  paragraphStyle: (id: string | null) => string | null,
-  page: string,
-  behindText: boolean,
-): PartRuns {
+function scanRuns(xml: string, styles: StyleSheet, page: string, behindText: boolean): PartRuns {
   // One per open table. `outer` is taken once when it opens, so a run resolves its background in
   // constant time however deep the nesting.
   const tables: OpenTable[] = [];
@@ -794,12 +959,9 @@ function scanRuns(
   // end tag, or where a run or paragraph opens, so one left open cannot hide the document.
   let change: string | null = null;
   let where: "table" | "cell" | "paragraph" | "run" | null = null;
-  let run: {
-    vanish: boolean;
-    size: number | null;
-    color: string | null;
-    fill: string | null;
-  } | null = null;
+  // The paragraph's style, whose run properties its runs take where theirs are unset.
+  let paragraphStyle: string | null = null;
+  let run: (RunLook & { fill: string | null; style: string | null }) | null = null;
   let inText = false;
   let textStart = 0;
   let runText = "";
@@ -830,13 +992,15 @@ function scanRuns(
       else tables.pop();
     } else if (tag === "w:tblStyle" && tables.length) tables[tables.length - 1].styled = true;
     else if (tag === "w:tc" && open && tables.length) tables[tables.length - 1].cell = null;
-    else if (tag === "w:p" && open && !selfClosing) paragraphFill = styleFill = null;
+    else if (tag === "w:p" && open && !selfClosing)
+      paragraphFill = styleFill = paragraphStyle = null;
     else if (tag === "w:p" && closing) {
       lines.push(line);
       line = "";
-    } else if (tag === "w:pStyle" && where === "paragraph")
-      styleFill = paragraphStyle(attr(attrs, "val"));
-    else if (tag === "w:tblPr") where = open && !selfClosing ? "table" : null;
+    } else if (tag === "w:pStyle" && where === "paragraph") {
+      paragraphStyle = attr(attrs, "val");
+      styleFill = styles.shading(paragraphStyle);
+    } else if (tag === "w:tblPr") where = open && !selfClosing ? "table" : null;
     else if (tag === "w:tcPr") where = open && !selfClosing ? "cell" : null;
     else if (tag === "w:pPr") where = open && !selfClosing ? "paragraph" : null;
     else if (tag === "w:rPr") where = open && !selfClosing ? "run" : null;
@@ -858,9 +1022,12 @@ function scanRuns(
         else if (where === "run" && run) run.fill = colour;
       }
     } else if (tag === "w:r" && open && !selfClosing) {
-      run = { vanish: false, size: null, color: null, fill: null };
+      run = { fill: null, style: null };
       runText = "";
     } else if (tag === "w:r" && closing && run) {
+      // Direct formatting first, then the run's and its paragraph's styles.
+      const look = { ...styles.look(paragraphStyle, run.style), ...run };
+      const vanish = look.vanish ?? false;
       // In a styled table with no shading, the style may shade the cell: unknown. So is the bare
       // page under a shape behind the text.
       const underCell = underTable(tables.at(-1));
@@ -871,21 +1038,25 @@ function scanRuns(
         (underCell === undefined ? (behindText ? null : page) : underCell);
       const whiteOnWhite =
         !inTextBox &&
-        isHex(run.color) &&
-        nearWhite(run.color) &&
+        isHex(look.color) &&
+        nearWhite(look.color) &&
         isHex(background) &&
         nearWhite(background);
-      const tiny = run.size !== null && run.size < 4;
-      if (runText.trim() && (run.vanish || tiny || whiteOnWhite)) {
+      // Squashed to a sliver (`w:w`, a percentage) is as unreadable as tiny.
+      const width = ((look.size ?? DEFAULT_SIZE) * (look.scale ?? 100)) / 100;
+      const tiny = (look.size != null && look.size < MIN_SIZE) || width < MIN_SIZE;
+      if (runText.trim() && (vanish || tiny || whiteOnWhite)) {
         hidden.push(runText);
-        if (!run.vanish) shownHidden.push(runText);
+        if (!vanish) shownHidden.push(runText);
       }
-      if (!run.vanish) line += runText;
+      if (!vanish) line += runText;
       run = null;
     } else if (run && where === "run") {
-      if (tag === "w:vanish") run.vanish = !/^(?:0|false|off)$/.test(attr(attrs, "val") ?? "");
-      else if (tag === "w:sz") run.size = Number(attr(attrs, "val")) || null;
-      else if (tag === "w:color") run.color = attr(attrs, "val");
+      if (tag === "w:rStyle") run.style = attr(attrs, "val");
+      else
+        for (const key of Object.keys(LOOK_TAGS) as Array<keyof RunLook>)
+          if (tag === LOOK_TAG_NAMES[key])
+            (run as Record<string, unknown>)[key] = lookValue(key, attrs!);
     } else if (tag === "w:t" && open && !selfClosing) {
       inText = true;
       textStart = match.index + match[0].length;
@@ -895,19 +1066,65 @@ function scanRuns(
   return { hidden, shownHidden, lines };
 }
 
-/** The header and footer parts by name, inflated; a part past `MAX_PARSED_XML_BYTES` between them is skipped. */
-function marginParts(files: Map<string, ZipEntry>): Array<[key: string, content: Buffer]> {
+/** An element that places a part by relationship id: a section's header or footer, an embedded chunk. */
+const PLACING = /<w:(?:headerReference|footerReference|altChunk)\b([^<>]*)>/g;
+const RELATIONSHIP_ID = /\s[A-Za-z_][\w.-]*:id\s*=\s*(?:"([^"]*)"|'([^']*)')/;
+
+const placedCache = new WeakMap<DocxArchive, Set<string>>();
+
+/**
+ * The relationship ids the main document places. Word shows a header, a footer or an embedded
+ * chunk only where the document names it: a part in the archive that nothing names (a header no
+ * section uses, a chunk the body never places) is no part of what it prints. `xml` is the main
+ * document without markup, when already read.
+ */
+function placedIds(archive: DocxArchive, xml?: string): Set<string> {
+  let ids = placedCache.get(archive);
+  if (ids) return ids;
+  if (xml === undefined) {
+    const entry = archive.files.get(archive.parts.main);
+    const content = entry && !entry.dir ? inflatePart(entry) : null;
+    xml = content ? withoutMarkup(content.toString("utf8")) : "";
+  }
+  ids = new Set();
+  for (const [, attrs] of xml.matchAll(PLACING)) {
+    const id = RELATIONSHIP_ID.exec(attrs!);
+    if (id) ids.add(id[1] ?? id[2]!);
+  }
+  placedCache.set(archive, ids);
+  return ids;
+}
+
+/** The parts of the types the document places, each once. */
+function placedParts(archive: DocxArchive, types: ReadonlyArray<Placeable["type"]>, xml?: string) {
+  const ids = placedIds(archive, xml);
+  const parts = new Map<string, Placeable>();
+  for (const part of archive.parts.placeable)
+    if (types.includes(part.type) && ids.has(part.id) && !parts.has(part.path))
+      parts.set(part.path, part);
+  return [...parts.values()];
+}
+
+/** The header and footer parts the document places, in name order, inflated; a part past `MAX_PARSED_XML_BYTES` between them is skipped. */
+function marginParts(
+  archive: DocxArchive,
+  xml?: string,
+): Array<[part: Placeable, content: Buffer]> {
   let left = MAX_PARSED_XML_BYTES;
-  const parts: Array<[string, Buffer]> = [];
-  for (const [key, entry] of [...files].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    if (!HEADER_OR_FOOTER.test(key) || entry.dir) continue;
-    const content = inflate(entry, left);
+  const parts: Array<[Placeable, Buffer]> = [];
+  const placed = placedParts(archive, ["header", "footer"], xml);
+  for (const part of placed.sort((a, b) => (a.path < b.path ? -1 : 1))) {
+    const content = inflate(archive.files.get(part.path)!, left);
     if (!content) continue;
     left -= content.length;
-    parts.push([key, content]);
+    parts.push([part, content]);
   }
   return parts;
 }
+
+/** A header or footer's XML as this reads it: of alternate content, what Word shows. */
+const marginText = (part: Buffer) =>
+  alternateBranch(withoutMarkup(part.toString("utf8")), "Choice").xml;
 
 /**
  * Hidden runs, tables and pictures in a DOCX's main document, or null when it has none to read.
@@ -922,11 +1139,7 @@ export function measureDocx(data: Uint8Array, archive = openDocx(data)): DocxMea
   const content = inflatePart(entry);
   if (!content?.length) return null;
   const xml = withoutMarkup(content.toString("utf8"));
-  const stylesEntry = parts.styles ? files.get(parts.styles) : undefined;
-  const styles = stylesEntry && inflatePart(stylesEntry);
-  const paragraphStyle = styleShading(
-    styles ? withoutMarkup(styles.toString("utf8")) : stylesEntry ? null : "",
-  );
+  const styles = archiveStyles(archive);
 
   const tableCount = xml.match(/<w:tbl>|<w:tbl\s/g)?.length ?? 0;
   // Pictures only: a text box or shape has an extent too.
@@ -950,15 +1163,18 @@ export function measureDocx(data: Uint8Array, archive = openDocx(data)): DocxMea
   // A shape anchored behind the text (a template's sidebar or band) makes the background unknown.
   const behindText = /<wp:anchor\b[^<>]*\bbehindDoc=["'](?:1|true|on)["']/.test(xml);
 
-  const hidden = scanRuns(xml, paragraphStyle, page, behindText).hidden;
+  // The runs `mammoth` reads: of alternate content, the Fallback. What of it Word does not show
+  // is hidden.
+  const body = alternateBranch(xml, "Fallback");
+  const hidden = [...scanRuns(body.xml, styles, page, behindText).hidden, ...body.unshown];
   const read = [...hidden];
   let trackedChanges = count(xml, REVISION);
   // A header banner (shape or picture) is an unreadable background, as `behindText` is.
-  for (const [, part] of marginParts(files)) {
-    const content = withoutMarkup(part.toString("utf8"));
+  for (const [, part] of marginParts(archive, xml)) {
+    const content = marginText(part);
     trackedChanges += count(content, REVISION);
     const drawn = behindText || /<w:(?:drawing|pict)\b/.test(content);
-    const runs = scanRuns(content, paragraphStyle, page, drawn);
+    const runs = scanRuns(content, styles, page, drawn);
     for (const run of runs.hidden) hidden.push(run);
     for (const run of runs.shownHidden) read.push(run);
   }
@@ -986,20 +1202,19 @@ export function measureDocx(data: Uint8Array, archive = openDocx(data)): DocxMea
  * The text of a DOCX's page headers and footers, which `mammoth` leaves out: one line per
  * paragraph or line break, each line once. Page numbers and hidden runs are left out.
  */
-export function docxMargins({ files }: DocxArchive): { header: string; footer: string } {
+export function docxMargins(archive: DocxArchive): { header: string; footer: string } {
   const lines = { header: new Set<string>(), footer: new Set<string>() };
-  for (const [key, content] of marginParts(files)) {
+  for (const [{ type }, content] of marginParts(archive)) {
     const { lines: paragraphs } = scanRuns(
-      withoutMarkup(content.toString("utf8")),
-      () => null,
+      marginText(content),
+      archiveStyles(archive),
       "FFFFFF",
       false,
     );
     for (const paragraph of paragraphs)
       for (let line of xmlText(paragraph).split("\n")) {
         line = line.trim();
-        if (line && !/^\d+$/.test(line))
-          lines[key.includes("header") ? "header" : "footer"].add(line);
+        if (line && !/^\d+$/.test(line)) lines[type === "footer" ? "footer" : "header"].add(line);
       }
   }
   return { header: [...lines.header].join("\n"), footer: [...lines.footer].join("\n") };
@@ -1010,10 +1225,10 @@ export function docxMargins({ files }: DocxArchive): { header: string; footer: s
  * read from its `<html` to its `</html>`, quoted-printable decoded when it says so; RTF and other
  * chunks are left out. The chunks share `MAX_XML_BYTES`: one past what is left is not read.
  */
-export function docxChunks({ files, parts }: DocxArchive): string[] {
+export function docxChunks(archive: DocxArchive): string[] {
   let left = MAX_XML_BYTES;
-  return parts.chunks.flatMap((chunk) => {
-    const inflated = inflate(files.get(chunk)!, left);
+  return placedParts(archive, ["aFChunk"]).flatMap(({ path }) => {
+    const inflated = inflate(archive.files.get(path)!, left);
     if (!inflated) return [];
     left -= inflated.length;
     let content = inflated.toString("latin1");

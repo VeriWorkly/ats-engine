@@ -19,7 +19,9 @@ import {
   readJobFile,
   readResumeFile,
   type AtsExtraction,
+  type AtsExtractRequest,
   type AtsExtractResponse,
+  type AtsJobFile,
   type AtsResumeFormat,
 } from "@veriworkly/ats-engine/node";
 
@@ -87,12 +89,26 @@ export function extractInChild(
   format: AtsResumeFormat,
   signal?: AbortSignal,
 ): Promise<AtsExtraction> {
+  return readInChild(data, format, false, signal);
+}
+
+/** A saved job posting page, read in a child as a resume is: a 19 MB page held this server 6 s. */
+export function readJobPageInChild(data: Uint8Array, signal?: AbortSignal): Promise<AtsJobFile> {
+  return readInChild(data, "html", true, signal);
+}
+
+function readInChild(
+  data: Uint8Array,
+  format: AtsResumeFormat,
+  job: boolean,
+  signal?: AbortSignal,
+): Promise<AtsExtraction & AtsJobFile> {
   return new Promise((done, fail) => {
     if (signal?.aborted) return fail(cancelled());
     const child = fork(CHILD, [], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
     const abort = () => stop(cancelled());
     signal?.addEventListener("abort", abort, { once: true });
-    const stop = (error?: Error, result?: AtsExtraction) => {
+    const stop = (error?: Error, result?: AtsExtraction & AtsJobFile) => {
       clearTimeout(timer);
       signal?.removeEventListener("abort", abort);
       child.removeAllListeners();
@@ -111,8 +127,12 @@ export function extractInChild(
     );
     child.on("message", (answer: AtsExtractResponse) =>
       answer.ok
-        ? stop(undefined, { text: answer.text, ...(answer.layout && { layout: answer.layout }) })
-        : stop(new AtsFileError(answer.message)),
+        ? stop(undefined, {
+            text: answer.text,
+            ...(answer.layout && { layout: answer.layout }),
+            ...(answer.company && { company: answer.company }),
+          })
+        : stop(new AtsFileError(answer.message, answer.cause ? { cause: answer.cause } : {})),
     );
     child.on("error", (error) =>
       stop(new AtsFileError(`Could not read the file: ${error.message}`)),
@@ -120,7 +140,13 @@ export function extractInChild(
     child.on("exit", (code, signal) =>
       stop(new AtsFileError(`Reading the file stopped its process (${signal ?? `exit ${code}`}).`)),
     );
-    child.send({ id: 1, format, buffer: Buffer.from(data).toString("base64") });
+    const request: AtsExtractRequest = {
+      id: 1,
+      format,
+      buffer: Buffer.from(data).toString("base64"),
+      job,
+    };
+    child.send(request);
   });
 }
 
@@ -182,6 +208,7 @@ export async function readJob(
           () =>
             readJobFile(absolute(path), {
               extract: (data, format) => extractInChild(data, format, signal),
+              readJobPage: (data) => readJobPageInChild(data, signal),
             }),
           signal,
         )

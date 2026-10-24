@@ -88,6 +88,9 @@ function parts(line: string): string[] {
   return out.flatMap((part) => part.split(SPACED_DASH));
 }
 
+/** Three or more abbreviations parted by commas, and nothing else: "PMP, CSM, CISSP". */
+const ABBREVIATIONS = /^\p{Lu}[\p{Lu}\p{N}&+-]{1,9}(?:,\s*\p{Lu}[\p{Lu}\p{N}&+-]{1,9}){2,}$/u;
+
 /** Brackets left empty by dates taken out: "Scrum Alliance (2019 - 2023)", "(2022, expires 2025)". */
 const EMPTY_BRACKETS = /\([\s,;:·–—-]*\)|\[[\s,;:·–—-]*\]/gu;
 const LEADING = new Set([..." \t,;:|·•–—-"]);
@@ -252,20 +255,50 @@ export function addCertifications(into: AtsParsedCertification[], rows: AtsParse
  * The rows of a certifications section. Where the section mixes plain lines and bullets, the
  * bullets describe the line above and are skipped; a list all in bullets is the list. A line of
  * dates alone joins the row above it. Each certification once, by name.
+ *
+ * LinkedIn prints a certification's name, its issuer and "Issued Jan 2021 · Expires Jan 2024" on
+ * three lines: two undated lines in a row with no issuer, over such a line, are a name and its
+ * issuer. A line of three or more abbreviations and nothing else ("PMP, CSM, CISSP") lists one
+ * certification each. Neither applies to the items of one line (`stacked: false`).
  */
 export function parseCertifications(
   lines: readonly string[],
   policy: AtsEnginePolicy,
   now: Date,
+  stacked = true,
 ): AtsParsedCertification[] {
   const plain = lines.some((line) => line.trim() && !BULLET.test(line));
+  const { opening } = wordsOf(policy.resumeParse);
   const rows: AtsParsedCertification[] = [];
   let last: AtsParsedCertification | undefined;
-  for (const line of lines) {
-    if (plain && BULLET.test(line)) continue;
+  // The row each line read, when it read one row.
+  const readAt = new Map<number, AtsParsedCertification>();
+  const bare = (row: AtsParsedCertification | undefined): row is AtsParsedCertification =>
+    row !== undefined && !row.issuer && !row.date && !row.expires;
+  const items = lines.flatMap((line, at) => {
+    const body = line.replace(BULLET_PREFIX, "").trim();
+    return stacked && ABBREVIATIONS.test(body)
+      ? body.split(",").map((item) => ({ line: item, at, many: true }))
+      : [{ line, at, many: false }];
+  });
+  for (const { line, at, many } of items) {
+    if (plain && BULLET.test(lines[at]!)) continue;
     const read = readCertification(line, policy, now);
     if (!read) continue;
     if (!read.row) {
+      const name = readAt.get(at - 2);
+      const issuer = readAt.get(at - 1);
+      if (
+        stacked &&
+        bare(name) &&
+        bare(issuer) &&
+        issuer === last &&
+        opening.test(line.replace(BULLET_PREFIX, ""))
+      ) {
+        name.issuer = issuer.name;
+        rows.pop();
+        last = name;
+      }
       if (last) {
         last.date ??= read.dated.date;
         if (!last.expires && read.dated.expires) {
@@ -277,6 +310,7 @@ export function parseCertifications(
     }
     last = read.row;
     rows.push(read.row);
+    if (!many) readAt.set(at, read.row);
   }
   // Each certification once, by name; dates joined from the line below first.
   const kept: AtsParsedCertification[] = [];
@@ -303,5 +337,6 @@ export function parseCertificationList(text: string, policy: AtsEnginePolicy, no
     items.filter((item) => item.trim()),
     policy,
     now,
+    false,
   );
 }

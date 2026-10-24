@@ -289,6 +289,22 @@ describe("repairParse", () => {
     const sent = JSON.parse(provider.calls[0]!.messages[0]!.content);
     expect(sent.resume).toBe(SOURCE);
   });
+
+  // Item 48 (owner, 2026-10-24): a repair that fills nothing is reported, not passed off as one.
+  it.each([
+    ["no values", {}, /filled no field the parse left empty/],
+    ["only invented values", { name: "John Smith", email: "x@fabricated.example" }, /2 value\(s\)/],
+  ])("reports a reply with %s as unusable, once, with what it cost", async (_, reply, message) => {
+    const provider = scriptedProvider(JSON.stringify(reply), JSON.stringify({ name: "Jane Doe" }));
+    const ai = createAtsAi({ provider, routes: { repairParse: { ...route, retries: 2 } } });
+    const failure = await ai
+      .repairParse({ resumeText: SOURCE, report: { parsed: empty } })
+      .catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code: "unusable", attempts: 1 });
+    expect((failure as Error).message).toMatch(message);
+    // Not retried: the second scripted reply is never asked for.
+    expect(provider.calls).toHaveLength(1);
+  });
 });
 
 describe("convertResume", () => {
@@ -328,6 +344,29 @@ describe("convertResume", () => {
       "basics.email",
       "experience[0].role",
     ]);
+  });
+
+  it("drops an entry whose every identity value was invented", async () => {
+    const provider = scriptedProvider(
+      JSON.stringify({
+        basics: { fullName: "Jane Doe" },
+        experience: [
+          { company: "Acme Corporation", role: "Senior Engineer", highlights: ["Built it"] },
+          { company: "Initech", role: "VP Sales", highlights: ["Grew revenue 300%"] },
+        ],
+        education: [{ school: "Hogwarts", degree: "PhD Magic" }],
+        projects: [{ name: "Moonshot", highlights: ["Landed on the moon"] }],
+      }),
+    );
+    const ai = createAtsAi({ provider, routes });
+    const outcome = await ai.convertResume({ resumeText: RESUME });
+
+    expect(outcome.result.experience.map((role) => role.company)).toEqual(["Acme Corporation"]);
+    expect(outcome.result.education).toEqual([]);
+    expect(outcome.result.projects).toEqual([]);
+    expect(outcome.rejected.map((violation) => violation.path)).toEqual(
+      expect.arrayContaining(["experience[1].company", "experience[1].role", "projects[0].name"]),
+    );
   });
 });
 
@@ -384,5 +423,29 @@ describe("groundedText and convertedToDocument", () => {
       expect.objectContaining({ title: "Senior Engineer", employer: "Acme Corporation" }),
     ]);
     expect(report.matchedKeywords).not.toContain("kubernetes");
+  });
+
+  it("keeps a degree and its field as the file writes them together", () => {
+    const source = "Анна Петрова\nОбразование\nБакалавр информатики, Московский университет, 2017";
+    const row = {
+      school: "Московский университет",
+      degree: "Бакалавр",
+      field: "информатики",
+      startDate: "",
+      endDate: "2017",
+      current: false,
+      summary: "",
+    };
+    const { resume } = groundedText(
+      { ...converted, summary: "", experience: [], education: [row] },
+      source,
+    );
+    expect(resume.education[0]).toMatchObject({ degree: "Бакалавр информатики", field: "" });
+    // Apart in the file, they stay apart.
+    const apart = groundedText(
+      { ...converted, summary: "", experience: [], education: [{ ...row, field: "физики" }] },
+      source,
+    );
+    expect(apart.resume.education[0]).toMatchObject({ degree: "Бакалавр", field: "физики" });
   });
 });

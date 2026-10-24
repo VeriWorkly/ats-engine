@@ -12,11 +12,18 @@ export function buildPdf(
   resources = "",
   info = "",
   extra: string[] = [],
-  /** `page` is added to the page dictionary (e.g. `/Annots[7 0 R]`), `trailer` to the trailer. */
-  { page = "", trailer = "" }: { page?: string; trailer?: string } = {},
+  /**
+   * `page` is added to the page dictionary (e.g. `/Annots[7 0 R]`), `trailer` to the trailer,
+   * `catalog` to the catalog (e.g. `/OCProperties<<…>>`).
+   */
+  {
+    page = "",
+    trailer = "",
+    catalog = "",
+  }: { page?: string; trailer?: string; catalog?: string } = {},
 ): Buffer {
   const objects = [
-    "<</Type/Catalog/Pages 2 0 R>>",
+    `<</Type/Catalog/Pages 2 0 R${catalog}>>`,
     "<</Type/Pages/Kids[3 0 R]/Count 1>>",
     `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 4 0 R>>${resources}>>/Contents 5 0 R${page}>>`,
     "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",

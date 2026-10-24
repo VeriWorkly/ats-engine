@@ -109,11 +109,7 @@ describe("analyze: a punctuated name is still a claim", () => {
   const RESUME =
     "Jane Doe\nSenior Engineer, Acme Corporation, 2020 - Present\n- Built infrastructure in Terraform";
   const JOB = "We need Terraform experience.";
-  it.each([
-    "Add Terraform from your work at (Google)",
-    'Add Terraform "Google" certified',
-    "Terraform (IaC)",
-  ])("drops %j", async (item) => {
+  const suggest = async (item: string) => {
     const provider: LlmProvider = {
       complete: async () => ({
         text: JSON.stringify({ keywordOpportunities: [item] }),
@@ -126,7 +122,25 @@ describe("analyze: a punctuated name is still a claim", () => {
       now: NOW,
     });
     const { result } = await ai.analyze({ resumeText: RESUME, report, jobDescription: JOB });
-    expect(result.keywordOpportunities).toEqual([]);
+    return result.keywordOpportunities;
+  };
+  it.each([
+    "Add Terraform from your work at (Google)",
+    'Add Terraform "Google" certified',
+    "Terraform (IaC)",
+    // The first word is a claim too unless it is an instruction ("Add", "Highlight").
+    "Google Terraform certification",
+    "Snowflake and Terraform",
+  ])("drops %j", async (item) => {
+    expect(await suggest(item)).toEqual([]);
+  });
+  it.each([
+    "Highlight Terraform in your summary",
+    "Mention Terraform in your skills",
+    "Ajoutez Terraform à vos compétences",
+    "Terraform",
+  ])("keeps %j", async (item) => {
+    expect(await suggest(item)).toEqual([item]);
   });
 });
 

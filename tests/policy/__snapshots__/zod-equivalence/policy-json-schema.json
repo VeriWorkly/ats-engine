@@ -1585,56 +1585,6 @@
                 }
               },
               "languageNames": {
-                "default": {
-                  "arabic": "arabic",
-                  "bengali": "bengali",
-                  "bulgarian": "bulgarian",
-                  "cantonese": "cantonese",
-                  "chinese": "chinese",
-                  "croatian": "croatian",
-                  "czech": "czech",
-                  "danish": "danish",
-                  "dutch": "dutch",
-                  "english": "english",
-                  "filipino": "filipino",
-                  "finnish": "finnish",
-                  "french": "french",
-                  "german": "german",
-                  "greek": "greek",
-                  "gujarati": "gujarati",
-                  "hebrew": "hebrew",
-                  "hindi": "hindi",
-                  "hungarian": "hungarian",
-                  "indonesian": "indonesian",
-                  "italian": "italian",
-                  "japanese": "japanese",
-                  "kannada": "kannada",
-                  "korean": "korean",
-                  "malay": "malay",
-                  "malayalam": "malayalam",
-                  "mandarin": "mandarin",
-                  "marathi": "marathi",
-                  "norwegian": "norwegian",
-                  "persian": "persian",
-                  "polish": "polish",
-                  "portuguese": "portuguese",
-                  "punjabi": "punjabi",
-                  "romanian": "romanian",
-                  "russian": "russian",
-                  "serbian": "serbian",
-                  "slovak": "slovak",
-                  "spanish": "spanish",
-                  "swahili": "swahili",
-                  "swedish": "swedish",
-                  "tagalog": "tagalog",
-                  "tamil": "tamil",
-                  "telugu": "telugu",
-                  "thai": "thai",
-                  "turkish": "turkish",
-                  "ukrainian": "ukrainian",
-                  "urdu": "urdu",
-                  "vietnamese": "vietnamese"
-                },
                 "type": "object",
                 "propertyNames": {
                   "type": "string",
@@ -7502,14 +7452,8 @@
                   "vietnamese": "vietnamese"
                 },
                 "type": "object",
-                "propertyNames": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "additionalProperties": {
-                  "type": "string",
-                  "minLength": 1
-                }
+                "propertyNames": {},
+                "additionalProperties": {}
               }
             },
             "required": [
@@ -10962,14 +10906,8 @@
                     },
                     "languageNames": {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "additionalProperties": {
-                        "type": "string",
-                        "minLength": 1
-                      }
+                      "propertyNames": {},
+                      "additionalProperties": {}
                     },
                     "seniorityLevels": {
                       "type": "object",
@@ -11555,14 +11493,8 @@
                     },
                     "languageNames": {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "additionalProperties": {
-                        "type": "string",
-                        "minLength": 1
-                      }
+                      "propertyNames": {},
+                      "additionalProperties": {}
                     },
                     "seniorityLevels": {
                       "type": "object",

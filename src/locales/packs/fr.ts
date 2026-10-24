@@ -1,3 +1,4 @@
+import { wholeWord as word } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
@@ -12,7 +13,6 @@ import type { AtsLanguagePackInput } from "../schema.js";
  * a baccalauréat is a bachelor's degree in Québec; the words every French-speaking country uses
  * for a degree (licence, doctorat, diplôme d'ingénieur) are here.
  */
-const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 const e = "[eéèê]";
 
 /** The French language pack: recognised by its function words; region FR by default. */

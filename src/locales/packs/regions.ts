@@ -1,3 +1,4 @@
+import { wholeWord as word } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
 import type { AtsRegionPackInput } from "../schema.js";
 
@@ -12,7 +13,6 @@ import type { AtsRegionPackInput } from "../schema.js";
  * Only the US pack turns on `ageAdvice`, since advising to hide a graduation year would contradict
  * the convention elsewhere.
  */
-const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 
 /**
  * "LLM" undotted, as the default policy reads it: a Master of Laws only where a degree stands and
@@ -74,8 +74,10 @@ export const DE: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     "7": word(
       String.raw`(?<!eidg\.\s?)dipl(?:om|\.)(?:-\p{L}+)?\.?(?![\p{L}-])(?!\.?\s*\(?(?:fh|ba|hf)(?!\p{L}))(?![^\n,;|]{0,60}?\s\(?hf(?!\p{L}))|magister|staatsexamen`,
     ),
+    // An English posting's "sales promotion in retail" is no doctorate: German puts none of these
+    // words before "Promotion".
     "8": word(
-      String.raw`promotion\s+(?:zum|zur|in|im|an\s+der)|promoviert|doktorarbeit|doktorgrad|dr\.[\s-]?(?:rer|phil|ing|med|jur|iur|oec|sc)\.`,
+      String.raw`(?<!(?<![\p{L}\p{M}])(?:sales|trade|product|brand|price|retail|store|consumer|marketing|event|career|internal|a|the|for|of|and|or|on|to|your|our)[\s-]{1,3})promotion\s+(?:zum|zur|in|im|an\s+der)|promoviert|doktorarbeit|doktorgrad|dr\.[\s-]?(?:rer|phil|ing|med|jur|iur|oec|sc)\.`,
     ),
   },
 });
@@ -138,7 +140,8 @@ export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
     // The Secondary School Certificate (SSC), and the Secondary School Leaving Certificate
     // (SSLC) of Karnataka and Kerala, are the Class X board exam, not school-leaving; the
     // pre-university course (PUC, "II PUC") is Class XII. "BE" undotted is the English verb
-    // unless a branch of engineering or a bracket follows; "LLM" undotted is a language model
+    // unless a branch of engineering or a bracket follows, and always after "must" or "to" ("must
+    // be computer literate"); "LLM" undotted is a language model
     // unless it stands where a degree does beside a law school (see `LLM` above).
     "2": word(
       String.raw`class\s+(?:x|10)(?:th)?|10th(?!\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|rank|position|place))(?:\s+(?:standard|grade|class))?|xth|(?:std\.?|standard)\s+(?:x|10)(?:th)?|matric(?:ulation)?|s\.?s\.?l\.?c\.?|s\.?s\.?c\.?|secondary\s+school\s+certificate`,
@@ -147,7 +150,7 @@ export const IN: AtsRegionPackInput = /* @__PURE__ */ deepFreeze({
       String.raw`class\s+(?:xii|12)(?:th)?|12th(?!\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|rank|position|place))(?:\s+(?:standard|grade|class))?|xiith|10\s*\+\s*2|(?:std\.?|standard)\s+(?:xii|12)(?:th)?|h\.?s\.?c\.?|intermediate\s+(?:\(|board|education|exam|from|in\s+(?:science|commerce|arts|mpc|bipc))|higher\s+secondary|senior\s+secondary|pre[\s-]university|(?:ii\s+|2nd\s+)?p\.?u\.?c\.?`,
     ),
     "6": word(
-      String.raw`b\.?\s?com\.?|b\.?c\.?a\.?|b\.?b\.?a\.?|b\.\s?e\.?|be(?=\s*\(|\s+(?:in\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\p{L}\p{M}]))|b\.?\s?pharm(?:a|acy)?\.?|ll\.?b\.?`,
+      String.raw`b\.?\s?com\.?|b\.?c\.?a\.?|b\.?b\.?a\.?|b\.\s?e\.?|(?<!(?:must|will|would|should|shall|can|could|may|might|to|not|also)\s{1,3})be(?=\s*\(|\s+(?:in\s+)?(?:mechanical|civil|electrical|electronics|computer|chemical|information|production|instrumentation|aeronautical|automobile|biomedical|biotechnology|mechatronics|industrial|metallurgy|textile|marine|aerospace)(?![\p{L}\p{M}]))|b\.?\s?pharm(?:a|acy)?\.?|ll\.?b\.?`,
     ),
     "7": word(
       String.raw`m\.?\s?com\.?|m\.?c\.?a\.?|m\.\s?e\.?|pgdm|pgdba|post[\s-]?graduate\s+diploma|m\.?b\.?b\.?s\.?|m\.?\s?pharm(?:a)?\.?|m\.?\s?phil\.?|ll\.m\.?|${LLM}`,

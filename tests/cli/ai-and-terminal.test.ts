@@ -312,7 +312,27 @@ describe("--ai", () => {
     expect(err.join("\n")).toMatch(
       /Sending the resume to gemini at generativelanguage\.googleapis\.com \(gemini-test\)/,
     );
+    expect(err.join("\n")).toContain(
+      "Your name, email and phone number are replaced with placeholders first; the check read " +
+        "no links, so any in the file are sent as written.",
+    );
     expect([...out, ...err].join("\n")).not.toContain("secret-gemini-key");
+  });
+
+  it("promises to hide only the contact details the parser read", async () => {
+    const path = join(dir, "nameless.txt");
+    writeFileSync(path, RESUME.split("\n").slice(1).join("\n"));
+    const { fetch } = fakeFetch(() => chatReply(INSIGHTS));
+    await main(
+      ["check", path, "--ai", "--provider", "gemini", "--model", "gemini-test"],
+      context({ env: { GEMINI_API_KEY: "key" }, fetch }),
+    );
+    const notice = err.join("\n");
+    expect(notice).toContain(
+      "Your email and phone number are replaced with placeholders first; the check read no " +
+        "name or links, so any in the file are sent as written.",
+    );
+    expect(notice).not.toContain("Your name");
   });
 
   it("talks to Anthropic's Messages API with the Anthropic preset", async () => {

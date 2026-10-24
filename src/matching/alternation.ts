@@ -1,12 +1,17 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
 import { memo } from "../util/memo.js";
 import { wordListPattern } from "../text/text.js";
-import { canonicalize, slashParts, type Vocabulary } from "./vocabulary.js";
+import { canonicalize, opensSentence, slashParts, type Vocabulary } from "./vocabulary.js";
 
 const isTermChar = (char: string) => /[\p{L}\p{M}\p{N}+#./-]/u.test(char);
 
 /** Caps the alternatives one "or" binds: a longer comma list is prose, not a choice. */
 const MAX_ALTERNATION_MEMBERS = 8;
+
+/** Caps the words of one alternative's name: "Google Cloud Platform". */
+const MAX_NAME_WORDS = 3;
+
+const capitalised = (word: string) => /^\p{Lu}/u.test(word);
 
 /** The comma-separated run immediately preceding an "or": "React, Vue, " -> [react, vue]. */
 function trailingList(text: string) {
@@ -24,6 +29,19 @@ function trailingList(text: string) {
     if (index === end) break;
 
     tokens.unshift(text.slice(index, end));
+    // A capitalised name of several words is one alternative ("Google Cloud or AWS"), but not
+    // with the word that opens the line ("Strong Python or Java").
+    for (let words = 1; words < MAX_NAME_WORDS && capitalised(tokens[0]!); words += 1) {
+      let space = index;
+      while (space > 0 && text[space - 1] === " ") space -= 1;
+      let start = space;
+      while (start > 0 && isTermChar(text[start - 1])) start -= 1;
+      const word = text.slice(start, space);
+      if (space === index || !capitalised(word) || word.endsWith(".")) break;
+      if (opensSentence(text, start)) break;
+      tokens.unshift(word);
+      index = start;
+    }
 
     let comma = index;
     while (comma > 0 && /\s/.test(text[comma - 1])) comma -= 1;
@@ -34,13 +52,25 @@ function trailingList(text: string) {
   return tokens;
 }
 
-/** The single term immediately following an "or": " Angular and more" -> [angular]. */
+/**
+ * The term immediately following an "or": " Angular and more" -> [angular]. A capitalised name
+ * of several words is one alternative: " Google Cloud" -> [google, cloud].
+ */
 function leadingList(text: string) {
+  const tokens: string[] = [];
   let index = 0;
   while (index < text.length && /\s/.test(text[index])) index += 1;
-  const start = index;
-  while (index < text.length && isTermChar(text[index])) index += 1;
-  return start === index ? [] : [text.slice(start, index)];
+  while (tokens.length < MAX_NAME_WORDS) {
+    const start = index;
+    while (index < text.length && isTermChar(text[index])) index += 1;
+    const word = text.slice(start, index);
+    if (!word || (tokens.length && !capitalised(word))) break;
+    tokens.push(word);
+    // A name goes on only past a space, from a capitalised word that ends no sentence.
+    if (!capitalised(word) || word.endsWith(".") || text[index] !== " ") break;
+    while (text[index] === " ") index += 1;
+  }
+  return tokens;
 }
 
 /**

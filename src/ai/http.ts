@@ -334,10 +334,12 @@ export async function postJson(
       retryAfterMs: after,
     });
   }
+  // A list is how this address answers (a batch or streaming endpoint), not a glitch: the same
+  // request gets the same list, so waiting and retrying cannot help.
   if (!json || typeof json !== "object" || Array.isArray(json))
     throw new LlmProviderError("Provider returned JSON that is not an object.", {
       status: response.status,
-      retryable: true,
+      retryable: !Array.isArray(json),
     });
   return json;
 }

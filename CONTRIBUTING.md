@@ -85,6 +85,11 @@ Releases go out from `main` through changesets and `.github/workflows/release.ym
    `io.github.VeriWorkly/ats-engine` (the registry compares the casing). Nothing publishes
    without that pull request.
 
+Before merging the "Version Packages" pull request, a maintainer with the private scoring policy
+runs `npm run test:private` on its branch. The tests that score against that policy
+(`tests/scoring/live-policy.test.ts`, `tests/integration/regressions.test.ts`) skip in CI, which
+has no copy of it, so this is the only place they run; the script says so when it finds no policy.
+
 The two steps are two jobs. `version` (step 2) may write to the repository and open pull
 requests, and cannot publish. `publish` (step 3) runs only when no changeset is pending; it alone
 gets the OIDC token, and it installs with `npm ci --ignore-scripts`, so no dependency's install

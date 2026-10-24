@@ -62,21 +62,34 @@ function levelsIn(text: string, matchers: LevelMatchers) {
   return [...text.matchAll(matchers.any)].map((match) => match[0]);
 }
 
-/** The level stated by words found: an explicit CEFR level first, else the first word's. */
-function cefrOfMatches(found: readonly string[], matchers: LevelMatchers): AtsCefrLevel | null {
-  const token = found.find((word) => CEFR_EXACT.test(word));
-  if (token) return token.toUpperCase() as AtsCefrLevel;
-  for (const word of found) {
-    const level = levelOf(word, matchers);
-    if (level) return level;
-  }
-  return null;
+/**
+ * The level stated by words found: an explicit CEFR level over a word's. Of several, the first,
+ * or with `highest` the highest: a resume row names the level reached ("school level, now
+ * fluent"), where a posting's first level is the least it asks.
+ */
+function cefrOfMatches(
+  found: readonly string[],
+  matchers: LevelMatchers,
+  highest = false,
+): AtsCefrLevel | null {
+  const tokens = found.filter((word) => CEFR_EXACT.test(word));
+  const levels = tokens.length
+    ? tokens.map((token) => token.toUpperCase() as AtsCefrLevel)
+    : found.flatMap((word) => levelOf(word, matchers) ?? []);
+  if (!levels.length) return null;
+  return highest
+    ? levels.reduce((top, level) => (compareCefr(level, top) > 0 ? level : top))
+    : levels[0]!;
 }
 
-/** The CEFR level a text states ("fluent", "B2"), or null. */
-export function cefrLevel(text: string, policy: AtsEnginePolicy): AtsCefrLevel | null {
+/** The CEFR level a text states ("fluent", "B2"), or null; see `cefrOfMatches` for `highest`. */
+export function cefrLevel(
+  text: string,
+  policy: AtsEnginePolicy,
+  highest = false,
+): AtsCefrLevel | null {
   const matchers = levelsOf(policy.resumeParse);
-  return cefrOfMatches(levelsIn(text, matchers), matchers);
+  return cefrOfMatches(levelsIn(text, matchers), matchers, highest);
 }
 
 /** The order of two CEFR levels: negative when `a` is below `b`. */
@@ -126,7 +139,7 @@ export function readLanguages(
   const named = [...body.matchAll(any)];
   if (!named.length) {
     const found = levelsIn(body, levels);
-    const cefr = cefrOfMatches(found, levels);
+    const cefr = cefrOfMatches(found, levels, true);
     // Only a line that is nothing but its level, not a sentence holding "basic".
     const rest = found.reduce((out, word) => out.replace(word, ""), body);
     return {
@@ -167,7 +180,7 @@ export function readLanguages(
       rows.push({
         language: entry.language,
         level: own ? levelText(own.found, own.suffix) : levelText([], entry.suffix),
-        cefr: own ? cefrOfMatches(own.found, levels) : null,
+        cefr: own ? cefrOfMatches(own.found, levels, true) : null,
       });
     }
     clause = [];

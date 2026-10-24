@@ -1,6 +1,12 @@
 import * as z from "zod/mini";
 
-import { regexString, term, wordList } from "../primitives.js";
+import {
+  capturingRegexString,
+  languageNameMap,
+  regexString,
+  term,
+  wordList,
+} from "../primitives.js";
 
 /**
  * What follows a UK clearance level: "clearance", "vetting" or "cleared", after at most three
@@ -199,7 +205,7 @@ export const keywordMatchSchema = z
      */
     requirements: z.prefault(
       z.object({
-        yearsPatterns: z._default(z.array(regexString("requirements.yearsPatterns")), [
+        yearsPatterns: z._default(z.array(capturingRegexString("requirements.yearsPatterns")), [
           // Not an age ("18 years old"). `\s*(?:\+\s*)?`, not `\s*\+?\s*`: adjacent `\s*` is quadratic.
           // A range reads its lower end; "and" joins one only after "between" ("Python 3 and 5
           // years" asks for five), with the lookbehind after the "and" so it runs once per "and".
@@ -540,9 +546,12 @@ export const keywordMatchSchema = z
             },
           ],
         ),
-        languagePatterns: z._default(z.array(regexString("requirements.languagePatterns")), [
-          String.raw`(?:fluent|fluency|proficien(?:t|cy)|native|business[\s-]level|working\s+proficiency|professional\s+proficiency)\s+(?:in\s+|with\s+)?(\p{L}+)`,
-        ]),
+        languagePatterns: z._default(
+          z.array(capturingRegexString("requirements.languagePatterns")),
+          [
+            String.raw`(?:fluent|fluency|proficien(?:t|cy)|native|business[\s-]level|working\s+proficiency|professional\s+proficiency)\s+(?:in\s+|with\s+)?(\p{L}+)`,
+          ],
+        ),
         /**
          * A language's name in other languages, keyed to its English name, lowercase ("Englisch" to
          * "english"). Language packs fill it in. Also the list of what is a language: a
@@ -550,7 +559,7 @@ export const keywordMatchSchema = z
          * here, so "proficient in Python" stays a skill. English names map to themselves.
          */
         languageNames: z._default(
-          z.record(z.string().check(z.minLength(1)), z.string().check(z.minLength(1))),
+          languageNameMap,
           Object.fromEntries(
             [
               "arabic",
@@ -740,6 +749,14 @@ export const keywordMatchSchema = z
       }
       for (const canonical of Object.values(km.synonyms))
         if (canonical.includes(" ")) multiWord.add(canonical);
+      // A resume's words are looked up one at a time, and a phrase is never looked up at all.
+      for (const key of Object.keys(km.synonyms))
+        if (/\s/u.test(key))
+          ctx.addIssue({
+            code: "custom",
+            path: ["synonyms", key],
+            message: `synonym "${key}" is more than one word and can never be looked up: map the other way, to it, with it in phrases`,
+          });
 
       for (const term of multiWord)
         if (!phrases.has(term))

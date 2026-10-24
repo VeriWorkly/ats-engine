@@ -1,3 +1,4 @@
+import { wholeWord as word } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
@@ -7,7 +8,6 @@ import type { AtsLanguagePackInput } from "../schema.js";
  * verb-final, so an action verb counts anywhere in a line, and the script has no capitals.
  * Indian-English credentials (B.Tech, Class XII) belong to the IN region pack.
  */
-const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 
 /** The Hindi language pack: recognised by Devanagari script; region IN by default. */
 export const hi: AtsLanguagePackInput = /* @__PURE__ */ deepFreeze({

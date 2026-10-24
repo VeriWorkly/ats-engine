@@ -10,6 +10,7 @@ import {
   buildDocxBody,
   buildRichDocx,
   marginXml,
+  placedMargins,
   relationshipsXml,
 } from "../fixtures/buildDocx.js";
 import { buildPdf, buildPdfPages, stream } from "../fixtures/buildPdf.js";
@@ -172,19 +173,15 @@ describe("every page whose text is read is measured", () => {
 });
 
 describe("DOCX headers and footers are read", () => {
+  const { sectPr, entries } = placedMargins([
+    ["word/header1.xml", marginXml("hdr", p("Daniel Fischer") + p("daniel.fischer@example.com"))],
+    ["word/header2.xml", marginXml("hdr", p("Daniel Fischer"))],
+    ["word/footer1.xml", marginXml("ftr", p("References available on request") + p("2"))],
+  ]);
+  const BODY = `${p("Experience")}${p("Senior Backend Engineer, HubSpot")}`;
+
   it("puts the header before the body and the footer after it, without page numbers", async () => {
-    const docx = buildDocxBody(
-      `${p("Experience")}${p("Senior Backend Engineer, HubSpot")}`,
-      false,
-      [
-        [
-          "word/header1.xml",
-          marginXml("hdr", p("Daniel Fischer") + p("daniel.fischer@example.com")),
-        ],
-        ["word/header2.xml", marginXml("hdr", p("Daniel Fischer"))],
-        ["word/footer1.xml", marginXml("ftr", p("References available on request") + p("2"))],
-      ],
-    );
+    const docx = buildRichDocx(BODY + sectPr, entries, false);
     expect(lines((await extractResume(docx, "docx")).text)).toEqual([
       "Daniel Fischer",
       "daniel.fischer@example.com",
@@ -192,6 +189,24 @@ describe("DOCX headers and footers are read", () => {
       "Senior Backend Engineer, HubSpot",
       "References available on request",
     ]);
+  });
+
+  // Word prints only the parts a section names: one left in the archive is never shown.
+  it("reads no header or footer that no section names", async () => {
+    const docx = buildRichDocx(BODY, [
+      ["word/header1.xml", marginXml("hdr", p("Snowflake Airflow"))],
+      ["word/footer1.xml", marginXml("ftr", p("Kubernetes Terraform Kafka", "<w:vanish/>"))],
+    ]);
+    const { text, layout } = await extractResume(docx, "docx");
+    expect(lines(text)).toEqual(["Experience", "Senior Backend Engineer, HubSpot"]);
+    expect(layout?.hiddenTextChars).toBe(0);
+    // The same parts placed are read.
+    const { sectPr: placed, entries: named } = placedMargins([
+      ["word/header1.xml", marginXml("hdr", p("Snowflake Airflow"))],
+    ]);
+    expect((await extractResume(buildRichDocx(BODY + placed, named), "docx")).text).toContain(
+      "Snowflake Airflow",
+    );
   });
 });
 
@@ -857,7 +872,7 @@ describe("hiddenText carries all of the hidden text", () => {
 
     // The body's hidden runs are read, Word-hidden ones too; a header's Word-hidden run is left
     // out of the header's text, its white one is not.
-    const docx = buildDocxBody(p("Jane Doe") + p("Kafka", "<w:vanish/>") + p("Experience"), false, [
+    const { sectPr, entries } = placedMargins([
       [
         "word/header1.xml",
         marginXml(
@@ -866,6 +881,11 @@ describe("hiddenText carries all of the hidden text", () => {
         ),
       ],
     ]);
+    const docx = buildRichDocx(
+      p("Jane Doe") + p("Kafka", "<w:vanish/>") + p("Experience") + sectPr,
+      entries,
+      false,
+    );
     const fromDocx = await extractResume(docx, "docx");
     expect(fromDocx.text).toContain("Kafka");
     expect(fromDocx.text).not.toContain("Snowflake");

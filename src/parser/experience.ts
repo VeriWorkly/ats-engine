@@ -405,7 +405,23 @@ export function parseRoles(
     if (named) return line;
     return `${line.slice(0, last.index)} | ${line.slice(last.index + last[0].length)}`;
   };
-  const lines = joinWrappedDates(shown ? given.map(parted) : given, rp, now);
+  // A resume that bullets its role headers too ("- **Engineer**, Acme — Jan 2021 – Present") has
+  // no unbulleted dated line: there a dated bullet holding a title and an employer, and no action
+  // verb, is a role's header.
+  const read = shown ? given.map(parted) : given;
+  const bulletedHeader = (line: string) => {
+    const body = line.replace(BULLET_PREFIX, "");
+    const found = BULLET.test(line) && roleDates(body, policy, now);
+    if (!found || opensWithVerb.test(body)) return line;
+    const own = body.replace(found.matched, " ").replace(duration, " ");
+    const { title, employer } = splitTitleAndEmployer(own, policy);
+    return employer && titleWords.test(title) ? body : line;
+  };
+  const lines = joinWrappedDates(
+    read.some((line) => roleDates(line, policy, now)) ? read : read.map(bulletedHeader),
+    rp,
+    now,
+  );
   // The employer the last employer line named, for the roles under it that name none.
   let group = "";
   // A header is a short, unbulleted line with no dates; a trailing full stop is allowed. A header in
@@ -507,16 +523,28 @@ export function parseRoles(
   const whole = (at: number, from: number) =>
     halfAt(at, from) !== null && !isSingle(lines[at]) && titled(at);
 
+  // An employer's line above a role's title, at the section start or after the previous role's
+  // bullets: it names every role under it until a role names its own.
+  const opensGroup = (at: number) =>
+    !titled(at) &&
+    employerLine(lines[at]!) &&
+    (at === 0 || BULLET.test(lines[at - 1]!)) &&
+    !isPlace(lines[at]!, policy, false);
+
   for (const { index, found, own } of anchors) {
     let header = own;
+    // The employer of this role, read from the line above, also names the roles under it.
+    let grouped = false;
     if (own && isSingle(own)) {
       // The neighbour is the header; what the dated line carries besides dates is where, not who.
       const full = titled(index) ? undefined : sides.find((offset) => whole(index + offset, index));
       const side = full ?? sides.find((offset) => halfAt(index + offset, index));
       // Only its title is not where.
       if (full !== undefined) header = take(index + full);
-      else if (side !== undefined)
+      else if (side !== undefined) {
+        grouped = side === -1 && titled(index) && opensGroup(index - 1);
         header = `${splitTitleAndEmployer(own, policy).title} | ${headerParts(take(index + side), policy)[0]}`;
+      }
     } else if (own && !titled(index)) {
       // No title word beside the dates ("Acme Corp, Berlin") and a title alone next to them: the
       // dated line is the employer and where.
@@ -606,20 +634,16 @@ export function parseRoles(
     // and as a place, it ends the previous role. A duration line may sit between it and the title.
     if (split.title && !employer) {
       const above = durationOnly(lines[top - 1]) && !used.has(top - 1) ? top - 2 : top - 1;
-      if (
-        titled(top) &&
-        free(above) &&
-        !titled(above) &&
-        employerLine(lines[above]) &&
-        (above === 0 || BULLET.test(lines[above - 1])) &&
-        !isPlace(lines[above], policy, false)
-      ) {
+      if (titled(top) && free(above) && opensGroup(above)) {
         employer = headerParts(take(above), policy)[0] ?? "";
         group = employer;
       } else employer = group;
     } else if (employer) {
       // Stacked, the employer over the title heads a group too.
-      group = top === dates - 2 && employer === headerParts(lines[top], policy)[0] ? employer : "";
+      group =
+        grouped || (top === dates - 2 && employer === headerParts(lines[top], policy)[0])
+          ? employer
+          : "";
     }
     roles.push({ ...found.range, title: split.title, employer });
   }

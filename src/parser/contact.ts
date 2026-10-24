@@ -25,10 +25,11 @@ export const EMAIL =
   /(?<![\p{sc=Latn}\p{M}\p{N}._%+-]|[\p{sc=Latn}\p{M}\p{N}]['’])[\p{sc=Latn}\p{M}\p{N}._%+-][\p{sc=Latn}\p{M}\p{N}._%+'’-]{0,63}@[A-Z0-9-]{1,63}(?:\.[A-Z0-9-]{1,63}){0,8}\.[A-Z]{2,24}\b/iu;
 /**
  * A web address: with a scheme or "www.", a profile on a site resumes link to ("dribbble.com/jane"),
- * or a personal `.dev` site. Not one inside an email address.
+ * or a personal `.dev` site. Not one inside an email address. A comma inside it is its own
+ * ("?ids=1,2"); one before a space or a bar ends it.
  */
 export const LINK =
-  /(?:https?:\/\/|www\.)[^\s|,]+|(?:linkedin\.com|github\.com|gitlab\.com|bitbucket\.org|dribbble\.com|behance\.net|orcid\.org|medium\.com|stackoverflow\.com|kaggle\.com|scholar\.google\.com)\/[^\s|,]+|(?<![\w.@/-])[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9][a-z0-9-]{0,62}){0,3}\.dev(?![\w@-])(?:\/[^\s|,]*)?/gi;
+  /(?:https?:\/\/|www\.)(?:[^\s|,]|,(?=[^\s|,]))+|(?:linkedin\.com|github\.com|gitlab\.com|bitbucket\.org|dribbble\.com|behance\.net|orcid\.org|medium\.com|stackoverflow\.com|kaggle\.com|scholar\.google\.com)\/(?:[^\s|,]|,(?=[^\s|,]))+|(?<![\w.@/-])[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9][a-z0-9-]{0,62}){0,3}\.dev(?![\w@-])(?:\/[^\s|,]*)?/gi;
 
 /** A LinkedIn profile's address, printed in a LinkedIn export's contact block. */
 const LINKEDIN_PROFILE = /linkedin\.com\/in\//i;

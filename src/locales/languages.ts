@@ -22,6 +22,13 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
     [keyof typeof degrees, string | undefined]
   >)
     if (pattern) degrees[level] = degrees[level] ? either(degrees[level], pattern) : pattern;
+  // By name in any case, and in a map: a level named "constructor" is no object's property.
+  const levelPatterns = new Map(
+    Object.entries(v.requirements?.seniorityLevels ?? {}).map(([name, patterns]) => [
+      name.toLowerCase(),
+      patterns,
+    ]),
+  );
 
   return {
     ...policy,
@@ -107,7 +114,7 @@ export function applyVocabulary(policy: AtsEnginePolicy, v: AtsVocabulary): AtsE
         languageNames: { ...km.requirements.languageNames, ...v.requirements?.languageNames },
         seniorityLevels: km.requirements.seniorityLevels.map((level) => ({
           ...level,
-          patterns: union(level.patterns, v.requirements?.seniorityLevels?.[level.name]),
+          patterns: union(level.patterns, levelPatterns.get(level.name.toLowerCase())),
         })),
       },
     },

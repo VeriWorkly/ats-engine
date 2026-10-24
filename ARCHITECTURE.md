@@ -135,8 +135,8 @@ No import cycles, value or type. Value closure per entry (internal modules / run
 
 Counted with esbuild's metafile, every bare import left external. "zod/mini" includes its
 English locale (`zod/v4/locales/en.js`, see `util/issues.ts`). Bundle budgets per subpath are
-enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 113 KB for `.`, 92 KB
-for `/locales`, 80 KB for `/ai`, 23 KB for `/node`, under 4 KB for every other; the script
+enforced by `npm run size` (`scripts/size.mjs`, minified and gzipped: 115.5 KB for `.`, 93 KB
+for `/locales`, 81.5 KB for `/ai`, 26 KB for `/node`, under 5 KB for every other; the script
 prints each entry's size against its budget, with the reason for each budget beside it, and
 writes what it measured to `dist/sizes.json`, exported as `./sizes.json`, which the docs build
 their size tables from; `npm run smoke` fails if it is missing or for another version). Two more

@@ -7,6 +7,7 @@ import {
   check as score,
 } from "../../src/index.js";
 import { BUILT_IN_LOCALES, withLocales } from "../../src/locales/index.js";
+import { stuffedTerms } from "../../src/checks/integrity/text.js";
 import { expectFast } from "../fixtures/timing.js";
 
 /**
@@ -269,6 +270,38 @@ Experience with PostgreSQL, Kafka and event driven architectures is required for
   it("is not checked without a posting", () => {
     expect(rule(check(`${RESUME}\n${POSTING}`), "copiedPosting")).toBeUndefined();
   });
+
+  it("flags the requirements pasted in, however long the rest of the posting", () => {
+    const asked = [
+      "Five or more years building data pipelines with Snowflake and Airflow in production",
+      "Hands-on experience modelling warehouse data with dbt and writing performant SQL",
+      "Experience streaming events through Kafka and operating Spark jobs at scale",
+      "Comfort owning Looker dashboards and partnering closely with analytics stakeholders",
+    ];
+    const about =
+      "Acme builds software that helps thousands of logistics companies plan their routes, track " +
+      "their fleets and keep their customers informed about every delivery, from the warehouse " +
+      "to the doorstep, across forty countries and growing every single quarter.";
+    const posting = [
+      "About Acme",
+      about,
+      about.replace("Acme", "Our team"),
+      "Requirements",
+      ...asked.map((line) => `- ${line}`),
+      "Benefits",
+      `- ${about.replace("Acme builds", "A learning budget for")}`,
+    ].join("\n");
+    const pasted = RESUME.replace("Experience\n", `Summary\n${asked.join(" ")}\nExperience\n`);
+    const report = check(pasted, { jobDescription: posting });
+    expect(rule(report, "copiedPosting")).toMatchObject({ passed: false, scoreImpact: 25 });
+    expect(report.jobMatchScore).toBeLessThanOrEqual(report.readinessScore);
+    // One requirement's words in a bullet of the candidate's own is no copy.
+    const own = RESUME.replace(
+      "- Led a team",
+      "- Built data pipelines with Snowflake and Airflow in production for finance\n- Led a team",
+    );
+    expect(rule(check(own, { jobDescription: posting }), "copiedPosting")?.passed).toBe(true);
+  });
 });
 
 describe("keyword stuffing", () => {
@@ -294,6 +327,46 @@ describe("keyword stuffing", () => {
     expect(
       rule(check(`Jane Doe\njane@example.com\nExperience\n${roles}`), "keywordStuffing")?.passed,
     ).toBe(true);
+  });
+
+  /** Three roles, each with `before` bullets above the line given and the rest below it. */
+  const roles = (line: string, before = [2, 3, 1]) =>
+    before
+      .map((n, i) => {
+        const above = Array.from(
+          { length: n },
+          (_, j) => `- Built service ${i}${j} for ${j + 2}M users`,
+        );
+        const below = Array.from(
+          { length: 4 - n },
+          (_, j) => `- Cut latency ${i}${j} by ${20 + j}%`,
+        );
+        return [
+          `Engineer, Acme${i} ${2014 + i * 3} - ${2016 + i * 3}`,
+          ...above,
+          line,
+          ...below,
+        ].join("\n");
+      })
+      .join("\n");
+  const resume = (experience: string) =>
+    `Jane Doe\njane@example.com\nExperience\n${experience}\nEducation\nB.S. Computer Science, State University, 2013`;
+
+  it("flags a list repeating one term inside Experience", () => {
+    const list = `- ${Array(20).fill("Kubernetes").join(", ")}`;
+    const found = rule(check(resume(roles(list, [2]))), "keywordStuffing");
+    expect(found).toMatchObject({ passed: false });
+    expect(found?.evidence).toContain("kubernetes ×20");
+  });
+
+  it("leaves a role's own stack line alone, wherever it sits in each role", () => {
+    const stack = "Technologies: Go, Kafka, PostgreSQL, Kubernetes";
+    expect(rule(check(resume(roles(stack))), "keywordStuffing")?.passed).toBe(true);
+  });
+
+  it("reads many copies of a line in linear time", () => {
+    const lines = Array<string>(32_000).fill("a b c");
+    expectFast(() => stuffedTerms(lines, POLICY, NOW), 500);
   });
 });
 

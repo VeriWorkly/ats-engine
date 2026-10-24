@@ -22,6 +22,8 @@ export type JobMatch = {
   /** Each at most 12. */
   matchedGroups: AtsKeywordGroups;
   missingGroups: AtsKeywordGroups;
+  /** How many terms each list holds before the cut. */
+  counts: { matched: number; missing: number };
 };
 
 /** At most this many terms in each list the report shows. */
@@ -34,6 +36,7 @@ const noMatch = (): JobMatch => ({
   missing: [],
   matchedGroups: { hard: [], soft: [] },
   missingGroups: { hard: [], soft: [] },
+  counts: { matched: 0, missing: 0 },
 });
 
 type Listed = { label: string; weight: number; skill: boolean; soft: boolean };
@@ -241,5 +244,6 @@ export function computeJobMatch(
     missing: missingList.all,
     matchedGroups: matchedList.groups,
     missingGroups: missingList.groups,
+    counts: { matched: matched.length, missing: missing.length },
   };
 }

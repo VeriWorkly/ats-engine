@@ -1,7 +1,12 @@
 import { fromJsonResume, isJsonResume } from "./document/jsonResume.js";
 import { renderResumeDocument } from "./document/render.js";
 import { resumeDocumentSchema } from "./document/schema.js";
-import { DOCUMENT_LIMITS, isResumeDocument, type AtsResumeDocument } from "./document/types.js";
+import {
+  ATS_DOCUMENT_FORMAT,
+  DOCUMENT_LIMITS,
+  isResumeDocument,
+  type AtsResumeDocument,
+} from "./document/types.js";
 import { findName } from "./parser/contact.js";
 import { DEFAULT_POLICY } from "./policy/default.js";
 import { readHiddenCharacters, type HiddenCharacters } from "./text/characters.js";
@@ -41,6 +46,8 @@ export type PreparedResume = {
   readonly document: AtsResumeDocument | null;
   /** Invisible characters the raw input carried, counted before `text` dropped them. */
   readonly hidden: HiddenCharacters;
+  /** The text ran past 50,000 characters and `text` holds only the first 50,000. */
+  readonly truncated: boolean;
   readonly [PREPARED]: true;
 };
 
@@ -72,7 +79,11 @@ function normalizedHead(text: string) {
     kept += normalizeText(text.slice(at, end));
     at = end;
   }
-  return { canonical: cut(kept.trim(), MAX_TEXT_CHARS), read: text.slice(0, at) };
+  const whole = kept.trim();
+  const canonical = cut(whole, MAX_TEXT_CHARS);
+  // Cut: more was kept than is read, or the paste goes on past the last chunk read.
+  const truncated = canonical.length < whole.length || /\S/.test(text.slice(at, at + CHUNK_CHARS));
+  return { canonical, read: text.slice(0, at), truncated };
 }
 
 /** Keys go on their own line so "experience" reads as a heading. Stops at the text budget. */
@@ -145,6 +156,35 @@ function validDocument(input: unknown): AtsResumeDocument {
   );
 }
 
+/**
+ * An object naming the structured format in another spelling or version ("ats-resume@2",
+ * "ATS-RESUME@1"): an error, not text read silently in its place.
+ */
+function isOtherVersion(input: unknown) {
+  const format = (input as { format?: unknown } | null)?.format;
+  return (
+    typeof format === "string" && /^\s*ats-resume/i.test(format) && format !== ATS_DOCUMENT_FORMAT
+  );
+}
+
+/**
+ * The raw strings of the fields a document kept, before the schema cleaned them: the invisible
+ * characters cleaning drops still count, and unknown keys, which the schema strips, do not.
+ */
+function keptStrings(raw: unknown, kept: unknown, out: string[] = []): string[] {
+  if (typeof kept === "string") {
+    if (typeof raw === "string") out.push(raw);
+  } else if (kept && typeof kept === "object" && raw && typeof raw === "object") {
+    for (const key of Object.keys(kept))
+      keptStrings(
+        (raw as Record<string, unknown>)[key],
+        (kept as Record<string, unknown>)[key],
+        out,
+      );
+  }
+  return out;
+}
+
 function isPreparedResume(value: unknown): value is PreparedResume {
   return typeof value === "object" && value !== null && PREPARED in value;
 }
@@ -158,9 +198,15 @@ export function prepareResume(input: unknown): PreparedResume {
 
   let text: string;
   let document: AtsResumeDocument | null = null;
+  // The raw text the engine reads, before invisible characters are dropped from it.
+  let raw: string | undefined;
 
   if (typeof input === "string") {
     text = input;
+  } else if (isOtherVersion(input)) {
+    throw new AtsInputError("Resume document format is not supported.", [
+      { path: "format", message: `Expected "${ATS_DOCUMENT_FORMAT}".` },
+    ]);
   } else if (isResumeDocument(input)) {
     if (isOversized(input))
       throw new AtsInputError("Resume document is too large.", [
@@ -168,6 +214,7 @@ export function prepareResume(input: unknown): PreparedResume {
       ]);
     document = validDocument(input);
     text = renderResumeDocument(document);
+    raw = keptStrings(input, document).join("\n");
   } else if (isJsonResume(input)) {
     const json = fromJsonResume(input);
     // A `basics` that is only a string is held to a printed name's checks: not a headline.
@@ -176,16 +223,17 @@ export function prepareResume(input: unknown): PreparedResume {
     // The adapter's output should validate; if not, the caller gets `AtsInputError`, not a ZodError.
     document = validDocument(json);
     text = renderResumeDocument(document);
+    raw = keptStrings(json, document).join("\n");
   } else {
     text = flatten(input);
   }
 
-  const { canonical, read } = normalizedHead(text);
+  const { canonical, read, truncated } = normalizedHead(text);
 
   return Object.freeze({
     text: canonical,
-    // Count what the engine reads: structured inputs are rendered first, so stripped unknown keys cannot smuggle characters.
-    hidden: readHiddenCharacters(typeof input === "string" ? read : canonical),
+    truncated,
+    hidden: readHiddenCharacters(raw ?? read),
     document,
     [PREPARED]: true as const,
   });

@@ -259,6 +259,31 @@ describe("detection", () => {
     expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
   });
 
+  // No bullets to weigh: the whole resume decides, not an empty sample any pack's words beat.
+  it("weighs a resume with no bullets whole, so place names keep it English", () => {
+    const report = check(
+      [
+        "Ravi Kumar",
+        "ravi@example.com | Des Moines, IA",
+        "Experience",
+        "Store Manager, Les Schwab Tire Centers — Des Moines, IA    03/2018 – 06/2021",
+        "Ran the Des Moines store and its team of twelve.",
+        "Research Assistant, Iowa State University — Ames, IA    09/2016 – 02/2018",
+        "Co-wrote a study on tire wear (Smith et al., 2017).",
+        "Education",
+        "BSc Mechanical Engineering, Iowa State University, 2016",
+        "Skills",
+        "Inventory, Scheduling, Excel",
+      ].join("\n"),
+    );
+    expect(report.locale.region).toBeNull();
+    expect(report.rules.map((rule) => rule.id)).toContain("ats-v2.writing.firstPerson");
+    // A French CV with no bullets is still French.
+    const unbulleted = LOCALE_FIXTURES.fr[0]!.text.replace(/^[-•]\s*/gmu, "");
+    expect(check(unbulleted).locale).toEqual(check(LOCALE_FIXTURES.fr[0]!.text).locale);
+    expect(check(unbulleted).locale.region).toBe("FR");
+  });
+
   // German or Hindi bullets keep their country's dates and rules under English headings or summary.
   const BECKER = [
     "Jonas Becker",
@@ -607,6 +632,84 @@ describe("packs", () => {
   it("replace an attached pack with the same id", () => {
     const twice = withLocales(withLocales(DEFAULT_POLICY, BUILT_IN_LOCALES), { languages: [de] });
     expect(twice.locales.languages.map((pack) => pack.id)).toEqual(["de", "fr", "hi", "es", "pt"]);
+  });
+
+  it("refuse a region's change to a rule id with a typo, and ignore one the policy left out", () => {
+    const typo = {
+      ...BUILT_IN_LOCALES.regions[0]!,
+      rules: { "ats-v2.privacy.dateOfBrith": { weight: 0 } },
+    };
+    let error: unknown;
+    try {
+      withLocales(DEFAULT_POLICY, { regions: [typo] });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(AtsPolicyError);
+    expect((error as AtsPolicyError).issues).toEqual([
+      {
+        path: "locales.regions.0.rules.ats-v2.privacy.dateOfBrith",
+        message:
+          'the policy has no rule with id "ats-v2.privacy.dateOfBrith"; did you mean "ats-v2.privacy.dateOfBirth"?',
+      },
+    ]);
+    // A host's own policy without the photo and date-of-birth rules still takes every region.
+    const own = parseAtsPolicy({
+      ...DEFAULT_POLICY,
+      rules: DEFAULT_POLICY.rules.filter((rule) => !/photo|dateOfBirth/.test(rule.id)),
+    });
+    expect(() => withLocales(own, BUILT_IN_LOCALES)).not.toThrow();
+  });
+
+  it("add seniority patterns to a level of any name, in any case", () => {
+    const levels = [
+      ...DEFAULT_POLICY.keywordMatch.requirements.seniorityLevels,
+      { name: "constructor", years: 3, patterns: ["foreman"] },
+    ];
+    const policy = withLocales(
+      {
+        ...DEFAULT_POLICY,
+        keywordMatch: {
+          ...DEFAULT_POLICY.keywordMatch,
+          requirements: { ...DEFAULT_POLICY.keywordMatch.requirements, seniorityLevels: levels },
+        },
+      },
+      {
+        languages: [
+          {
+            ...de,
+            requirements: { ...de.requirements, seniorityLevels: { Senior: ["oberarzt"] } },
+          },
+        ],
+      },
+    );
+    const localized = localizePolicy(policy, "", { languages: ["de"] }).policy;
+    const patterns = (name: string) =>
+      localized.keywordMatch.requirements.seniorityLevels.find((level) => level.name === name)
+        ?.patterns;
+    expect(patterns("senior")).toContain("oberarzt");
+    expect(patterns("constructor")).toEqual(["foreman"]);
+  });
+
+  it("match a language name a pack writes with capitals", () => {
+    const policy = withLocales(DEFAULT_POLICY, {
+      regions: [
+        {
+          ...BUILT_IN_LOCALES.regions[0]!,
+          requirements: { languageNames: { Castellano: "Spanish" } },
+        },
+      ],
+    });
+    const report = score(
+      "Jane Doe\njane@example.com\nExperience\nEngineer, Acme 2020 - 2022\n- Built the billing service\nLanguages\nSpanish (native), English (fluent)",
+      policy,
+      {
+        now: NOW,
+        jobDescription: "Requirements\n- Fluent in Castellano",
+        region: BUILT_IN_LOCALES.regions[0]!.id,
+      },
+    );
+    expect(report.requirements.find((row) => row.kind === "language")?.status).toBe("met");
   });
 
   it("publish a JSON Schema for contributors", () => {

@@ -20,6 +20,7 @@ import {
 } from "../checks/writing.js";
 import { parseResumeDocument } from "../document/parse.js";
 import type { PreparedResume } from "../input.js";
+import { requirementLines } from "../matching/requirements.js";
 import { BULLET, wordListRegex, words } from "../text/text.js";
 import { statesDateOfBirth } from "../parser/contact.js";
 import { parseQuality, parseReadLines, readSections } from "../parser/index.js";
@@ -130,7 +131,15 @@ export function readResume(
         sample: prepared.hidden.smuggled.slice(0, 80),
       },
       homoglyphWords: homoglyphWords(text),
-      copiedPostingRatio: jobDescription?.trim() ? copiedPosting(text, jobDescription) : null,
+      copiedPostingRatio: jobDescription?.trim()
+        ? copiedPosting(
+            text,
+            jobDescription,
+            requirementLines(jobDescription, policy)
+              .map((line) => line.text)
+              .join("\n"),
+          )
+        : null,
       stuffedTerms: stuffedTerms(lines, policy, now, parsed.name ?? "", fullCitations(cited)),
       timelineIssues: timelineIssues(parsed.roles, parsed.monthsOfExperience, now),
       unsupportedSkills: unsupportedSkills(sections, parsed.skills),

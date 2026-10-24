@@ -2,8 +2,10 @@ import { isSupportedCountry, type CountryCode } from "libphonenumber-js/min";
 import * as z from "zod/mini";
 
 import {
+  capturingRegexString,
   cefrLevels,
   iscedDegrees,
+  languageNameMap,
   monthNumber,
   regexString,
   seasonRanges,
@@ -103,12 +105,12 @@ const vocabularyShape = {
   requirements: z.optional(
     z.partial(
       z.object({
-        yearsPatterns: z.array(regexString("requirements.yearsPatterns")),
+        yearsPatterns: z.array(capturingRegexString("requirements.yearsPatterns")),
         equivalence: wordList("requirements.equivalence"),
         authorization: wordList("requirements.authorization"),
         clearance: wordList("requirements.clearance"),
-        languagePatterns: z.array(regexString("requirements.languagePatterns")),
-        languageNames: z.record(z.string().check(z.minLength(1)), z.string().check(z.minLength(1))),
+        languagePatterns: z.array(capturingRegexString("requirements.languagePatterns")),
+        languageNames: languageNameMap,
         /** Patterns added to the seniority level of that name ("entry": "werkstudent(?:in)?"). */
         seniorityLevels: z.record(
           z.string().check(z.minLength(1)),
@@ -202,7 +204,8 @@ export const regionPackSchema = z.object({
   /**
    * Adjustments to the attached policy's rules, by rule id: a convention that differs by country
    * (a date of birth, a photo) is weighed differently there. `weight` replaces a rule's weight,
-   * or every non-zero band weight of a banded rule. An id the policy does not have is ignored.
+   * or every non-zero band weight of a banded rule. An id the policy does not have is ignored,
+   * and one a typo away from an id it has is refused when the pack is attached.
    */
   rules: z._default(
     z.record(

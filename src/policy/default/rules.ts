@@ -284,7 +284,7 @@ export const DEFAULT_RULES = [
     ],
     passEvidence: "The resume is not a copy of the posting.",
     failEvidence:
-      '{pct}% of the job posting appears word for word in the resume, such as "{sample}".',
+      '{pct}% of the job posting, or of its requirements, appears word for word in the resume, such as "{sample}".',
     fix: "Describe your own experience. A pasted posting is caught the moment a recruiter reads the resume.",
   },
   {

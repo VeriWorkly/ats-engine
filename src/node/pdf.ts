@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 
 import type { AtsLayoutSignals } from "../types.js";
 import { hiddenSignals } from "./docx.js";
-import { measureVisibility, readImages } from "./hidden.js";
+import { CrowdedPage, measureVisibility, readImages } from "./hidden.js";
 import type { Box } from "./surroundings.js";
 import { joinPages, pageText, withLinks, type PdfTextItem } from "./lines.js";
 import { optional } from "./peer.js";
@@ -78,6 +78,8 @@ async function readPdf(
     let visibilityRead = true;
     let measured = 0;
 
+    // The layers the document shows: text in one turned off is hidden. Unreadable, every layer shows.
+    const layers = await document.getOptionalContentConfig().catch(() => undefined);
     const last = Math.min(document.numPages, MAX_PAGES_READ);
     for (let number = 1; number <= last && chars < maxChars; number += 1) {
       const page = await document.getPage(number);
@@ -104,6 +106,7 @@ async function readPdf(
               list,
               page.view as Box,
               await readImages(ops, list, page as unknown as Parameters<typeof readImages>[2]),
+              layers,
             );
             // A loop, not `push(...)`: a spread of many runs overflows the stack.
             for (const run of seen.hidden) hidden.push(run);
@@ -126,8 +129,11 @@ async function readPdf(
               const [[a, b], [c, d]] = [toViewport(x0, y0), toViewport(x1, y1)];
               return [Math.min(a, c), Math.min(b, d), Math.max(a, c), Math.max(b, d)];
             });
-          } catch {
+          } catch (error) {
             visibilityRead = false;
+            // A page too crowded to measure still counts the tables it rules.
+            if (error instanceof CrowdedPage && number <= MAX_PAGES_MEASURED)
+              tables += error.tables;
           }
 
       try {

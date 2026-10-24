@@ -230,6 +230,8 @@ export function describeAiError(error: unknown, config: AiConfig): string {
       );
     case "refused":
       return `${where} declined this resume.`;
+    case "unusable":
+      return `${where} found nothing in the resume to add (${error.message}).`;
     case "invalid_output":
       return `${where} did not return a usable answer (${error.message}). Try another model.`;
     case "provider":

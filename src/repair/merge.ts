@@ -2,7 +2,7 @@ import { escapeRegex, normalizeText, wordListRegex } from "../text/text.js";
 import { educationLevel } from "../parser/education.js";
 import { isLeave, organisationWordsOf, titleWordsOf } from "../parser/experience.js";
 import { isSectionHeading } from "../parser/sections.js";
-import { findDateRange, isPlausibleDate } from "../parser/dates.js";
+import { findDateRange, findDates, isPlausibleDate } from "../parser/dates.js";
 import { parseQuality } from "../parser/index.js";
 import { finalizeParsed, type ParsedCore } from "../parser/record.js";
 import { inLanguagesOf } from "../locales/languages.js";
@@ -79,6 +79,24 @@ export function writtenYears(text: string): Set<number> {
   for (const [, short] of text.matchAll(TWO_DIGIT_YEAR))
     years.add(1900 + Number(short)).add(2000 + Number(short));
   return years;
+}
+
+/**
+ * The months a document writes with their year, as "2019-9", in any form the parser reads ("Sep
+ * 2019", "09/2019", a range's "09/19 –"): the line's dates and its range's ends.
+ */
+function writtenMonths(text: string, policy: AtsEnginePolicy, now: Date): Set<string> {
+  const months = new Set<string>();
+  const add = (date: AtsParsedDate | null | undefined) => {
+    if (date?.month) months.add(`${date.year}-${date.month}`);
+  };
+  for (const line of text.split("\n")) {
+    for (const { date } of findDates(line, policy.resumeParse, now)) add(date);
+    const range = findDateRange(line, policy.resumeParse, now)?.range;
+    add(range?.start);
+    add(range?.end);
+  }
+  return months;
 }
 
 /**
@@ -255,10 +273,17 @@ export function mergeGrounded(
   const ok = (path: string, value: string) => /[\p{L}\p{N}]/u.test(value) && !rejected.has(path);
 
   // Dates and "current" set tenure, so they are grounded too: a year must appear in the document,
-  // and "current" needs a present-tense word beside the role's own dates.
-  const years = writtenYears(normalizeText(source));
-  const date = (value: AtsParsedDate | null) =>
-    isPlausibleDate(value, now) && years.has(value.year) ? value : null;
+  // a month with that year ("2019 - 2022" gives no month to keep), and "current" needs a
+  // present-tense word beside the role's own dates.
+  const text = normalizeText(source);
+  const years = writtenYears(text);
+  const months = writtenMonths(text, policy, now);
+  const date = (value: AtsParsedDate | null) => {
+    if (!isPlausibleDate(value, now) || !years.has(value.year)) return null;
+    return value.month === null || months.has(`${value.year}-${value.month}`)
+      ? value
+      : { year: value.year, month: null };
+  };
   const ongoing = ongoingIn(source, policy);
   const isCurrent = (role: AtsRepairCandidate["roles"][number], start: AtsParsedDate | null) =>
     role.current && ongoing(start?.year ?? null, [role.employer, role.title]);

@@ -535,6 +535,17 @@ describe("the fingerprint names the policy as applied", () => {
   it("still changes with the vocabulary a pack applies", () => {
     expect(policyFingerprint(DE_POLICY)).not.toBe(policyFingerprint(P));
   });
+
+  // N4 B29: detection words decide which bullets a pack's language governs, so they are part of
+  // the reading; the order packs are read in is not.
+  it("changes with the detection words of a language a resume is read in", () => {
+    const fingerprint = (packs: (typeof de)[]) =>
+      score(DE_RESUME, withLocales(DEFAULT_POLICY, { languages: packs }), { now: NOW }).engine
+        .policy;
+    const extended = { ...de, detectionWords: [...de.detectionWords!, "zwischen"] };
+    expect(fingerprint([extended])).not.toBe(fingerprint([de]));
+    expect(fingerprint([de, hi])).toBe(fingerprint([hi, de]));
+  });
 });
 
 describe("rule ids are unique", () => {
@@ -572,6 +583,29 @@ describe("degrees the review found unread", () => {
     ["Ingeniería Civil Industrial, Universidad de Chile", 6, ES_POLICY],
     ["पीएच.डी. (कंप्यूटर विज्ञान)", 8, HI_POLICY],
   ])("reads %s at level %i", (line, level, policy) => {
+    expect(isced(line, policy)).toBe(level);
+  });
+});
+
+// N4 B25: ordinary words a region's or the base's degree pattern read as a credential.
+describe("ordinary words are not degrees", () => {
+  it.each([
+    ["You will provide a level 2 support service", "GB"],
+    ["You must be computer literate", "IN"],
+    ["Experience in sales promotion in retail", "DE"],
+    ["We cannot offer a Certificate of Sponsorship", "GB"],
+    ["We cannot offer a Certificate of Sponsorship", "US"],
+  ])("does not read %j as a degree asked in %s", (line, region) => {
+    expect(requirement(line, localized([], region))?.kind).not.toBe("education");
+  });
+
+  it.each([
+    ["A Levels: Maths, Physics, 2013", 3, DEFAULT_POLICY],
+    ["A-level 3 subjects, 2013", 3, DEFAULT_POLICY],
+    ["Certificate of Higher Education", 4, DEFAULT_POLICY],
+    ["BE Computer Science, Anna University", 6, IN_POLICY],
+    ["Promotion in Informatik, TU München", 8, DE_POLICY],
+  ])("still reads %j at level %i", (line, level, policy) => {
     expect(isced(line, policy)).toBe(level);
   });
 });

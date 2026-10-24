@@ -288,14 +288,16 @@ export function localizePolicy(
           (postingSample !== undefined && isWrittenIn(postingSample, pack)),
       );
   // Every pack the resume has words of adds its vocabulary; the language of its bullets decides
-  // rules and region (English bullets under a French summary stay English).
-  const bullets = sampleOf(
+  // rules and region (English bullets under a French summary stay English). A resume with no
+  // bullets is weighed whole: an empty sample would let any pack's words win.
+  const bulletSample = sampleOf(
     resumeText
       .slice(0, DETECTION_SAMPLE)
       .split("\n")
       .filter((line) => BULLET.test(line))
       .join("\n"),
   );
+  const bullets = bulletSample.words.length ? bulletSample : resumeSample;
   const leading = options.languages
     ? languages
     : inResume.filter((pack) => outweighs(bullets, pack, policy.text));
@@ -316,7 +318,10 @@ export function localizePolicy(
   };
   const key = `${locale.languages.join("+")}|${locale.region ?? ""}|${dateOrder ?? ""}`;
 
-  const cached = localizedOf(policy);
+  // A host's own unparsed policy is neither cached nor frozen: freezing would freeze the host's
+  // objects, and a cache keyed by it would miss the host's later changes to it.
+  const shared = Object.isFrozen(policy);
+  const cached = shared ? localizedOf(policy) : new Map<string, AtsEnginePolicy>();
   let localized = cached.get(key);
   if (!localized) {
     localized = languages.reduce(applyVocabulary, policy);
@@ -342,7 +347,7 @@ export function localizePolicy(
     if (dateOrder)
       localized = { ...localized, resumeParse: { ...localized.resumeParse, dateOrder } };
     // Shared across resumes, so frozen.
-    cached.set(key, deepFreeze(localized));
+    cached.set(key, shared ? deepFreeze(localized) : localized);
   }
   const read = leading.map((pack) => pack.id);
   const other = unsupportedIn(read);

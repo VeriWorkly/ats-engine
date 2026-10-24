@@ -115,9 +115,15 @@ const wordsOf = (text: string) => text.toLowerCase().match(/[\p{L}\p{M}\p{N}]+/g
 
 /**
  * The share of the posting that appears in the resume word for word, in runs of eight words,
- * long enough that coincidence is rare. Null for a posting too short to compare.
+ * long enough that coincidence is rare; or the share of its requirements (`asked`), when that is
+ * higher: pasted in, they lift the job match however long the rest of the posting is. Null for a
+ * posting too short to compare.
  */
-export function copiedPosting(resume: string, posting: string | undefined): Finding | null {
+export function copiedPosting(
+  resume: string,
+  posting: string | undefined,
+  asked = "",
+): Finding | null {
   const jobWords = wordsOf(posting ?? "");
   if (jobWords.length < SHINGLE * 3) return null;
   const resumeRuns = new Set<string>();
@@ -125,13 +131,21 @@ export function copiedPosting(resume: string, posting: string | undefined): Find
   for (let i = 0; i + SHINGLE <= resumeWords.length; i += 1)
     resumeRuns.add(resumeWords.slice(i, i + SHINGLE).join(" "));
 
+  const whole = sharedRuns(jobWords, resumeRuns);
+  const askedWords = wordsOf(asked);
+  const part = askedWords.length >= SHINGLE * 3 ? sharedRuns(askedWords, resumeRuns) : NONE;
+  return part.value > whole.value ? part : whole;
+}
+
+/** The share of the runs of `words` that `runs` holds, quoting the first. */
+function sharedRuns(words: string[], runs: Set<string>): Finding {
   let shared = 0;
   let total = 0;
   let sample = "";
-  for (let i = 0; i + SHINGLE <= jobWords.length; i += 1) {
-    const run = jobWords.slice(i, i + SHINGLE).join(" ");
+  for (let i = 0; i + SHINGLE <= words.length; i += 1) {
+    const run = words.slice(i, i + SHINGLE).join(" ");
     total += 1;
-    if (!resumeRuns.has(run)) continue;
+    if (!runs.has(run)) continue;
     shared += 1;
     sample ||= run;
   }
@@ -166,6 +180,12 @@ function listItems(line: string): string[] | null {
     .filter(Boolean);
   if (items.length < 3 || items.some((item) => item.split(/\s+/).length > 4)) return null;
   return items;
+}
+
+/** A labelled list, as a role states its stack: "Technologies: Go, Kafka, PostgreSQL". */
+function stackLine(line: string) {
+  const text = line.replace(BULLET_PREFIX, "");
+  return LABELLED.test(text) && listItems(text) !== null;
 }
 
 /**
@@ -256,18 +276,20 @@ export function stuffedTerms(
 
   // A skill named again and again within one line, or across the plain lists of a skills section.
   // Other entries repeat a field by nature, as do dated or labelled entries a skills section
-  // swallowed under an unrecognised heading.
+  // swallowed under an unrecognised heading. In a work section, whose roles name their own stacks,
+  // only within one line, its dated headers aside.
   const besideRoles = new Set(lines.filter((_, at) => nearRole(at)));
+  const datedLines = new Set(lines.filter((_, at) => dated[at]));
   const flag = (items: Map<string, number>) => {
     for (const [item, count] of items)
       if (count >= 3) stuffed.set(item, Math.max(count, stuffed.get(item) ?? 0));
   };
   for (const section of segmentResume(lines, policy)) {
-    if (section.kind === "experience" || section.kind === "projects") continue;
+    const work = section.kind === "experience" || section.kind === "projects";
     const across = new Map<string, number>();
     for (const line of section.lines) {
-      if (besideRoles.has(line)) continue;
-      const items = listItems(line) ?? [];
+      if (work ? datedLines.has(line) : besideRoles.has(line)) continue;
+      const items = listItems(work ? line.replace(BULLET_PREFIX, "") : line) ?? [];
       const within = new Map<string, number>();
       for (const item of items) add(within, item);
       flag(within);
@@ -282,7 +304,10 @@ export function stuffedTerms(
   lines.forEach((line, at) => {
     if (line.split(/\s+/).length < 3 || dated[at]) return;
     const key = line.toLowerCase();
-    lineAt.set(key, [...(lineAt.get(key) ?? []), at]);
+    // Pushed, not spread: a copy per line is quadratic on thousands of copies.
+    const seen = lineAt.get(key);
+    if (seen) seen.push(at);
+    else lineAt.set(key, [at]);
   });
   // Every copy at one distance from its role's dates is the layout of a role block.
   const sameOffset = (at: number[], offset: number[]) =>
@@ -293,14 +318,16 @@ export function stuffedTerms(
   // pairing"); a run of terms has neither.
   const roleOf = (at: number) => at - above[at];
   const opensWithVerb = actionVerbAtStart(policy.text);
+  // So is a role's own stack, labelled ("Technologies: Go, Kafka"), wherever it sits in each.
   const eachInARole = (at: number[]) =>
     at.length <= 4 &&
     at.every((index) => Number.isFinite(roleOf(index))) &&
     new Set(at.map(roleOf)).size === at.length &&
-    listItems(lines[at[0]]) === null &&
-    readsAsSentence(lines[at[0]]) &&
-    (wordsOf(lines[at[0]]).some((word) => stopwords.has(word)) ||
-      opensWithVerb.test(lines[at[0]].replace(BULLET_PREFIX, "")));
+    (stackLine(lines[at[0]]) ||
+      (listItems(lines[at[0]]) === null &&
+        readsAsSentence(lines[at[0]]) &&
+        (wordsOf(lines[at[0]]).some((word) => stopwords.has(word)) ||
+          opensWithVerb.test(lines[at[0]].replace(BULLET_PREFIX, "")))));
   const repeatedLines = [...lineAt].filter(
     ([, at]) =>
       at.length >= 3 &&

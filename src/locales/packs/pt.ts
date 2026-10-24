@@ -1,3 +1,4 @@
+import { wholeWord as word } from "../../text/text.js";
 import { deepFreeze } from "../../util/memo.js";
 import type { AtsLanguagePackInput } from "../schema.js";
 
@@ -12,7 +13,6 @@ import type { AtsLanguagePackInput } from "../schema.js";
  *   so a Spanish resume is not read as Portuguese, nor the other way round.
  * Brazil's credentials and states are the BR region's.
  */
-const word = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
 const a = "[aáàâã]";
 const e = "[eéê]";
 const i = "[ií]";

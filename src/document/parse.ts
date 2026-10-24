@@ -44,7 +44,7 @@ export function parseResumeDocument(
         // Time off is no role, as in printed text: "Parental leave", "Elternzeit".
         if ((!title && !employer) || isLeave(title, employer, policy)) continue;
         const start = parseDocumentDate(item.start, rp, now);
-        const end = parseDocumentDate(item.end, rp, now);
+        const end = parseDocumentDate(item.end, rp, now, "end");
         // An end that is no date but an open end in any language read ("heute", "Current role").
         const current =
           Boolean(item.current) || (start !== null && !end && saysOngoing(item.end, rp));
@@ -62,7 +62,9 @@ export function parseResumeDocument(
           credential,
           ...educationLevel(credential, policy),
           end:
-            item.current || saysOngoing(item.end, rp) ? null : parseDocumentDate(item.end, rp, now),
+            item.current || saysOngoing(item.end, rp)
+              ? null
+              : parseDocumentDate(item.end, rp, now, "end"),
         });
       }
     } else if (section.kind === "skills") {
@@ -81,7 +83,7 @@ export function parseResumeDocument(
             name,
             issuer: item.issuer?.trim() ?? "",
             date: parseDocumentDate(item.date, rp, now),
-            expires: parseDocumentDate(item.expires, rp, now),
+            expires: parseDocumentDate(item.expires, rp, now, "end"),
           },
         ]);
       }
@@ -97,7 +99,11 @@ export function parseResumeDocument(
         )
           continue;
         const level = item.level?.trim() ?? "";
-        spokenLanguages.push({ language, level, cefr: level ? cefrLevel(level, policy) : null });
+        spokenLanguages.push({
+          language,
+          level,
+          cefr: level ? cefrLevel(level, policy, true) : null,
+        });
       }
     } else if (section.kind === "other") {
       // Read as the text parser reads that section: each entry's heading, or its lines without one.

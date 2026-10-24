@@ -21,10 +21,15 @@ export default tseslint.config(
     files: ["scripts/**/*.mjs", "action/**/*.mjs", "*.mjs"],
     languageOptions: {
       globals: Object.fromEntries(
-        ["process", "console", "TextEncoder", "TextDecoder", "URL"].map((name) => [
-          name,
-          "readonly",
-        ]),
+        [
+          "process",
+          "console",
+          "TextEncoder",
+          "TextDecoder",
+          "URL",
+          "setTimeout",
+          "clearTimeout",
+        ].map((name) => [name, "readonly"]),
       ),
     },
   },

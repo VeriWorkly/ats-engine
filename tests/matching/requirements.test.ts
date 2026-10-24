@@ -48,6 +48,34 @@ describe("requirements", () => {
   it("is empty without a posting", () => {
     expect(check(RESUME, DEFAULT_POLICY, { now: NOW }).requirements).toEqual([]);
   });
+
+  it("judges the first 25 and says when the posting lists more", () => {
+    const asked = (n: number) =>
+      `Requirements\n${Array.from({ length: n }, (_, i) => `- Go and tool${i}`).join("\n")}`;
+    const warning = "The posting lists 30 requirements; only the first 25 were judged.";
+    const many = check(RESUME, DEFAULT_POLICY, { jobDescription: asked(30), now: NOW });
+    expect(many.requirements).toHaveLength(25);
+    expect(many.parsingWarnings).toContain(warning);
+    const few = check(RESUME, DEFAULT_POLICY, { jobDescription: asked(25), now: NOW });
+    expect(few.parsingWarnings.join(" ")).not.toContain("requirements");
+  });
+
+  it("finds evidence on any line of a long resume, as the job match does", () => {
+    const filler = Array.from({ length: 1_200 }, (_, i) => `- Shipped release ${i}`).join("\n");
+    const report = check(
+      RESUME.replace("Education", `${filler}\nEducation`).replace(
+        "Skills\nGo",
+        "Skills\nSnowflake, Go",
+      ),
+      DEFAULT_POLICY,
+      { jobDescription: "Requirements\n- Snowflake", now: NOW },
+    );
+    expect(report.jobMatchScore).toBe(100);
+    expect(report.requirements[0]).toMatchObject({
+      status: "met",
+      evidence: ["Snowflake, Go, Python, Kubernetes, Terraform, PostgreSQL"],
+    });
+  });
 });
 
 describe("skills", () => {
@@ -71,6 +99,33 @@ describe("skills", () => {
       status: "met",
       evidence: ["Built data pipelines with Python and Kafka"],
     });
+  });
+
+  it.each(["dbt", "git", "npm"])("reads a short tool, %s, as the job match does", (tool) => {
+    const ask = `Requirements\n- Hands-on experience with ${tool}`;
+    const without = check(RESUME, DEFAULT_POLICY, { jobDescription: ask, now: NOW });
+    expect(without.requirements[0]?.status).toBe("missing");
+    expect(without.missingKeywords).toContain(tool);
+    const withIt = check(RESUME.replace("Skills\nGo", `Skills\n${tool}, Go`), DEFAULT_POLICY, {
+      jobDescription: ask,
+      now: NOW,
+    });
+    expect(withIt.requirements[0]?.status).toBe("met");
+    expect(withIt.matchedKeywords).toContain(tool);
+  });
+
+  it.each([
+    ["Experience with Terraform or Google Cloud"],
+    ["Kafka or GitHub Actions"],
+    ["Experience with Google Cloud or Terraform"],
+  ])("takes a product name of two words as one alternative: %s", (ask) => {
+    const report = check(RESUME, DEFAULT_POLICY, {
+      jobDescription: `Requirements\n- ${ask}`,
+      now: NOW,
+    });
+    expect(report.requirements[0]?.status).toBe("met");
+    expect(report.jobMatchScore).toBe(100);
+    expect(report.missingKeywords).toEqual([]);
   });
 
   it("is partial with some and missing with none", () => {
@@ -159,6 +214,53 @@ describe("skills", () => {
     expect(listing("Python", "Python, Node.js/React").missingKeywords).toEqual(
       expect.arrayContaining(["node.js", "react"]),
     );
+  });
+
+  it("reads no skill in the path of a resume's link to a site of two labels", () => {
+    const ask = "Snowflake\n- Airflow\n- Looker";
+    for (const link of [
+      "github.com/snowflake/airflow/looker",
+      "acme.co/snowflake/airflow/looker",
+    ]) {
+      const report = listing(`Python, Go\nProjects\n- Portfolio: ${link}`, ask);
+      expect(report.jobMatchScore, link).toBe(0);
+      expect(report.requirements.map((row) => row.status)).toEqual([
+        "missing",
+        "missing",
+        "missing",
+      ]);
+    }
+    // A skill written with a dot and slashes is still a skill.
+    for (const skills of ["ASP.NET/C#/SQL", "Socket.io/Redis/Kafka"])
+      expect(listing(skills, "SQL\n- Kafka").jobMatchScore, skills).toBeGreaterThan(0);
+  });
+
+  it("reads no skill on the contact line, and quotes none of it", () => {
+    const ask = "Snowflake\n- Airflow\n- Looker";
+    for (const contact of [
+      "jane@example.com | Snowflake Airflow Looker",
+      "Snowflake, Airflow, Looker | +1 415 555 0142",
+    ]) {
+      const report = check(
+        RESUME.replace("jane@example.com | +1 415 555 0142", contact),
+        DEFAULT_POLICY,
+        {
+          jobDescription: `Requirements\n- ${ask}`,
+          now: NOW,
+        },
+      );
+      expect(report.jobMatchScore, contact).toBe(0);
+      expect(
+        report.requirements.map((row) => [row.status, row.evidence]),
+        contact,
+      ).toEqual([
+        ["missing", []],
+        ["missing", []],
+        ["missing", []],
+      ]);
+    }
+    // Skills listed under a heading still count.
+    expect(listing("Snowflake, Airflow, Looker", ask).jobMatchScore).toBe(100);
   });
 
   it.each([

@@ -270,4 +270,11 @@ describe("printable on /format", () => {
       b: "ok\n\tfine",
     });
   });
+
+  it("does not run out of stack on a value nested 200,000 deep", () => {
+    let deep: unknown = "x\u001b";
+    for (let level = 0; level < 200_000; level += 1) deep = [deep];
+    expect(() => printable(deep)).not.toThrow();
+    expect(printable([["x\u001b"]])).toEqual([["x"]]);
+  });
 });

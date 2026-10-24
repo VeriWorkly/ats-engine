@@ -61,6 +61,24 @@ describe("a role header with its location", () => {
     ).roles;
     expect(roles.map((role) => role.employer)).not.toContain("the ledger service");
   });
+
+  it.each([
+    "Senior Software Engineer, Globex Corporation International Jan 2021 – Present",
+    "Senior Software Engineer, Globex Corporation International\tJan 2021 – Present",
+  ])("does not join a lowercase description onto the dated header %j", (header) => {
+    expect(
+      parseResume(
+        [
+          "Jane Doe",
+          "Experience",
+          header,
+          "built the ledger service used by every team in the company",
+        ],
+        DEFAULT_POLICY,
+        now,
+      ).roles.map(({ title, employer }) => [title, employer]),
+    ).toEqual([["Senior Software Engineer", "Globex Corporation International"]]);
+  });
 });
 
 /** The roles a resume reads, with a bullet under the block and an education section after it. */
@@ -517,6 +535,63 @@ describe("dates first, title and employer below on lines of their own", () => {
     ).toEqual([
       ["Software Engineer", "", 2019, false],
       ["Analyst", "", 2016, false],
+    ]);
+  });
+});
+
+describe("role headers written as bullets", () => {
+  it("reads a dated bullet with a title and an employer as a role when no other line is dated", () => {
+    expect(
+      rolesIn(
+        "- **Senior Software Engineer**, Globex Corp — Jan 2021 – Present",
+        "- Led the payments team",
+        "- Software Engineer, Initech Inc — Mar 2018 – Dec 2020",
+      ),
+    ).toEqual([
+      { title: "Senior Software Engineer", employer: "Globex Corp" },
+      { title: "Software Engineer", employer: "Initech Inc" },
+    ]);
+  });
+
+  it("reads no role from a dated bullet beside an unbulleted dated header, nor from a sentence", () => {
+    expect(
+      rolesIn(
+        "Senior Software Engineer, Globex Corp — Jan 2021 – Present",
+        "- Analyst, Initech Inc — Mar 2018 – Dec 2020",
+      ),
+    ).toEqual([{ title: "Senior Software Engineer", employer: "Globex Corp" }]);
+    expect(rolesIn("- Led the migration at Globex Corp, Jan 2021 – Present")).toEqual([]);
+  });
+});
+
+describe("several titles under one employer's line, each dated on its own line", () => {
+  it.each(["Senior Engineer, Jan 2021 – Present", "Senior Engineer    Jan 2021 – Present"])(
+    "names the employer for every title in %j's layout",
+    (first) => {
+      const second = first
+        .replace("Senior Engineer", "Engineer")
+        .replace("Jan 2021 – Present", "Jan 2019 – Dec 2020");
+      expect(
+        rolesIn("Globex Corp", first, "- Led the payments team", second, "- Built the ledger"),
+      ).toEqual([
+        { title: "Senior Engineer", employer: "Globex Corp" },
+        { title: "Engineer", employer: "Globex Corp" },
+      ]);
+    },
+  );
+
+  it("still gives a role that names its own employer that one", () => {
+    expect(
+      rolesIn(
+        "Globex Corp",
+        "Senior Engineer, Jan 2021 – Present",
+        "- Led the payments team",
+        "Initech Inc",
+        "Engineer, Jan 2019 – Dec 2020",
+      ),
+    ).toEqual([
+      { title: "Senior Engineer", employer: "Globex Corp" },
+      { title: "Engineer", employer: "Initech Inc" },
     ]);
   });
 });

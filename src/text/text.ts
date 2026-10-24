@@ -27,6 +27,12 @@ export function wordListRegex(list: readonly string[], flags = "i") {
   return new RegExp(wordListPattern(list), `${flags}u`);
 }
 
+/**
+ * `body` with no letter or mark either side, in any script: what the language and region packs
+ * write `\b` as (a digit may touch it, unlike `wordListPattern`). Compile with the `u` flag.
+ */
+export const wholeWord = (body: string) => String.raw`(?<![\p{L}\p{M}])(?:${body})(?![\p{L}\p{M}])`;
+
 /** The first `max` UTF-16 units, one fewer when the cut would split a surrogate pair. */
 export function cut(text: string, max: number) {
   return /[\uD800-\uDBFF]/.test(text.charAt(max - 1)) ? text.slice(0, max - 1) : text.slice(0, max);

@@ -1,4 +1,5 @@
 import type { AtsEnginePolicy } from "../policy/schema.js";
+import { BULLET } from "../text/text.js";
 import { findDateRange } from "./dates.js";
 import { despaceLines, isBareSectionHeading } from "./sections.js";
 
@@ -36,12 +37,26 @@ function joinWrapped(lines: string[], policy: AtsEnginePolicy): string[] {
       !/[.!?]$/.test(previous) &&
       continues(previous, line) &&
       !isBareSectionHeading(line, policy) &&
-      !isDateLine(line, policy)
+      !isDateLine(line, policy) &&
+      !(CONTINUATION.test(line) && isRowHeader(previous, policy))
     )
       joined[last] = previous.endsWith("-") ? previous + line : `${previous} ${line}`;
     else joined.push(line);
   }
   return joined;
+}
+
+/**
+ * A line set in columns (a tab), or an unbulleted line ending in a date range: a role's header,
+ * which a lowercase description under it never continues (it would be read as the employer). A
+ * sentence with a range inside it ("… from 2015 – 2023 at three …") may still wrap.
+ */
+function isRowHeader(line: string, policy: AtsEnginePolicy) {
+  if (line.includes("\t")) return true;
+  const found = BULLET.test(line) ? null : findDateRange(line, policy.resumeParse);
+  return (
+    found !== null && !/\p{L}/u.test(line.slice(line.indexOf(found.matched) + found.matched.length))
+  );
 }
 
 /** A line that is a date range and nothing else ("janv. 2021 – aujourd'hui"): a role's dates. */
