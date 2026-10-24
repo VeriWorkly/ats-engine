@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const policy =
   process.env.ATS_ENGINE_POLICY ??
-  fileURLToPath(new URL("../.private/ats-engine-policy.dev.json", import.meta.url));
+  fileURLToPath(new URL("../.private/ats-engine-policy.json", import.meta.url));
 if (!existsSync(policy)) {
   console.log(`No private policy at ${policy}: the private-policy tests were not run.`);
   process.exit(0);

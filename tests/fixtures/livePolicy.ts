@@ -11,7 +11,7 @@ import { parseAtsPolicy, type AtsEnginePolicy } from "../../src/index.js";
 // `ATS_ENGINE_POLICY` points at it from anywhere; the default is this repo's .private folder.
 const policyPath =
   process.env.ATS_ENGINE_POLICY ??
-  fileURLToPath(new URL("../../.private/ats-engine-policy.dev.json", import.meta.url));
+  fileURLToPath(new URL("../../.private/ats-engine-policy.json", import.meta.url));
 
 let policy: AtsEnginePolicy | null = null;
 let loadError: string | null = null;
