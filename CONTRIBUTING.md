@@ -11,7 +11,8 @@ npm run check   # build, types, lint, tests, bundle sizes, browser/edge smoke, p
 
 Node 22.12 or later. `npm run bench` prints field accuracy over the labelled corpora (the
 hand-written resumes; a seeded generated set rendered as text, PDF, two-column PDF and DOCX; and the
-same generator in German, French, Hindi, Spanish and Portuguese, as text and DOCX, read by detection as a
+same generator in German, French, Hindi, Spanish and Portuguese, as text, DOCX and PDF in a Unicode
+font, read by detection as a
 host reads them) and
 fails on any miss `bench/baseline.json` does not list (a resume, a field and its row), so a field
 read better elsewhere cannot hide one read worse. The baseline is not a goal and is not tuned to

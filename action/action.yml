@@ -22,7 +22,7 @@ inputs:
     required: false
     default: ""
   region:
-    description: Read the resume as from this country (US, GB, DE, FR, IN, ES, BR or PT). Empty means inferred.
+    description: Read the resume as from this country (US, GB, DE, FR, IN, ES, BR, PT, MX, AR, CO or CL). Empty means inferred.
     required: false
     default: ""
   version:
