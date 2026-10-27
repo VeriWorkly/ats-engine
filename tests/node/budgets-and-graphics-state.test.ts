@@ -1449,3 +1449,52 @@ describe("the XML mammoth parses is checked before it parses any of it", () => {
     });
   });
 });
+
+describe("pdf.js decodes no image past the pixel cap", () => {
+  // A full-page grey scan `width` by `height` pixels, all of its rows in a few kilobytes of Flate.
+  // `rows`: how many rows the stream really holds; pdf.js still allocates for every declared one.
+  const scan = (width: number, height: number, text = "", rows = height) =>
+    buildPdf(`q 612 0 0 792 0 0 cm /Im1 Do Q${text && `\n${text}`}`, "/XObject<</Im1 7 0 R>>", "", [
+      stream(
+        `/Type/XObject/Subtype/Image/Width ${width}/Height ${height}/ColorSpace/DeviceGray/BitsPerComponent 8/Filter/FlateDecode`,
+        deflateSync(Buffer.alloc(width * rows, 0xcc)).toString("latin1"),
+      ),
+    ]);
+
+  it("still reads a scan at the cap as a picture", async () => {
+    const { layout } = await extractResume(scan(4096, 4096), "pdf");
+    expect(layout?.imageOnlyPages).toBe(1);
+  }, 60_000);
+
+  it("reports a page with a larger image as not measured, not as a blank page", async () => {
+    const { layout } = await extractResume(scan(4097, 4096), "pdf");
+    expect(layout).not.toHaveProperty("imageOnlyPages");
+    expect(layout).not.toHaveProperty("imageCount");
+    expect(layout).not.toHaveProperty("hiddenTextChars");
+  }, 60_000);
+
+  it("does not call a 600 dpi scan's OCR layer hidden text", async () => {
+    const ocr = `3 Tr ${line(700, "Jane Doe Senior Engineer at Acme Corporation Kubernetes")}`;
+    const { text, layout } = await extractResume(scan(5100, 6600, ocr, 8), "pdf");
+    expect(text).toContain("Jane Doe");
+    expect(layout?.hiddenTextChars ?? 0).toBe(0);
+  }, 60_000);
+
+  it("reads a page declaring a 20000 by 20000 image without decoding it", async () => {
+    // Decoded, it is over a gigabyte of buffers outside V8's heap, where its old-space cap cannot
+    // stop it. They are counted as allocated, touched or not, so RSS would miss them.
+    const pdf = scan(20_000, 20_000, line(700, "Jane Doe Senior Engineer"), 1);
+    const buffers = () => process.memoryUsage().arrayBuffers;
+    const before = buffers();
+    let peak = before;
+    const sample = setInterval(() => (peak = Math.max(peak, buffers())), 5);
+    try {
+      const { text } = await extractResume(pdf, "pdf");
+      expect(text).toContain("Jane Doe");
+    } finally {
+      clearInterval(sample);
+    }
+    peak = Math.max(peak, buffers());
+    expect(peak - before).toBeLessThan(200 * 1024 * 1024);
+  }, 60_000);
+});
