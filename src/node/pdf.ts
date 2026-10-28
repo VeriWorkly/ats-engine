@@ -20,6 +20,15 @@ const MIN_PAGE_TEXT = 20;
 const STAMP_TEXT = 40;
 /** Points a side (about 0.7in) an image must reach to count as a photo. */
 const PHOTO_MIN = 50;
+/**
+ * Pixels pdf.js decodes per image: a letter page scanned at 400 dpi fits. Unbounded, a few
+ * crafted pages of huge images allocate gigabytes outside V8's heap, past its old-space cap. pdf.js
+ * leaves a larger image out of the page's operators (with a warning, and no hook to see it), so
+ * `declaresLargeImage` finds it in the file instead.
+ */
+const MAX_IMAGE_PIXELS = 4096 * 4096;
+/** Characters around an image's `/Subtype/Image` searched for its `/Width` and `/Height`. */
+const IMAGE_DICTIONARY_REACH = 4_096;
 
 const ENCRYPTED = "The PDF is password-protected; remove the password and upload it again.";
 const DAMAGED = "The file could not be read as a PDF; it may be damaged.";
@@ -43,6 +52,27 @@ const pdfjsFiles = () => ({
 type PdfGeometry = Omit<AtsLayoutSignals, "tableCount">;
 
 /**
+ * Whether the file declares an image past `MAX_IMAGE_PIXELS`, which pdf.js leaves undrawn. An
+ * image XObject is a stream, and a stream's dictionary is never compressed or encrypted, so its
+ * size can be read from the bytes. One drawn to no page still counts: its page is not known here.
+ */
+function declaresLargeImage(data: Uint8Array): boolean {
+  const pdf = new TextDecoder("latin1").decode(data);
+  for (const { index: at } of pdf.matchAll(/\/Subtype\s*\/Image(?![\w.#-])/g)) {
+    // From the object's start (the previous object's `endobj` at worst) to its stream.
+    const streamed = pdf.indexOf("stream", at);
+    const dictionary = pdf.slice(
+      Math.max(pdf.lastIndexOf("obj", at), at - IMAGE_DICTIONARY_REACH),
+      Math.min(streamed === -1 ? pdf.length : streamed, at + IMAGE_DICTIONARY_REACH),
+    );
+    const width = /\/Width\s+(\d+)/.exec(dictionary)?.[1];
+    const height = /\/Height\s+(\d+)/.exec(dictionary)?.[1];
+    if (width && height && Number(width) * Number(height) > MAX_IMAGE_PIXELS) return true;
+  }
+  return false;
+}
+
+/**
  * A PDF's text and page geometry, in one pdf.js pass. The text is assembled in reading order
  * (`pageText`); reading stops once it passes `maxChars` or after `MAX_PAGES_READ` pages. Every page
  * whose text is read is measured too (columns, hidden text), so hidden text cannot sit past the
@@ -54,10 +84,13 @@ async function readPdf(
 ): Promise<{ text: string; geometry: PdfGeometry; tables: number }> {
   const pdfjs = await optional(() => import("pdfjs-dist/legacy/build/pdf.mjs"), "pdfjs-dist");
   const ops = pdfjs.OPS as unknown as Record<string, number>;
+  // Read before pdf.js, which can detach the bytes.
+  const largeImage = declaresLargeImage(data);
   const document = await pdfjs
     .getDocument({
       data,
       isEvalSupported: false,
+      maxImageSize: MAX_IMAGE_PIXELS,
       ...pdfjsFiles(),
       verbosity: 0,
     })
@@ -75,7 +108,9 @@ async function readPdf(
     let imageOnlyPages = 0;
     let imageCount = 0;
     let tables = 0;
-    let visibilityRead = true;
+    // A page drawn without its image is not the page a reader sees: it would read as blank, and a
+    // scan's OCR layer as hidden text. Its pictures and hidden text are reported as not measured.
+    let visibilityRead = !largeImage;
     let measured = 0;
 
     // The layers the document shows: text in one turned off is hidden. Unreadable, every layer shows.

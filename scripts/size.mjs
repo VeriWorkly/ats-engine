@@ -49,8 +49,9 @@ const BUDGETS = {
   // alternate content and placed parts, PDF layers and part-hidden runs, HTML style sheets, the
   // byte-order mark rule, job pages read in the child and the 50,000-character warning took it to
   // 25.5.
-  // 26: all of the N4 fixes together came to 25.7.
-  "./node": 26,
+  // 26: all of the N4 fixes together came to 25.7. 26.5: the per-image decode cap and the
+  // large-image scan took it to 26.1.
+  "./node": 26.5,
 };
 
 /**
